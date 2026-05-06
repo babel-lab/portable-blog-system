@@ -1,7 +1,15 @@
 <%# Phase 3-e-3：Blogger summary 模式 HTML 模板 %>
 <%# 摘要導流：顯示 description + CTA 連往 canonical（含 UTM）+ hashtag %>
 <%# 不渲染 markdown body 全文（避免內容外洩） %>
+<%# Phase 5-f-2：補 in-body canonical link + BlogPosting JSON-LD %>
 <div class="lab-blogger-article">
+
+  <% if (canonicalUrl) { %>
+  <link rel="canonical" href="<%= canonicalUrl %>" />
+  <% } %>
+  <% if (jsonLd) { %>
+  <script type="application/ld+json"><%- JSON.stringify(jsonLd).replace(/</g, '\\u003c') %></script>
+  <% } %>
 
   <header class="lab-article__header">
     <% if (post.category) { %>

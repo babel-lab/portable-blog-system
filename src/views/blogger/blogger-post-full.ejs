@@ -2,7 +2,15 @@
 <%# 外層包 .lab-blogger-article（對齊 docs/blogger-export.md 與 Phase 3-d CSS） %>
 <%# 全部子區塊 inline（不使用 partials） %>
 <%# 資料缺漏的選用區塊不輸出空殼 %>
+<%# Phase 5-f-2：補 in-body canonical link + BlogPosting JSON-LD %>
 <div class="lab-blogger-article">
+
+  <% if (canonicalUrl) { %>
+  <link rel="canonical" href="<%= canonicalUrl %>" />
+  <% } %>
+  <% if (jsonLd) { %>
+  <script type="application/ld+json"><%- JSON.stringify(jsonLd).replace(/</g, '\\u003c') %></script>
+  <% } %>
 
   <header class="lab-article__header">
     <% if (post.category) { %>

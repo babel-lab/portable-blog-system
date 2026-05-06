@@ -52,11 +52,11 @@ function placeholderHtml(post) {
 `;
 }
 
-async function renderFullPost(post) {
+async function renderFullPost(post, canonicalUrl, jsonLd) {
   const bodyHtml = renderBody(post.body || '');
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-full.ejs'),
-    { post: { ...post, bodyHtml } },
+    { post: { ...post, bodyHtml }, canonicalUrl, jsonLd },
     { async: true },
   );
 }
@@ -95,10 +95,54 @@ function resolveCanonicalUrl(post, settings) {
   return { url: buildBloggerToGithubUrl(absolute, post.slug), warning: null };
 }
 
-async function renderSummaryPost(post, canonicalUrl) {
+// Phase 5-f-2：cover 絕對化（用 bloggerSiteUrl 為 base；cover 已 absolute 直接返回）
+function absolutizeBloggerCover(post, settings) {
+  const url = post.cover;
+  if (!url) return null;
+  if (/^https?:\/\//.test(url)) return url;
+  const base = (settings.site?.bloggerSiteUrl || '').replace(/\/+$/, '');
+  if (!base) return null;
+  return `${base}/${url.replace(/^\/+/, '')}`;
+}
+
+// Phase 5-f-2：BlogPosting JSON-LD（in-body）；canonicalUrl 缺則 null
+function buildBloggerJsonLd(post, canonicalUrl, settings, ogImage) {
+  if (!canonicalUrl) return null;
+  const cat = (settings.categories || []).find(
+    (c) => c.id === post.category || c.slug === post.category,
+  );
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    '@id': canonicalUrl,
+    headline: post.title,
+    description: post.description || settings.site.description,
+    datePublished: post.date,
+    dateModified: post.updated || post.date,
+    author: { '@type': 'Person', name: post.author || settings.site.author },
+    mainEntityOfPage: canonicalUrl,
+    inLanguage: settings.site.language,
+    articleSection: cat?.name || post.category,
+  };
+  if (ogImage) jsonLd.image = ogImage;
+  return jsonLd;
+}
+
+// Phase 5-f-2：OG 欄位（5-f-3 才會被 copy-helper 使用；本階段先建立）
+function buildOgFields(post, canonicalUrl, ogImage) {
+  return {
+    title: post.fbTitle || post.title || '',
+    description: post.description || '',
+    url: canonicalUrl || '',
+    image: ogImage || '',
+    alt: post.coverAlt || '',
+  };
+}
+
+async function renderSummaryPost(post, canonicalUrl, jsonLd) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-summary.ejs'),
-    { post, canonicalUrl },
+    { post, canonicalUrl, jsonLd },
     { async: true },
   );
 }
@@ -243,13 +287,19 @@ async function main() {
     const canonical = resolveCanonicalUrl(post, settings);
     if (canonical.warning) blogger.warnings.push(canonical.warning);
 
+    // Phase 5-f-2：SEO helper 預先計算（cover 絕對化 / BlogPosting JSON-LD / OG 欄位）
+    // ogFields 5-f-3 才會被 copy-helper 使用；此處先建立避免 5-f-3 再動 build-blogger.js
+    const ogImage = absolutizeBloggerCover(post, settings);
+    const jsonLd = buildBloggerJsonLd(post, canonical.url, settings, ogImage);
+    const ogFields = buildOgFields(post, canonical.url, ogImage);
+
     let html;
     let renderedKind;
     if (post.bloggerMode === 'full') {
-      html = await renderFullPost(post);
+      html = await renderFullPost(post, canonical.url, jsonLd);
       renderedKind = 'full';
     } else if (post.bloggerMode === 'summary') {
-      html = await renderSummaryPost(post, canonical.url);
+      html = await renderSummaryPost(post, canonical.url, jsonLd);
       renderedKind = 'summary';
     } else if (post.bloggerMode === 'redirect-card') {
       html = await renderRedirectCardPost(post, canonical.url);

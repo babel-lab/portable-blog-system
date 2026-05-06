@@ -1,6 +1,11 @@
 <%# Phase 3-e-3：Blogger redirect-card 模式 HTML 模板 %>
 <%# 精簡導流卡：標題 + description + 大 CTA 即可，不顯示分類/日期/hashtag %>
+<%# Phase 5-f-2：補 in-body canonical link（不加 JSON-LD：純跳轉卡無 BlogPosting 語意） %>
 <div class="lab-blogger-article">
+
+  <% if (canonicalUrl) { %>
+  <link rel="canonical" href="<%= canonicalUrl %>" />
+  <% } %>
 
   <article class="lab-card">
     <h2 class="lab-article__title"><%= post.title %></h2>

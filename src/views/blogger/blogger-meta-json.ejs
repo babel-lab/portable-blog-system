@@ -1,1 +1,4 @@
-<!-- blogger/blogger-meta-json.ejs：Phase 1 以後依 CLAUDE.md 擴充 -->
+<%# blogger-meta-json.ejs：保留模板，目前未被 build-blogger.js 直接 render。 %>
+<%# 實際 dist-blogger/posts/{slug}/meta.json 由 build-blogger.js 的 buildMeta() %>
+<%# 函式建構 JS 物件後 JSON.stringify 直接寫入；不經此 EJS 模板。 %>
+<%# 若未來改採 EJS 渲染，可在此擴寫；屬獨立規範對齊階段。 %>
