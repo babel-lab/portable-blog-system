@@ -456,15 +456,37 @@ promotion:
     page: "fan1"
     title: ""
     message: ""
+    target: "auto"
     hashtags:
       - ""
-    targetUrl: "auto"
-    utm:
-      source: "facebook"
-      medium: "social"
-      campaign: "fan1_post"
-      content: "{slug}"
+    note: ""
 ```
+
+promotion.config.json 結構：
+
+```json
+{
+  "facebook": {
+    "enabled": true,
+    "defaultPage": "fan1",
+    "pages": {
+      "fan1": {
+        "name": "粉絲頁 1",
+        "enabled": true
+      }
+    },
+    "utm": {
+      "source": "facebook",
+      "medium": "social",
+      "campaignPattern": "{page}_post",
+      "contentPattern": "{slug}"
+    }
+  }
+}
+```
+
+UTM 設定集中於 promotion.config.json，文章 frontmatter 不自帶 utm。
+campaignPattern 與 contentPattern 支援 `{page}` 與 `{slug}` placeholder。
 
 輸出位置：
 
@@ -482,6 +504,14 @@ FB promotion 文案必須包含：
 文章連結
 UTM 參數
 Hashtag
+```
+
+src/views/promotion/ 三支模板的角色：
+
+```text
+facebook-post.ejs      build-promotion 預設使用，render 完整版 FB 貼文
+facebook-summary.ejs   精簡版（無標題），保留供未來在 promotion.facebook 加 mode 欄位時使用
+facebook-hashtags.ejs  partial，被 post / summary include
 ```
 
 ---

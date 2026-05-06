@@ -198,15 +198,17 @@ dist-promotion/facebook/
 
 **處理時機**：屬 SEO / site config 階段。Phase 4 範圍**不**處理。`build:blogger` 的 canonical warning 同源，一併留待。
 
-### 7.2 CLAUDE.md 與本實作的 schema 漂移
+### 7.2 CLAUDE.md 與本實作的 schema 漂移（已對齊）
 
-| 項目 | CLAUDE.md §6 範例 | 本實作（Phase 4-a） | 影響 |
-|---|---|---|---|
-| URL 欄位名 | `targetUrl: "auto"` | `target: "auto"` | 字面不同；CLAUDE.md 範例會誤導 |
-| UTM 設定位置 | frontmatter 的 `utm: { source, medium, campaign, content }` | `promotion.config.json` 的 `facebook.utm`（含 `campaignPattern` / `contentPattern`）；**文章不自帶 UTM** | 結構不同；文章中無 utm 欄位 |
-| 多 mode（full / summary） | 未在 FB 範圍說明 | 4-d 三支 ejs 已建立，4-e 只接 `facebook-post.ejs` | 未衝突，但 `mode` 欄位尚未加入 schema |
+CLAUDE.md §6 Phase 4 已於規範對齊階段更新，與 Phase 4-a~4-h 實作一致。已對齊內容：
 
-**處理時機**：留待後續「規範對齊」獨立階段（修 CLAUDE.md，或調整實作向 CLAUDE.md 靠攏）。Phase 4-h 不處理。
+- frontmatter 欄位名：`targetUrl` → `target`
+- UTM 設定位置：移除 frontmatter inline utm，集中於 `promotion.config.json`
+- frontmatter 補上 `note` 欄位
+- §6 補上 `promotion.config.json` 結構說明
+- §6 補上三支 EJS 模板的角色說明
+
+`facebook-summary.ejs` 仍保留為「未來加 `mode` 欄位時使用」，現階段 4-e 只接入 `facebook-post.ejs`，CLAUDE.md 已寫明此行為。
 
 ### 7.3 Phase 4 範圍外 / Phase 4 後做
 
