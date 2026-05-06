@@ -53,3 +53,46 @@ blogger:
   publishedUrl: "<貼上 Blogger 文章正式 URL>"
   bloggerPostId: "<從 Blogger 後台取得>"
   publishedAt: "<發布日期 ISO>"
+
+----------------------------------------
+[7] OG title（社群分享預覽標題）
+----------------------------------------
+<%= ogFields && ogFields.title ? ogFields.title : '（無 OG title）' %>
+（fbTitle 優先 / fallback post.title；Blogger 主題自動產 og:title 通常使用文章標題，可作對照）
+
+----------------------------------------
+[8] OG description（社群分享預覽描述）
+----------------------------------------
+<%= ogFields && ogFields.description ? ogFields.description : '（無 OG description）' %>
+（Blogger 主題自動產 og:description 通常使用「搜尋說明」（[3] 區段），可作對照）
+
+----------------------------------------
+[9] OG image（社群分享預覽圖）
+----------------------------------------
+<% if (ogFields && ogFields.image) { %>
+URL: <%= ogFields.image %>
+Alt: <%= ogFields.alt || '（無 coverAlt）' %>
+<% } else { %>
+（無 cover，請於 Blogger 後台或文章內容確認是否需要補圖）
+<% } %>
+（建議圖片 1200×630 像素，供 Facebook / Twitter / LinkedIn 預覽使用）
+
+----------------------------------------
+[10] canonical & JSON-LD 檢查
+----------------------------------------
+canonical URL（已含 blogger→github UTM）：
+<% if (canonical && canonical.url) { %>
+<%- canonical.url %>
+<% } else { %>
+（canonical 缺漏，請補 frontmatter canonical 欄位或 site.config.json githubSiteUrl）
+<% } %>
+
+提示：
+- Blogger 主題自動 head canonical 通常會指向 Blogger 平台 URL（與此處不同）
+- 5-f-2 已在 HTML body 內補 <link rel="canonical">，作輔助標示
+- BlogPosting JSON-LD 已嵌入 HTML body（5-f-2，redirect-card 模式除外）<% if (post.bloggerMode === 'redirect-card') { %>
+- 注意：本篇是 redirect-card 模式，依設計**不**含 BlogPosting JSON-LD（純跳轉卡）<% } else if (jsonLd) { %>
+- 本篇 JSON-LD @type: <%= jsonLd['@type'] %>，articleSection: <%= jsonLd.articleSection || '（無）' %>
+- 發布後可至 Google Rich Results Test 驗證：
+  https://search.google.com/test/rich-results<% } else { %>
+- 注意：本篇 JSON-LD 未產生（canonical 缺漏導致 build-blogger.js 未建立 BlogPosting）<% } %>

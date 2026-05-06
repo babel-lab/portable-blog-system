@@ -174,10 +174,11 @@ async function renderCategoryIndex(data) {
 }
 
 // Phase 3-e-5：copy-helper.txt（純文字、可逐區複製到 Blogger 後台）
-async function renderCopyHelper(post, canonical, meta) {
+// Phase 5-f-3：擴充傳入 ogFields / jsonLd 給 SEO 區段 [7]-[10]
+async function renderCopyHelper(post, canonical, meta, ogFields, jsonLd) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-copy-helper.ejs'),
-    { post, canonical, meta },
+    { post, canonical, meta, ogFields, jsonLd },
     { async: true },
   );
 }
@@ -324,7 +325,7 @@ async function main() {
     // Phase 3-e-5：copy-helper.txt + publish-checklist.txt
     const copyHelperFile = path.join(outputDir, 'copy-helper.txt');
     const publishChecklistFile = path.join(outputDir, 'publish-checklist.txt');
-    const copyHelperText = await renderCopyHelper(post, canonical, meta);
+    const copyHelperText = await renderCopyHelper(post, canonical, meta, ogFields, jsonLd);
     const publishChecklistText = await renderPublishChecklist(post, canonical, meta);
     await writeText(copyHelperFile, copyHelperText);
     await writeText(publishChecklistFile, publishChecklistText);
