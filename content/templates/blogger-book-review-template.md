@@ -34,6 +34,15 @@ blocks:
   socialFollow: true
   relatedPosts: true
   sidebar: true
+promotion:
+  facebook:
+    enabled: false
+    page: "fan1"
+    title: ""
+    message: ""
+    target: "auto"
+    hashtags: []
+    note: ""
 ---
 
 # 文章標題

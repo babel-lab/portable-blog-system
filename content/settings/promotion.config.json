@@ -2,7 +2,17 @@
   "facebook": {
     "enabled": true,
     "defaultPage": "fan1",
-    "utmSource": "facebook",
-    "utmMedium": "social"
+    "pages": {
+      "fan1": {
+        "name": "粉絲頁 1",
+        "enabled": true
+      }
+    },
+    "utm": {
+      "source": "facebook",
+      "medium": "social",
+      "campaignPattern": "{page}_post",
+      "contentPattern": "{slug}"
+    }
   }
 }
