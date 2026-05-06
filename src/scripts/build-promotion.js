@@ -26,6 +26,7 @@ const FB_DIR = path.join(DIST_DIR, 'facebook');
 const VIEWS_DIR = path.join(PROJECT_ROOT, 'src', 'views');
 const FB_POST_TEMPLATE = path.join(VIEWS_DIR, 'promotion', 'facebook-post.ejs');
 const MANIFEST_FILE = path.join(FB_DIR, 'build-manifest.json');
+const INDEX_FILE = path.join(FB_DIR, 'all-posts-index.txt');
 
 const rel = (p) => path.relative(PROJECT_ROOT, p).split(path.sep).join('/');
 
@@ -56,6 +57,51 @@ async function renderAndWriteFacebookText(entry) {
   const txtFile = path.join(FB_DIR, entry.site, `${entry.slug}.txt`);
   await writeText(txtFile, txt.trimEnd() + '\n');
   return rel(txtFile);
+}
+
+// 4-f：依 enabled entries + stats 組裝人讀索引純字串。
+// 不使用 EJS（依限制 9 / §29 不過度工程化）。
+function buildIndexText({ generatedAt, mode, stats, enabledEntries, fbGloballyEnabled }) {
+  const urlMissing = enabledEntries.filter((e) => !e.finalUrl).length;
+  const lines = [];
+  lines.push('# FB Promotion Index');
+  lines.push('');
+  lines.push(`generated:     ${generatedAt}`);
+  lines.push(`mode:          ${mode}`);
+  lines.push(`total enabled: ${stats.enabled}`);
+  lines.push(
+    `by source:     github=${stats.bySource.github.enabled}, blogger=${stats.bySource.blogger.enabled}`,
+  );
+  lines.push(`url missing:   ${urlMissing}`);
+  if (!fbGloballyEnabled) {
+    lines.push('');
+    lines.push('NOTE: facebook globally disabled (promotion.facebook.enabled !== true)');
+  }
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  if (enabledEntries.length === 0) {
+    lines.push('(no enabled posts)');
+  } else {
+    enabledEntries.forEach((entry, i) => {
+      if (i > 0) lines.push('');
+      lines.push(`## ${i + 1}. ${entry.site} / ${entry.slug}`);
+      lines.push('');
+      lines.push(`title:    ${entry.fbTitle || entry.title || ''}`);
+      lines.push(`page:     ${entry.page || ''}`);
+      lines.push(`hashtags: ${(entry.hashtags || []).join(' ')}`);
+      lines.push(
+        `url:      ${entry.finalUrl || '(URL 待設定 site.config.json githubSiteUrl / bloggerSiteUrl)'}`,
+      );
+      if (entry.urlReason) {
+        lines.push(`reason:   ${entry.urlReason}`);
+      }
+      lines.push(`txt:      ${entry.txtPath || ''}`);
+    });
+  }
+
+  return lines.join('\n').trimEnd() + '\n';
 }
 
 // ---- 過濾邏輯 ------------------------------------------------------------
@@ -235,9 +281,21 @@ async function main() {
     console.log(`[build-promotion] wrote ${txtCount} text file(s)`);
   }
 
+  // ---- 4-f：寫 all-posts-index.txt（在寫 manifest 前；與 manifest 共用 generatedAt）----
+  const generatedAt = new Date().toISOString();
+  const indexText = buildIndexText({
+    generatedAt,
+    mode,
+    stats,
+    enabledEntries,
+    fbGloballyEnabled,
+  });
+  await writeText(INDEX_FILE, indexText);
+  console.log(`[build-promotion] wrote ${rel(INDEX_FILE)}`);
+
   // ---- 寫 manifest ----
   const manifest = {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     mode,
     config: {
       facebookEnabled: fbGloballyEnabled,
