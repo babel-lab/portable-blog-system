@@ -833,7 +833,8 @@ portable-blog-system/
 │  │  │  ├─ adsense-post-middle.ejs
 │  │  │  ├─ adsense-post-bottom.ejs
 │  │  │  ├─ adsense-sidebar.ejs
-│  │  │  └─ adsense-home-inline.ejs
+│  │  │  ├─ adsense-home-inline.ejs
+│  │  │  └─ adsense-head.ejs
 │  │  │
 │  │  └─ promotion/
 │  │     ├─ facebook-post.ejs
