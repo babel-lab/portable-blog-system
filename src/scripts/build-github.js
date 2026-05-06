@@ -51,6 +51,7 @@ const HEAD_PARTIALS = [
   { dir: 'seo', name: 'canonical' },
   { dir: 'seo', name: 'json-ld' },
   { dir: 'tracking', name: 'ga4' },
+  { dir: 'ads', name: 'adsense-head' },
 ];
 
 async function renderHeadPartials(data) {
@@ -84,6 +85,7 @@ function makeBaseData(settings) {
     site: settings.site,
     navigation: settings.navigation,
     ga4: settings.ga4,
+    ads: settings.ads,
     ...extra,
   });
 }

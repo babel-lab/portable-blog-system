@@ -8,6 +8,12 @@
   </div>
 </section>
 
+<% if (typeof ads !== 'undefined' && ads && ads.enabled === true) { %>
+<div class="lab-container">
+  <%- await include('../ads/adsense-home-inline', { ads }) %>
+</div>
+<% } %>
+
 <section id="latest" class="lab-section">
   <div class="lab-container">
     <h2>最新文章</h2>

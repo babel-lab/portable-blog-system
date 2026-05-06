@@ -18,7 +18,19 @@
     </p>
   </header>
 
+  <% if (typeof ads !== 'undefined' && ads && ads.enabled === true && post.blocks && post.blocks.adsenseTop) { %>
+  <div class="lab-container">
+    <%- await include('../ads/adsense-post-top', { ads }) %>
+  </div>
+  <% } %>
+
   <div class="lab-article__body lab-container">
     <%- bodyHtml %>
   </div>
+
+  <% if (typeof ads !== 'undefined' && ads && ads.enabled === true && post.blocks && post.blocks.adsenseBottom) { %>
+  <div class="lab-container">
+    <%- await include('../ads/adsense-post-bottom', { ads }) %>
+  </div>
+  <% } %>
 </article>
