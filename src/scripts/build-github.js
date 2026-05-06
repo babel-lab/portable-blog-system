@@ -44,13 +44,20 @@ async function writeText(file, content, outputs) {
 
 // Phase 5-b：渲染 SEO partials 後 post-process 注入 base.ejs 產出的 HTML 之 head 內。
 // 採用 post-process 而非修改 base.ejs，避開未授權檔案修改。
-const SEO_PARTIALS = ['meta-tags', 'open-graph', 'canonical', 'json-ld'];
+// Phase 5-d：擴充加入 tracking/ga4 partial，邏輯一致。
+const HEAD_PARTIALS = [
+  { dir: 'seo', name: 'meta-tags' },
+  { dir: 'seo', name: 'open-graph' },
+  { dir: 'seo', name: 'canonical' },
+  { dir: 'seo', name: 'json-ld' },
+  { dir: 'tracking', name: 'ga4' },
+];
 
-async function renderSeoHead(data) {
+async function renderHeadPartials(data) {
   const parts = [];
-  for (const name of SEO_PARTIALS) {
+  for (const { dir, name } of HEAD_PARTIALS) {
     const html = await ejs.renderFile(
-      path.join(VIEWS_DIR, 'seo', `${name}.ejs`),
+      path.join(VIEWS_DIR, dir, `${name}.ejs`),
       data,
       { async: true },
     );
@@ -67,15 +74,16 @@ async function renderPage({ template, data }) {
     { ...data, body: inner },
     { async: true },
   );
-  const seoHead = await renderSeoHead(data);
-  if (!seoHead) return wrapped;
-  return wrapped.replace('</head>', `    ${seoHead.replace(/\n/g, '\n    ')}\n  </head>`);
+  const headPartials = await renderHeadPartials(data);
+  if (!headPartials) return wrapped;
+  return wrapped.replace('</head>', `    ${headPartials.replace(/\n/g, '\n    ')}\n  </head>`);
 }
 
 function makeBaseData(settings) {
   return (extra) => ({
     site: settings.site,
     navigation: settings.navigation,
+    ga4: settings.ga4,
     ...extra,
   });
 }
