@@ -10,3 +10,17 @@ $bp-lg: 64em;
   --lab-bp-md: 48em;
   --lab-bp-lg: 64em;
 }
+
+// Phase 6-a：RWD 共用 mixin（mobile-first，min-width）
+// 用法：@use '../abstracts/breakpoints' as bp; @include bp.respond-to('md') { ... }
+@mixin respond-to($bp) {
+  @if $bp == 'sm' {
+    @media (min-width: $bp-sm) { @content; }
+  } @else if $bp == 'md' {
+    @media (min-width: $bp-md) { @content; }
+  } @else if $bp == 'lg' {
+    @media (min-width: $bp-lg) { @content; }
+  } @else {
+    @error "Unknown breakpoint `#{$bp}` — use 'sm' | 'md' | 'lg'.";
+  }
+}
