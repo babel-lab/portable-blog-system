@@ -1,1 +1,21 @@
-<!-- ads/adsense-slot.ejs：Phase 1 以後依 CLAUDE.md 擴充 -->
+<%# Phase 5-e-2 基底 partial：所有 specialized ad partial 都 forward 到此檔。
+       接收 { slotKey, ads }；3 重 gate（enabled + adsenseClient + slots[slotKey]）。
+       gate 任一不成立 → 整段空輸出。
+       不引用其他模板 / 不讀檔 / 不在此處撒 SCSS hook 以外的樣式（依 5-e-2 條件）。 %>
+<%
+const _ads = (typeof ads === 'object' && ads) ? ads : {};
+const _enabled = _ads.enabled === true;
+const _client = (_ads.adsenseClient || '').toString().trim();
+const _slotKey = (typeof slotKey === 'string' && slotKey) ? slotKey : null;
+const _slotId = _slotKey && _ads.slots ? (_ads.slots[_slotKey] || '').toString().trim() : '';
+const _shouldRender = _enabled && _client && _slotKey && _slotId;
+-%>
+<% if (_shouldRender) { -%>
+<ins class="adsbygoogle lab-ad-slot lab-ad-slot--<%= _slotKey %>"
+     style="display:block"
+     data-ad-client="<%= _client %>"
+     data-ad-slot="<%= _slotId %>"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+<% } -%>

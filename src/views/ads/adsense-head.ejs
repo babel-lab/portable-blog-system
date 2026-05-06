@@ -1,0 +1,12 @@
+<%# Phase 5-e-2 head loader partial：輸出 adsbygoogle.js 一次。
+       2 重 gate（enabled + adsenseClient）；任一不成立 → 整段空輸出。
+       5-e-3 將加入 build-github.js HEAD_PARTIALS 注入機制（與 5-d ga4.ejs 對稱）。
+       本檔為 CLAUDE.md §8 ads/ 規範擴充，待後續對齊階段補列入。 %>
+<%
+const _ads = (typeof ads === 'object' && ads) ? ads : {};
+const _enabled = _ads.enabled === true;
+const _client = (_ads.adsenseClient || '').toString().trim();
+-%>
+<% if (_enabled && _client) { -%>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=<%= _client %>" crossorigin="anonymous"></script>
+<% } -%>
