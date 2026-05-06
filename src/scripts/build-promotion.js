@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadSettings } from './load-settings.js';
 import { loadPosts } from './load-posts.js';
+import { buildFacebookUrl } from './ga4-url-builder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,8 +60,14 @@ function classifyFacebook(post, fbConfig) {
 
 // ---- manifest 條目組裝（4-b 不算 finalUrl/UTM）---------------------------
 
-function buildManifestEntry(post, page, fb) {
+function buildManifestEntry(post, page, fb, settings) {
   const hashtags = Array.isArray(fb.hashtags) ? fb.hashtags.filter(Boolean) : [];
+  const { baseUrl, finalUrl, urlSource, urlReason } = buildFacebookUrl({
+    post,
+    fb,
+    page,
+    settings,
+  });
   return {
     site: post.site ?? null,
     slug: post.slug ?? null,
@@ -74,6 +81,10 @@ function buildManifestEntry(post, page, fb) {
     hashtags,
     hashtagCount: hashtags.length,
     note: fb.note || null,
+    baseUrl,
+    finalUrl,
+    urlSource,
+    urlReason,
   };
 }
 
@@ -132,7 +143,7 @@ async function main() {
         });
         continue;
       }
-      enabledEntries.push(buildManifestEntry(post, verdict.page, verdict.fb));
+      enabledEntries.push(buildManifestEntry(post, verdict.page, verdict.fb, settings));
     }
   }
 
@@ -180,6 +191,12 @@ async function main() {
   if (!fbGloballyEnabled) {
     console.warn(
       '[build-promotion] WARNING: promotion.facebook.enabled !== true — 全域停用，本次不收任何 enabled posts',
+    );
+  }
+  const urlMissingCount = enabledEntries.filter((e) => !e.finalUrl).length;
+  if (urlMissingCount > 0) {
+    console.warn(
+      `[build-promotion] WARNING: ${urlMissingCount} post(s) finalUrl=null（site URL 未設或 publishedUrl 缺漏）`,
     );
   }
 
