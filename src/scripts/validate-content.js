@@ -22,6 +22,11 @@ export function validateContent({ posts, settings }) {
     if (t.slug) tagBySlug.set(t.slug, t);
   }
 
+  // Phase 4-g：promotion.facebook 配置快取
+  const fbConfig = settings.promotion?.facebook ?? {};
+  const fbGloballyEnabled = fbConfig.enabled === true;
+  const VALID_ABS_URL_RE = /^https?:\/\//;
+
   for (const post of posts) {
     const sourcePath = post.sourcePath;
 
@@ -42,6 +47,47 @@ export function validateContent({ posts, settings }) {
         warnings.push({ type: 'tag-site-mismatch', sourcePath, value: tag, site: post.site });
       }
     }
+
+    // Phase 4-g：promotion.facebook 驗證
+    // 僅當 post 自己 enabled 才觸發；enabled=false 視為作者明確選擇不發 FB
+    const fb = post.promotion?.facebook;
+    if (fb && fb.enabled === true) {
+      // P0: 推廣文案必填
+      if (!fb.message || String(fb.message).trim() === '') {
+        warnings.push({ type: 'promotion-message-missing', sourcePath });
+      }
+      // P0: hashtags 必填非空
+      const cleanedHashtags = Array.isArray(fb.hashtags)
+        ? fb.hashtags.filter((h) => typeof h === 'string' && h.trim() !== '')
+        : [];
+      if (cleanedHashtags.length === 0) {
+        warnings.push({ type: 'promotion-hashtags-empty', sourcePath });
+      }
+      // P0: page 必須存在於 promotion.config.json 且未停用
+      const page = fb.page || fbConfig.defaultPage || null;
+      if (page) {
+        const pageDef = fbConfig.pages?.[page];
+        if (!pageDef) {
+          warnings.push({ type: 'promotion-page-unknown', sourcePath, value: page });
+        } else if (pageDef.enabled !== true) {
+          warnings.push({ type: 'promotion-page-disabled', sourcePath, value: page });
+        }
+      }
+      // P0: target 須為 auto / 空 / 合法 http(s) URL
+      const target = fb.target;
+      if (
+        typeof target === 'string' &&
+        target !== '' &&
+        target !== 'auto' &&
+        !VALID_ABS_URL_RE.test(target)
+      ) {
+        warnings.push({ type: 'promotion-target-invalid', sourcePath, value: target });
+      }
+      // P1: 全域停用診斷（不阻擋）
+      if (!fbGloballyEnabled) {
+        warnings.push({ type: 'promotion-globally-disabled', sourcePath });
+      }
+    }
   }
 
   return { warnings, count: warnings.length };
@@ -60,8 +106,9 @@ export function printWarnings(warnings) {
   for (const [p, ws] of byPath) {
     console.warn(`[validate-content] post: ${p}`);
     for (const w of ws) {
+      const valuePart = w.value !== undefined ? `: ${w.value}` : '';
       const extra = w.site ? ` (site=${w.site})` : '';
-      console.warn(`[validate-content]   - ${w.type}: ${w.value}${extra}`);
+      console.warn(`[validate-content]   - ${w.type}${valuePart}${extra}`);
     }
   }
   console.warn(`[validate-content] ${warnings.length} warning(s) on ${byPath.size} post(s)`);
@@ -72,7 +119,11 @@ const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve
 
 if (isMain) {
   const settings = await loadSettings();
-  const { posts } = await loadPosts({ site: 'github' });
+  // Phase 4-g：main 模式同時檢查 github + blogger
+  // build:github / build:blogger 仍依各自呼叫方傳入的 posts 範圍處理
+  const github = await loadPosts({ site: 'github' });
+  const blogger = await loadPosts({ site: 'blogger' });
+  const posts = [...github.posts, ...blogger.posts];
   const { warnings } = validateContent({ posts, settings });
   printWarnings(warnings);
 }
