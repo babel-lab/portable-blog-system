@@ -1,6 +1,6 @@
 # seo-checklist
 
-對齊 Phase 5-a~5-e 實作。完整規格參見 `docs/seo-ga4-adsense.md`。
+對齊 Phase 5-a~5-g 實作。完整規格參見 `docs/seo-ga4-adsense.md`。
 
 ---
 
@@ -46,7 +46,8 @@
 
 ### 3.1 Validate
 
-- [ ] `npm run validate:content` → **0 warnings**
+- [ ] `npm run validate:content` → **0 errors**（exit code 0；warning 不阻擋部署，但建議補齊；參見 docs/seo-ga4-adsense.md §8）
+- [ ] 若有 ERROR（如 missing-title / missing-slug / missing-date / invalid-date-format / invalid-status / duplicate-slug），exit code 將為 1；必須先補欄位再部署
 
 ### 3.2 Build 順序（重要）
 
@@ -101,7 +102,8 @@
 - [ ] **AdSense enabled=true 整體 build 驗收**：5-e 全程跑 enabled=false 安全路徑（含 5 條 grep 0 命中）；正式啟用須提供 publisher id + 對應 slot ID 並做獨立授權驗收（流程見 docs/seo-ga4-adsense.md §6.7）
 - [ ] **AdSense postMiddle / sidebar 接入**：partial 已存在但 5-e 未 wire（postMiddle 因 markdown body 無中段 anchor；sidebar 因尚無正式元件）；後續可擴充
 - [ ] **5-f Blogger SEO**：Blogger summary HTML 缺 OG / JSON-LD；copy-helper 缺搜尋說明 / 自訂 slug 欄位
-- [ ] **5-g validate-content SEO 警告**：description / cover / JSON-LD 必填欄缺漏目前不會被警告
+- [ ] **4-a 樣本 cover 補上**：5-g-4 對 ready 文章 cover 為空已警告（`missing-cover` × 2，不阻擋 build）；部署前建議補
+- [ ] **既有 10 條 WARNING 的 status gate 對齊**：4-g 6 條 promotion + 初始 4 條 category/tag 未加 status gate（依 loadPosts 預過濾 de facto 只警 ready/published）；屬規範對齊獨立階段
 - [ ] **GA4 data-ga4-* 屬性散播**：5-d 機制就緒但未在 post-detail / category / tag / affiliate-box / download-box / social-follow 等元件上加 `data-ga4-*` 屬性。即使啟用 GA4，page_view 之外的 8 個 event 不會送
 - [ ] **4-g 負面測試**：（promotion 階段）正向樣本驗證已過；負面測試（暫改 frontmatter 觸發 6 條 warning 後還原）尚未做
 
