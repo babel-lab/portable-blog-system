@@ -12,6 +12,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import ejs from 'ejs';
+
 import { loadSettings } from './load-settings.js';
 import { loadPosts } from './load-posts.js';
 import { buildFacebookUrl } from './ga4-url-builder.js';
@@ -21,6 +23,8 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const DIST_DIR = path.join(PROJECT_ROOT, 'dist-promotion');
 const FB_DIR = path.join(DIST_DIR, 'facebook');
+const VIEWS_DIR = path.join(PROJECT_ROOT, 'src', 'views');
+const FB_POST_TEMPLATE = path.join(VIEWS_DIR, 'promotion', 'facebook-post.ejs');
 const MANIFEST_FILE = path.join(FB_DIR, 'build-manifest.json');
 
 const rel = (p) => path.relative(PROJECT_ROOT, p).split(path.sep).join('/');
@@ -34,6 +38,24 @@ function parseMode(argv) {
 async function writeJson(file, data) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+}
+
+async function writeText(file, content) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, content, 'utf-8');
+}
+
+// 4-e：將單筆 enabled entry render 成 FB 貼文純文字並寫到
+// dist-promotion/facebook/{site}/{slug}.txt。回傳該檔的相對路徑。
+async function renderAndWriteFacebookText(entry) {
+  const txt = await ejs.renderFile(
+    FB_POST_TEMPLATE,
+    { post: entry },
+    { async: true },
+  );
+  const txtFile = path.join(FB_DIR, entry.site, `${entry.slug}.txt`);
+  await writeText(txtFile, txt.trimEnd() + '\n');
+  return rel(txtFile);
 }
 
 // ---- 過濾邏輯 ------------------------------------------------------------
@@ -198,6 +220,19 @@ async function main() {
     console.warn(
       `[build-promotion] WARNING: ${urlMissingCount} post(s) finalUrl=null（site URL 未設或 publishedUrl 缺漏）`,
     );
+  }
+
+  // ---- 4-e：render 並寫個別 .txt（在寫 manifest 前完成，讓 txtPath 進 manifest）----
+  let txtCount = 0;
+  for (const entry of enabledEntries) {
+    const txtPath = await renderAndWriteFacebookText(entry);
+    entry.txtPath = txtPath;
+    txtCount += 1;
+    const note = entry.finalUrl ? '' : ' (URL fallback)';
+    console.log(`[build-promotion] wrote ${txtPath}${note}`);
+  }
+  if (txtCount > 0) {
+    console.log(`[build-promotion] wrote ${txtCount} text file(s)`);
   }
 
   // ---- 寫 manifest ----
