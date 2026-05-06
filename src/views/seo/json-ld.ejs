@@ -1,1 +1,3 @@
-<!-- seo/json-ld.ejs：Phase 1 以後依 CLAUDE.md 擴充 -->
+<% if (typeof seo !== 'undefined' && seo && seo.jsonLd) { -%>
+<script type="application/ld+json"><%- JSON.stringify(seo.jsonLd).replace(/</g, '\\u003c') %></script>
+<% } -%>

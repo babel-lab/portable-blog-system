@@ -1,1 +1,34 @@
-<!-- seo/open-graph.ejs：Phase 1 以後依 CLAUDE.md 擴充 -->
+<% if (typeof seo !== 'undefined' && seo) { -%>
+<meta property="og:type" content="<%= seo.ogType || 'website' %>" />
+<% if (typeof title !== 'undefined' && title) { -%>
+<meta property="og:title" content="<%= title %>" />
+<% } -%>
+<% if (typeof description !== 'undefined' && description) { -%>
+<meta property="og:description" content="<%= description %>" />
+<% } -%>
+<% if (seo.canonicalUrl) { -%>
+<meta property="og:url" content="<%= seo.canonicalUrl %>" />
+<% } -%>
+<% if (typeof site !== 'undefined' && site && site.siteName) { -%>
+<meta property="og:site_name" content="<%= site.siteName %>" />
+<% } -%>
+<% if (seo.ogLocale) { -%>
+<meta property="og:locale" content="<%= seo.ogLocale %>" />
+<% } -%>
+<% if (seo.ogImage) { -%>
+<meta property="og:image" content="<%= seo.ogImage %>" />
+<% if (seo.ogImageAlt) { -%>
+<meta property="og:image:alt" content="<%= seo.ogImageAlt %>" />
+<% } -%>
+<% } -%>
+<meta name="twitter:card" content="<%= seo.ogImage ? 'summary_large_image' : 'summary' %>" />
+<% if (typeof title !== 'undefined' && title) { -%>
+<meta name="twitter:title" content="<%= title %>" />
+<% } -%>
+<% if (typeof description !== 'undefined' && description) { -%>
+<meta name="twitter:description" content="<%= description %>" />
+<% } -%>
+<% if (seo.ogImage) { -%>
+<meta name="twitter:image" content="<%= seo.ogImage %>" />
+<% } -%>
+<% } -%>

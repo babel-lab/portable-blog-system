@@ -42,6 +42,24 @@ async function writeText(file, content, outputs) {
   if (outputs) outputs.push(rel(file));
 }
 
+// Phase 5-b：渲染 SEO partials 後 post-process 注入 base.ejs 產出的 HTML 之 head 內。
+// 採用 post-process 而非修改 base.ejs，避開未授權檔案修改。
+const SEO_PARTIALS = ['meta-tags', 'open-graph', 'canonical', 'json-ld'];
+
+async function renderSeoHead(data) {
+  const parts = [];
+  for (const name of SEO_PARTIALS) {
+    const html = await ejs.renderFile(
+      path.join(VIEWS_DIR, 'seo', `${name}.ejs`),
+      data,
+      { async: true },
+    );
+    const trimmed = html.trim();
+    if (trimmed) parts.push(trimmed);
+  }
+  return parts.join('\n');
+}
+
 async function renderPage({ template, data }) {
   const inner = await ejs.renderFile(path.join(VIEWS_DIR, template), data, { async: true });
   const wrapped = await ejs.renderFile(
@@ -49,7 +67,9 @@ async function renderPage({ template, data }) {
     { ...data, body: inner },
     { async: true },
   );
-  return wrapped;
+  const seoHead = await renderSeoHead(data);
+  if (!seoHead) return wrapped;
+  return wrapped.replace('</head>', `    ${seoHead.replace(/\n/g, '\n    ')}\n  </head>`);
 }
 
 function makeBaseData(settings) {
@@ -58,6 +78,162 @@ function makeBaseData(settings) {
     navigation: settings.navigation,
     ...extra,
   });
+}
+
+// ---- 5-b SEO helpers --------------------------------------------------------
+
+function siteBaseUrl(settings) {
+  return (settings.site?.githubSiteUrl || '').replace(/\/+$/, '');
+}
+
+function ogLocaleFromLanguage(language) {
+  if (language === 'zh-Hant') return 'zh_TW';
+  if (language === 'zh-Hans') return 'zh_CN';
+  if (language === 'en' || language === 'en-US') return 'en_US';
+  return language || null;
+}
+
+function absolutizeUrl(url, base) {
+  if (!url) return null;
+  if (/^https?:\/\//.test(url)) return url;
+  if (!base) return null;
+  const cleanPath = url.replace(/^\/+/, '');
+  return `${base}/${cleanPath}`;
+}
+
+function findCategoryName(settings, value) {
+  if (!value) return null;
+  const list = settings.categories || [];
+  const cat = list.find((c) => c.id === value || c.slug === value);
+  return cat?.name || value;
+}
+
+function buildCanonicalUrl({ pageType, post, slug, settings }) {
+  const base = siteBaseUrl(settings);
+  if (!base) return null;
+  switch (pageType) {
+    case 'home':
+      return `${base}/`;
+    case 'post-list':
+      return `${base}/posts/`;
+    case 'post-detail': {
+      const raw = post?.canonical;
+      if (raw && raw !== 'auto' && /^https?:\/\//.test(raw)) return raw;
+      return `${base}/posts/${post.slug}/`;
+    }
+    case 'category-list':
+      return `${base}/categories/`;
+    case 'category':
+      return `${base}/categories/${slug}/`;
+    case 'tag-list':
+      return `${base}/tags/`;
+    case 'tag':
+      return `${base}/tags/${slug}/`;
+    case '404':
+    case 'design-system':
+      return null;
+    default:
+      return null;
+  }
+}
+
+function commonSeo({ pageType, settings, canonicalUrl }) {
+  return {
+    pageType,
+    canonicalUrl,
+    robots: 'index, follow',
+    ogType: 'website',
+    ogLocale: ogLocaleFromLanguage(settings.site?.language),
+    ogImage: null,
+    ogImageAlt: null,
+    jsonLd: null,
+    publishedTime: null,
+    modifiedTime: null,
+    keywords: null,
+  };
+}
+
+function buildSeoForHome({ settings }) {
+  const canonicalUrl = buildCanonicalUrl({ pageType: 'home', settings });
+  const seo = commonSeo({ pageType: 'home', settings, canonicalUrl });
+  if (canonicalUrl) {
+    seo.jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      '@id': canonicalUrl,
+      name: settings.site.siteName,
+      url: canonicalUrl,
+      description: settings.site.description,
+      inLanguage: settings.site.language,
+    };
+  }
+  return seo;
+}
+
+function buildSeoForPostList({ settings }) {
+  const canonicalUrl = buildCanonicalUrl({ pageType: 'post-list', settings });
+  return commonSeo({ pageType: 'post-list', settings, canonicalUrl });
+}
+
+function buildSeoForPostDetail({ settings, post }) {
+  const canonicalUrl = buildCanonicalUrl({ pageType: 'post-detail', settings, post });
+  const base = siteBaseUrl(settings);
+  const ogImage = absolutizeUrl(post.cover, base);
+  const seo = {
+    ...commonSeo({ pageType: 'post-detail', settings, canonicalUrl }),
+    ogType: 'article',
+    ogImage,
+    ogImageAlt: post.coverAlt || null,
+    publishedTime: post.date || null,
+    modifiedTime: post.updated || post.date || null,
+    keywords: Array.isArray(post.tags) && post.tags.length > 0 ? post.tags : null,
+  };
+  if (canonicalUrl) {
+    seo.jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      '@id': canonicalUrl,
+      headline: post.title,
+      description: post.description || settings.site.description,
+      datePublished: post.date,
+      dateModified: post.updated || post.date,
+      author: { '@type': 'Person', name: post.author || settings.site.author },
+      mainEntityOfPage: canonicalUrl,
+      inLanguage: settings.site.language,
+      articleSection: findCategoryName(settings, post.category),
+    };
+    if (ogImage) seo.jsonLd.image = ogImage;
+  }
+  return seo;
+}
+
+function buildSeoForCategory({ settings, group }) {
+  const slug = group.category?.slug || group.category?.id;
+  const canonicalUrl = buildCanonicalUrl({ pageType: 'category', settings, slug });
+  return commonSeo({ pageType: 'category', settings, canonicalUrl });
+}
+
+function buildSeoForCategoryList({ settings }) {
+  const canonicalUrl = buildCanonicalUrl({ pageType: 'category-list', settings });
+  return commonSeo({ pageType: 'category-list', settings, canonicalUrl });
+}
+
+function buildSeoForTag({ settings, group }) {
+  const slug = group.tag?.slug || group.tag?.id;
+  const canonicalUrl = buildCanonicalUrl({ pageType: 'tag', settings, slug });
+  return commonSeo({ pageType: 'tag', settings, canonicalUrl });
+}
+
+function buildSeoForTagList({ settings }) {
+  const canonicalUrl = buildCanonicalUrl({ pageType: 'tag-list', settings });
+  return commonSeo({ pageType: 'tag-list', settings, canonicalUrl });
+}
+
+function buildSeoNoindex({ pageType, settings }) {
+  return {
+    ...commonSeo({ pageType, settings, canonicalUrl: null }),
+    robots: 'noindex, nofollow',
+  };
 }
 
 async function main() {
@@ -93,6 +269,7 @@ async function main() {
       posts: githubPosts.posts,
       title: settings.site.siteName,
       description: settings.site.description,
+      seo: buildSeoForHome({ settings }),
     }),
   });
   await writeText(path.join(PAGES_DIR, 'index.html'), homeHtml, outputs);
@@ -103,6 +280,7 @@ async function main() {
       posts: githubPosts.posts,
       title: `文章列表 | ${settings.site.siteName}`,
       description: `${settings.site.siteName} 文章列表`,
+      seo: buildSeoForPostList({ settings }),
     }),
   });
   await writeText(path.join(PAGES_DIR, 'posts', 'index.html'), listHtml, outputs);
@@ -116,6 +294,7 @@ async function main() {
         bodyHtml,
         title: `${post.title} | ${settings.site.siteName}`,
         description: post.description || settings.site.description,
+        seo: buildSeoForPostDetail({ settings, post }),
       }),
     });
     await writeText(path.join(PAGES_DIR, 'posts', post.slug, 'index.html'), detailHtml, outputs);
@@ -146,6 +325,7 @@ async function main() {
         posts: group.posts,
         title: `分類：${group.category.name} | ${settings.site.siteName}`,
         description: `${settings.site.siteName} 分類「${group.category.name}」文章列表`,
+        seo: buildSeoForCategory({ settings, group }),
       }),
     });
     await writeText(path.join(PAGES_DIR, 'categories', slug, 'index.html'), html, outputs);
@@ -164,6 +344,7 @@ async function main() {
       entries: categoryEntries,
       title: `分類索引 | ${settings.site.siteName}`,
       description: `${settings.site.siteName} 分類索引`,
+      seo: buildSeoForCategoryList({ settings }),
     }),
   });
   await writeText(path.join(PAGES_DIR, 'categories', 'index.html'), categoryListHtml, outputs);
@@ -185,6 +366,7 @@ async function main() {
         posts: group.posts,
         title: `標籤：${group.tag.name} | ${settings.site.siteName}`,
         description: `${settings.site.siteName} 標籤「${group.tag.name}」文章列表`,
+        seo: buildSeoForTag({ settings, group }),
       }),
     });
     await writeText(path.join(PAGES_DIR, 'tags', slug, 'index.html'), html, outputs);
@@ -203,6 +385,7 @@ async function main() {
       entries: tagEntries,
       title: `標籤索引 | ${settings.site.siteName}`,
       description: `${settings.site.siteName} 標籤索引`,
+      seo: buildSeoForTagList({ settings }),
     }),
   });
   await writeText(path.join(PAGES_DIR, 'tags', 'index.html'), tagListHtml, outputs);
@@ -212,6 +395,7 @@ async function main() {
     data: baseData({
       title: `找不到頁面 | ${settings.site.siteName}`,
       description: '找不到頁面',
+      seo: buildSeoNoindex({ pageType: '404', settings }),
     }),
   });
   await writeText(path.join(PAGES_DIR, '404.html'), notFoundHtml, outputs);
@@ -231,6 +415,7 @@ async function main() {
       title: `Design System | ${settings.site.siteName}`,
       description: `${settings.site.siteName} Design System`,
       subpages: designSubpages,
+      seo: buildSeoNoindex({ pageType: 'design-system', settings }),
     }),
   });
   await writeText(path.join(PAGES_DIR, 'design-system', 'index.html'), designSystemHtml, outputs);
@@ -241,6 +426,7 @@ async function main() {
       data: baseData({
         title: `${sub.code} ${sub.name} | Design System | ${settings.site.siteName}`,
         description: `${settings.site.siteName} Design System - ${sub.name}`,
+        seo: buildSeoNoindex({ pageType: 'design-system', settings }),
       }),
     });
     await writeText(path.join(PAGES_DIR, 'design-system', sub.slug, 'index.html'), html, outputs);

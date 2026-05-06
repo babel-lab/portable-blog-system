@@ -1,1 +1,18 @@
-<!-- seo/meta-tags.ejs：Phase 1 以後依 CLAUDE.md 擴充 -->
+<% if (typeof description !== 'undefined' && description) { -%>
+<meta name="description" content="<%= description %>" />
+<% } -%>
+<% if (typeof site !== 'undefined' && site && site.author) { -%>
+<meta name="author" content="<%= site.author %>" />
+<% } -%>
+<meta name="robots" content="<%= (typeof seo !== 'undefined' && seo && seo.robots) || 'index, follow' %>" />
+<% if (typeof seo !== 'undefined' && seo) { -%>
+<% if (Array.isArray(seo.keywords) && seo.keywords.length > 0) { -%>
+<meta name="keywords" content="<%= seo.keywords.join(', ') %>" />
+<% } -%>
+<% if (seo.publishedTime) { -%>
+<meta property="article:published_time" content="<%= seo.publishedTime %>" />
+<% } -%>
+<% if (seo.modifiedTime) { -%>
+<meta property="article:modified_time" content="<%= seo.modifiedTime %>" />
+<% } -%>
+<% } -%>
