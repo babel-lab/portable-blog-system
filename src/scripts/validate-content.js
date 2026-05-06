@@ -19,6 +19,19 @@ const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
 const READY_STATUS = new Set(['ready', 'published']);
 const DATE_FORMAT_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Phase 5-g-4：WARNING 規則常數
+const VALID_SITE = new Set(['github', 'blogger']);
+const VALID_TYPE = new Set(['post', 'tech-note', 'book-review', 'download', 'comic', 'life-note']);
+const VALID_PRIMARY_PLATFORM = new Set(['github', 'blogger']);
+const VALID_PUBLISH_MODE = {
+  github: new Set(['full', 'summary']),
+  blogger: new Set(['full', 'summary', 'redirect-card']),
+};
+const TITLE_MAX = 60;
+const DESCRIPTION_MAX = 160;
+const SEARCH_DESCRIPTION_MAX = 200;
+const VALID_CANONICAL_RE = /^https?:\/\//;
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -55,9 +68,10 @@ export function validateContent({ posts, settings }) {
       });
     }
 
-    // Phase 5-g-3 ERROR：missing-* / invalid-date-format
+    // Phase 5-g-3 ERROR + Phase 5-g-4 WARNING
     // 只對 ready / published 觸發；draft / archived 視為作者編輯中或已封存，不警
     if (typeof status === 'string' && READY_STATUS.has(status)) {
+      // 5-g-3 ERROR：missing-* / invalid-date-format
       if (!post.title || String(post.title).trim() === '') {
         issues.push({ severity: 'error', type: 'missing-title', sourcePath });
       }
@@ -68,6 +82,69 @@ export function validateContent({ posts, settings }) {
         issues.push({ severity: 'error', type: 'missing-date', sourcePath });
       } else if (typeof post.date === 'string' && !DATE_FORMAT_RE.test(post.date)) {
         issues.push({ severity: 'error', type: 'invalid-date-format', sourcePath, value: post.date });
+      }
+
+      // 5-g-4 WARNING：SEO 內容品質（必填）
+      if (!post.description || (typeof post.description === 'string' && post.description.trim() === '')) {
+        issues.push({ severity: 'warning', type: 'missing-description', sourcePath });
+      }
+      if (!post.category || (typeof post.category === 'string' && post.category.trim() === '')) {
+        issues.push({ severity: 'warning', type: 'missing-category', sourcePath });
+      }
+      if (!post.cover || (typeof post.cover === 'string' && post.cover.trim() === '')) {
+        issues.push({ severity: 'warning', type: 'missing-cover', sourcePath });
+      }
+      const cleanedTags = Array.isArray(post.tags)
+        ? post.tags.filter((t) => typeof t === 'string' && t.trim() !== '')
+        : [];
+      if (cleanedTags.length === 0) {
+        issues.push({ severity: 'warning', type: 'empty-tags', sourcePath });
+      }
+
+      // 5-g-4 WARNING：SEO 內容品質（長度）
+      if (typeof post.title === 'string' && post.title.length > TITLE_MAX) {
+        issues.push({ severity: 'warning', type: 'long-title', sourcePath, value: post.title.length });
+      }
+      if (typeof post.description === 'string' && post.description.length > DESCRIPTION_MAX) {
+        issues.push({ severity: 'warning', type: 'long-description', sourcePath, value: post.description.length });
+      }
+      if (typeof post.searchDescription === 'string' && post.searchDescription.length > SEARCH_DESCRIPTION_MAX) {
+        issues.push({ severity: 'warning', type: 'long-search-description', sourcePath, value: post.searchDescription.length });
+      }
+
+      // 5-g-4 WARNING：schema 一致性
+      if (post.site !== undefined && !VALID_SITE.has(post.site)) {
+        issues.push({ severity: 'warning', type: 'invalid-site', sourcePath, value: String(post.site) });
+      }
+      if (post.type !== undefined && !VALID_TYPE.has(post.type)) {
+        issues.push({ severity: 'warning', type: 'invalid-type', sourcePath, value: String(post.type) });
+      }
+      if (post.primaryPlatform !== undefined && !VALID_PRIMARY_PLATFORM.has(post.primaryPlatform)) {
+        issues.push({ severity: 'warning', type: 'invalid-primary-platform', sourcePath, value: String(post.primaryPlatform) });
+      }
+      if (
+        typeof post.canonical === 'string' &&
+        post.canonical !== '' &&
+        post.canonical !== 'auto' &&
+        !VALID_CANONICAL_RE.test(post.canonical)
+      ) {
+        issues.push({ severity: 'warning', type: 'invalid-canonical', sourcePath, value: post.canonical });
+      }
+      const publishTargets = post.publishTargets || {};
+      for (const platform of ['github', 'blogger']) {
+        const target = publishTargets[platform];
+        if (target && target.enabled === true) {
+          const mode = target.mode;
+          const validSet = VALID_PUBLISH_MODE[platform];
+          if (typeof mode !== 'string' || !validSet.has(mode)) {
+            issues.push({
+              severity: 'warning',
+              type: 'invalid-publish-target-mode',
+              sourcePath,
+              value: `${platform}:${mode === undefined ? '(missing)' : String(mode)}`,
+            });
+          }
+        }
       }
     }
 
