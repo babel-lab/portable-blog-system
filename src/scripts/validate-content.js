@@ -14,6 +14,11 @@ import { fileURLToPath } from 'node:url';
 import { loadSettings } from './load-settings.js';
 import { loadPosts } from './load-posts.js';
 
+// Phase 5-g-3：ERROR 規則常數
+const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
+const READY_STATUS = new Set(['ready', 'published']);
+const DATE_FORMAT_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -38,6 +43,33 @@ export function validateContent({ posts, settings }) {
 
   for (const post of posts) {
     const sourcePath = post.sourcePath;
+
+    // Phase 5-g-3 ERROR：invalid-status（任何 status 都檢查；status 非合法值 → 系統無法判斷處理方式）
+    const status = post.status;
+    if (typeof status !== 'string' || !VALID_STATUS.has(status)) {
+      issues.push({
+        severity: 'error',
+        type: 'invalid-status',
+        sourcePath,
+        value: status === undefined || status === null ? '(missing)' : String(status),
+      });
+    }
+
+    // Phase 5-g-3 ERROR：missing-* / invalid-date-format
+    // 只對 ready / published 觸發；draft / archived 視為作者編輯中或已封存，不警
+    if (typeof status === 'string' && READY_STATUS.has(status)) {
+      if (!post.title || String(post.title).trim() === '') {
+        issues.push({ severity: 'error', type: 'missing-title', sourcePath });
+      }
+      if (!post.slug || String(post.slug).trim() === '') {
+        issues.push({ severity: 'error', type: 'missing-slug', sourcePath });
+      }
+      if (!post.date || (typeof post.date === 'string' && post.date.trim() === '')) {
+        issues.push({ severity: 'error', type: 'missing-date', sourcePath });
+      } else if (typeof post.date === 'string' && !DATE_FORMAT_RE.test(post.date)) {
+        issues.push({ severity: 'error', type: 'invalid-date-format', sourcePath, value: post.date });
+      }
+    }
 
     if (post.category) {
       const cat = categoryById.get(post.category) || categoryBySlug.get(post.category);
@@ -95,6 +127,24 @@ export function validateContent({ posts, settings }) {
       // P1: 全域停用診斷（不阻擋）
       if (!fbGloballyEnabled) {
         issues.push({ severity: 'warning', type: 'promotion-globally-disabled', sourcePath });
+      }
+    }
+  }
+
+  // Phase 5-g-3 ERROR：duplicate-slug 全集合掃描（每篇命中都加一條 ERROR）
+  const slugMap = new Map();
+  for (const post of posts) {
+    const s = post.slug;
+    if (typeof s === 'string' && s.trim() !== '') {
+      const key = s.trim();
+      if (!slugMap.has(key)) slugMap.set(key, []);
+      slugMap.get(key).push(post.sourcePath);
+    }
+  }
+  for (const [slug, paths] of slugMap) {
+    if (paths.length >= 2) {
+      for (const p of paths) {
+        issues.push({ severity: 'error', type: 'duplicate-slug', sourcePath: p, value: slug });
       }
     }
   }
