@@ -1,0 +1,18 @@
+[
+  {
+    "label": "首頁",
+    "href": "/"
+  },
+  {
+    "label": "文章",
+    "href": "/posts/"
+  },
+  {
+    "label": "分類",
+    "href": "/categories/"
+  },
+  {
+    "label": "Design System",
+    "href": "/design-system/"
+  }
+]

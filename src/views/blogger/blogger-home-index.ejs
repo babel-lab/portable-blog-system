@@ -1,0 +1,44 @@
+<%# Phase 3-e-6：Blogger 首頁索引 %>
+<%# 全站 ready post 依分類分組顯示；外層 .lab-blogger-components 取得 tokens %>
+<div class="lab-blogger-components">
+
+  <header>
+    <h1><%= siteName %> — Blogger 文章索引</h1>
+    <p>共 <%= posts.length %> 篇 ready 文章｜建置時間 <%= builtAt %></p>
+  </header>
+
+  <% if (posts.length === 0) { %>
+  <p><em>（目前無 ready post，請於 frontmatter 設 status: ready 並啟用 publishTargets.blogger.enabled）</em></p>
+  <% } else { %>
+
+  <% Object.entries(groupedByCategory).forEach(function(entry) { %>
+  <% const group = entry[1]; %>
+  <section>
+    <h2><%= group.categoryName %>（<%= group.posts.length %> 篇）</h2>
+    <ul class="lab-card-grid">
+      <% group.posts.forEach(function(post) { %>
+      <li>
+        <article class="lab-post-card">
+          <p class="lab-post-card__category"><%= post.category %></p>
+          <h3 class="lab-post-card__title"><%= post.title %></h3>
+          <% if (post.description) { %>
+          <p class="lab-post-card__description"><%= post.description %></p>
+          <% } %>
+          <p class="lab-post-card__meta">
+            <time datetime="<%= post.date %>"><%= post.date %></time>
+            ｜mode: <code><%= post.bloggerMode %></code>
+            <% if (post.bloggerPublishedUrl) { %>｜<a href="<%- post.bloggerPublishedUrl %>" rel="noopener noreferrer" target="_blank">已發布</a><% } %>
+          </p>
+          <% if (post.canonicalResolved) { %>
+          <a class="lab-post-card__link" href="<%- post.canonicalResolved %>" rel="noopener noreferrer" target="_blank">前往原文（含 UTM）→</a>
+          <% } %>
+        </article>
+      </li>
+      <% }); %>
+    </ul>
+  </section>
+  <% }); %>
+
+  <% } %>
+
+</div>

@@ -1,0 +1,3 @@
+.lab-book-photo { display: flex; flex-direction: column; align-items: center; gap: var(--lab-space-3); margin: var(--lab-space-6) 0; }
+.lab-book-photo__image { max-width: 100%; height: auto; border-radius: var(--lab-radius-md); box-shadow: var(--lab-shadow-md); }
+.lab-book-photo__caption { font-size: var(--lab-font-size-sm); color: var(--lab-color-muted); text-align: center; }

@@ -1,0 +1,3 @@
+.lab-card { padding: var(--lab-space-5); border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-lg); background: var(--lab-color-background); box-shadow: var(--lab-shadow-sm); }
+.lab-card-grid { display: flex; flex-wrap: wrap; gap: var(--lab-space-6); }
+.lab-card-grid > * { flex: 1 1 18rem; min-width: 0; }

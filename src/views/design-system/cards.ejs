@@ -1,0 +1,53 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>G-06 Cards</h1>
+    <p>Phase 2-2 定義的卡片元件：通用 <code>.lab-card</code> + 多卡容器 <code>.lab-card-grid</code> + 文章卡 <code>.lab-post-card</code>（含 <code>--featured</code>）。所有元件完全使用 Phase 2-1 token。</p>
+
+    <h2>.lab-card（通用卡片）</h2>
+    <p>最簡單的 base：padding / border / shadow / radius。</p>
+    <div class="lab-card" style="max-width:24rem; margin-top:var(--lab-space-4);">
+      <h3 style="margin:0;">通用卡片標題</h3>
+      <p style="margin:var(--lab-space-2) 0 0;">所有值來自 Phase 2-1 token：<code>--lab-space-5</code> padding、<code>--lab-color-border</code> 邊、<code>--lab-shadow-sm</code> 輕陰影、<code>--lab-radius-lg</code> 圓角。</p>
+    </div>
+
+    <h2>.lab-card-grid（多卡 flex-wrap 容器）</h2>
+    <p><code>display: flex; flex-wrap: wrap;</code> + 子元素 <code>flex: 1 1 18rem</code>。視窗寬時多欄、窄時自動 wrap 單欄。</p>
+    <div class="lab-card-grid">
+      <% for (let i = 1; i <= 3; i++) { %>
+      <div class="lab-card">
+        <h3 style="margin:0;">卡片 <%= i %></h3>
+        <p style="margin:var(--lab-space-2) 0 0;">flex-basis: 18rem。視窗寬時三卡並列、窄時 wrap。</p>
+      </div>
+      <% } %>
+    </div>
+
+    <h2>.lab-post-card（文章卡片）</h2>
+    <p>Phase 2-2-b 已 token 化。展示一般版與 <code>--featured</code> modifier。</p>
+    <div class="lab-card-grid">
+      <article class="lab-post-card">
+        <p class="lab-post-card__category">tech-note</p>
+        <h3 class="lab-post-card__title">範例文章標題</h3>
+        <p class="lab-post-card__description">這是文章描述，長度約一兩行，提供使用者快速判讀內容。</p>
+        <p class="lab-post-card__meta"><time datetime="2026-05-04">2026-05-04</time></p>
+        <a class="lab-post-card__link" href="#">閱讀文章</a>
+      </article>
+
+      <article class="lab-post-card lab-post-card--featured">
+        <p class="lab-post-card__category">tech-note</p>
+        <h3 class="lab-post-card__title">精選文章（featured）</h3>
+        <p class="lab-post-card__description">套用 <code>--featured</code> modifier，邊框混入 primary 色調。</p>
+        <p class="lab-post-card__meta"><time datetime="2026-05-04">2026-05-04</time></p>
+        <a class="lab-post-card__link" href="#">閱讀文章</a>
+      </article>
+    </div>
+
+    <h2>變體規劃</h2>
+    <p>CLAUDE.md §19 列出 6 種卡片類型；目前 Phase 2-2 完成 2 種，其餘待後續階段：</p>
+    <ul>
+      <li>✅ 一般文章卡片：<code>.lab-post-card</code>（Phase 2-2-b 已 token 化）</li>
+      <li>✅ 精選文章：<code>.lab-post-card--featured</code>（Phase 1 既有保留）</li>
+      <li>📋 技術文章 / 書評 / 教具下載：<code>.lab-post-card--{tech,book,download}</code>（規劃中）</li>
+      <li>📋 側邊欄 / 推廣卡片：<code>.lab-card--sidebar</code> / <code>.lab-card--promotion</code>（規劃中）</li>
+    </ul>
+  </div>
+</section>

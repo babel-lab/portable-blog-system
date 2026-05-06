@@ -1,0 +1,19 @@
+// Phase 3-b：Blogger 文章排版 entry
+// 自包含：含 75 個 tokens + 全部文章 body 規則，全部 scope 在 .lab-blogger-article
+// 單獨貼到 Blogger 即可使用，不需另外引入 blogger-tokens.css
+
+@use '../abstracts/tokens';
+@use '../abstracts/spacing';
+@use '../abstracts/typography';
+@use '../abstracts/breakpoints';
+@use '../abstracts/z-index';
+@use 'blogger-article-rules' as ar;
+
+.lab-blogger-article {
+  @include tokens.lab-tokens-base;
+  @include spacing.lab-tokens-space;
+  @include typography.lab-tokens-typography;
+  @include breakpoints.lab-tokens-bp;
+  @include z-index.lab-tokens-z;
+  @include ar.lab-article-rules;
+}

@@ -1,0 +1,16 @@
+// Phase 3-a：Blogger 專用 token entry
+// 全部 75 個 --lab-* 變數 scope 在 .lab-blogger-article 下，避免污染 Blogger 預設主題
+
+@use '../abstracts/tokens';
+@use '../abstracts/spacing';
+@use '../abstracts/typography';
+@use '../abstracts/breakpoints';
+@use '../abstracts/z-index';
+
+.lab-blogger-article {
+  @include tokens.lab-tokens-base;
+  @include spacing.lab-tokens-space;
+  @include typography.lab-tokens-typography;
+  @include breakpoints.lab-tokens-bp;
+  @include z-index.lab-tokens-z;
+}

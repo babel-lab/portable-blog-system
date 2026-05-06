@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "blocks": [
+    "profile",
+    "categories",
+    "tags",
+    "adsense"
+  ]
+}

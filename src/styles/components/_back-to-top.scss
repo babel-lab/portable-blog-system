@@ -1,0 +1,2 @@
+.lab-back-to-top { position: fixed; right: var(--lab-space-4); bottom: var(--lab-space-4); z-index: var(--lab-z-back-to-top); width: 2.75rem; height: 2.75rem; border-radius: var(--lab-radius-full); border: 0; background: var(--lab-color-primary); color: var(--lab-color-background); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+.lab-back-to-top.is-visible { opacity: 1; pointer-events: auto; }

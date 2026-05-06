@@ -1,0 +1,29 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>G-03 Spacing</h1>
+    <p>Phase 2-1 已定義的 <code>--lab-space-*</code> 全部 token，共 12 個。每個 token 的橫條長度 = token 值，視覺對應該 token 在 padding / gap / margin / position offset 等場景的實際大小。Spacing 單位以 <code>rem</code> 為主（CLAUDE.md §2 Phase 2 規範）。</p>
+
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-3); margin-top:var(--lab-space-6);">
+      <% [
+        { n: 1, value: '0.25rem' },
+        { n: 2, value: '0.5rem' },
+        { n: 3, value: '0.75rem' },
+        { n: 4, value: '1rem' },
+        { n: 5, value: '1.25rem' },
+        { n: 6, value: '1.5rem' },
+        { n: 8, value: '2rem' },
+        { n: 10, value: '2.5rem' },
+        { n: 12, value: '3rem' },
+        { n: 16, value: '4rem' },
+        { n: 20, value: '5rem' },
+        { n: 24, value: '6rem' },
+      ].forEach(function(t) { %>
+      <div style="display:flex; align-items:center; gap:var(--lab-space-3);">
+        <code style="width:10rem;">--lab-space-<%= t.n %></code>
+        <div style="height:var(--lab-space-4); width:var(--lab-space-<%= t.n %>); background:var(--lab-color-primary); border-radius:var(--lab-radius-sm);"></div>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);"><%= t.value %></span>
+      </div>
+      <% }); %>
+    </div>
+  </div>
+</section>

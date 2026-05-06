@@ -1,0 +1,48 @@
+<%# Phase 3-e-5：Blogger 發布檢查清單 %>
+<%# 標準 checkbox 清單、依 mode 微調內容檢查項 %>
+========================================
+Blogger 發布檢查清單 - <%= post.title %>
+========================================
+slug:    <%= post.slug %>
+mode:    <%= post.bloggerMode %>
+builtAt: <%= meta.build.builtAt %>
+
+----------------------------------------
+基本欄位（共通）
+----------------------------------------
+[ ] Blogger 標題已貼
+[ ] Blogger HTML 已貼（從 <%= meta.build.postFile %>）
+[ ] Blogger 搜尋說明已貼
+[ ] Blogger 自訂網址已設定（建議：<%= post.slug %>）
+[ ] Blogger 標籤已設定（<%= Array.isArray(post.tags) && post.tags.length > 0 ? post.tags.join(', ') : '無 tags' %>）
+
+----------------------------------------
+預覽
+----------------------------------------
+[ ] Blogger 預覽桌機版
+[ ] Blogger 預覽手機版
+
+----------------------------------------
+內容檢查（依 <%= post.bloggerMode %> 模式）
+----------------------------------------
+<% if (post.bloggerMode === 'full') { %>
+[ ] 圖片可正常顯示
+[ ] AdSense 區塊未破版
+<% if (post.affiliate && post.affiliate.enabled) { %>
+[ ] 聯盟連結 rel="sponsored nofollow noopener noreferrer" 正確
+<% } %>
+<% if (post.download && post.download.enabled) { %>
+[ ] 教具下載連結可正常下載
+<% } %>
+<% } else if (post.bloggerMode === 'summary' || post.bloggerMode === 'redirect-card') { %>
+[ ] CTA 連結 UTM 正確指向 canonical
+<% if (canonical.url) { %>    （預期：<%- canonical.url %>）<% } else { %>    （⚠ canonical 缺漏，fallback 警告：<%= canonical.warning %>）<% } %>
+<% } else { %>
+[ ] （placeholder 模式，無 mode-aware 內容檢查）
+<% } %>
+
+----------------------------------------
+發布後
+----------------------------------------
+[ ] 發布後 URL 已回填到 <%= post.sourcePath %> 的 blogger.publishedUrl
+[ ] FB 推廣文案已複製（屬 Phase 4 promotion，目前未實作）

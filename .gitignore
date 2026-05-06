@@ -1,0 +1,15 @@
+node_modules/
+dist/*
+!dist/.gitkeep
+dist-blogger/*
+!dist-blogger/.gitkeep
+dist-promotion/*
+!dist-promotion/.gitkeep
+dist-reports/*
+!dist-reports/.gitkeep
+.cache/
+.env
+.env.local
+.DS_Store
+Thumbs.db
+.vscode/.history/

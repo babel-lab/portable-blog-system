@@ -1,0 +1,92 @@
+// Base
+.lab-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lab-space-2);
+  padding: var(--lab-space-3) var(--lab-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--lab-radius-full);
+  background: transparent;
+  color: var(--lab-color-text);
+  font-family: var(--lab-font-sans);
+  font-size: var(--lab-font-size-base);
+  font-weight: var(--lab-font-weight-bold);
+  line-height: var(--lab-line-height-tight);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease, opacity .15s ease;
+}
+
+.lab-button:focus-visible {
+  outline: 2px solid var(--lab-color-primary);
+  outline-offset: 2px;
+}
+
+// Variants
+.lab-button--primary {
+  background: var(--lab-color-primary);
+  color: var(--lab-color-background);
+  border-color: var(--lab-color-primary);
+}
+.lab-button--primary:hover {
+  background: color-mix(in srgb, var(--lab-color-primary) 88%, #000);
+  border-color: color-mix(in srgb, var(--lab-color-primary) 88%, #000);
+}
+.lab-button--primary:active {
+  background: color-mix(in srgb, var(--lab-color-primary) 78%, #000);
+}
+
+.lab-button--secondary {
+  background: var(--lab-color-gray-100);
+  color: var(--lab-color-text);
+  border-color: var(--lab-color-gray-200);
+}
+.lab-button--secondary:hover {
+  background: var(--lab-color-gray-200);
+  border-color: var(--lab-color-gray-300);
+}
+.lab-button--secondary:active {
+  background: var(--lab-color-gray-300);
+}
+
+.lab-button--outline {
+  background: transparent;
+  color: var(--lab-color-primary);
+  border-color: currentColor;
+}
+.lab-button--outline:hover {
+  background: var(--lab-color-primary);
+  color: var(--lab-color-background);
+  border-color: var(--lab-color-primary);
+}
+
+.lab-button--text {
+  padding-inline: var(--lab-space-2);
+  background: transparent;
+  color: var(--lab-color-link);
+  border-color: transparent;
+}
+.lab-button--text:hover {
+  color: var(--lab-color-link-hover);
+  text-decoration: underline;
+}
+
+// Disabled (modifier 與原生屬性皆支援)
+.lab-button--disabled,
+.lab-button[disabled],
+.lab-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+// Sizes
+.lab-button--sm {
+  padding: var(--lab-space-2) var(--lab-space-3);
+  font-size: var(--lab-font-size-sm);
+}
+.lab-button--lg {
+  padding: var(--lab-space-4) var(--lab-space-6);
+  font-size: var(--lab-font-size-lg);
+}

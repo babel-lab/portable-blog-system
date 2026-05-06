@@ -1,0 +1,103 @@
+<%# Phase 3-e-2：Blogger full 模式文章 HTML 模板 %>
+<%# 外層包 .lab-blogger-article（對齊 docs/blogger-export.md 與 Phase 3-d CSS） %>
+<%# 全部子區塊 inline（不使用 partials） %>
+<%# 資料缺漏的選用區塊不輸出空殼 %>
+<div class="lab-blogger-article">
+
+  <header class="lab-article__header">
+    <% if (post.category) { %>
+    <p class="lab-article__category"><%= post.category %></p>
+    <% } %>
+    <h1 class="lab-article__title"><%= post.title %></h1>
+    <% if (post.titleEn) { %>
+    <p class="lab-article__title-en"><%= post.titleEn %></p>
+    <% } %>
+    <p class="lab-article__meta">
+      <% if (post.date) { %>
+      <time datetime="<%= post.date %>"><%= post.date %></time>
+      <% } %>
+      <% if (post.updated && post.updated !== post.date) { %>
+       · <span>更新於 <time datetime="<%= post.updated %>"><%= post.updated %></time></span>
+      <% } %>
+      <% if (post.author) { %>
+       · <span><%= post.author %></span>
+      <% } %>
+    </p>
+    <% if (post.description) { %>
+    <p class="lab-article__description"><%= post.description %></p>
+    <% } %>
+  </header>
+
+  <%# === Book Photo（前置；type=book-review 且有 cover 時） === %>
+  <% if (post.type === 'book-review' && post.book && post.book.showBookPhoto && post.book.coverImage) { %>
+  <figure class="lab-book-photo">
+    <img class="lab-book-photo__image" src="<%= post.book.coverImage %>" alt="<%= post.book.coverAlt || post.book.title || '' %>">
+    <% if (post.book.title) { %>
+    <figcaption class="lab-book-photo__caption">《<%= post.book.title %>》<% if (post.book.publisher) { %> — <%= post.book.publisher %><% } %></figcaption>
+    <% } %>
+  </figure>
+  <% } %>
+
+  <%# === Affiliate Box（前置；enabled + links 非空 + position.top） === %>
+  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(post.affiliate.links) && post.affiliate.links.length > 0 && post.affiliate.position && post.affiliate.position.top) { %>
+  <aside class="lab-affiliate-box">
+    <h3 class="lab-affiliate-box__title">立即購買</h3>
+    <% if (post.affiliate.disclosure) { %>
+    <p class="lab-affiliate-box__disclosure"><%= post.affiliate.disclosure %></p>
+    <% } %>
+    <ul class="lab-affiliate-box__links">
+      <% post.affiliate.links.forEach(function(link) { %>
+      <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+      <% }); %>
+    </ul>
+  </aside>
+  <% } %>
+
+  <%# === Article body（markdown 渲染後 inject） === %>
+  <div class="lab-article__body">
+    <%- post.bodyHtml %>
+  </div>
+
+  <%# === Download Box（enabled + fileUrl） === %>
+  <% if (post.download && post.download.enabled && post.download.fileUrl) { %>
+  <aside class="lab-download-box">
+    <% if (post.download.title) { %>
+    <h3 class="lab-download-box__title"><%= post.download.title %></h3>
+    <% } %>
+    <% if (post.download.description) { %>
+    <p class="lab-download-box__description"><%= post.download.description %></p>
+    <% } %>
+    <a class="lab-download-box__cta" href="<%= post.download.fileUrl %>" download>
+      <% if (post.download.fileType) { %><span class="lab-download-box__filetype"><%= post.download.fileType %></span><% } %>下載檔案
+    </a>
+    <% if (post.download.licenseNote) { %>
+    <p class="lab-download-box__license"><%= post.download.licenseNote %></p>
+    <% } %>
+  </aside>
+  <% } %>
+
+  <%# === Affiliate Box（後置；條件同前置但檢查 position.bottom） === %>
+  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(post.affiliate.links) && post.affiliate.links.length > 0 && post.affiliate.position && post.affiliate.position.bottom) { %>
+  <aside class="lab-affiliate-box">
+    <h3 class="lab-affiliate-box__title">立即購買</h3>
+    <% if (post.affiliate.disclosure) { %>
+    <p class="lab-affiliate-box__disclosure"><%= post.affiliate.disclosure %></p>
+    <% } %>
+    <ul class="lab-affiliate-box__links">
+      <% post.affiliate.links.forEach(function(link) { %>
+      <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+      <% }); %>
+    </ul>
+  </aside>
+  <% } %>
+
+  <%# === Hashtag === %>
+  <% if (post.blocks && post.blocks.hashtags && Array.isArray(post.tags) && post.tags.length > 0) { %>
+  <ul class="lab-hashtags">
+    <% post.tags.forEach(function(tag) { %>
+    <li><span class="lab-hashtag">#<%= tag %></span></li>
+    <% }); %>
+  </ul>
+  <% } %>
+
+</div>

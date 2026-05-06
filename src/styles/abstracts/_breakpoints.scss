@@ -1,0 +1,12 @@
+// Phase 1 既有 SCSS 變數（@media 必用，保留）
+$bp-sm: 36em;
+$bp-md: 48em;
+$bp-lg: 64em;
+
+// Phase 3-a：純 mixin，不自動輸出 :root；由 main.scss 或 blogger entry 明確 include
+// 註：CSS 變數無法用於 @media query，這裡僅供 DS 頁顯示與 JS 讀取
+@mixin lab-tokens-bp {
+  --lab-bp-sm: 36em;
+  --lab-bp-md: 48em;
+  --lab-bp-lg: 64em;
+}

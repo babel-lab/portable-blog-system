@@ -1,0 +1,43 @@
+<%# Phase 3-e-3：Blogger summary 模式 HTML 模板 %>
+<%# 摘要導流：顯示 description + CTA 連往 canonical（含 UTM）+ hashtag %>
+<%# 不渲染 markdown body 全文（避免內容外洩） %>
+<div class="lab-blogger-article">
+
+  <header class="lab-article__header">
+    <% if (post.category) { %>
+    <p class="lab-article__category"><%= post.category %></p>
+    <% } %>
+    <h1 class="lab-article__title"><%= post.title %></h1>
+    <p class="lab-article__meta">
+      <% if (post.date) { %>
+      <time datetime="<%= post.date %>"><%= post.date %></time>
+      <% } %>
+      <% if (post.author) { %>
+       · <span><%= post.author %></span>
+      <% } %>
+    </p>
+  </header>
+
+  <div class="lab-article__body">
+    <p><%= post.description || '（本文為導流摘要，完整內容請見原站。）' %></p>
+  </div>
+
+  <% if (canonicalUrl) { %>
+  <p>
+    <a class="lab-button lab-button--primary" href="<%= canonicalUrl %>" rel="noopener noreferrer" target="_blank">
+      閱讀完整文章 →
+    </a>
+  </p>
+  <% } else { %>
+  <p><em>（無 canonical 連結，請補上 frontmatter <code>canonical</code> 欄位或 site.config.json <code>githubSiteUrl</code>）</em></p>
+  <% } %>
+
+  <% if (post.blocks && post.blocks.hashtags && Array.isArray(post.tags) && post.tags.length > 0) { %>
+  <ul class="lab-hashtags">
+    <% post.tags.forEach(function(tag) { %>
+    <li><span class="lab-hashtag">#<%= tag %></span></li>
+    <% }); %>
+  </ul>
+  <% } %>
+
+</div>

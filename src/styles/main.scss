@@ -1,0 +1,42 @@
+@use './abstracts/tokens';
+@use './abstracts/themes';
+@use './abstracts/spacing';
+@use './abstracts/typography';
+@use './abstracts/breakpoints';
+@use './abstracts/mixins';
+@use './abstracts/z-index';
+@use './base/reset';
+@use './base/base';
+@use './base/article';
+@use './base/print';
+@use './layout/header';
+@use './layout/nav';
+@use './layout/mobile-drawer';
+@use './layout/footer';
+@use './layout/sidebar';
+@use './layout/grid';
+@use './components/button';
+@use './components/card';
+@use './components/post-card';
+@use './components/tag';
+@use './components/hashtag';
+@use './components/breadcrumb';
+@use './components/adsense';
+@use './components/social-follow';
+@use './components/affiliate-box';
+@use './components/book-photo';
+@use './components/download-box';
+@use './components/related-posts';
+@use './components/prev-next';
+@use './components/back-to-top';
+@use './components/toc';
+@use './components/code-block';
+
+// Phase 3-a：明確 include token mixin 至 :root（abstracts 已改為純 mixin、不自動輸出）
+:root {
+  @include tokens.lab-tokens-base;
+  @include spacing.lab-tokens-space;
+  @include typography.lab-tokens-typography;
+  @include breakpoints.lab-tokens-bp;
+  @include z-index.lab-tokens-z;
+}

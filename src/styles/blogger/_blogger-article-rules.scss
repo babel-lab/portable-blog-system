@@ -1,0 +1,124 @@
+// Phase 3-b：Blogger 文章基礎排版 mixin（partial）
+// 所有規則設計為「相對 selector」，必須在 .lab-blogger-article parent 下 @include
+// 不含任何全域 selector（h1 / p / a / table / img 等）
+// 不含 reset；不動 body / html / Blogger 外層 theme class / 全域 box-sizing / 全域 img / 全域 a
+
+@mixin lab-article-rules {
+  // Body 基底（套在 .lab-blogger-article 自身）
+  font-family: var(--lab-font-sans);
+  font-size: var(--lab-font-size-base);
+  line-height: var(--lab-line-height-relaxed);
+  color: var(--lab-color-text);
+
+  // Headings
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: var(--lab-font-weight-bold);
+    line-height: var(--lab-line-height-tight);
+    color: var(--lab-color-text);
+    margin-block: var(--lab-space-8) var(--lab-space-4);
+  }
+  h1 { font-size: var(--lab-font-size-4xl); }
+  h2 { font-size: var(--lab-font-size-3xl); }
+  h3 { font-size: var(--lab-font-size-2xl); }
+  h4 { font-size: var(--lab-font-size-xl); }
+  h5 { font-size: var(--lab-font-size-lg); }
+  h6 { font-size: var(--lab-font-size-base); }
+
+  // Paragraph
+  p { margin-block: 0 var(--lab-space-4); }
+
+  // Inline 強調
+  strong { font-weight: var(--lab-font-weight-bold); }
+  em { font-style: italic; }
+
+  // Links（scoped；不影響全域 a）
+  a { color: var(--lab-color-link); text-decoration: underline; }
+  a:hover { color: var(--lab-color-link-hover); }
+  a:visited { color: var(--lab-color-link-visited); }
+
+  // Lists
+  ul, ol { margin-block: 0 var(--lab-space-4); padding-left: var(--lab-space-6); }
+  li { margin-block: var(--lab-space-1) 0; }
+
+  // Blockquote
+  blockquote {
+    margin-block: var(--lab-space-6);
+    padding: var(--lab-space-4) var(--lab-space-5);
+    border-left: 4px solid var(--lab-color-primary);
+    background: var(--lab-color-surface);
+    color: var(--lab-color-text);
+    font-style: italic;
+  }
+
+  // HR
+  hr {
+    margin-block: var(--lab-space-8);
+    border: 0;
+    border-top: 1px solid var(--lab-color-border);
+  }
+
+  // Images（scoped；不影響全域 img）
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--lab-radius-md);
+  }
+
+  // Figures
+  figure {
+    margin: var(--lab-space-6) 0;
+    text-align: center;
+  }
+  figcaption {
+    margin-top: var(--lab-space-2);
+    font-size: var(--lab-font-size-sm);
+    color: var(--lab-color-muted);
+  }
+
+  // Tables（基礎處理：width 100% + collapse；不做 overflow wrapper hack）
+  table {
+    width: 100%;
+    margin-block: var(--lab-space-6);
+    border-collapse: collapse;
+    font-size: var(--lab-font-size-sm);
+  }
+  th, td {
+    padding: var(--lab-space-2) var(--lab-space-3);
+    border: 1px solid var(--lab-color-border);
+    text-align: left;
+  }
+  th {
+    background: var(--lab-color-surface);
+    font-weight: var(--lab-font-weight-semibold);
+  }
+
+  // Inline code（原生 HTML，非 Phase 3-c .lab-code-block 元件）
+  code {
+    padding: var(--lab-space-1) var(--lab-space-2);
+    border-radius: var(--lab-radius-sm);
+    background: var(--lab-color-gray-100);
+    color: var(--lab-color-gray-800);
+    font-family: var(--lab-font-mono);
+    font-size: var(--lab-font-size-sm);
+  }
+
+  // Block code（原生 <pre> + <pre><code>）
+  pre {
+    margin-block: var(--lab-space-6);
+    padding: var(--lab-space-4);
+    border-radius: var(--lab-radius-md);
+    background: var(--lab-color-gray-900);
+    color: var(--lab-color-gray-100);
+    font-family: var(--lab-font-mono);
+    font-size: var(--lab-font-size-sm);
+    line-height: var(--lab-line-height-base);
+    overflow-x: auto;
+  }
+  pre code {
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+  }
+}

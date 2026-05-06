@@ -1,0 +1,34 @@
+[
+  {
+    "id": "github",
+    "name": "GitHub",
+    "slug": "github",
+    "site": [
+      "github"
+    ]
+  },
+  {
+    "id": "vite",
+    "name": "Vite",
+    "slug": "vite",
+    "site": [
+      "github"
+    ]
+  },
+  {
+    "id": "static-site",
+    "name": "靜態網站",
+    "slug": "static-site",
+    "site": [
+      "github"
+    ]
+  },
+  {
+    "id": "book",
+    "name": "書籍",
+    "slug": "book",
+    "site": [
+      "blogger"
+    ]
+  }
+]

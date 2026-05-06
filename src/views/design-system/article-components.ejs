@@ -1,0 +1,145 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>G-07 Article Components</h1>
+    <p>Phase 2-2 完成的文章元件，涵蓋 CLAUDE.md §19 列出的 10 個 Article Components + Breadcrumb / TOC / Code Block。所有元件完全使用 Phase 2-1 token。</p>
+
+    <h2>Breadcrumb（麵包屑）</h2>
+    <p>Phase 2-2-h。</p>
+    <nav class="lab-breadcrumb" aria-label="Breadcrumb">
+      <span class="lab-breadcrumb__item"><a class="lab-breadcrumb__link" href="/">首頁</a></span>
+      <span class="lab-breadcrumb__separator" aria-hidden="true">/</span>
+      <span class="lab-breadcrumb__item"><a class="lab-breadcrumb__link" href="/posts/">文章</a></span>
+      <span class="lab-breadcrumb__separator" aria-hidden="true">/</span>
+      <span class="lab-breadcrumb__item"><span class="lab-breadcrumb__current" aria-current="page">當前文章標題</span></span>
+    </nav>
+
+    <h2>Hashtag（標籤）</h2>
+    <p>Phase 2-2-g。</p>
+    <ul class="lab-hashtags">
+      <li><a class="lab-hashtag" href="#">#github</a></li>
+      <li><a class="lab-hashtag" href="#">#vite</a></li>
+      <li><a class="lab-hashtag" href="#">#static-site</a></li>
+      <li><a class="lab-hashtag" href="#">#scss</a></li>
+    </ul>
+
+    <h2>Code Block（程式碼）</h2>
+    <p>Phase 2-2-i。需 <code>.lab-article</code> scope。</p>
+    <div class="lab-article">
+      <p>行內範例：呼叫 <code>console.log()</code> 輸出值。</p>
+      <pre><code>function hello(name) {
+  console.log(`Hello, ${name}!`);
+}
+hello('world');</code></pre>
+    </div>
+
+    <h2>TOC（目錄）</h2>
+    <p>Phase 2-2-j。展示嵌套清單與 <code>is-active</code> 狀態。</p>
+    <nav class="lab-toc" aria-label="Table of contents" style="max-width:24rem;">
+      <p class="lab-toc__title">目錄</p>
+      <ul class="lab-toc__list">
+        <li><a class="lab-toc__link" href="#">第一章 引言</a></li>
+        <li>
+          <a class="lab-toc__link is-active" href="#">第二章 系統架構</a>
+          <ul class="lab-toc__list">
+            <li><a class="lab-toc__link" href="#">2.1 資料流</a></li>
+            <li><a class="lab-toc__link" href="#">2.2 模組劃分</a></li>
+          </ul>
+        </li>
+        <li><a class="lab-toc__link" href="#">第三章 結論</a></li>
+      </ul>
+    </nav>
+
+    <h2>Prev / Next（前後文章）</h2>
+    <p>Phase 2-2-k。</p>
+    <nav class="lab-prev-next" aria-label="文章導覽">
+      <a class="lab-prev-next__prev" href="#">
+        <span class="lab-prev-next__label">← 上一篇</span>
+        <span class="lab-prev-next__title">前一篇文章標題</span>
+      </a>
+      <a class="lab-prev-next__next" href="#">
+        <span class="lab-prev-next__label">下一篇 →</span>
+        <span class="lab-prev-next__title">下一篇文章標題</span>
+      </a>
+    </nav>
+
+    <h2>Related Posts（相關文章）</h2>
+    <p>Phase 2-2-l。</p>
+    <section class="lab-related-posts">
+      <h3 class="lab-related-posts__title">相關文章</h3>
+      <ul class="lab-related-posts__list">
+        <% for (let i = 1; i <= 3; i++) { %>
+        <li class="lab-related-posts__item">
+          <a class="lab-related-posts__link" href="#">
+            <span class="lab-related-posts__category">tech-note</span>
+            <span class="lab-related-posts__post-title">範例文章 <%= i %> — 標題簡短示範</span>
+            <time class="lab-related-posts__date" datetime="2026-05-04">2026-05-04</time>
+          </a>
+        </li>
+        <% } %>
+      </ul>
+    </section>
+
+    <h2>Social Follow（社群追蹤）</h2>
+    <p>Phase 2-2-m。</p>
+    <section class="lab-social-follow" aria-label="社群追蹤">
+      <p class="lab-social-follow__title">追蹤我</p>
+      <ul class="lab-social-follow__list">
+        <li><a class="lab-social-follow__link" href="#"><span class="lab-social-follow__icon" aria-hidden="true">fb</span>Facebook</a></li>
+        <li><a class="lab-social-follow__link" href="#"><span class="lab-social-follow__icon" aria-hidden="true">ig</span>Instagram</a></li>
+        <li><a class="lab-social-follow__link" href="#"><span class="lab-social-follow__icon" aria-hidden="true">gh</span>GitHub</a></li>
+      </ul>
+    </section>
+
+    <h2>Book Photo（書本封面）</h2>
+    <p>Phase 2-2-n。圖片以 SVG data URI 模擬，不需外部素材。</p>
+    <figure class="lab-book-photo">
+      <img class="lab-book-photo__image" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='280' viewBox='0 0 200 280'><rect width='200' height='280' fill='%23e5e7eb' stroke='%239ca3af' stroke-width='2'/><text x='100' y='140' text-anchor='middle' fill='%23374151' font-size='16' font-family='sans-serif'>Book Cover</text></svg>" alt="範例書本封面">
+      <figcaption class="lab-book-photo__caption">《範例書名》— 出版社名稱</figcaption>
+    </figure>
+
+    <h2>Download Box（教具下載）</h2>
+    <p>Phase 2-2-o。</p>
+    <aside class="lab-download-box">
+      <h3 class="lab-download-box__title">下載教具 PDF</h3>
+      <p class="lab-download-box__description">適用於小學中年級的數學練習單，附解答。</p>
+      <a class="lab-download-box__cta" href="#" download>
+        <span class="lab-download-box__filetype">PDF</span>下載檔案
+      </a>
+      <p class="lab-download-box__license">本素材僅供個人、家庭與教學使用，請勿轉售或大量散布。</p>
+    </aside>
+
+    <h2>Affiliate Box（聯盟行銷）</h2>
+    <p>Phase 2-2-p。連結 <code>rel="sponsored nofollow noopener noreferrer"</code>。</p>
+    <aside class="lab-affiliate-box">
+      <h3 class="lab-affiliate-box__title">立即購買</h3>
+      <p class="lab-affiliate-box__disclosure">本文包含聯盟行銷連結。若你透過連結購買，本站可能取得少量回饋。</p>
+      <ul class="lab-affiliate-box__links">
+        <li><a class="lab-affiliate-box__link" href="#" rel="sponsored nofollow noopener noreferrer">博客來 <span class="lab-affiliate-box__network">通路王</span></a></li>
+        <li><a class="lab-affiliate-box__link" href="#" rel="sponsored nofollow noopener noreferrer">誠品 <span class="lab-affiliate-box__network">聯盟網</span></a></li>
+      </ul>
+    </aside>
+
+    <h2>AdSense Placeholder（廣告占位）</h2>
+    <p>Phase 2-2-q。展示 5 個 spacing modifier。</p>
+    <% [
+      { mod: 'post-top', label: 'post-top' },
+      { mod: 'post-middle', label: 'post-middle' },
+      { mod: 'post-bottom', label: 'post-bottom' },
+      { mod: 'sidebar', label: 'sidebar' },
+      { mod: 'home-inline', label: 'home-inline' },
+    ].forEach(function(a) { %>
+    <div class="lab-adsense lab-adsense--<%= a.mod %>">
+      <span class="lab-adsense__label">廣告區（<%= a.label %>）</span>
+    </div>
+    <% }); %>
+
+    <h2>Back to Top（回到頂端）</h2>
+    <p>Phase 2-2-c。元件本身 <code>position: fixed</code>，加 <code>is-visible</code> class 後出現在右下角（44×44 圓鈕）。</p>
+    <button class="lab-back-to-top is-visible" type="button" aria-label="回到頁面上方">↑</button>
+
+    <h2>未實作元件</h2>
+    <ul>
+      <li>📋 Post CTA（CLAUDE.md §19 G-07 列出，目前 Phase 2-2 未獨立 SCSS — 規劃中）</li>
+    </ul>
+  </div>
+</section>

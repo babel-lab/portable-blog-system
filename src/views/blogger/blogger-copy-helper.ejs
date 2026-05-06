@@ -1,0 +1,55 @@
+<%# Phase 3-e-5：Blogger 發布輔助文字 %>
+<%# 純文字、可逐區複製到 Blogger 後台對應欄位 %>
+========================================
+Blogger 發布輔助 - <%= post.title %>
+========================================
+slug:       <%= post.slug %>
+mode:       <%= post.bloggerMode %>
+sourcePath: <%= post.sourcePath %>
+builtAt:    <%= meta.build.builtAt %>
+
+----------------------------------------
+[1] Blogger 標題（貼到「文章標題」欄位）
+----------------------------------------
+<%= post.title %>
+
+----------------------------------------
+[2] Blogger 自訂網址（貼到「自訂網址 / Permalink」）
+----------------------------------------
+<%= post.slug %>
+
+----------------------------------------
+[3] Blogger 搜尋說明（貼到「搜尋說明」欄位）
+----------------------------------------
+<%= post.searchDescription || post.description || '（空，請手動補）' %>
+
+----------------------------------------
+[4] Blogger 標籤（複製整行、用逗號分隔）
+----------------------------------------
+<%= Array.isArray(post.tags) && post.tags.length > 0 ? post.tags.join(', ') : '（無 tags）' %>
+
+----------------------------------------
+[5] HTML 內容
+----------------------------------------
+請複製檔案：<%= meta.build.postFile %>
+（已包覆 .lab-blogger-article wrapper）
+<% if (post.bloggerMode === 'summary' || post.bloggerMode === 'redirect-card') { %>
+
+【<%= post.bloggerMode %> 模式 CTA 連結（已含 UTM）】
+<% if (canonical.url) { %>
+<%- canonical.url %>
+<% } else { %>
+canonical 缺漏 — fallback 警告：<%= canonical.warning %>
+<% } %>
+<% } %>
+
+----------------------------------------
+[6] 發布後請回填 frontmatter
+----------------------------------------
+請於 <%= post.sourcePath %> 補上：
+
+blogger:
+  status: "published"
+  publishedUrl: "<貼上 Blogger 文章正式 URL>"
+  bloggerPostId: "<從 Blogger 後台取得>"
+  publishedAt: "<發布日期 ISO>"

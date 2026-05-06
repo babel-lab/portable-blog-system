@@ -1,0 +1,34 @@
+<section class="lab-hero">
+  <div class="lab-container">
+    <p class="lab-eyebrow">Phase 1-B-1 首頁</p>
+    <h1><%= site.siteName %></h1>
+    <% if (site.description) { %>
+    <p><%= site.description %></p>
+    <% } %>
+  </div>
+</section>
+
+<section id="latest" class="lab-section">
+  <div class="lab-container">
+    <h2>最新文章</h2>
+    <% if (!posts || posts.length === 0) { %>
+    <p>目前沒有可顯示的文章。</p>
+    <% } else { %>
+    <div class="lab-card-grid">
+      <% posts.forEach(function (post) { %>
+      <article class="lab-post-card">
+        <p class="lab-post-card__category"><%= post.category %></p>
+        <h3 class="lab-post-card__title"><%= post.title %></h3>
+        <% if (post.description) { %>
+        <p class="lab-post-card__description"><%= post.description %></p>
+        <% } %>
+        <p class="lab-post-card__meta">
+          <time datetime="<%= post.date %>"><%= post.date %></time>
+        </p>
+        <a class="lab-post-card__link" href="/posts/<%= post.slug %>/">閱讀文章</a>
+      </article>
+      <% }); %>
+    </div>
+    <% } %>
+  </div>
+</section>

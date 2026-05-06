@@ -1,0 +1,31 @@
+<%# Phase 3-e-6：Blogger 分類索引（單一分類） %>
+<div class="lab-blogger-components">
+
+  <header>
+    <h1>分類：<%= categoryName %>（<%= posts.length %> 篇）</h1>
+    <p>建置時間 <%= builtAt %></p>
+    <p><a href="blogger-home.html">← 返回首頁索引</a></p>
+  </header>
+
+  <ul class="lab-card-grid">
+    <% posts.forEach(function(post) { %>
+    <li>
+      <article class="lab-post-card">
+        <h3 class="lab-post-card__title"><%= post.title %></h3>
+        <% if (post.description) { %>
+        <p class="lab-post-card__description"><%= post.description %></p>
+        <% } %>
+        <p class="lab-post-card__meta">
+          <time datetime="<%= post.date %>"><%= post.date %></time>
+          ｜mode: <code><%= post.bloggerMode %></code>
+          <% if (post.bloggerPublishedUrl) { %>｜<a href="<%- post.bloggerPublishedUrl %>" rel="noopener noreferrer" target="_blank">已發布</a><% } %>
+        </p>
+        <% if (post.canonicalResolved) { %>
+        <a class="lab-post-card__link" href="<%- post.canonicalResolved %>" rel="noopener noreferrer" target="_blank">前往原文 →</a>
+        <% } %>
+      </article>
+    </li>
+    <% }); %>
+  </ul>
+
+</div>

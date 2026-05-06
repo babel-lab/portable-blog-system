@@ -1,0 +1,8 @@
+{
+  "facebook": {
+    "enabled": true,
+    "defaultPage": "fan1",
+    "utmSource": "facebook",
+    "utmMedium": "social"
+  }
+}

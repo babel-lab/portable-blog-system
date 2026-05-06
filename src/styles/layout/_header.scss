@@ -1,0 +1,6 @@
+.lab-header { position: sticky; top: 0; z-index: 20; background: rgb(255 255 255 / 90%); backdrop-filter: blur(12px); border-bottom: 1px solid transparent; }
+.lab-header.is-scrolled { border-bottom-color: var(--lab-color-border); }
+.lab-header__inner { display: flex; align-items: center; justify-content: space-between; min-height: 4rem; gap: 1rem; }
+.lab-header__brand { font-weight: 800; text-decoration: none; }
+.lab-header__menu-button { display: inline-flex; border: 1px solid var(--lab-color-border); background: #fff; border-radius: .5rem; padding: .4rem .7rem; }
+@media (min-width: 48em) { .lab-header__menu-button { display: none; } }

@@ -1,0 +1,41 @@
+// Phase 3-d：Blogger 完整可貼用 CSS（合併 entry）
+//
+// 設計：
+//   1. tokens 透過 :where(.lab-blogger-article, .lab-blogger-components) 一次輸出（zero specificity）
+//   2. article body rules 全部 scope 在 .lab-blogger-article 下（沿用 Phase 3-b partial）
+//   3. components rules 維持 .lab-* 全域 selector，不嵌在任何 wrapper 下（沿用 Phase 3-c partial）
+//
+// 與其他三個 CSS 檔的差異：
+//   - tokens / article / components 三個各自為獨立模組可單獨貼用（自包含 tokens）
+//   - full-style 為單一 SCSS entry 編譯產物，tokens 只一份
+//   - 推薦使用：依 CLAUDE.md §10「Blogger 主題貼一次 blogger-full-style.css，之後文章只貼 HTML」
+//
+// 使用方式：
+//   1. 於 Blogger 後台主題 HTML <head> 內加 <style>{此檔內容}</style>
+//   2. 文章內容外層包 <div class="lab-blogger-article">...</div>（自動取得 tokens + article body 排版 + components）
+//   3. 文章外（首頁 / 側欄 / CTA 區塊）若需要使用 components，包 <div class="lab-blogger-components">...</div>
+
+@use '../abstracts/tokens';
+@use '../abstracts/spacing';
+@use '../abstracts/typography';
+@use '../abstracts/breakpoints';
+@use '../abstracts/z-index';
+@use 'blogger-article-rules' as ar;
+@use 'blogger-components-rules' as cr;
+
+// === Tokens（emit once，zero specificity） ===
+:where(.lab-blogger-article, .lab-blogger-components) {
+  @include tokens.lab-tokens-base;
+  @include spacing.lab-tokens-space;
+  @include typography.lab-tokens-typography;
+  @include breakpoints.lab-tokens-bp;
+  @include z-index.lab-tokens-z;
+}
+
+// === Article body rules（scoped 在 .lab-blogger-article 下） ===
+.lab-blogger-article {
+  @include ar.lab-article-rules;
+}
+
+// === Components（維持 .lab-* 全域，emit at top level） ===
+@include cr.lab-components-rules;

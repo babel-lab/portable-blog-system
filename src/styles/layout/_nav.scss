@@ -1,0 +1,4 @@
+.lab-nav { display: none; gap: 1rem; }
+.lab-nav a { text-decoration: none; color: var(--lab-color-muted); }
+.lab-nav a:hover { color: var(--lab-color-primary); }
+@media (min-width: 48em) { .lab-nav { display: flex; } }

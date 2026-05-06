@@ -1,0 +1,24 @@
+<article class="lab-article">
+  <header class="lab-article__header lab-container">
+    <p class="lab-article__category"><%= post.category %></p>
+    <h1 class="lab-article__title"><%= post.title %></h1>
+    <% if (post.titleEn) { %>
+    <p class="lab-article__title-en"><%= post.titleEn %></p>
+    <% } %>
+    <p class="lab-article__meta">
+      <time datetime="<%= post.date %>"><%= post.date %></time>
+      <% if (post.updated && post.updated !== post.date) { %>
+      ·
+      <span>更新於 <time datetime="<%= post.updated %>"><%= post.updated %></time></span>
+      <% } %>
+      <% if (post.author) { %>
+      ·
+      <span><%= post.author %></span>
+      <% } %>
+    </p>
+  </header>
+
+  <div class="lab-article__body lab-container">
+    <%- bodyHtml %>
+  </div>
+</article>

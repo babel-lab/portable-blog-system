@@ -1,0 +1,19 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>標籤索引</h1>
+    <% if (!entries || entries.length === 0) { %>
+    <p>目前沒有可顯示的標籤。</p>
+    <% } else { %>
+    <ul class="lab-taxonomy-list">
+      <% entries.forEach(function (entry) { %>
+      <li class="lab-taxonomy-list__item">
+        <a class="lab-taxonomy-list__link" href="/tags/<%= entry.slug %>/">
+          <span class="lab-taxonomy-list__name"><%= entry.name %></span>
+          <span class="lab-taxonomy-list__count">（<%= entry.count %>）</span>
+        </a>
+      </li>
+      <% }); %>
+    </ul>
+    <% } %>
+  </div>
+</section>

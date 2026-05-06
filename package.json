@@ -1,0 +1,32 @@
+{
+  "name": "portable-blog-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "node src/scripts/build-github.js --mode=dev",
+    "dev": "vite --host 0.0.0.0",
+    "prebuild": "node src/scripts/build-github.js --mode=build",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:data": "node src/scripts/build-github.js",
+    "build:github": "node src/scripts/build-github.js",
+    "build:blogger": "node src/scripts/build-blogger.js",
+    "build:promotion": "node src/scripts/build-promotion.js",
+    "build:sitemap": "node src/scripts/build-sitemap.js",
+    "build:blogger-theme": "node src/scripts/build-blogger-theme-css.js",
+    "validate:content": "node src/scripts/validate-content.js",
+    "new:post": "node src/scripts/new-post.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-basic-ssl": "latest",
+    "ejs": "latest",
+    "fast-glob": "latest",
+    "gray-matter": "latest",
+    "markdown-it": "latest",
+    "sass": "latest",
+    "vite": "latest",
+    "vite-plugin-ejs": "latest"
+  },
+  "devDependencies": {}
+}

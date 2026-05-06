@@ -1,0 +1,19 @@
+<%# Phase 3-e-3：Blogger redirect-card 模式 HTML 模板 %>
+<%# 精簡導流卡：標題 + description + 大 CTA 即可，不顯示分類/日期/hashtag %>
+<div class="lab-blogger-article">
+
+  <article class="lab-card">
+    <h2 class="lab-article__title"><%= post.title %></h2>
+    <% if (post.description) { %>
+    <p style="margin: var(--lab-space-2) 0 var(--lab-space-4);"><%= post.description %></p>
+    <% } %>
+    <% if (canonicalUrl) { %>
+    <a class="lab-button lab-button--primary lab-button--lg" href="<%= canonicalUrl %>" rel="noopener noreferrer" target="_blank">
+      前往閱讀 →
+    </a>
+    <% } else { %>
+    <p><em>（無 canonical 連結，請補上 frontmatter <code>canonical</code> 欄位或 site.config.json <code>githubSiteUrl</code>）</em></p>
+    <% } %>
+  </article>
+
+</div>

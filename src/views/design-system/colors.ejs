@@ -1,0 +1,39 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>G-02 Colors</h1>
+    <p>Phase 2-1 已定義的 <code>--lab-color-*</code> 全部 token，共 20 個。每個色塊以 inline style 直接套用對應 token 變數，便於 DevTools 即時對照。</p>
+
+    <h2>Semantic Colors（語意色 × 7）</h2>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--lab-space-4); margin-top:var(--lab-space-4);">
+      <% ['primary','accent','text','muted','background','surface','border'].forEach(function(c) { %>
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1); width:12rem;">
+        <div style="height:var(--lab-space-16); border:1px solid var(--lab-color-border); border-radius:var(--lab-radius-md); background:var(--lab-color-<%= c %>);"></div>
+        <code>--lab-color-<%= c %></code>
+      </div>
+      <% }); %>
+    </div>
+
+    <h2>Link Colors（連結色 × 3）</h2>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--lab-space-4); margin-top:var(--lab-space-4);">
+      <% ['link','link-hover','link-visited'].forEach(function(c) { %>
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1); width:12rem;">
+        <div style="height:var(--lab-space-16); border:1px solid var(--lab-color-border); border-radius:var(--lab-radius-md); background:var(--lab-color-<%= c %>);"></div>
+        <code>--lab-color-<%= c %></code>
+      </div>
+      <% }); %>
+    </div>
+
+    <h2>Grayscale（灰階 × 10）</h2>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--lab-space-4); margin-top:var(--lab-space-4);">
+      <% [50,100,200,300,400,500,600,700,800,900].forEach(function(n) { %>
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1); width:12rem;">
+        <div style="height:var(--lab-space-16); border:1px solid var(--lab-color-border); border-radius:var(--lab-radius-md); background:var(--lab-color-gray-<%= n %>);"></div>
+        <code>--lab-color-gray-<%= n %></code>
+      </div>
+      <% }); %>
+    </div>
+
+    <h2>主題切換預覽</h2>
+    <p>切換 <code>&lt;body&gt;</code> 的 <code>lab-site--github</code> ↔ <code>lab-site--blogger</code> class（DevTools Elements 手動編輯測試），<code>--lab-color-primary</code> 色塊應隨主題變色（github 藍 ↔ blogger 棕）。</p>
+  </div>
+</section>

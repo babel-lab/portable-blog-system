@@ -1,0 +1,30 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>標籤：<%= tag.name %></h1>
+    <% if (!posts || posts.length === 0) { %>
+    <p>此標籤目前沒有可顯示的文章。</p>
+    <% } else { %>
+    <ul class="lab-post-list">
+      <% posts.forEach(function (post) { %>
+      <li class="lab-post-list__item">
+        <article class="lab-post-card">
+          <p class="lab-post-card__category"><%= post.category %></p>
+          <h2 class="lab-post-card__title">
+            <a href="/posts/<%= post.slug %>/"><%= post.title %></a>
+          </h2>
+          <% if (post.titleEn) { %>
+          <p class="lab-post-card__title-en"><%= post.titleEn %></p>
+          <% } %>
+          <% if (post.description) { %>
+          <p class="lab-post-card__description"><%= post.description %></p>
+          <% } %>
+          <p class="lab-post-card__meta">
+            <time datetime="<%= post.date %>"><%= post.date %></time>
+          </p>
+        </article>
+      </li>
+      <% }); %>
+    </ul>
+    <% } %>
+  </div>
+</section>

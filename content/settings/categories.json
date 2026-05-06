@@ -1,0 +1,35 @@
+[
+  {
+    "id": "tech-note",
+    "name": "技術筆記",
+    "slug": "tech-note",
+    "site": [
+      "github",
+      "blogger"
+    ]
+  },
+  {
+    "id": "book-review",
+    "name": "書評",
+    "slug": "book-review",
+    "site": [
+      "blogger"
+    ]
+  },
+  {
+    "id": "download",
+    "name": "教具下載",
+    "slug": "download",
+    "site": [
+      "blogger"
+    ]
+  },
+  {
+    "id": "life-note",
+    "name": "生活文章",
+    "slug": "life-note",
+    "site": [
+      "blogger"
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "github": {
+    "className": "lab-site--github",
+    "primary": "#2563eb"
+  },
+  "blogger": {
+    "className": "lab-site--blogger",
+    "primary": "#b45309"
+  }
+}

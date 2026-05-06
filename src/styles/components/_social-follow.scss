@@ -1,0 +1,7 @@
+.lab-social-follow { display: flex; flex-direction: column; gap: var(--lab-space-3); }
+.lab-social-follow__title { margin: 0; font-size: var(--lab-font-size-sm); font-weight: var(--lab-font-weight-semibold); color: var(--lab-color-muted); }
+.lab-social-follow__list { display: flex; flex-wrap: wrap; gap: var(--lab-space-2); margin: 0; padding: 0; list-style: none; }
+.lab-social-follow__link { display: inline-flex; align-items: center; gap: var(--lab-space-2); padding: var(--lab-space-2) var(--lab-space-3); border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-full); background: var(--lab-color-background); color: var(--lab-color-text); text-decoration: none; font-size: var(--lab-font-size-sm); font-weight: var(--lab-font-weight-semibold); }
+.lab-social-follow__link:hover { border-color: var(--lab-color-primary); color: var(--lab-color-primary); background: var(--lab-color-surface); }
+.lab-social-follow__link:focus-visible { outline: 2px solid var(--lab-color-primary); outline-offset: 2px; }
+.lab-social-follow__icon { display: inline-flex; align-items: center; justify-content: center; width: 1.25em; height: 1.25em; }

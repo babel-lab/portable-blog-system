@@ -1,0 +1,46 @@
+// Phase 3-a：純 mixin，不自動輸出 :root；由 main.scss 或 blogger entry 明確 include
+@mixin lab-tokens-base {
+  // Phase 1 既有 token（鍵名不改、不刪）
+  --lab-color-primary: #2563eb;
+  --lab-color-accent: #f97316;
+  --lab-color-text: #1f2937;
+  --lab-color-muted: #6b7280;
+  --lab-color-background: #ffffff;
+  --lab-color-surface: #f8fafc;
+  --lab-color-border: #e5e7eb;
+  --lab-radius-md: 0.75rem;
+  --lab-radius-lg: 1rem;
+  --lab-shadow-card: 0 10px 30px rgb(15 23 42 / 8%);
+  --lab-container: 72rem;
+
+  // Phase 2-1 新增：Link
+  --lab-color-link: #2563eb;
+  --lab-color-link-hover: #1d4ed8;
+  --lab-color-link-visited: #6d28d9;
+
+  // Phase 2-1 新增：Grayscale
+  --lab-color-gray-50: #f9fafb;
+  --lab-color-gray-100: #f3f4f6;
+  --lab-color-gray-200: #e5e7eb;
+  --lab-color-gray-300: #d1d5db;
+  --lab-color-gray-400: #9ca3af;
+  --lab-color-gray-500: #6b7280;
+  --lab-color-gray-600: #4b5563;
+  --lab-color-gray-700: #374151;
+  --lab-color-gray-800: #1f2937;
+  --lab-color-gray-900: #111827;
+
+  // Phase 2-1 新增：Radius
+  --lab-radius-sm: 0.375rem;
+  --lab-radius-full: 9999px;
+
+  // Phase 2-1 新增：Shadow
+  --lab-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
+  --lab-shadow-md: 0 4px 12px rgb(15 23 42 / 8%);
+  --lab-shadow-lg: 0 20px 40px rgb(15 23 42 / 12%);
+
+  // Phase 2-1 新增：Container 階層
+  --lab-container-sm: 40rem;
+  --lab-container-md: 56rem;
+  --lab-container-lg: 72rem;
+}

@@ -1,0 +1,41 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>G-05 Buttons</h1>
+    <p>Phase 2-2-a 定義的 <code>.lab-button</code> 元件，含 5 變體 + 2 size + disabled 狀態。所有按鈕完全使用 Phase 2-1 token。</p>
+
+    <h2>Variants（變體 × 5）</h2>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <a href="#" class="lab-button lab-button--primary">Primary</a>
+      <a href="#" class="lab-button lab-button--secondary">Secondary</a>
+      <a href="#" class="lab-button lab-button--outline">Outline</a>
+      <a href="#" class="lab-button lab-button--text">Text</a>
+      <a href="#" class="lab-button lab-button--primary lab-button--disabled" aria-disabled="true">Disabled</a>
+    </div>
+
+    <h2>Sizes（size × 3）</h2>
+    <p>以 primary 為例；可套用於任一變體。</p>
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <a href="#" class="lab-button lab-button--primary lab-button--sm">Small (sm)</a>
+      <a href="#" class="lab-button lab-button--primary">Default</a>
+      <a href="#" class="lab-button lab-button--primary lab-button--lg">Large (lg)</a>
+    </div>
+
+    <h2>Disabled × 變體</h2>
+    <p><code>.lab-button--disabled</code> modifier 可與任一變體疊加；亦支援原生 <code>:disabled</code> / <code>[disabled]</code>。</p>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <a href="#" class="lab-button lab-button--primary lab-button--disabled" aria-disabled="true">Primary</a>
+      <a href="#" class="lab-button lab-button--secondary lab-button--disabled" aria-disabled="true">Secondary</a>
+      <a href="#" class="lab-button lab-button--outline lab-button--disabled" aria-disabled="true">Outline</a>
+      <a href="#" class="lab-button lab-button--text lab-button--disabled" aria-disabled="true">Text</a>
+      <button type="button" class="lab-button lab-button--primary" disabled>Native &lt;button disabled&gt;</button>
+    </div>
+
+    <h2>互動測試</h2>
+    <ul>
+      <li><strong>Hover</strong>：滑鼠移至按鈕觀察色彩變化（primary / secondary 加深；outline 反白；text 加底線）</li>
+      <li><strong>Focus</strong>：用 Tab 鍵跳到按鈕，應出現 2px primary outline + 2px offset</li>
+      <li><strong>Active</strong>：按住 primary / secondary 按鈕，背景再加深一階</li>
+      <li><strong>Disabled</strong>：<code>opacity: 0.5</code> + <code>cursor: not-allowed</code> + <code>pointer-events: none</code></li>
+    </ul>
+  </div>
+</section>

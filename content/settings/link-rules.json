@@ -1,0 +1,14 @@
+{
+  "external": {
+    "target": "_blank",
+    "rel": "nofollow noopener noreferrer"
+  },
+  "affiliate": {
+    "target": "_blank",
+    "rel": "sponsored nofollow noopener noreferrer"
+  },
+  "internal": {
+    "target": "_self",
+    "rel": ""
+  }
+}

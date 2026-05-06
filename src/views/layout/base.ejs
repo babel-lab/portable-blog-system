@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="<%= site.language %>">
+  <head>
+    <%- await include('./head', { title: title, description: description }) %>
+  </head>
+  <body class="lab-site lab-site--github">
+    <%- await include('./header', { site: site, navigation: navigation }) %>
+    <main>
+      <%- body %>
+    </main>
+    <%- await include('./footer', { site: site }) %>
+    <script type="module" src="/_assets/entry.js"></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+// Phase 1 既有 SCSS 變數（保留）
+$z-header: 20;
+$z-drawer: 40;
+$z-overlay: 30;
+$z-back-to-top: 25;
+
+// Phase 3-a：純 mixin，不自動輸出 :root；由 main.scss 或 blogger entry 明確 include
+@mixin lab-tokens-z {
+  --lab-z-base: 0;
+  --lab-z-dropdown: 10;
+  --lab-z-header: 20;
+  --lab-z-back-to-top: 25;
+  --lab-z-overlay: 30;
+  --lab-z-drawer: 40;
+  --lab-z-modal: 50;
+}

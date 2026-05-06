@@ -1,0 +1,15 @@
+{
+  "enabled": false,
+  "measurementId": "",
+  "events": [
+    "page_view",
+    "internal_link_click",
+    "tag_click",
+    "category_click",
+    "affiliate_click",
+    "download_click",
+    "social_click",
+    "blogger_to_github_click",
+    "github_to_blogger_click"
+  ]
+}

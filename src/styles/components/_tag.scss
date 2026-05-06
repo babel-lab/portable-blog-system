@@ -1,0 +1,2 @@
+.lab-tag-list { display: flex; flex-wrap: wrap; gap: var(--lab-space-2); margin-top: var(--lab-space-4); }
+.lab-tag { display: inline-flex; border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-full); padding: .35rem var(--lab-space-3); background: var(--lab-color-background); }

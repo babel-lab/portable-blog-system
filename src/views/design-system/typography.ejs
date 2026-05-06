@@ -1,0 +1,84 @@
+<section class="lab-section">
+  <div class="lab-container">
+    <h1>G-04 Typography</h1>
+    <p>Phase 2-1 已定義的 typography 全部 token，共 21 個。涵蓋 font-family / font-size / line-height / font-weight / letter-spacing 五大類。</p>
+
+    <h2>Font Families（字型 × 2）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <% [
+        { name: 'sans', label: 'Sans-serif（內文 / 標題）' },
+        { name: 'mono', label: 'Monospace（程式碼 / 等寬）' },
+      ].forEach(function(f) { %>
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-font-<%= f.name %></code>
+        <p style="margin:0; font-family:var(--lab-font-<%= f.name %>); font-size:var(--lab-font-size-lg);"><%= f.label %> — The quick brown fox jumps over the lazy dog. 1234567890</p>
+      </div>
+      <% }); %>
+    </div>
+
+    <h2>Font Sizes（字級 × 8）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <% [
+        { key: 'xs', value: '0.75rem' },
+        { key: 'sm', value: '0.875rem' },
+        { key: 'base', value: '1rem' },
+        { key: 'lg', value: '1.125rem' },
+        { key: 'xl', value: '1.25rem' },
+        { key: '2xl', value: '1.5rem' },
+        { key: '3xl', value: '1.875rem' },
+        { key: '4xl', value: '2.25rem' },
+      ].forEach(function(s) { %>
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-<%= s.key %></code>
+        <span style="font-size:var(--lab-font-size-<%= s.key %>);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);"><%= s.value %></span>
+      </div>
+      <% }); %>
+    </div>
+
+    <h2>Line Heights（行高 × 4）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-4); margin-top:var(--lab-space-4);">
+      <% [
+        { key: 'tight', value: '1.25' },
+        { key: 'base', value: '1.5' },
+        { key: 'relaxed', value: '1.7' },
+        { key: 'loose', value: '2' },
+      ].forEach(function(lh) { %>
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-line-height-<%= lh.key %> (<%= lh.value %>)</code>
+        <p style="margin:0; line-height:var(--lab-line-height-<%= lh.key %>); max-width:42rem;">這是用來示範行高的多行段落。Lorem ipsum dolor sit amet, consectetur adipiscing elit. 多行文字配合不同行高 token，可以看出段落呼吸感的差異。</p>
+      </div>
+      <% }); %>
+    </div>
+
+    <h2>Font Weights（字重 × 4）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-2); margin-top:var(--lab-space-4);">
+      <% [
+        { key: 'regular', value: '400' },
+        { key: 'medium', value: '500' },
+        { key: 'semibold', value: '600' },
+        { key: 'bold', value: '700' },
+      ].forEach(function(w) { %>
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-weight-<%= w.key %></code>
+        <span style="font-weight:var(--lab-font-weight-<%= w.key %>); font-size:var(--lab-font-size-lg);">範例 Sample <%= w.value %></span>
+      </div>
+      <% }); %>
+    </div>
+
+    <h2>Letter Spacing（字距 × 3）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-2); margin-top:var(--lab-space-4);">
+      <% [
+        { key: 'tight', value: '-0.01em' },
+        { key: 'normal', value: '0' },
+        { key: 'wide', value: '0.08em' },
+      ].forEach(function(ls) { %>
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-letter-spacing-<%= ls.key %></code>
+        <span style="letter-spacing:var(--lab-letter-spacing-<%= ls.key %>); font-size:var(--lab-font-size-lg);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);"><%= ls.value %></span>
+      </div>
+      <% }); %>
+    </div>
+  </div>
+</section>

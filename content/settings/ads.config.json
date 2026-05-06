@@ -1,0 +1,11 @@
+{
+  "enabled": false,
+  "adsenseClient": "",
+  "slots": {
+    "postTop": "",
+    "postMiddle": "",
+    "postBottom": "",
+    "sidebar": "",
+    "homeInline": ""
+  }
+}

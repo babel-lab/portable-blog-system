@@ -1,0 +1,31 @@
+// Phase 3-c：Blogger components entry
+//
+// 設計：
+//   - tokens 放在 :where(.lab-blogger-article, .lab-blogger-components) 內
+//     使用 :where() 達成 zero specificity，且兩個容器擇一使用即可
+//   - components 規則維持原本 .lab-* 全域 selector，不嵌在 .lab-blogger-article 下
+//     讓 components 在 Blogger 文章 / 首頁 / 側欄 / CTA 區塊都可重用
+//
+// 使用方式：
+//   1. 文章內：將內容外層包 <div class="lab-blogger-article">...</div>
+//   2. 文章外（首頁 / 側欄）：將容器外層包 <div class="lab-blogger-components">...</div>
+//   兩者皆會解析 --lab-* tokens；外層之外的 Blogger 預設主題不受影響
+
+@use '../abstracts/tokens';
+@use '../abstracts/spacing';
+@use '../abstracts/typography';
+@use '../abstracts/breakpoints';
+@use '../abstracts/z-index';
+@use 'blogger-components-rules' as cr;
+
+// Tokens：放在兩個 wrapper class 任一，zero specificity
+:where(.lab-blogger-article, .lab-blogger-components) {
+  @include tokens.lab-tokens-base;
+  @include spacing.lab-tokens-space;
+  @include typography.lab-tokens-typography;
+  @include breakpoints.lab-tokens-bp;
+  @include z-index.lab-tokens-z;
+}
+
+// Components：維持原本 .lab-* 全域命名（emit at top level）
+@include cr.lab-components-rules;

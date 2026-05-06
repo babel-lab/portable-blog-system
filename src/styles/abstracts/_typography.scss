@@ -1,0 +1,36 @@
+// Phase 1 既有 SCSS 變數（保留）
+$font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+// Phase 3-a：純 mixin，不自動輸出 :root；由 main.scss 或 blogger entry 明確 include
+@mixin lab-tokens-typography {
+  // Font families
+  --lab-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lab-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  // Font sizes
+  --lab-font-size-xs: 0.75rem;
+  --lab-font-size-sm: 0.875rem;
+  --lab-font-size-base: 1rem;
+  --lab-font-size-lg: 1.125rem;
+  --lab-font-size-xl: 1.25rem;
+  --lab-font-size-2xl: 1.5rem;
+  --lab-font-size-3xl: 1.875rem;
+  --lab-font-size-4xl: 2.25rem;
+
+  // Line heights
+  --lab-line-height-tight: 1.25;
+  --lab-line-height-base: 1.5;
+  --lab-line-height-relaxed: 1.7;
+  --lab-line-height-loose: 2;
+
+  // Font weights
+  --lab-font-weight-regular: 400;
+  --lab-font-weight-medium: 500;
+  --lab-font-weight-semibold: 600;
+  --lab-font-weight-bold: 700;
+
+  // Letter spacing
+  --lab-letter-spacing-tight: -0.01em;
+  --lab-letter-spacing-normal: 0;
+  --lab-letter-spacing-wide: 0.08em;
+}
