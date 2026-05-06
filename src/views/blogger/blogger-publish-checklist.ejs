@@ -42,6 +42,20 @@ builtAt: <%= meta.build.builtAt %>
 <% } %>
 
 ----------------------------------------
+SEO 檢查（5-f）
+----------------------------------------
+[ ] HTML body 內 <link rel="canonical"> 已自動產出（5-f-2）
+<% if (post.bloggerMode !== 'redirect-card') { %>
+[ ] HTML body 內 BlogPosting JSON-LD 已自動產出（5-f-2）
+[ ] 已用 Google Rich Results Test 驗證 BlogPosting：
+    https://search.google.com/test/rich-results
+<% } else { %>
+[ ] redirect-card 模式不含 BlogPosting JSON-LD（依設計，純跳轉卡）
+<% } %>
+[ ] copy-helper [7]-[10] 區段已對照 Blogger 後台 / theme 確認（5-f-3）
+[ ] OG image（cover）已補上或確認本篇不需要
+
+----------------------------------------
 發布後
 ----------------------------------------
 [ ] 發布後 URL 已回填到 <%= post.sourcePath %> 的 blogger.publishedUrl
