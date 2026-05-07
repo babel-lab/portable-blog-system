@@ -32,6 +32,19 @@ const DESCRIPTION_MAX = 160;
 const SEARCH_DESCRIPTION_MAX = 200;
 const VALID_CANONICAL_RE = /^https?:\/\//;
 
+// Phase 7-fix-1 (E)：body-leading-h1 規則用
+// 偵測 markdown body 第一個非空行是否為 ATX H1（# 後面接空白）。
+// 不檢測 setext H1（=== 形式），因 source pattern 罕見且 user 報告場景為 ATX。
+function bodyStartsWithAtxH1(body) {
+  if (typeof body !== 'string' || body === '') return false;
+  const lines = body.split('\n');
+  for (const line of lines) {
+    if (line.trim() === '') continue;
+    return /^#\s+/.test(line);
+  }
+  return false;
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -99,6 +112,14 @@ export function validateContent({ posts, settings }) {
         : [];
       if (cleanedTags.length === 0) {
         issues.push({ severity: 'warning', type: 'empty-tags', sourcePath });
+      }
+
+      // Phase 7-fix-1 (E) WARNING：body-leading-h1
+      // markdown body 第一個非空行為 ATX H1（# heading）→ 與 article header 的 <h1> 重複。
+      // parse-markdown.js 已在 render 階段自動降級 H1 → H2，本警告僅作教育性提示，
+      // 建議作者直接以 ## 起手，避免依賴 pipeline 後處理。
+      if (bodyStartsWithAtxH1(post.body)) {
+        issues.push({ severity: 'warning', type: 'body-leading-h1', sourcePath });
       }
 
       // 5-g-4 WARNING：SEO 內容品質（長度）
