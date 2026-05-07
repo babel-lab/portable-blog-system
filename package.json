@@ -16,7 +16,13 @@
     "build:sitemap": "node src/scripts/build-sitemap.js",
     "build:blogger-theme": "node src/scripts/build-blogger-theme-css.js",
     "validate:content": "node src/scripts/validate-content.js",
-    "new:post": "node src/scripts/new-post.js"
+    "new:post": "node src/scripts/new-post.js",
+    "report:build": "node src/scripts/export-build-report.js",
+    "report:drafts": "node src/scripts/report-draft-posts.js",
+    "report:missing-tags": "node src/scripts/report-missing-tags.js",
+    "report:urls": "node src/scripts/report-published-urls.js",
+    "check:links": "node src/scripts/check-broken-links.js",
+    "check:images": "node src/scripts/check-image-links.js"
   },
   "dependencies": {
     "@vitejs/plugin-basic-ssl": "latest",
