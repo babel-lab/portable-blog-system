@@ -18,6 +18,18 @@
     </p>
   </header>
 
+  <% if (post.cover) { %>
+  <div class="lab-container">
+    <div class="lab-article__cover">
+      <img class="lab-article__cover-img"
+           src="<%= post.cover %>"
+           alt="<%= post.coverAlt || post.title || '' %>"
+           decoding="async"
+           width="1200" height="630">
+    </div>
+  </div>
+  <% } %>
+
   <% if (typeof ads !== 'undefined' && ads && ads.enabled === true && post.blocks && post.blocks.adsenseTop) { %>
   <div class="lab-container">
     <%- await include('../ads/adsense-post-top', { ads }) %>

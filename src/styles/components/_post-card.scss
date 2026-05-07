@@ -1,6 +1,8 @@
 @use '../abstracts/mixins' as mx;
 
 .lab-post-card { padding: var(--lab-space-5); border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-lg); box-shadow: var(--lab-shadow-card); background: var(--lab-color-background); }
+.lab-post-card__cover { display: block; width: 100%; max-height: 220px; aspect-ratio: 1200 / 630; overflow: hidden; border-radius: var(--lab-radius-md); margin-bottom: var(--lab-space-3); background: var(--lab-color-gray-100); }
+.lab-post-card__cover-img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lab-post-card__category { color: var(--lab-color-primary); font-weight: var(--lab-font-weight-bold); }
 .lab-post-card__title { margin-top: var(--lab-space-1); font-size: var(--lab-font-size-xl); }
 .lab-post-card__description { margin-top: var(--lab-space-2); color: var(--lab-color-muted); }
