@@ -1,6 +1,20 @@
+@use '../abstracts/breakpoints' as bp;
+
 .lab-header { position: sticky; top: 0; z-index: 20; background: rgb(255 255 255 / 90%); backdrop-filter: blur(12px); border-bottom: 1px solid transparent; }
 .lab-header.is-scrolled { border-bottom-color: var(--lab-color-border); }
-.lab-header__inner { display: flex; align-items: center; justify-content: space-between; min-height: 4rem; gap: 1rem; }
+.lab-header__inner { display: flex; align-items: center; justify-content: space-between; min-height: 3.5rem; gap: 1rem; }
+.lab-header.is-scrolled .lab-header__inner { min-height: 3rem; }
 .lab-header__brand { font-weight: 800; text-decoration: none; }
-.lab-header__menu-button { display: inline-flex; border: 1px solid var(--lab-color-border); background: #fff; border-radius: .5rem; padding: .4rem .7rem; }
-@media (min-width: 48em) { .lab-header__menu-button { display: none; } }
+// Phase 6-b 修補：menu button 預設 display: none，避免 CSS 載入前 FOUC 在 desktop 閃出漢堡 icon。
+// 僅小版（< md）才顯示，不依賴 md+ media query 才隱藏。
+.lab-header__menu-button { display: none; border: 1px solid var(--lab-color-border); background: #fff; border-radius: .5rem; padding: .4rem .7rem; cursor: pointer; }
+.lab-header__menu-button:focus-visible { outline: 2px solid var(--lab-color-primary); outline-offset: 2px; }
+
+@media (max-width: #{bp.$bp-md - 0.01em}) {
+  .lab-header__menu-button { display: inline-flex; }
+}
+
+@include bp.respond-to('md') {
+  .lab-header__inner { min-height: 4rem; }
+  .lab-header.is-scrolled .lab-header__inner { min-height: 3.5rem; }
+}

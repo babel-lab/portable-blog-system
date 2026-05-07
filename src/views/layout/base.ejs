@@ -9,6 +9,7 @@
       <%- body %>
     </main>
     <%- await include('./footer', { site: site }) %>
+    <%- await include('./mobile-drawer', { navigation: navigation }) %>
     <script type="module" src="/_assets/entry.js"></script>
   </body>
 </html>

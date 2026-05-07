@@ -1,4 +1,20 @@
-.lab-mobile-drawer { position: fixed; inset: 0 0 0 auto; width: min(80vw, 20rem); z-index: 40; padding: 1rem; background: #fff; transform: translateX(100%); transition: transform .2s ease; display: grid; align-content: start; gap: 1rem; }
-.lab-mobile-drawer.is-open { transform: translateX(0); }
+@use '../abstracts/breakpoints' as bp;
+
+.lab-mobile-drawer { position: fixed; inset: 0 0 0 auto; width: min(80vw, 20rem); z-index: 40; padding: 1rem; background: var(--lab-color-gray-100, #f3f4f6); border-left: 1px solid var(--lab-color-border); transform: translateX(100%); transition: transform .2s ease; display: grid; align-content: start; gap: 1rem; }
+.lab-mobile-drawer.is-open { transform: translateX(0); box-shadow: -20px 0 40px rgb(15 23 42 / 12%); }
 .lab-mobile-drawer__close { justify-self: end; }
-.lab-overlay { position: fixed; inset: 0; z-index: 30; background: rgb(15 23 42 / 45%); }
+.lab-overlay { position: fixed; inset: 0; z-index: 30; background: rgb(15 23 42 / 85%); }
+
+.lab-mobile-drawer__nav { display: flex; flex-direction: column; gap: .5rem; }
+.lab-mobile-drawer__link { padding: .5rem .25rem; text-decoration: none; color: var(--lab-color-text); border-radius: .25rem; }
+.lab-mobile-drawer__link:hover { background: var(--lab-color-surface); }
+.lab-mobile-drawer__link:focus-visible { outline: 2px solid var(--lab-color-primary); outline-offset: 2px; }
+
+// Phase 6-b 修補：drawer 關閉時 transform: translateX(100%) 仍佔 layout，造成 body 水平捲動。
+// 用 overflow-x: clip 而非 hidden，避免 overflow-y 自動變 auto 而破壞 sticky-header。
+.lab-site { overflow-x: clip; }
+
+@include bp.respond-to('md') {
+  .lab-mobile-drawer,
+  .lab-overlay { display: none; }
+}
