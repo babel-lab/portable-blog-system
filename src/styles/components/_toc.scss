@@ -1,8 +1,10 @@
+@use '../abstracts/mixins' as mx;
+
 .lab-toc { display: flex; flex-direction: column; gap: var(--lab-space-3); padding: var(--lab-space-4); background: var(--lab-color-surface); border-radius: var(--lab-radius-md); }
 .lab-toc__title { margin: 0; font-size: var(--lab-font-size-sm); font-weight: var(--lab-font-weight-semibold); color: var(--lab-color-muted); }
 .lab-toc__list { display: flex; flex-direction: column; gap: var(--lab-space-2); margin: 0; padding: 0; list-style: none; }
 .lab-toc__list .lab-toc__list { padding-left: var(--lab-space-4); margin-top: var(--lab-space-2); }
 .lab-toc__link { color: var(--lab-color-link); text-decoration: none; font-size: var(--lab-font-size-sm); line-height: var(--lab-line-height-base); }
 .lab-toc__link:hover { color: var(--lab-color-link-hover); text-decoration: underline; }
-.lab-toc__link:focus-visible { outline: 2px solid var(--lab-color-primary); outline-offset: 2px; }
+.lab-toc__link:focus-visible { @include mx.lab-focus-ring; }
 .lab-toc__link.is-active { color: var(--lab-color-primary); font-weight: var(--lab-font-weight-semibold); }

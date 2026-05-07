@@ -1,6 +1,9 @@
+@use '../abstracts/mixins' as mx;
+
 .lab-post-card { padding: var(--lab-space-5); border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-lg); box-shadow: var(--lab-shadow-card); background: var(--lab-color-background); }
 .lab-post-card__category { color: var(--lab-color-primary); font-weight: var(--lab-font-weight-bold); }
 .lab-post-card__title { margin-top: var(--lab-space-1); font-size: var(--lab-font-size-xl); }
 .lab-post-card__description { margin-top: var(--lab-space-2); color: var(--lab-color-muted); }
 .lab-post-card__link { display: inline-flex; margin-top: var(--lab-space-4); color: var(--lab-color-primary); font-weight: var(--lab-font-weight-bold); }
 .lab-post-card--featured { border-color: color-mix(in srgb, var(--lab-color-primary) 30%, var(--lab-color-border)); }
+.lab-post-card a:focus-visible { @include mx.lab-focus-ring; }

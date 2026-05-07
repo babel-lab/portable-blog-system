@@ -1,3 +1,11 @@
 @mixin respond-min($bp) {
   @media (min-width: $bp) { @content; }
 }
+
+// focus-ring-2：統一焦點環樣式 mixin
+// 套用於所有可聚焦元件的 :focus-visible 規則
+// 內容只使用 CSS custom properties，不 hardcode；視覺策略可由 token 一處調整
+@mixin lab-focus-ring {
+  outline: var(--lab-focus-ring-width) var(--lab-focus-ring-style) var(--lab-focus-ring-color);
+  outline-offset: var(--lab-focus-ring-offset);
+}

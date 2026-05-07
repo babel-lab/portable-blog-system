@@ -1,3 +1,5 @@
+@use '../abstracts/mixins' as mx;
+
 // Base
 .lab-button {
   display: inline-flex;
@@ -19,8 +21,7 @@
 }
 
 .lab-button:focus-visible {
-  outline: 2px solid var(--lab-color-primary);
-  outline-offset: 2px;
+  @include mx.lab-focus-ring;
 }
 
 // Variants

@@ -1,4 +1,6 @@
+@use '../abstracts/mixins' as mx;
+
 .lab-hashtags { display: flex; flex-wrap: wrap; gap: var(--lab-space-2); }
 .lab-hashtag { display: inline-flex; align-items: center; padding: var(--lab-space-1) var(--lab-space-3); border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-full); background: var(--lab-color-gray-100); color: var(--lab-color-gray-700); font-size: var(--lab-font-size-sm); text-decoration: none; }
 .lab-hashtag:hover { background: var(--lab-color-gray-200); color: var(--lab-color-text); }
-.lab-hashtag:focus-visible { outline: 2px solid var(--lab-color-primary); outline-offset: 2px; }
+.lab-hashtag:focus-visible { @include mx.lab-focus-ring; }
