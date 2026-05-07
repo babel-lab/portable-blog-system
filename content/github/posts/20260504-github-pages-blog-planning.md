@@ -13,8 +13,8 @@ category: "tech-note"
 tags: ["github", "vite", "static-site"]
 description: "整理 GitHub Pages 免費空間限制與可搬家部落格規劃。"
 searchDescription: "GitHub Pages 免費空間、Vite 靜態網站、Markdown 部落格、Google AdSense 與搬家規劃。"
-cover: ""
-coverAlt: ""
+cover: "/images/placeholders/cover-placeholder.svg"
+coverAlt: "GitHub Pages 免費空間限制與部落格規劃 cover placeholder"
 status: "ready"
 draft: false
 canonical: "auto"

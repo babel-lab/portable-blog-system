@@ -21,8 +21,8 @@ tags:
 description: "Portable Blog System Phase 1-A 第一篇 ready 範例文章，紀錄資料管線的最小可驗證範圍。"
 searchDescription: "Portable Blog System、Phase 1、Markdown frontmatter、draft 過濾、Vite、靜態網站。"
 
-cover: ""
-coverAlt: ""
+cover: "/images/placeholders/cover-placeholder.svg"
+coverAlt: "Portable Blog System MVP 開發筆記 cover placeholder"
 
 status: "ready"
 draft: false
