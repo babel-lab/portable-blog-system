@@ -5,14 +5,25 @@
     <p>此分類目前沒有可顯示的文章。</p>
     <% } else { %>
     <ul class="lab-post-list">
-      <% posts.forEach(function (post) { %>
+      <%# Phase 8-d-3c-5：迴圈內 per-item view-model；低風險欄位（title / cover / coverAlt / slug / description）優先讀 normalized；保留 legacy fallback %>
+      <%# 模板實際使用之欄位中，contentKind / type / excerpt 未在模板，依指令不新增；不改 HTML 結構 / class name / category / titleEn / date 之既有讀法；不改頁面層 category.name 之既有讀法 %>
+      <% posts.forEach(function (post) {
+        const itemView = post.normalized || {};
+        const itemDisplay = itemView.display || {};
+        const itemIdentity = itemView.identity || {};
+        const itemTitle = itemDisplay.title || post.title;
+        const itemDescription = itemDisplay.description || post.description;
+        const itemCover = itemDisplay.cover || post.cover;
+        const itemCoverAlt = itemDisplay.coverAlt || post.coverAlt || itemTitle;
+        const itemSlug = itemIdentity.slug || post.slug;
+      %>
       <li class="lab-post-list__item">
         <article class="lab-post-card">
-          <% if (post.cover) { %>
+          <% if (itemCover) { %>
           <div class="lab-post-card__cover">
             <img class="lab-post-card__cover-img"
-                 src="<%= post.cover %>"
-                 alt="<%= post.coverAlt || post.title || '' %>"
+                 src="<%= itemCover %>"
+                 alt="<%= itemCoverAlt || '' %>"
                  loading="lazy"
                  decoding="async"
                  width="1200" height="630">
@@ -20,13 +31,13 @@
           <% } %>
           <p class="lab-post-card__category"><%= post.category %></p>
           <h2 class="lab-post-card__title">
-            <a href="/posts/<%= post.slug %>/"><%= post.title %></a>
+            <a href="/posts/<%= itemSlug %>/"><%= itemTitle %></a>
           </h2>
           <% if (post.titleEn) { %>
           <p class="lab-post-card__title-en"><%= post.titleEn %></p>
           <% } %>
-          <% if (post.description) { %>
-          <p class="lab-post-card__description"><%= post.description %></p>
+          <% if (itemDescription) { %>
+          <p class="lab-post-card__description"><%= itemDescription %></p>
           <% } %>
           <p class="lab-post-card__meta">
             <time datetime="<%= post.date %>"><%= post.date %></time>
