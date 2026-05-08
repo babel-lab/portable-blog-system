@@ -54,9 +54,14 @@ function placeholderHtml(post) {
 
 async function renderFullPost(post, canonicalUrl, jsonLd) {
   const bodyHtml = renderBody(post.body || '');
+  // Phase 8-d-3b：additive alias for EJS ergonomics；指向 8-d-2 掛載之 post.normalized。
+  //   - 不重新呼叫 normalizePostOutput；不啟用 deriveGithubUrl；不預測 Blogger URL
+  //   - EJS template 本批不改讀 normalized；屬 8-d-3c 之後範圍
+  //   - 既有 EJS 仍讀 post.X；本欄位 additive，不影響輸出
+  //   - 同樣 pattern 套用於 renderSummaryPost / renderRedirectCardPost / renderCopyHelper / renderPublishChecklist
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-full.ejs'),
-    { post: { ...post, bodyHtml }, canonicalUrl, jsonLd },
+    { post: { ...post, bodyHtml }, normalized: post.normalized, canonicalUrl, jsonLd },
     { async: true },
   );
 }
@@ -142,7 +147,8 @@ function buildOgFields(post, canonicalUrl, ogImage) {
 async function renderSummaryPost(post, canonicalUrl, jsonLd) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-summary.ejs'),
-    { post, canonicalUrl, jsonLd },
+    // Phase 8-d-3b：additive alias `normalized`（見 renderFullPost 之說明）
+    { post, normalized: post.normalized, canonicalUrl, jsonLd },
     { async: true },
   );
 }
@@ -150,7 +156,8 @@ async function renderSummaryPost(post, canonicalUrl, jsonLd) {
 async function renderRedirectCardPost(post, canonicalUrl) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-redirect-card.ejs'),
-    { post, canonicalUrl },
+    // Phase 8-d-3b：additive alias `normalized`（見 renderFullPost 之說明）
+    { post, normalized: post.normalized, canonicalUrl },
     { async: true },
   );
 }
@@ -178,7 +185,8 @@ async function renderCategoryIndex(data) {
 async function renderCopyHelper(post, canonical, meta, ogFields, jsonLd) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-copy-helper.ejs'),
-    { post, canonical, meta, ogFields, jsonLd },
+    // Phase 8-d-3b：additive alias `normalized`（見 renderFullPost 之說明）
+    { post, normalized: post.normalized, canonical, meta, ogFields, jsonLd },
     { async: true },
   );
 }
@@ -187,7 +195,8 @@ async function renderCopyHelper(post, canonical, meta, ogFields, jsonLd) {
 async function renderPublishChecklist(post, canonical, meta) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-publish-checklist.ejs'),
-    { post, canonical, meta },
+    // Phase 8-d-3b：additive alias `normalized`（見 renderFullPost 之說明）
+    { post, normalized: post.normalized, canonical, meta },
     { async: true },
   );
 }
