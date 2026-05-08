@@ -1,6 +1,15 @@
 <%# Phase 3-e-3：Blogger redirect-card 模式 HTML 模板 %>
 <%# 精簡導流卡：標題 + description + 大 CTA 即可，不顯示分類/日期/hashtag %>
 <%# Phase 5-f-2：補 in-body canonical link（不加 JSON-LD：純跳轉卡無 BlogPosting 語意） %>
+<%# Phase 8-d-3c-3：低風險欄位改讀 normalized；保留 legacy fallback %>
+<%# 模板實際使用之欄位中，僅 title / description 屬本批低風險清單；cover / coverAlt / contentKind / slug / excerpt 不在模板中，不新增 %>
+<%# 不改 canonicalUrl 之既有讀法 %>
+<%
+const view = normalized || {};
+const display = view.display || {};
+const cardTitle = display.title || post.title;
+const cardDescription = display.description || post.description;
+%>
 <div class="lab-blogger-article">
 
   <% if (canonicalUrl) { %>
@@ -8,9 +17,9 @@
   <% } %>
 
   <article class="lab-card">
-    <h2 class="lab-article__title"><%= post.title %></h2>
-    <% if (post.description) { %>
-    <p style="margin: var(--lab-space-2) 0 var(--lab-space-4);"><%= post.description %></p>
+    <h2 class="lab-article__title"><%= cardTitle %></h2>
+    <% if (cardDescription) { %>
+    <p style="margin: var(--lab-space-2) 0 var(--lab-space-4);"><%= cardDescription %></p>
     <% } %>
     <% if (canonicalUrl) { %>
     <a class="lab-button lab-button--primary lab-button--lg" href="<%= canonicalUrl %>" rel="noopener noreferrer" target="_blank">

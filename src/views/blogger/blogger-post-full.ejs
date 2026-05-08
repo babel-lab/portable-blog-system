@@ -3,6 +3,17 @@
 <%# 全部子區塊 inline（不使用 partials） %>
 <%# 資料缺漏的選用區塊不輸出空殼 %>
 <%# Phase 5-f-2：補 in-body canonical link + BlogPosting JSON-LD %>
+<%# Phase 8-d-3c-3：低風險欄位改讀 normalized；保留 legacy fallback %>
+<%# 模板實際使用之欄位中，僅 title / description / type(contentKind) 屬本批低風險清單；cover / coverAlt / slug / excerpt 不在模板中，不新增 %>
+<%# 不改 canonicalUrl / jsonLd / category / titleEn / date / updated / author / book / affiliate / bodyHtml / download / blocks / tags 之既有讀法 %>
+<%
+const view = normalized || {};
+const display = view.display || {};
+const identity = view.identity || {};
+const fullTitle = display.title || post.title;
+const fullDescription = display.description || post.description;
+const fullContentKind = identity.contentKind || post.contentKind || post.type;
+%>
 <div class="lab-blogger-article">
 
   <% if (canonicalUrl) { %>
@@ -16,7 +27,7 @@
     <% if (post.category) { %>
     <p class="lab-article__category"><%= post.category %></p>
     <% } %>
-    <h1 class="lab-article__title"><%= post.title %></h1>
+    <h1 class="lab-article__title"><%= fullTitle %></h1>
     <% if (post.titleEn) { %>
     <p class="lab-article__title-en"><%= post.titleEn %></p>
     <% } %>
@@ -31,13 +42,13 @@
        · <span><%= post.author %></span>
       <% } %>
     </p>
-    <% if (post.description) { %>
-    <p class="lab-article__description"><%= post.description %></p>
+    <% if (fullDescription) { %>
+    <p class="lab-article__description"><%= fullDescription %></p>
     <% } %>
   </header>
 
   <%# === Book Photo（前置；type=book-review 且有 cover 時） === %>
-  <% if (post.type === 'book-review' && post.book && post.book.showBookPhoto && post.book.coverImage) { %>
+  <% if (fullContentKind === 'book-review' && post.book && post.book.showBookPhoto && post.book.coverImage) { %>
   <figure class="lab-book-photo">
     <img class="lab-book-photo__image" src="<%= post.book.coverImage %>" alt="<%= post.book.coverAlt || post.book.title || '' %>">
     <% if (post.book.title) { %>
