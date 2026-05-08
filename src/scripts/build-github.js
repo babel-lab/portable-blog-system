@@ -301,6 +301,11 @@ async function main() {
       template: 'pages/post-detail.ejs',
       data: baseData({
         post,
+        // Phase 8-d-3a：additive alias for EJS ergonomics；指向 8-d-2 掛載之 post.normalized。
+        //   - 不重新呼叫 normalizePostOutput；不啟用 deriveGithubUrl；不預測 Blogger URL
+        //   - EJS template 本批不改讀 normalized；屬 8-d-3b 之後範圍
+        //   - 既有 EJS 仍讀 post.X；本欄位 additive，不影響輸出
+        normalized: post.normalized,
         bodyHtml,
         title: `${post.title} | ${settings.site.siteName}`,
         description: post.description || settings.site.description,
