@@ -1,3 +1,9 @@
 # C-01 content schema
 
 文章採 Markdown + frontmatter。分類、標籤與站台設定集中於 `content/settings/`。
+
+---
+
+See also:
+- `docs/publish-bundle.md` §2.6.1（`.md` frontmatter 內容屬性欄位列表）
+- `docs/migration-from-frontmatter.md` §4（舊 frontmatter → `.md` frontmatter 對照）

@@ -186,6 +186,10 @@ blocks:
 ---
 ```
 
+See also:
+- `docs/publish-bundle.md` §2.6.1（`.md` frontmatter 內容屬性欄位列表）
+- `docs/migration-from-frontmatter.md` §4（舊 frontmatter → `.md` frontmatter 對照）
+
 ## 3.2 站台設定
 
 站台、分類、標籤、主題、廣告、社群、推廣、連結規則使用 JSON 管理。
@@ -1063,6 +1067,10 @@ comic：四格漫畫，第二階段可加強
 life-note：生活文章，第二階段可加強
 ```
 
+See also:
+- `docs/publish-bundle.md` §2.4（`type` → `contentKind` 改名與 `blogger.type` 分離原則）
+- `docs/migration-from-frontmatter.md` §3（`type` → `contentKind` 遷移規則）
+
 ---
 
 # 12. 書評文章規則
@@ -1494,6 +1502,10 @@ canonical 使用正式 URL
 未來搬家時保留對應
 站內互連時可引用
 ```
+
+See also:
+- `docs/publish-json-schema.md` §5.3（Blogger URL 規則，含 post yyyy/mm 與 page URL 分支）
+- `docs/publish-json-schema.md` §5.6（`blogger.type`）
 
 ---
 

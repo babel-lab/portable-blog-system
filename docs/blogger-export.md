@@ -257,6 +257,11 @@ Blogger 後台貼完 CSS 後，**務必用 Blogger 平台的「預覽」功能**
 
 → 上述項目將於 Phase 3-e 起另行規劃實作。
 
+See also:
+- `docs/publish-bundle.md` §2.5（`posts/` 與 `pages/` 皆適用 publish bundle）
+- `docs/publish-json-schema.md` §5.3（Blogger URL 規則，含 post / page 分支）
+- `docs/publish-json-schema.md` §5.6（`blogger.type`）
+
 ---
 
 ## 附錄：Build 指令對照

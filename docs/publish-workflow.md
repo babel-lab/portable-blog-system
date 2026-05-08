@@ -97,3 +97,10 @@ npm run build:blogger-theme  # Blogger 可貼用 CSS（首次貼主題用）
 - Phase 5 細節：`docs/seo-ga4-adsense.md`
 - 部署細節：`docs/github-deploy.md`
 - 備份細節：`docs/backup-and-migration.md`
+
+---
+
+See also:
+- `docs/publish-bundle.md` §2.6（三檔欄位分工）
+- `docs/migration-from-frontmatter.md` §7（人工遷移 10 步）
+- `docs/checklists/sidecar-migration-checklist.md`（三檔遷移檢查表）
