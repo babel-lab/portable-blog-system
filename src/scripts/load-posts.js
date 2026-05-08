@@ -10,6 +10,10 @@ import matter from 'gray-matter';
 //   本檔仍不 import readPostSidecars（保留低粒度，以利後續批次微調讀取邏輯）。
 import { readPublishSidecar, readFacebookSidecar } from './load-sidecars.js';
 
+// Phase 8-d-2：於 entry 組裝完成後 additive 掛載 entry.normalized；
+//   helper 為純函式，不修改 entry 既有欄位；不讀 settings；不啟用 GitHub URL 推導。
+import { normalizePostOutput } from './normalize-post-output.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
@@ -101,6 +105,14 @@ async function processMarkdownEntry(absPath, sourceCollection) {
   if (publishSidecar.exists && publishSidecar.data) {
     entry.publish = publishSidecar.data;
   }
+
+  // Phase 8-d-2：additive 掛載 entry.normalized
+  //   - normalize-post-output 為純函式；不修改 entry 既有欄位
+  //   - 不傳入 settings（依 8-d-2 指令；8-d-3 / 8-d-4 之 caller 端視需要再傳入完整 settings）
+  //   - 不啟用 GitHub URL 推導（deriveGithubUrl: false）
+  //   - 既有 callers / EJS / build 仍讀 entry 原欄位；entry.normalized 屬 additive runtime 欄位
+  //   - 不 console.warn warnings；不 throw；warning 由 entry.normalized.validationMeta.warnings 攜帶供下游使用
+  entry.normalized = normalizePostOutput(entry, {}, { deriveGithubUrl: false });
 
   return { included: true, entry };
 }
