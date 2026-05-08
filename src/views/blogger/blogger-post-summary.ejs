@@ -2,6 +2,15 @@
 <%# 摘要導流：顯示 description + CTA 連往 canonical（含 UTM）+ hashtag %>
 <%# 不渲染 markdown body 全文（避免內容外洩） %>
 <%# Phase 5-f-2：補 in-body canonical link + BlogPosting JSON-LD %>
+<%# Phase 8-d-3c-1：低風險欄位改讀 normalized；保留 legacy fallback %>
+<%# 模板實際使用之欄位中，僅 title / description 屬本批低風險清單；其餘 contentKind / slug / excerpt / cover / coverAlt 不在模板中，不新增 %>
+<%# 不改 canonicalUrl / jsonLd / category / date / author / tags / blocks 之既有讀法 %>
+<%
+const view = normalized || {};
+const display = view.display || {};
+const summaryTitle = display.title || post.title;
+const summaryDescription = display.description || post.description;
+%>
 <div class="lab-blogger-article">
 
   <% if (canonicalUrl) { %>
@@ -15,7 +24,7 @@
     <% if (post.category) { %>
     <p class="lab-article__category"><%= post.category %></p>
     <% } %>
-    <h1 class="lab-article__title"><%= post.title %></h1>
+    <h1 class="lab-article__title"><%= summaryTitle %></h1>
     <p class="lab-article__meta">
       <% if (post.date) { %>
       <time datetime="<%= post.date %>"><%= post.date %></time>
@@ -27,7 +36,7 @@
   </header>
 
   <div class="lab-article__body">
-    <p><%= post.description || '（本文為導流摘要，完整內容請見原站。）' %></p>
+    <p><%= summaryDescription || '（本文為導流摘要，完整內容請見原站。）' %></p>
   </div>
 
   <% if (canonicalUrl) { %>
