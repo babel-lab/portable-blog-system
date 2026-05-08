@@ -21,7 +21,8 @@ const DATE_FORMAT_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Phase 5-g-4：WARNING 規則常數
 const VALID_SITE = new Set(['github', 'blogger']);
-const VALID_TYPE = new Set(['post', 'tech-note', 'book-review', 'download', 'comic', 'life-note']);
+// Phase 8-b-3：VALID_TYPE 改名為 VALID_CONTENT_KIND，並新增 'page' 列舉值
+const VALID_CONTENT_KIND = new Set(['post', 'tech-note', 'book-review', 'download', 'comic', 'life-note', 'page']);
 const VALID_PRIMARY_PLATFORM = new Set(['github', 'blogger']);
 const VALID_PUBLISH_MODE = {
   github: new Set(['full', 'summary']),
@@ -137,8 +138,36 @@ export function validateContent({ posts, settings }) {
       if (post.site !== undefined && !VALID_SITE.has(post.site)) {
         issues.push({ severity: 'warning', type: 'invalid-site', sourcePath, value: String(post.site) });
       }
-      if (post.type !== undefined && !VALID_TYPE.has(post.type)) {
-        issues.push({ severity: 'warning', type: 'invalid-type', sourcePath, value: String(post.type) });
+      // Phase 8-b-3：contentKind 相容讀取與舊 type 警告
+      //   - post.contentKind 為主（load-posts 在無 contentKind 時自動 fallback 到 data.type）
+      //   - post.type 仍保留作 debug；以下三條規則處理命名落差
+      if (post.contentKind !== undefined && !VALID_CONTENT_KIND.has(post.contentKind)) {
+        issues.push({
+          severity: 'warning',
+          type: 'invalid-content-kind',
+          sourcePath,
+          value: String(post.contentKind),
+        });
+      }
+      if (
+        post.type !== undefined &&
+        post.contentKind !== undefined &&
+        post.type !== post.contentKind
+      ) {
+        issues.push({
+          severity: 'warning',
+          type: 'contentkind-and-type-conflict',
+          sourcePath,
+          value: `type=${String(post.type)}, contentKind=${String(post.contentKind)}`,
+        });
+      }
+      if (post.type !== undefined && post.contentKind === post.type) {
+        issues.push({
+          severity: 'warning',
+          type: 'frontmatter-uses-deprecated-type',
+          sourcePath,
+          value: String(post.type),
+        });
       }
       if (post.primaryPlatform !== undefined && !VALID_PRIMARY_PLATFORM.has(post.primaryPlatform)) {
         issues.push({ severity: 'warning', type: 'invalid-primary-platform', sourcePath, value: String(post.primaryPlatform) });

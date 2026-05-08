@@ -49,8 +49,17 @@ export async function loadPosts({ site = 'github' } = {}) {
       continue;
     }
 
-    posts.push({
+    // Phase 8-b-3：type → contentKind 相容讀取
+    //   data.contentKind 為主；若無則 fallback 到 data.type（舊命名）。
+    //   保留原始 data 之 type 欄位不刪，避免破壞既有 debug 流程；
+    //   兩者並存且值不同之 warning 由 validate-content.js 處理。
+    const normalizedData = {
       ...data,
+      contentKind: data.contentKind ?? data.type,
+    };
+
+    posts.push({
+      ...normalizedData,
       sourcePath,
       bodyLength: content.length,
       body: content,
