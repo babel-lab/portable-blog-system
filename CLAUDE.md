@@ -138,7 +138,7 @@ content/
 ---
 id: "20260504-github-pages-blog-planning"
 site: "github"
-type: "tech-note"
+contentKind: "tech-note"
 primaryPlatform: "github"
 
 title: "GitHub Pages 免費空間限制與部落格規劃"
@@ -1056,7 +1056,7 @@ Blogger 文章 HTML 需包：
 
 # 11. 文章類型
 
-系統至少支援：
+`contentKind` 欄位放在 `.md` frontmatter，描述「這是什麼樣的內容」。列舉值至少支援：
 
 ```text
 post：一般文章
@@ -1065,11 +1065,14 @@ book-review：書評文章
 download：教具下載文章
 comic：四格漫畫，第二階段可加強
 life-note：生活文章，第二階段可加強
+page：固定頁（About / 工具目錄 / 下載索引頁等）
 ```
 
+`contentKind` 與 Blogger 平台之 `blogger.type`（`post` / `page`，放在 `.publish.json`）為獨立兩維度，不可混用、不可相互推導。
+
 See also:
-- `docs/publish-bundle.md` §2.4（`type` → `contentKind` 改名與 `blogger.type` 分離原則）
-- `docs/migration-from-frontmatter.md` §3（`type` → `contentKind` 遷移規則）
+- `docs/publish-bundle.md` §2.4（`contentKind` 與 `blogger.type` 分離原則）
+- `docs/migration-from-frontmatter.md` §3（既有 `type` 欄位之 `contentKind` 對應與遷移範例）
 
 ---
 

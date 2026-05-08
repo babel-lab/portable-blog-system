@@ -117,17 +117,17 @@ Phase 8-a 起明確分離兩個獨立維度，避免 CLAUDE.md §11 既有 `type
 | `tech-note` | `post` | 技術筆記，發到 Blogger「文章」區 |
 | `page` | `page` | 固定頁（About / 工具目錄 / 下載索引頁），發到 Blogger「網頁」區 |
 
-#### 2.4.5 與 CLAUDE.md §11 既有 `type` 命名之關係
+#### 2.4.5 與 CLAUDE.md §11 之命名對齊歷史
 
-CLAUDE.md §11「文章類型」既有 `type` 欄位（列舉 `post / tech-note / book-review / download / comic / life-note`）語意對應本文件之 `contentKind`。
+「內容型態」之欄位名於 Phase 8-a 起正式由 `type` 重新命名為 `contentKind`，以避免與 `blogger.type` 之 `post` / `page` 撞名。
 
-**Phase 8-a 不修改 CLAUDE.md**。本文件以下列原則處置命名落差：
+對齊歷程：
 
-1. 8-a 起所有規範文件（本文件、`docs/publish-json-schema.md`、`docs/fb-sidecar-schema.md`、後續批次之 migration 文件）一律使用 `contentKind` 作為內容型態欄位名
-2. CLAUDE.md §11 之 `type` 視為**舊命名**，待 Phase 8 後續批次（CLAUDE.md 整理批次）統一更名為 `contentKind`，更名時機由作者另行決定
-3. CLAUDE.md 更名前，遇舊文章 frontmatter 出現 `type` 欄位時，視為 `contentKind` 之相容寫法。實作落地時機為 Phase 8-b 之後
+1. **Phase 8-a-1～7（文件先行）**：8-a 新建之規範文件、遷移指引、checklist、sample 範本一律使用 `contentKind`。CLAUDE.md §11 此期間暫保留舊 `type` 命名，僅以 See also 指向本節。
+2. **CLAUDE.md 整理批次（路徑 C）**：CLAUDE.md §11 之欄位名與列舉值已對齊為 `contentKind`，並補入 `page` 列舉值；CLAUDE.md §3.1 frontmatter 範例之 `type:` 同步改為 `contentKind:`。本節描述之命名落差至此**收尾**。
+3. **既有文章 frontmatter 之相容處理**：`content/{site}/posts/*.md` 之既有文章若仍含舊 `type` 欄位，於相容期內由 `validate-content` 視為 `contentKind` 之相容寫法（實作落地時機為 Phase 8-b 之後）。本節不要求現在主動遷移既有文章。
 
-明確標註：**「內容型態」之欄位名於 Phase 8-a 起正式由 `type` 重新命名為 `contentKind`，以避免與 `blogger.type` 之 `post` / `page` 撞名。**
+明確標註：**「內容型態」欄位 = `contentKind`；CLAUDE.md §3.1、§11、本文件、`docs/publish-json-schema.md`、`docs/fb-sidecar-schema.md`、`docs/migration-from-frontmatter.md`、sample 範本之命名已全部對齊。**
 
 ### 2.5 `posts/` 與 `pages/` 皆適用 publish bundle
 
