@@ -471,7 +471,7 @@ JSON-LD 用 `<` escape `<`（防 `</script>` 注入），與 5-b `seo/json-ld.ej
 | `long-description` | description.length > 160 |
 | `long-search-description` | searchDescription.length > 200 |
 | `invalid-site` | site 不在 {github, blogger} |
-| `invalid-type` | type 不在 {post, tech-note, book-review, download, comic, life-note} |
+| `invalid-content-kind` | contentKind 不在 {post, tech-note, book-review, download, comic, life-note, page}（Phase 8-b-3 起：contentKind 為主欄位，舊 `type` 為 legacy frontmatter 欄位、由 load-posts 相容讀取） |
 | `invalid-primary-platform` | primaryPlatform 不在 {github, blogger} |
 | `invalid-canonical` | canonical 是字串、非空、非 auto、不符 `^https?://` |
 | `invalid-publish-target-mode` | publishTargets.{x}.enabled=true 且 mode 不在 valid set（github: full/summary；blogger: full/summary/redirect-card） |
