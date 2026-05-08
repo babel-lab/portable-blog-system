@@ -33,6 +33,33 @@ const DESCRIPTION_MAX = 160;
 const SEARCH_DESCRIPTION_MAX = 200;
 const VALID_CANONICAL_RE = /^https?:\/\//;
 
+// Phase 8-b-6：sidecar / frontmatter 欄位衝突 warning 之欄位清單
+//   採 presence-only 檢查（兩邊都有同名欄位即 warn，不比較值）；
+//   sidecar 不存在或 sidecar data 缺漏時略過該 sidecar 之檢查。
+const PUBLISH_OVERLAP_FIELDS = [
+  'title',
+  'description',
+  'excerpt',
+  'slug',
+  'canonicalUrl',
+  'publishedUrl',
+  'status',
+  'tags',
+  'category',
+  'contentKind',
+  'type',
+];
+const FB_OVERLAP_FIELDS = [
+  'title',
+  'description',
+  'excerpt',
+  'url',
+  'canonicalUrl',
+  'publishedUrl',
+  'tags',
+  'hashtags',
+];
+
 // Phase 7-fix-1 (E)：body-leading-h1 規則用
 // 偵測 markdown body 第一個非空行是否為 ATX H1（# 後面接空白）。
 // 不檢測 setext H1（=== 形式），因 source pattern 罕見且 user 報告場景為 ATX。
@@ -254,6 +281,44 @@ export function validateContent({ posts, settings }) {
       // P1: 全域停用診斷（不阻擋）
       if (!fbGloballyEnabled) {
         issues.push({ severity: 'warning', type: 'promotion-globally-disabled', sourcePath });
+      }
+    }
+
+    // Phase 8-b-6：sidecar / frontmatter 欄位衝突 warning
+    //   - presence-only 檢查；兩邊都有同名欄位即 warn，不比較值
+    //   - .publish.json 不存在或 parse 失敗（post.publish === undefined） → 跳過 publish overlap
+    //   - .fb.md 不存在或 parse 失敗（sidecars.facebook.data === null）→ 跳過 fb overlap
+    //   - 嚴格 warning（不升 error），不改變 post 欄位值，不阻擋流程
+    const publishData = post.publish;
+    if (publishData && typeof publishData === 'object') {
+      for (const field of PUBLISH_OVERLAP_FIELDS) {
+        if (post[field] !== undefined && publishData[field] !== undefined) {
+          issues.push({
+            severity: 'warning',
+            type: 'sidecar-frontmatter-overlap',
+            sourcePath,
+            value: `${field} in .md frontmatter and .publish.json`,
+          });
+        }
+      }
+    }
+
+    const fbSidecar = post.sidecars?.facebook;
+    if (
+      fbSidecar &&
+      fbSidecar.exists === true &&
+      fbSidecar.data &&
+      typeof fbSidecar.data === 'object'
+    ) {
+      for (const field of FB_OVERLAP_FIELDS) {
+        if (post[field] !== undefined && fbSidecar.data[field] !== undefined) {
+          issues.push({
+            severity: 'warning',
+            type: 'sidecar-frontmatter-overlap',
+            sourcePath,
+            value: `${field} in .md frontmatter and .fb.md`,
+          });
+        }
       }
     }
   }
