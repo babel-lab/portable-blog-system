@@ -21,17 +21,27 @@
     <p>目前沒有可顯示的文章。</p>
     <% } else { %>
     <div class="lab-card-grid">
-      <% posts.forEach(function (post) { %>
+      <%# Phase 8-d-3c-7-b：迴圈內 per-item view-model；低風險欄位（title / slug / description）優先讀 normalized；保留 legacy fallback %>
+      <%# home.ejs 之 post-card 較精簡（無 cover / coverAlt / titleEn），依指令 14 不新增；view-model 僅含 3 個變數，不沿用 8-d-3c-4～6 之完整 5 變數結構 %>
+      <%# 不改 HTML 結構 / class name / category / date 之既有讀法；不改 hero / site.X / AdSense / heading / empty-state 等非 post 區塊 %>
+      <% posts.forEach(function (post) {
+        const itemView = post.normalized || {};
+        const itemDisplay = itemView.display || {};
+        const itemIdentity = itemView.identity || {};
+        const itemTitle = itemDisplay.title || post.title;
+        const itemDescription = itemDisplay.description || post.description;
+        const itemSlug = itemIdentity.slug || post.slug;
+      %>
       <article class="lab-post-card">
         <p class="lab-post-card__category"><%= post.category %></p>
-        <h3 class="lab-post-card__title"><%= post.title %></h3>
-        <% if (post.description) { %>
-        <p class="lab-post-card__description"><%= post.description %></p>
+        <h3 class="lab-post-card__title"><%= itemTitle %></h3>
+        <% if (itemDescription) { %>
+        <p class="lab-post-card__description"><%= itemDescription %></p>
         <% } %>
         <p class="lab-post-card__meta">
           <time datetime="<%= post.date %>"><%= post.date %></time>
         </p>
-        <a class="lab-post-card__link" href="/posts/<%= post.slug %>/">閱讀文章</a>
+        <a class="lab-post-card__link" href="/posts/<%= itemSlug %>/">閱讀文章</a>
       </article>
       <% }); %>
     </div>
