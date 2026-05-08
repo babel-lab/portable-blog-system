@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "canonical": {
+    "url": "https://babel-lab.blogspot.com/2026/04/we-media-myself.html",
+    "source": "blogger"
+  },
+  "ogImage": {
+    "url": "https://example.com/images/we-media-myself-cover.jpg",
+    "alt": "示範文章封面圖"
+  },
+  "blogger": {
+    "type": "post",
+    "permalink": "we-media-myself",
+    "status": "published",
+    "publishedUrl": "https://babel-lab.blogspot.com/2026/04/we-media-myself.html",
+    "publishedAt": "2026-04-01T10:00:00+08:00",
+    "bloggerPostId": "1234567890123456789",
+    "publishYear": "2026",
+    "publishMonth": "04",
+    "history": []
+  },
+  "github": {
+    "slug": "",
+    "path": "",
+    "status": "draft",
+    "publishedUrl": "",
+    "publishedAt": ""
+  },
+  "seo": {
+    "metaTitle": "",
+    "metaDescription": "",
+    "robots": "index,follow"
+  }
+}

@@ -1,0 +1,474 @@
+# `.fb.md` Sidecar 格式規範 (Facebook Promotion Sidecar Schema)
+
+本文件為 `.fb.md` 之完整格式規範。所有讀取、寫入、驗證 `.fb.md` 之實作皆須以本文件為準。
+
+對應之上層規範詳見 `docs/publish-bundle.md`；對應之 `.publish.json` 規格詳見 `docs/publish-json-schema.md`。
+
+對應之範本檔 `_sample.fb.md` 將於 Phase 8-a 後續批次建立，本文件先行公布規格與簡短範例（見 §10）。
+
+---
+
+## §1 檔名規則
+
+### 1.1 命名
+
+每篇文章之 `.fb.md` 檔名為：
+
+```
+{slug}.fb.md
+```
+
+`{slug}` 必須與同資料夾內 `{slug}.md` 之 frontmatter `slug` 欄位、以及同資料夾內 `{slug}.publish.json`（若存在）之檔名前綴完全一致。
+
+### 1.2 位置
+
+`.fb.md` 與對應之 `.md` 位於同一資料夾。本檔同時適用於 `posts/` 與 `pages/` 資料夾：
+
+posts：
+
+```
+content/blogger/posts/example.md
+content/blogger/posts/example.fb.md
+
+content/github/posts/example.md
+content/github/posts/example.fb.md
+```
+
+pages：
+
+```
+content/blogger/pages/about.md
+content/blogger/pages/about.fb.md
+
+content/github/pages/tools-index.md
+content/github/pages/tools-index.fb.md
+```
+
+`pages/` 之 sidecar 規範與 `posts/` 完全一致；publish bundle 適用範圍與 Page 一級支援詳見 `docs/publish-bundle.md` §2.5。
+
+不得置於 `content/templates/`、`content/{site}/posts/`、`content/{site}/pages/` 以外之其他資料夾，亦不得置於 `dist-*` 內。
+
+### 1.3 編碼與格式
+
+- 編碼：UTF-8 無 BOM
+- 換行：LF
+- 內容：合法之 YAML frontmatter + Markdown body 結構（詳見 §2）
+
+### 1.4 一對一關係
+
+一篇文章對應一份 `.fb.md`。`.fb.md` 不得脫離對應 `.md` 單獨存在。若 `.md` 被刪除或封存，對應之 `.fb.md` 應一併刪除或移至 `content/archive/`（屬作者操作）。
+
+### 1.5 `posts/` 與 `pages/` 皆適用
+
+`.fb.md` 同時適用於 `content/{site}/posts/` 與 `content/{site}/pages/` 資料夾。Page 之 FB 推廣文案需求與 post 一致，採完整 sidecar 結構，**不另設簡化版**。Page 不因「於 Blogger 後台被歸為網頁」而失去 FB 推廣能力，所有 §3 之 frontmatter 欄位、§4 之 body 規格、§5 之 placeholder、§7 之 severity 規則皆同等適用。
+
+詳細之 publish bundle 適用範圍與 Page 一級支援原則詳見 `docs/publish-bundle.md` §2.5。
+
+---
+
+## §2 結構
+
+### 2.1 整體結構
+
+`.fb.md` 由 YAML frontmatter 與 Markdown body 兩段構成：
+
+```
+---
+<YAML frontmatter>
+---
+
+<Markdown body>
+```
+
+frontmatter 以兩道 `---` 分隔線界定，必須位於檔案開頭。frontmatter 段之後可空一行或多行；其後之內容皆視為 body。
+
+### 2.2 frontmatter 段
+
+frontmatter 為標準 YAML，欄位定義詳見 §3。frontmatter 段必須存在；若缺漏（檔案無 `---` 分隔線、或 frontmatter 為空）則視為格式錯誤，validate 階段列為 error。
+
+### 2.3 body 段
+
+body 為標準 Markdown，作為 FB 貼文之純文字內容使用。Markdown 之精細排版指令（如 `**bold**`、表格、程式碼區塊）於 FB 平台不被解析，故建議僅使用換行、段落分隔、純文字、URL 與 emoji。詳見 §4。
+
+---
+
+## §3 frontmatter 欄位
+
+### 3.1 欄位總表
+
+| 欄位 | 型別 | 必填 | 預設值 | 說明 |
+| --- | --- | --- | --- | --- |
+| `enabled` | boolean | 是 | `false` | 是否啟用本篇 FB 文案；§6 判定之第二條件 |
+| `page` | string | 否 | `""` | 對應 `promotion.config.json` 中之 page key；空字串時 fallback 至 `defaultPage` |
+| `target` | enum | 是 | `"auto"` | 文章 URL 解析目標；列舉值見 §5.4 |
+| `customUrl` | string | 否 | `""` | 當 `target === "custom"` 時使用之外部 URL；其他 target 值下忽略 |
+| `hashtags` | array of string | 否 | `[]` | FB 貼文使用之 hashtag 陣列；建議帶 `#` 號 |
+| `title` | string | 否 | `""` | FB / OG 標題；空字串時 fallback 至 `.md` frontmatter `title` |
+| `note` | string | 否 | `""` | 作者備忘，不輸出至 FB 貼文 |
+
+### 3.2 欄位驗證細節
+
+- `enabled` 必須為 boolean；其他型別（如字串 `"true"`、整數 `1`）視為 invalid，列為 warning
+- `page` 之合法值由 `promotion.config.json` 之 `facebook.pages` 動態決定；驗證規則見 §8.1
+- `target` 必須為 §5.4 列舉值之一；其他值列為 error
+- `customUrl` 僅於 `target === "custom"` 時生效；非 custom 但 `customUrl` 非空字串時列為 warning
+- `hashtags` 必須為陣列，元素必須為字串；不符 → warning
+- `title` / `note` 為自由字串，本文件不限長度
+
+### 3.3 不允許之欄位
+
+frontmatter 不得包含本表以外之欄位。出現未列欄位於 validate 階段列為 warning，不阻擋 build。新增欄位屬規格變更，應更新本文件。
+
+---
+
+## §4 body 規格
+
+### 4.1 內容定位
+
+body 為 FB 貼文之**純文字內容**。於 build 階段經 placeholder 解析後，整段輸出至：
+
+```
+dist-promotion/facebook/{site}/{slug}.txt
+```
+
+作者再手動複製貼上至 Facebook 後台。
+
+### 4.2 Markdown 使用建議
+
+由於 Facebook 貼文不解析 Markdown 語法，body 雖以 `.fb.md` 副檔名標示為 Markdown，實務上建議：
+
+- **可使用**：換行、空行段落分隔、純文字、URL、emoji
+- **避免使用**：粗體、斜體、標題、表格、清單符號、程式碼區塊、圖片語法（FB 不顯示，反而干擾閱讀）
+
+若作者選擇使用部分 Markdown 標記，build 階段不主動移除，最終呈現以 FB 平台為準。
+
+### 4.3 多段結構
+
+body 允許多段、多空行。空行作為段落分隔被保留至輸出 `.txt`。
+
+### 4.4 placeholder 嵌入
+
+body 中可嵌入 URL placeholder（詳見 §5），於 build 階段被解析為實際 URL。
+
+### 4.5 hashtag 與 body 之關係
+
+`hashtags` 欄位與 body 內容彼此獨立。build 階段預設將 `hashtags` 陣列以空格串接、附於 body 結尾輸出。實際輸出格式由 `src/views/promotion/facebook-post.ejs` 模板決定，本文件不另指定。
+
+---
+
+## §5 URL placeholder
+
+### 5.1 支援清單
+
+`.fb.md` body 內可使用下列 URL placeholder：
+
+- `{{ articleUrl }}` — 依 `target` 動態解析之文章 URL
+- `{{ blogger.publishedUrl }}` — 強制為 Blogger 平台之 `publishedUrl`
+- `{{ github.publishedUrl }}` — 強制為 GitHub Pages 平台之 `publishedUrl`
+- `{{ canonicalUrl }}` — 強制為 canonical URL（依 `.publish.json` `canonical` 區塊）
+
+placeholder 名稱為 case-sensitive。其他名稱（含拼寫變體、未定義路徑）皆視為未知 placeholder，build 階段不解析、validate 階段列為 warning。
+
+### 5.2 比對規則
+
+placeholder 比對容忍左右空白：
+
+```
+{{KEY}}        ← 視為同一 placeholder
+{{ KEY }}      ← 視為同一 placeholder
+{{  KEY  }}    ← 視為同一 placeholder
+```
+
+對應之概念正規表達式為：
+
+```
+\{\{\s*KEY\s*\}\}
+```
+
+其中 `KEY` 為 §5.1 列舉之 placeholder 名稱。實作時 `KEY` 中之路徑符號 `.`（如 `blogger.publishedUrl`）必須以正規表達式之 escape 形式比對。
+
+不容忍 `{{` 與 `}}` 之間出現換行。跨行 placeholder 不被解析。
+
+### 5.3 各 target 對應之 `articleUrl`
+
+`{{ articleUrl }}` 之解析結果依 frontmatter `target` 欄位動態決定（詳見 §5.4）。其他三個 placeholder（`{{ blogger.publishedUrl }}` / `{{ github.publishedUrl }}` / `{{ canonicalUrl }}`）不受 `target` 影響，固定指向各自對應欄位。
+
+### 5.4 `target` 列舉值與解析來源
+
+`target` 之合法值如下：
+
+| `target` 值 | `{{ articleUrl }}` 解析來源 |
+| --- | --- |
+| `"auto"` | 依 `primaryPlatform` 與可用 `publishedUrl` 推導；詳見 §5.5 |
+| `"blogger"` | `.publish.json` `blogger.publishedUrl` |
+| `"github"` | `.publish.json` `github.publishedUrl`，缺則 fallback 至 `site.config.json` `githubSiteUrl` + `github.path`（沿用 `docs/publish-json-schema.md` §8.4） |
+| `"canonical"` | `.publish.json` `canonical.url` |
+| `"custom"` | frontmatter `customUrl` 欄位 |
+
+未列於上述者皆視為 invalid，validate 階段列為 error。
+
+### 5.5 `target === "auto"` 之解析原則
+
+`target === "auto"` 時，`{{ articleUrl }}` 依以下順序推導：
+
+1. 若 `primaryPlatform === "blogger"`：取 `blogger.publishedUrl`；若為空字串，進入步驟 2
+2. 若 `primaryPlatform === "github"`：取 `github.publishedUrl`（含 §5.4 之 fallback）；若為空字串，進入步驟 3
+3. 步驟 1 或 2 之選定平台 URL 為空字串時：取 `canonical.url`
+4. 全部皆為空字串：解析失敗，依 §7.2 之 placeholder 未解析 severity 規則處置
+
+### 5.6 Blogger URL 預測禁則（強制規範）
+
+下列規則承襲自 `docs/publish-json-schema.md` §5.3：
+
+- 系統不得自行組出 Blogger 之 `publishedUrl`
+- 若 `blogger.publishedUrl` 尚未回填（為空字串），系統不得以 `bloggerSiteUrl + permalink` 或任何月份組合替代
+- Blogger URL 必須等實際發布後由作者回填至 `.publish.json` 之 `blogger.publishedUrl`
+- 因此 `target === "blogger"` 但 `blogger.publishedUrl` 為空時，`{{ articleUrl }}` 與 `{{ blogger.publishedUrl }}` 皆判為解析失敗，依 §7.2 處置
+
+### 5.7 解析失敗之處置
+
+placeholder 解析失敗（對應欄位為空字串、缺漏、或無法推導）時：
+
+- build 階段不阻擋產出 `.txt`；於該檔內保留原始 placeholder 字串（例：`{{ articleUrl }}` 不被替換），作者於最終貼文前可肉眼辨識
+- validate 階段依 §7.2 之 severity 矩陣處置
+
+build 階段不得以「未知 URL」或任意預測值替換未解析之 placeholder。
+
+---
+
+## §6 FB 文案存在判定
+
+### 6.1 兩條件 AND
+
+「FB 文案存在」之判定為下列兩條件之**邏輯 AND**：
+
+1. `{slug}.fb.md` 檔案存在
+2. `.fb.md` frontmatter `enabled === true`
+
+兩條件缺其一，視為「FB 文案缺漏」。
+
+### 6.2 反例
+
+下列情況皆視為「FB 文案缺漏」：
+
+- `.fb.md` 檔案不存在
+- `.fb.md` 檔案存在但 frontmatter 缺 `enabled` 欄位
+- `.fb.md` 檔案存在但 `enabled === false`
+- `.fb.md` 檔案存在但 frontmatter 為非合法 YAML 或無法解析
+
+「檔案存在但 `enabled === false`」明確視為缺漏，**不視為「作者選擇不發 FB」之合法狀態**。作者若暫不欲發 FB，仍應建立 `.fb.md` 並填入完整文案備用，僅將 `enabled` 設為 `false` 暫停；遇 §7.1 之 severity 判定時依 status 對應 severity 處置。
+
+### 6.3 與 frontmatter `promotion.facebook.enabled` 之關係
+
+舊 frontmatter `promotion.facebook.enabled` 於 Phase 8-b 相容期內仍作為 fallback 使用。當 `.fb.md` 不存在但 frontmatter `promotion.facebook.enabled === true` 時，視為「FB 文案存在於 frontmatter 之相容期路徑」；此情況下 §6.1 之第一條件不成立，仍判為缺漏，但於 8-b 相容期內 severity 應依 §9 之相容性規則調整為 warning，不直接 error。
+
+詳細之相容期 severity 處置規則屬 Phase 8-c 之實作範圍。
+
+---
+
+## §7 severity 規則
+
+### 7.1 FB 文案缺漏之 severity
+
+依 `.md` frontmatter 文件層級 `status` 動態判定：
+
+| 文章 status | severity |
+| --- | --- |
+| `draft` | warning |
+| `ready` | error（擋正式檢查） |
+| `published` | error（擋正式檢查） |
+| `archived` | warning |
+
+「擋正式檢查」之具體行為由 `validate-content` 之 exit code 與 severity 機制決定，沿用 Phase 5-g 既有設計。
+
+### 7.2 placeholder 未解析之 severity
+
+| 文章 status | severity |
+| --- | --- |
+| `draft` | warning，不擋 build |
+| `ready` | error，擋正式檢查 |
+| `published` | error，擋正式檢查 |
+| `archived` | warning |
+
+未解析之 placeholder 若被作者複製貼上至 Facebook，將輸出原始字串（例：`{{ articleUrl }}`），導致導流連結錯誤。`ready` / `published` 階段對此採 error 阻擋；`draft` / `archived` 階段採 warning 提醒。
+
+### 7.3 與 `docs/publish-bundle.md` §4 之關係
+
+本文件 §7.1 與 §7.2 之 severity 矩陣為 `docs/publish-bundle.md` §4 之具體落地版本。`publish-bundle.md` 為總則；本表為 `.fb.md` 之專屬適用條目。
+
+### 7.4 規則生效時機
+
+§7.1 與 §7.2 之**實作落地時機為 Phase 8-c**。Phase 8-a 至 Phase 8-b 期間本文件僅作為規範依據，`validate-content.js` 尚未加入對應規則。
+
+---
+
+## §8 與 `promotion.config.json` 的關係
+
+### 8.1 `page` 欄位驗證
+
+`.fb.md` frontmatter `page` 欄位之合法值由 `content/settings/promotion.config.json` 之 `facebook.pages` 動態決定。
+
+驗證規則：
+
+- `page` 必須為 `pages` 中**存在**之 key
+- 對應之 `pages[page].enabled` 必須為 `true`
+- 兩條件任一不符 → warning，不阻擋 build
+
+`page` 為空字串時，fallback 至 `promotion.config.json` 之 `facebook.defaultPage`。`defaultPage` 亦須符合上述兩條件。
+
+### 8.2 全域開關
+
+`promotion.config.json` 之 `facebook.enabled` 為全域開關。當全域 `enabled !== true` 時：
+
+- 所有 `.fb.md` 不再產出 `dist-promotion/facebook/{site}/{slug}.txt`
+- validate 階段列 warning（沿用 Phase 4-g 之 `promotion-globally-disabled` 規則）
+- 不視為 §7.1 之 FB 文案缺漏 error 條件
+
+### 8.3 UTM 與粉專設定不寫死於 `.fb.md`
+
+UTM 參數、粉專完整名稱、URL pattern、campaign 命名規則等仍由 `promotion.config.json` 集中管理。`.fb.md` **不得**寫死下列欄位：
+
+- UTM 參數（`utm_source` / `utm_medium` / `utm_campaign` / `utm_content`）
+- 粉專完整名稱
+- campaign / content 命名 pattern
+
+UTM 之套用由 build 階段依 `promotion.config.json` 之 `facebook.utm` 設定動態組裝。
+
+### 8.4 `.fb.md` 與 `promotion.config.json` 之分工
+
+| 資料類型 | 管理位置 |
+| --- | --- |
+| 個別文章之 FB 文案內容 | `.fb.md` body |
+| 個別文章之 hashtag、target、customUrl、note | `.fb.md` frontmatter |
+| 粉專定義、enabled 狀態、defaultPage | `promotion.config.json` `facebook.pages` |
+| UTM 規則、campaign / content pattern | `promotion.config.json` `facebook.utm` |
+| FB 全域開關 | `promotion.config.json` `facebook.enabled` |
+
+---
+
+## §9 與既有 frontmatter `promotion.facebook` 的關係
+
+### 9.1 範圍
+
+既有 `.md` frontmatter 之 `promotion.facebook` 區塊（Phase 1-7 既有設計，含 `enabled` / `page` / `title` / `message` / `target` / `hashtags` / `note` 等欄位）為舊路徑。Phase 8 引入 `.fb.md` sidecar 後，二者形成新舊兩條路徑並存。
+
+### 9.2 Phase 8-a 階段：僅定義規格，不執行遷移
+
+Phase 8-a 階段不執行任何 frontmatter `promotion.facebook` 至 `.fb.md` 之資料遷移。既有文章之 frontmatter 不予改動。
+
+### 9.3 Phase 8-b 階段起進入相容期
+
+Phase 8-b 啟用 `.fb.md` 讀取後，進入相容期：
+
+- 同欄位同時存在於 `.fb.md` frontmatter 與 `.md` frontmatter `promotion.facebook` 時：**`.fb.md` 勝**
+- `.fb.md` 不存在時：fallback 至 `.md` frontmatter `promotion.facebook`
+- 兩者皆無：依 §7.1 之 severity 規則判定
+
+### 9.4 衝突處置
+
+當 `.fb.md` 與 `.md` frontmatter `promotion.facebook` 同時提供同一欄位且值不同時：
+
+- sidecar 勝出
+- validate 階段列 warning，提示作者整理資料來源
+- **不得升為 error**（沿用 `docs/publish-bundle.md` §3.2 之相容性原則）
+
+### 9.5 詳細對照表延至遷移文件
+
+`promotion.facebook.message` 與 `.fb.md` body、`promotion.facebook.hashtags` 與 `.fb.md` frontmatter `hashtags` 等之逐欄位對照表，留待 `docs/migration-from-frontmatter.md` 撰寫（屬 Phase 8-a 後續批次）。本文件不重複列出。
+
+### 9.6 相容層退場時機
+
+`.md` frontmatter `promotion.facebook` 之相容層退場屬 Phase 8-g 之決策，由作者於所有文章遷移完成後另行決定。
+
+---
+
+## §10 範例
+
+下列範例為**規格示意**，**不建立為範本檔**。範本檔 `_sample.fb.md` 屬 Phase 8-a 後續批次建立。
+
+### 10.1 簡短範例：書評文章
+
+```
+---
+enabled: true
+page: "fan1"
+target: "auto"
+customUrl: ""
+hashtags:
+  - "#貝果書屋"
+  - "#書評"
+  - "#AI玩轉自媒體的52個商業思維"
+title: ""
+note: "排程晚間發文"
+---
+
+[貝果書屋] 《自媒自創：AI玩轉自媒體的52個商業思維》
+
+書封完全沒有文字，會有人敢買嗎？
+
+買了後發現…是本在講用 AI 提示詞驗證自己的「自媒體藍圖筆記書」。
+
+👇 完整故事與漫畫全文：
+{{ articleUrl }}
+```
+
+說明：
+
+- `enabled: true` 且檔案存在，符合 §6 判定
+- `target: "auto"` → `{{ articleUrl }}` 依 `primaryPlatform` 推導（§5.5）
+- `customUrl` 留空（target 非 custom）
+- `note` 為作者備忘，不輸出
+- `title` 留空，build 階段 fallback 至 `.md` frontmatter `title`
+
+### 10.2 簡短範例：純導流卡（指定 Blogger）
+
+```
+---
+enabled: true
+page: "fan1"
+target: "blogger"
+customUrl: ""
+hashtags:
+  - "#新文上線"
+title: ""
+note: ""
+---
+
+新文上線，整理 GitHub Pages 免費空間限制與部落格規劃。
+
+👇 詳細整理：
+{{ blogger.publishedUrl }}
+```
+
+說明：
+
+- `target: "blogger"` → `{{ articleUrl }}` 解析來源為 `blogger.publishedUrl`
+- 此例作者直接使用 `{{ blogger.publishedUrl }}` 而非 `{{ articleUrl }}`，於本範例兩者解析結果一致；但語意上前者明確、後者依 target 動態，可讀性差異留作者自行選擇
+
+### 10.3 範例使用注意
+
+完整範本檔 `content/templates/_sample.fb.md` 將於 Phase 8-a 後續批次建立。本批次僅以本節 §10 之示意範例先行公布規格用法，**不建立 `_sample.fb.md` 檔案**。
+
+---
+
+## §11 範本參照
+
+### 11.1 起點範本（後續批次建立）
+
+作者建立新 `.fb.md` 時，將自下列範本複製為起點：
+
+```
+content/templates/_sample.fb.md
+```
+
+該範本將於 Phase 8-a 後續批次建立。本文件先行公布規格與簡短範例（§10）；範本檔之欄位、預設值、結構必須與本文件一致。
+
+### 11.2 範本與本規範之一致性
+
+範本檔之內容必須與本文件之 §3 / §5 / §6 / §10 一致。若兩者不同，以本文件為準，範本應更新對齊。
+
+範本變更不視為規格變更，不需更新本文件。
+
+---
+
+（本文件結束）

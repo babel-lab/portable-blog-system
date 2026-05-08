@@ -1,0 +1,41 @@
+{
+  "$comment": [
+    "範本檔（template only）。複製到正式文章之 .publish.json 時，請刪除本 $comment 欄位。",
+    "contentKind 屬內容型態，不放在 .publish.json，應寫入 .md frontmatter（詳見 docs/publish-bundle.md §2.4 與 §2.6.1）。",
+    "blogger.type 屬 Blogger 發布端型態，固定放在本檔之 blogger 區塊，可為 'post' 或 'page'（詳見 docs/publish-json-schema.md §5.6）。",
+    "本範本之 blogger.type 預設為 'post'；建立 Blogger Page 之 .publish.json 時，請改為 'page'。",
+    "blogger.publishedUrl 為唯一真相來源，發布前不得預測；發布後由作者回填（詳見 docs/publish-json-schema.md §5.3）。"
+  ],
+  "schemaVersion": 1,
+  "canonical": {
+    "url": "",
+    "source": "auto"
+  },
+  "ogImage": {
+    "url": "",
+    "alt": ""
+  },
+  "blogger": {
+    "type": "post",
+    "permalink": "",
+    "status": "draft",
+    "publishedUrl": "",
+    "publishedAt": "",
+    "bloggerPostId": "",
+    "publishYear": "",
+    "publishMonth": "",
+    "history": []
+  },
+  "github": {
+    "slug": "",
+    "path": "",
+    "status": "draft",
+    "publishedUrl": "",
+    "publishedAt": ""
+  },
+  "seo": {
+    "metaTitle": "",
+    "metaDescription": "",
+    "robots": "index,follow"
+  }
+}
