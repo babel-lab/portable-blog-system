@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 import { loadSettings } from './load-settings.js';
 import { loadPosts } from './load-posts.js';
+// Phase 8-c-3：placeholder resolver helper（純函式；只用於 .fb.md body 檢查）
+import { resolvePlaceholders } from './resolve-placeholders.js';
 
 // Phase 5-g-3：ERROR 規則常數
 const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
@@ -71,6 +73,36 @@ function bodyStartsWithAtxH1(body) {
     return /^#\s+/.test(line);
   }
   return false;
+}
+
+// Phase 8-c-3：FB sidecar placeholder / content 之 status × severity 矩陣
+//   依 docs/placeholder-resolver-design.md §7 原則：
+//     - draft / archived / 未知 status：placeholder unresolved 與 body 空 → warning
+//     - ready / published 之 .fb.md body 空 → error
+//     - published 之所有 placeholder unresolved → error
+//     - ready 之 articleUrl unresolved → error；
+//       blogger.publishedUrl 在 target 指向 blogger（含 auto+primaryPlatform=blogger）時 → error；
+//       github.publishedUrl 在 target 指向 github 時 → error；其餘 → warning
+//   - reason='unsupported-placeholder'（暫不支援之第二批 placeholder 或未知名稱）一律 warning
+function severityForFbContentMissing(status) {
+  if (status === 'ready' || status === 'published') return 'error';
+  return 'warning';
+}
+function severityForFbPlaceholder(status, placeholderName, reason, target, primaryPlatform) {
+  if (reason === 'unsupported-placeholder') return 'warning';
+  if (status !== 'ready' && status !== 'published') return 'warning';
+  if (status === 'published') return 'error';
+  // status === 'ready'
+  if (placeholderName === 'articleUrl') return 'error';
+  if (placeholderName === 'blogger.publishedUrl') {
+    if (target === 'blogger' || (target === 'auto' && primaryPlatform === 'blogger')) return 'error';
+    return 'warning';
+  }
+  if (placeholderName === 'github.publishedUrl') {
+    if (target === 'github' || (target === 'auto' && primaryPlatform === 'github')) return 'error';
+    return 'warning';
+  }
+  return 'warning';
 }
 
 export function validateContent({ posts, settings }) {
@@ -317,6 +349,54 @@ export function validateContent({ posts, settings }) {
             type: 'sidecar-frontmatter-overlap',
             sourcePath,
             value: `${field} in .md frontmatter and .fb.md`,
+          });
+        }
+      }
+    }
+
+    // Phase 8-c-3：.fb.md placeholder 與 body 內容檢查
+    //   - 僅在 .fb.md 存在時檢查（exists=false 不產生本批 warning/error）
+    //   - body 為空（trim 後）→ fb-md-content-missing（severityForFbContentMissing）
+    //   - body 含 placeholder → 用 resolvePlaceholders 檢查；未解析者依
+    //     severityForFbPlaceholder 動態決定 severity
+    //   - 不修改 .fb.md body、不修改 post 欄位、不產生 build output
+    //   - 不接入 build-promotion（屬 8-c-4）
+    if (fbSidecar && fbSidecar.exists === true) {
+      const fbBody = typeof fbSidecar.body === 'string' ? fbSidecar.body : '';
+      const fbData =
+        fbSidecar.data && typeof fbSidecar.data === 'object' ? fbSidecar.data : null;
+
+      if (fbBody.trim() === '') {
+        issues.push({
+          severity: severityForFbContentMissing(status),
+          type: 'fb-md-content-missing',
+          sourcePath,
+          value: `.fb.md body is empty (status=${status ?? '(none)'})`,
+        });
+      } else {
+        const fbTarget =
+          fbData && typeof fbData.target === 'string' ? fbData.target : 'auto';
+        const fbPrimaryPlatform =
+          typeof post.primaryPlatform === 'string' ? post.primaryPlatform : 'blogger';
+
+        const resolved = resolvePlaceholders(
+          fbBody,
+          { post, publish: post.publish ?? null, facebook: fbData },
+          { target: fbTarget, primaryPlatform: fbPrimaryPlatform },
+        );
+
+        for (const u of resolved.unresolvedPlaceholders) {
+          issues.push({
+            severity: severityForFbPlaceholder(
+              status,
+              u.name,
+              u.reason,
+              fbTarget,
+              fbPrimaryPlatform,
+            ),
+            type: 'fb-md-placeholder-unresolved',
+            sourcePath,
+            value: `{{ ${u.name} }} unresolved in .fb.md (status=${status ?? '(none)'}): ${u.reason}`,
           });
         }
       }
