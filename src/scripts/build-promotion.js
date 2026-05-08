@@ -17,6 +17,8 @@ import ejs from 'ejs';
 import { loadSettings } from './load-settings.js';
 import { loadPosts } from './load-posts.js';
 import { buildFacebookUrl } from './ga4-url-builder.js';
+// Phase 8-c-4：placeholder resolver helper（純函式；對 .fb.md body 做 placeholder 替換）
+import { resolvePlaceholders } from './resolve-placeholders.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,12 +50,25 @@ async function writeText(file, content) {
 
 // 4-e：將單筆 enabled entry render 成 FB 貼文純文字並寫到
 // dist-promotion/facebook/{site}/{slug}.txt。回傳該檔的相對路徑。
+//
+// Phase 8-c-4：
+//   - 若 entry.resolvedFacebookBody 存在（由 buildManifestEntry 自 .fb.md sidecar 解析得來），
+//     直接使用解析後文字作為 .txt 內容，跳過 EJS template 路徑。
+//     理由：.fb.md body 設計為完整 FB 貼文文字（fb-sidecar-schema.md §4），不需 EJS framing。
+//   - 否則沿用既有 EJS template 路徑（從 promotion.facebook frontmatter 渲染）。
+//   - .fb.md 不存在或 body 空 → 既有行為完全不變。
+//   - unresolved placeholder 由 resolvePlaceholders 保留為原文（不在此處再處理）。
 async function renderAndWriteFacebookText(entry) {
-  const txt = await ejs.renderFile(
-    FB_POST_TEMPLATE,
-    { post: entry },
-    { async: true },
-  );
+  let txt;
+  if (typeof entry.resolvedFacebookBody === 'string' && entry.resolvedFacebookBody !== '') {
+    txt = entry.resolvedFacebookBody;
+  } else {
+    txt = await ejs.renderFile(
+      FB_POST_TEMPLATE,
+      { post: entry },
+      { async: true },
+    );
+  }
   const txtFile = path.join(FB_DIR, entry.site, `${entry.slug}.txt`);
   await writeText(txtFile, txt.trimEnd() + '\n');
   return rel(txtFile);
@@ -136,7 +151,7 @@ function buildManifestEntry(post, page, fb, settings) {
     page,
     settings,
   });
-  return {
+  const entry = {
     site: post.site ?? null,
     slug: post.slug ?? null,
     sourcePath: post.sourcePath,
@@ -154,6 +169,52 @@ function buildManifestEntry(post, page, fb, settings) {
     urlSource,
     urlReason,
   };
+
+  // Phase 8-c-4：若 .fb.md sidecar 存在且 body 非空，解析 placeholder 並掛到 entry
+  //   - 不修改 post.sidecars.facebook.body（傳入 helper 為 immutable 字串）
+  //   - 不修改 post 欄位、不新增 post.facebook、不覆蓋 post.publish
+  //   - resolved 文字僅作為輸出用變數 entry.resolvedFacebookBody
+  //   - unresolved placeholder 由 resolvePlaceholders 保留原文（soft-fail）
+  //   - console.warn 提示 unresolved；不 throw、不 process.exit（hard-fail 已由 8-c-3 validate-content 負責）
+  const fbSidecar = post.sidecars?.facebook;
+  if (
+    fbSidecar &&
+    fbSidecar.exists === true &&
+    typeof fbSidecar.body === 'string' &&
+    fbSidecar.body.trim() !== ''
+  ) {
+    const fbData =
+      fbSidecar.data && typeof fbSidecar.data === 'object' ? fbSidecar.data : null;
+    const ctx = {
+      post,
+      publish: post.publish ?? null,
+      facebook: fbData,
+      sourceCollection: post.sourceCollection,
+    };
+    const opts = {
+      target: fbData?.target,
+      primaryPlatform: fbData?.primaryPlatform ?? post.primaryPlatform,
+    };
+    const resolved = resolvePlaceholders(fbSidecar.body, ctx, opts);
+    entry.resolvedFacebookBody = resolved.resolvedText;
+    entry.facebookSidecar = {
+      sourcePath: fbSidecar.path,
+      placeholders: resolved.placeholders,
+      replacementsCount: resolved.replacements.length,
+      unresolvedPlaceholders: resolved.unresolvedPlaceholders,
+    };
+
+    if (resolved.unresolvedPlaceholders.length > 0) {
+      const summary = resolved.unresolvedPlaceholders
+        .map((u) => `{{ ${u.name} }}=${u.reason}`)
+        .join(', ');
+      console.warn(
+        `[build-promotion] WARNING: .fb.md placeholder unresolved in ${post.sourcePath}: ${summary}`,
+      );
+    }
+  }
+
+  return entry;
 }
 
 // ---- 主流程 --------------------------------------------------------------
