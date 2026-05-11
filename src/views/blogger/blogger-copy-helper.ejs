@@ -96,3 +96,22 @@ canonical URL（已含 blogger→github UTM）：
 - 發布後可至 Google Rich Results Test 驗證：
   https://search.google.com/test/rich-results<% } else { %>
 - 注意：本篇 JSON-LD 未產生（canonical 缺漏導致 build-blogger.js 未建立 BlogPosting）<% } %>
+<%# Phase 8-f-5-b：系列組合標題輔助區塊 %>
+<%# 僅當 copyHelperSeriesTitle 由 build-blogger.js 預計算且非空時顯示；不取代 [1] Blogger 標題 %>
+<%# 現有 fixture 無 series 區塊 → 不顯示本區塊 → copy-helper.txt byte-identical %>
+<% if (typeof copyHelperSeriesTitle !== 'undefined' && copyHelperSeriesTitle !== null && copyHelperSeriesTitle !== '') { %>
+
+----------------------------------------
+[11] 系列組合標題（series.titleTemplate 解析結果；人工貼文輔助）
+----------------------------------------
+<%= copyHelperSeriesTitle %>
+<% if (Array.isArray(copyHelperSeriesTitleUnresolvedPlaceholders) && copyHelperSeriesTitleUnresolvedPlaceholders.length > 0) { %>
+
+⚠️ 注意：以下 placeholder 未解析（series.json 或 frontmatter 可能缺資料），原文保留於上方標題：
+<% copyHelperSeriesTitleUnresolvedPlaceholders.forEach(function(u) { %>  - {<%= u.name %>}（reason: <%= u.reason %>）
+<% }); %><% } %>
+
+提示：
+- 本區塊僅為人工貼文輔助；本系統不取代 [1] Blogger 標題之原 post.title
+- 若 series.json 或 frontmatter series 欄位有變動，下次 build 會自動更新本區塊
+<% } %>

@@ -13,6 +13,10 @@ import { loadSettings } from './load-settings.js';
 import { loadBloggerPosts } from './load-blogger-posts.js';
 import { validateContent, printWarnings } from './validate-content.js';
 import { renderBody } from './parse-markdown.js';
+// Phase 8-f-5-b：series.titleTemplate placeholder resolver（純函式 helper；Phase 8-f-4-b 落地）
+//   - 僅用於 copy-helper 之「系列組合標題」輔助區塊預計算
+//   - 不取代 post.title / fbTitle / Blogger 主標題；不修改其他 EJS 或 dist 路徑
+import { resolveTitleTemplate } from './resolve-series-title.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -182,11 +186,32 @@ async function renderCategoryIndex(data) {
 
 // Phase 3-e-5：copy-helper.txt（純文字、可逐區複製到 Blogger 後台）
 // Phase 5-f-3：擴充傳入 ogFields / jsonLd 給 SEO 區段 [7]-[10]
-async function renderCopyHelper(post, canonical, meta, ogFields, jsonLd) {
+async function renderCopyHelper(
+  post,
+  canonical,
+  meta,
+  ogFields,
+  jsonLd,
+  copyHelperSeriesTitle,
+  copyHelperSeriesTitleUnresolvedPlaceholders,
+) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-copy-helper.ejs'),
     // Phase 8-d-3b：additive alias `normalized`（見 renderFullPost 之說明）
-    { post, normalized: post.normalized, canonical, meta, ogFields, jsonLd },
+    // Phase 8-f-5-b：additive props `copyHelperSeriesTitle` / `copyHelperSeriesTitleUnresolvedPlaceholders`
+    //   - 由 main loop 預計算（呼叫 resolveTitleTemplate）；helper 與 EJS 自身保持純函式 / 純模板
+    //   - 不修改 post.title / post.normalized.display.title / buildMeta() 輸出 / 其他 EJS
+    //   - copy-helper.ejs 內僅作為新增「系列組合標題」輔助區塊；不取代原 [1] Blogger 標題
+    {
+      post,
+      normalized: post.normalized,
+      canonical,
+      meta,
+      ogFields,
+      jsonLd,
+      copyHelperSeriesTitle,
+      copyHelperSeriesTitleUnresolvedPlaceholders,
+    },
     { async: true },
   );
 }
@@ -335,7 +360,35 @@ async function main() {
     // Phase 3-e-5：copy-helper.txt + publish-checklist.txt
     const copyHelperFile = path.join(outputDir, 'copy-helper.txt');
     const publishChecklistFile = path.join(outputDir, 'publish-checklist.txt');
-    const copyHelperText = await renderCopyHelper(post, canonical, meta, ogFields, jsonLd);
+
+    // Phase 8-f-5-b：預計算 series.titleTemplate 解析結果，作為 copy-helper 「系列組合標題」輔助區塊
+    //   - 僅當 post.normalized.series 存在且 titleTemplate 非空字串時觸發解析
+    //   - resolveTitleTemplate 為純函式；不 throw / 不 process.exit；unresolved 保留原文
+    //   - 不修改 post.title / post.normalized.display.title / buildMeta 輸出 / 其他 EJS / 其他 dist 路徑
+    //   - 現有 fixture 無 series 區塊 → copyHelperSeriesTitle 為 null → EJS 不顯示 [11] 區塊 → copy-helper.txt byte-identical
+    let copyHelperSeriesTitle = null;
+    let copyHelperSeriesTitleUnresolvedPlaceholders = [];
+    {
+      const series = post.normalized?.series;
+      if (series && typeof series.titleTemplate === 'string' && series.titleTemplate !== '') {
+        const result = resolveTitleTemplate(series.titleTemplate, {
+          series,
+          post: { title: post.title, titleEn: post.titleEn },
+        });
+        copyHelperSeriesTitle = result.resolvedText;
+        copyHelperSeriesTitleUnresolvedPlaceholders = result.unresolvedPlaceholders;
+      }
+    }
+
+    const copyHelperText = await renderCopyHelper(
+      post,
+      canonical,
+      meta,
+      ogFields,
+      jsonLd,
+      copyHelperSeriesTitle,
+      copyHelperSeriesTitleUnresolvedPlaceholders,
+    );
     const publishChecklistText = await renderPublishChecklist(post, canonical, meta);
     await writeText(copyHelperFile, copyHelperText);
     await writeText(publishChecklistFile, publishChecklistText);
