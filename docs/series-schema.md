@@ -530,7 +530,10 @@ Phase 8-f 系列批次依序完成下列接入點，建構 series metadata 之**
 | 8-f-3-c | （docs 補強） | 本節 §15 補入；§11.3 同步更新 |
 | 8-f-4-a | （無 commit；純讀取分析） | resolve-series-title helper 設計分析 |
 | **8-f-4-b** | **`e097ac5`** | **新增 `src/scripts/resolve-series-title.js`**（純函式 helper；3 個 export；7 個支援 placeholder；詳見 §16） |
-| 8-f-4-c | （本批 docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §16 helper 設計詳述 |
+| 8-f-4-c | （docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §16 helper 設計詳述 |
+| 8-f-5-a | （無 commit；純讀取分析）| Blogger copy-helper 接入設計分析 |
+| **8-f-5-b** | **`abf8c5e`** | **`blogger-copy-helper.ejs` 新增 [11] 系列組合標題輔助區塊**；`build-blogger.js` import `resolveTitleTemplate` + main loop 預計算 + `renderCopyHelper` 簽名擴充（詳見 §17） |
+| 8-f-5-c | （本批 docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §17 copy-helper 接入實況與其他 caller 決策摘要 |
 
 ### 15.2 normalized.series 資料形狀
 
@@ -640,20 +643,21 @@ series.resolved        ← computed:settings-lookup
 
 ### 15.6 尚未落地（後續批次）
 
-> **註**：Phase 8-f-4（resolve-series-title helper）已於 commit `e097ac5`（8-f-4-b）落地；詳見 **§16**。下表中原列為依賴「8-f-4」之項目（8-f-7 / 8-f-8）依賴已滿足。
+> **註**：
+> - Phase 8-f-4（resolve-series-title helper）已於 commit `e097ac5`（8-f-4-b）落地；詳見 **§16**。
+> - 原 8-f-7 候選之「blogger-copy-helper.ejs 套用 series titleTemplate」已於 commit `abf8c5e`（**Phase 8-f-5-b**）落地；採「**新增 [11] 輔助區塊；不取代 [1] 主標題**」之保守路線。詳見 **§17**。
+> - 其他 caller（blogger-post-full / post-detail / promotion / publish-checklist / meta.json）之接入決策詳見 **§17.3**。
 
-下列項目**不在 Phase 8-f-3-b / 8-f-4-b 範圍**，屬後續批次規劃：
+下列項目**仍屬後續批次規劃**：
 
 | 候選批次 | 範圍 | 依賴 |
 | --- | --- | --- |
-| Phase 8-f-5 | `build-promotion` 從 `normalized.series.hashtags` 繼承至 FB hashtags（單篇可完整覆寫） | normalized.series（已落地） |
+| Phase 8-f-5（hashtags 繼承） | `build-promotion` 從 `normalized.series.hashtags` 繼承至 FB hashtags（單篇可完整覆寫） | normalized.series（已落地） |
 | Phase 8-f-6 | `build-promotion` 輸出 `titleEn` 至 manifest（可選顯示） | 無 |
-| Phase 8-f-7 | `blogger-copy-helper.ejs` / `blogger-publish-checklist.ejs` 套用 series titleTemplate | resolve-series-title helper（**已落地**） |
-| Phase 8-f-8 | EJS `post-detail.ejs` / `blogger-post-full.ejs` 套用 series titleTemplate | resolve-series-title helper（**已落地**） |
 | Phase 8-f-9 | `new-post.js` 加 series 區塊 + `type` → `contentKind` 修正 | 無 |
 | Phase 8-f-10 | `new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作） | 8-f-9 |
 
-各批次落地時機由作者依需求安排；亦可調整拆批粒度。**Phase 8-f-7（Blogger copy-helper 接入）為最低風險首選**，因 copy-helper.txt 為純文字 manual reference、非 customer-facing（詳見 §16.9）。
+各批次落地時機由作者依需求安排；亦可調整拆批粒度。
 
 ---
 
@@ -796,6 +800,47 @@ resolveTitleTemplate(template, context = {})
 | 4 | `build-promotion.js`（FB 貼文 title / fbTitle） | ⭐⭐ 中 | 影響 FB 推廣文案 |
 
 各接入點屬獨立批次；可依作者實際需求調整順序與粒度。
+
+---
+
+## §17 Phase 8-f-5 copy-helper 接入實況與其他 caller 決策
+
+### 17.1 Blogger copy-helper 接入細節（Phase 8-f-5-b 落地）
+
+- **已接入**：`src/views/blogger/blogger-copy-helper.ejs`（commit `abf8c5e`）
+- **新增區塊**：**[11] 系列組合標題（series.titleTemplate 解析結果；人工貼文輔助）**
+- 設計原則：**「不取代主標題；僅作輔助」**
+  - **不**取代既有 [1] Blogger 標題 / 文章 H1
+  - **不**修改 `post.title` / `post.normalized.display.title`
+  - **不**寫入 `meta.json`（buildMeta 不動）
+  - **不**影響 Blogger 正式 HTML（blogger-post-full / summary / redirect-card）
+  - **不**影響 GitHub 正式 HTML（post-detail / list views）
+  - **不**影響 Promotion / Facebook 輸出
+- **無 series 區塊之文章**：[11] 區塊**不顯示**；copy-helper.txt 內容 byte-identical（modulo timestamp 與 EJS scriptlet 尾隨空白）
+- 資料來源：`build-blogger.js` main loop 預計算 → 透過 `renderCopyHelper` 簽名 additive 傳入 EJS（不破壞既有 props）
+
+### 17.2 unresolved placeholders 行為
+
+- **不 throw** / **不 process.exit** / **不阻擋 build**
+- 原 `{X.Y}` placeholder **保留於 `resolvedText` 主體**
+- copy-helper [11] 區塊內顯示 **`⚠️ 注意：以下 placeholder 未解析...`** 之人工提醒
+- 提醒列出 `{name}` 與 `reason`（`missing-value` / `unsupported-placeholder`）
+- **不寫入** `validationMeta`
+- **不新增** `validate-content` user-visible warning
+
+### 17.3 其他 caller 接入決策（Phase 8-f-6-a 分析結果）
+
+依 8-f-5-b 確立之「**不取代主標題；僅作輔助**」原則，下列 caller **暫不接入**：
+
+| Caller | 不接入理由 |
+| --- | --- |
+| `blogger-post-full.ejs` / `summary.ejs`（H1 主標題） | 取代 H1 會與 copy-helper [1] raw title 不一致；customer-facing 線上 HTML；SEO 風險高 |
+| `post-detail.ejs` / GitHub list views | 同上；customer-facing；列表卡片組合 title 過長 |
+| `blogger-publish-checklist.ejs` | 標頭僅作識別；新增區塊與 copy-helper [11] 重複；價值低 |
+| `build-promotion.js` / `facebook-post.ejs` | 可作 additive 欄位候選；但 FB title 字長受限；本階段不取代 `entry.title` / `fbTitle` |
+| `build-blogger.js buildMeta()` / `meta.json` | meta.json 屬發布回填層；schema 變動影響下游 tools；series 屬內容屬性不應入 meta.json |
+
+各接入候選若未來有實際需求，可獨立另開批次評估；建議優先考慮 additive 模式（不取代既有欄位）。
 
 ---
 
