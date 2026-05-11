@@ -19,9 +19,35 @@
 // 範例：
 //   node src/scripts/new-post.js my-first-post
 
-const slugArg = process.argv[2] || 'my-new-post';
+const args = process.argv.slice(2);
+let slugArg = null;
+let seriesId = null;
+let seriesNumber = null;
+let seriesSubtitle = null;
+for (let i = 0; i < args.length; i++) {
+  const a = args[i];
+  if (a === '--series-id') {
+    seriesId = args[++i] ?? null;
+  } else if (a === '--series-number') {
+    seriesNumber = args[++i] ?? null;
+  } else if (a === '--series-subtitle') {
+    seriesSubtitle = args[++i] ?? null;
+  } else if (slugArg === null) {
+    slugArg = a;
+  }
+}
+if (slugArg === null) slugArg = 'my-new-post';
+
 const today = new Date().toISOString().slice(0, 10);
 const idDate = today.replaceAll('-', '');
+
+let SERIES_BLOCK = '';
+if (seriesId !== null) {
+  const lines = [`series:`, `  id: "${seriesId}"`];
+  if (seriesNumber !== null) lines.push(`  number: ${seriesNumber}`);
+  if (seriesSubtitle !== null) lines.push(`  subtitle: "${seriesSubtitle}"`);
+  SERIES_BLOCK = lines.join('\n') + '\n\n';
+}
 
 const TEMPLATE = `---
 id: "${idDate}-${slugArg}"
@@ -40,7 +66,7 @@ author: "Dean"
 category: ""
 tags: []
 
-description: "請填寫 60 字內的文章摘要（將進入 og:description / meta description / JSON-LD）"
+${SERIES_BLOCK}description: "請填寫 60 字內的文章摘要（將進入 og:description / meta description / JSON-LD）"
 searchDescription: ""
 
 cover: ""
