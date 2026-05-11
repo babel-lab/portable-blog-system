@@ -471,4 +471,40 @@ content/templates/_sample.fb.md
 
 ---
 
+## §12 與系列文章 metadata 之分工（cross-link）
+
+### 12.1 series 不放 `.fb.md`
+
+系列文章 metadata（`series.id` / `series.name` / `series.number` / `series.subtitle` / `series.titleTemplate` / `series.hashtags` 等）為**內容屬性**，放在 `.md` frontmatter 或集中設定檔 `content/settings/series.json`（詳見 `docs/series-schema.md` §1 與 §11），**不**置於 `.fb.md`。
+
+`.fb.md` 第一版 frontmatter 7 欄位（`enabled` / `page` / `target` / `customUrl` / `hashtags` / `title` / `note`）沿 §3.1 定義不變，**本批次不擴大**。
+
+### 12.2 後續批次預告之新欄位（佔位；本批不擴大）
+
+下列欄位為 Phase 8-e-1 之 series metadata 規格（`docs/series-schema.md`）所預告之 `.fb.md` 擴充項目；**本文件 §3.1 表格不於本批新增；§3.3 之「不允許之欄位」規則於本批仍適用，未來新增時機由 Phase 8-e-2 之後決定**：
+
+- `titleEn`：英文標題（詳見 `docs/series-schema.md` §7 與 §10.2）
+- `seriesNumberOverride`：單篇覆寫系列序號之極少數情境（詳見 `docs/series-schema.md` §5.4 / §10.3）
+- `hashtagsInheritFromSeries`：是否從 series 繼承 hashtags 之顯式開關（詳見 `docs/series-schema.md` §8 / §10.3；目前採「自動繼承 + 單篇完整覆蓋」策略，未必需要此欄位）
+
+以上欄位**本批仍不允許出現於 `.fb.md` frontmatter**；於 §3.3 判定下視為 warning。具體 schema 擴充由後續批次規格批決定。
+
+### 12.3 hashtags 預設來源與 series 之關係
+
+`.fb.md` frontmatter `hashtags` 之預設來源與 series 之關係詳見 `docs/series-schema.md` §8。摘要：
+
+- 當文章屬系列時，hashtags 預設來自 `series.hashtags`（或同系列第一篇文章之 `.fb.md` `hashtags`）
+- 單篇 `.fb.md` 可完整覆寫；**不**採自動合併策略
+- `series.hashtags` 屬系列定義層，**不**作為單篇 override 機制
+
+### 12.4 title 與 series 之關係
+
+`.fb.md` frontmatter `title`（§3.1）與 Blogger `.md` frontmatter `title`、`.publish.json` `seo.metaTitle` 之預設一致性規則、可手動修改原則，詳見 `docs/series-schema.md` §6。摘要：
+
+- 三處 title 預設相同（SEO 一致性）
+- 若文章屬系列且定義 `series.titleTemplate`，預設值來自 template 套用結果
+- 三處皆允許後續手動修改，build / validate 不強制鎖死
+
+---
+
 （本文件結束）

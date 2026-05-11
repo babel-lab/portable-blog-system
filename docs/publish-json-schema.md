@@ -81,6 +81,8 @@ content/github/pages/tools-index.publish.json
 
 `contentKind` 為內容型態欄位，**屬內容屬性**，放在 `.md` frontmatter（詳見 `docs/publish-bundle.md` §2.4 與 §2.6.1），**不得**置於本檔。`blogger.type`（§5.6）為 Blogger 發布端型態，與 `contentKind` 為獨立兩維度，不可混用、不可相互推導。
 
+`series`（系列文章 metadata，含 `series.id` / `series.name` / `series.number` 等欄位）為內容語意分組欄位，**屬內容屬性**，放在 `.md` frontmatter 或集中設定檔 `content/settings/series.json`（詳見 `docs/series-schema.md` §1 與 §11），**不得**置於本檔。`.publish.json` 僅承載平台發布狀態與回填資料；違反者於 validate 階段列 warning（沿用 `docs/publish-bundle.md` §2.6.4 之硬性原則）。
+
 ---
 
 ## §3 `canonical` 區塊

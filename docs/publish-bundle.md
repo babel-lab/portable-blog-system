@@ -204,6 +204,8 @@ Blogger Page URL **不一定遵守文章年月規則**。Page URL 之形式由 B
 
 `series`、`quote`、`relatedLinks`、`otherLinks` 為 Phase 8-a 起新加入之內容屬性欄位；具體欄位字典留待後續批次之 content-schema 文件定義（屬本批之外）。
 
+See also：`series` 之完整欄位字典、跨平台共用原則、`series.id` 穩定性、自動建議序號、Blogger / FB title 與 `titleEn` 分工，詳見 `docs/series-schema.md`（Phase 8-e-1）。`series` 屬內容屬性，**不放** `.publish.json` 與 `.fb.md`（沿用 §1.1 / §2.6.4 之硬性原則）。
+
 #### 2.6.2 `.publish.json`：發布狀態 / 平台回填 / 平台輸出
 
 放置「發布後才回填、會頻繁變動」之資料：
