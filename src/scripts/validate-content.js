@@ -255,6 +255,69 @@ export function validateContent({ posts, settings }) {
           }
         }
       }
+
+      // Phase 8-e-5-b：series metadata 結構檢查（warning-only）
+      //   - series 區塊存在但非 plain object → series-not-object
+      //   - series.id 存在但非 non-empty string → series-id-invalid
+      //   - series.number 存在但非正整數 → series-number-invalid
+      //   - series.subtitle 存在但非 string → series-subtitle-invalid-type
+      //   - 本批不檢查：缺號 / titleTemplate / hashtags 繼承 / series.id 與 _sample.series.json 之對應
+      //   - 觸發範圍與 invalid-content-kind / invalid-primary-platform 一致（僅 ready/published；drafts/archived 由 load-posts 過濾不進此處）
+      if (post.series !== undefined) {
+        if (
+          typeof post.series !== 'object' ||
+          post.series === null ||
+          Array.isArray(post.series)
+        ) {
+          issues.push({
+            severity: 'warning',
+            type: 'series-not-object',
+            sourcePath,
+            value: Array.isArray(post.series)
+              ? 'array'
+              : post.series === null
+                ? 'null'
+                : typeof post.series,
+          });
+        } else {
+          const s = post.series;
+          if (s.id !== undefined) {
+            if (typeof s.id !== 'string' || s.id.trim() === '') {
+              issues.push({
+                severity: 'warning',
+                type: 'series-id-invalid',
+                sourcePath,
+                value: typeof s.id === 'string' ? '(empty)' : `typeof=${typeof s.id}`,
+              });
+            }
+          }
+          if (s.number !== undefined) {
+            if (
+              typeof s.number !== 'number' ||
+              !Number.isInteger(s.number) ||
+              s.number <= 0
+            ) {
+              issues.push({
+                severity: 'warning',
+                type: 'series-number-invalid',
+                sourcePath,
+                value:
+                  typeof s.number === 'number'
+                    ? String(s.number)
+                    : `typeof=${typeof s.number}`,
+              });
+            }
+          }
+          if (s.subtitle !== undefined && typeof s.subtitle !== 'string') {
+            issues.push({
+              severity: 'warning',
+              type: 'series-subtitle-invalid-type',
+              sourcePath,
+              value: `typeof=${typeof s.subtitle}`,
+            });
+          }
+        }
+      }
     }
 
     if (post.category) {
@@ -399,6 +462,20 @@ export function validateContent({ posts, settings }) {
             value: `{{ ${u.name} }} unresolved in .fb.md (status=${status ?? '(none)'}): ${u.reason}`,
           });
         }
+      }
+
+      // Phase 8-e-5-b：.fb.md titleEn 型別檢查（warning-only）
+      //   - titleEn 為 .fb.md 之選填欄位（Phase 8-e-2 落地至 fb-sidecar-schema.md §3.1）
+      //   - 存在但非 string → fb-md-titleEn-invalid-type
+      //   - 空字串視為合法（fallback 至 .md frontmatter titleEn）
+      //   - 觸發範圍與其他 fb-md-* 規則一致（僅當 .fb.md 存在）
+      if (fbData && fbData.titleEn !== undefined && typeof fbData.titleEn !== 'string') {
+        issues.push({
+          severity: 'warning',
+          type: 'fb-md-titleEn-invalid-type',
+          sourcePath,
+          value: `typeof=${typeof fbData.titleEn}`,
+        });
       }
     }
   }
