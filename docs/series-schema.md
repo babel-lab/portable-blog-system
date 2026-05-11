@@ -415,24 +415,32 @@ series metadata 之存放位置有兩種候選：
 
 具體實作時機由 Phase 8-e-2 之後決定。本文件 §11 為設計建議，不視為硬性規格。
 
-### 11.3 `content/settings/series.json` 結構草案
+### 11.3 `content/settings/series.json` 結構
 
-候選結構：
+Phase 8-e-4 落地之正式結構（範本 `content/settings/_sample.series.json`）：
 
 ```json
 {
-  "series": {
-    "bagel-bookstore-ai-self-media": {
+  "series": [
+    {
+      "id": "we-media-ai-52",
       "name": "自媒自創：AI玩轉自媒體的52個商業思維",
-      "nameEn": "We-Media Myself: 52 AI-Powered Business Thinking",
+      "nameEn": "We-Media with AI: 52 Business Thinking Notes",
       "titleTemplate": "[貝果書屋] 《{series.name}》#{series.number}({series.subtitle})",
-      "hashtags": ["#貝果書屋", "#書評"]
+      "hashtags": ["#貝果書屋", "#自媒自創", "#AI自媒體"]
     }
-  }
+  ]
 }
 ```
 
-正式 schema 留待 Phase 8-e-3 之後定義。本批不建立 `content/settings/series.json` 或 `_sample.series.json`。
+頂層為 object，含 `series` array；每筆系列為 object，含 `id` / `name` / `nameEn` / `titleTemplate` / `hashtags`。
+
+採 array-of-objects 而非 object-keyed 之原因：
+
+- 陣列可保留作者定義之系列序列，便於日後增加排序屬性
+- 避免 `series.id` 含特殊字元時造成 JSON object key 之表達限制
+
+build 系統尚未自動讀取本檔；**接入屬後續批次**（建議 Phase 8-e-6 之 build script 階段一併處理）。
 
 ---
 
@@ -463,24 +471,29 @@ series 為新加入之內容屬性欄位，**不影響** `.publish.json` 之 `sc
 
 ---
 
-## §13 範本參照（佔位）
+## §13 範本參照
 
-### 13.1 本批不建立 sample
+### 13.1 已落地之 sample / template
 
-下列 sample 檔**本批不建立**，留待 Phase 8-e-3 之後：
+下列 sample / template 已於 **Phase 8-e-4** 落地：
 
-- `content/settings/_sample.series.json`（若採 §11.2 集中管理策略）
-- `content/templates/_sample-series-post.md`（含 series 區塊之文章範本）
+- `content/settings/_sample.series.json`：集中管理 series metadata 之範本，採 §11.2 之候選 B 策略
+- `content/templates/_sample-series-post.md`：含 `series` 區塊之文章範本，示範 §2 之 frontmatter 用法與 §4 / §5 之排序 / 序號規則
 
-理由：
+### 13.2 sample / template 之效力範圍
 
-- 本批為文件先行批，僅交付規格
-- sample 之欄位、預設值、結構應與本文件 §2 / §11.3 一致；新增時機由具體實作批次決定
-- 若於本批新增 sample，後續批次調整 schema 時 sample 需同步修訂，反而增加維護成本
+本批僅新增 sample / template，**不代表系統行為已啟用**：
 
-### 13.2 範本與本規範之一致性
+- **不**代表 build 系統已自動讀取 `_sample.series.json`（接入屬後續批次，建議 Phase 8-e-6）
+- **不**代表系統已實作自動序號建議邏輯（屬後續批次，建議 Phase 8-e-5；詳見 §5）
+- **不**代表系統已實作 series hashtags 自動繼承（屬後續批次；詳見 §8）
+- 後續實作仍需另開 **8-e-5 / 8-e-6** 或更晚批次決定
 
-未來建立之 sample 必須與本文件 §2 / §11.3 一致。若兩者不同，以本文件為準，sample 應更新對齊。
+### 13.3 範本與本規範之一致性
+
+sample / template 之欄位、預設值、結構必須與本文件 §2 / §11.3 一致。若兩者不同，以本文件為準，sample 應更新對齊。
+
+範本變更不視為規格變更，不需更新本文件。
 
 ---
 

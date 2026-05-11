@@ -1,0 +1,21 @@
+{
+  "$comment": [
+    "範本檔（template only）。複製到 content/settings/series.json 時，請刪除本 $comment 欄位。",
+    "series.id 為穩定識別碼，一旦寫入第一篇文章 frontmatter 即不得修改；series.name 可後續修改而不影響 id（詳見 docs/series-schema.md §3）。",
+    "series.hashtags 為系列預設 hashtags；自動繼承策略屬後續批次實作（詳見 docs/series-schema.md §8）。",
+    "本批為 sample 補強；build 系統尚未自動讀取本檔，自動序號建議與 hashtags 繼承之實作屬後續批次（建議 Phase 8-e-5 / 8-e-6）。"
+  ],
+  "series": [
+    {
+      "id": "we-media-ai-52",
+      "name": "自媒自創：AI玩轉自媒體的52個商業思維",
+      "nameEn": "We-Media with AI: 52 Business Thinking Notes",
+      "titleTemplate": "[貝果書屋] 《{series.name}》#{series.number}({series.subtitle})",
+      "hashtags": [
+        "#貝果書屋",
+        "#自媒自創",
+        "#AI自媒體"
+      ]
+    }
+  ]
+}
