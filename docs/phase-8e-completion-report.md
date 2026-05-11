@@ -25,7 +25,7 @@ Phase 8-e 屬**規格與規範**性質，**不實作**自動序號邏輯、hasht
 
 ## §2 Commit 清單
 
-Phase 8-e 共 5 個 commit：
+Phase 8-e 共 8 個 commit（含本 completion report 與 8-e-6 系列 fixture validation 後續補強）：
 
 | # | 批次 | Commit | 訊息標題 | 類型 |
 |---|---|---|---|---|
@@ -34,10 +34,14 @@ Phase 8-e 共 5 個 commit：
 | 3 | **8-e-3** | `331a158` | chore(phase-8e): add titleEn to facebook sidecar sample | sample 補強 |
 | 4 | **8-e-4** | `3ce4c30` | chore(phase-8e): add series metadata samples | sample / template / docs 補強 |
 | 5 | **8-e-5-b** | `aadecb5` | feat(phase-8e): validate fb sidecar titleEn and article series fields | validate-content 規則落地 |
+| 6 | **本報告** | `7a13891` | docs(phase-8e): add completion report | 本 completion report 初版 |
+| 7 | **8-e-6-b-1** | `e7de6cd` | feat(phase-8e): scan validation-fixtures directory in validate-content | validate main entry 支援 fixtures 目錄 |
+| 8 | **8-e-6-b-2** | `a6cabd0` | test(phase-8e): add validation fixtures for warning-only rules | 4 個 validation fixture 檔案 |
 
 另含分析批次（純讀取，無 commit）：
 - 8-d-4-a（屬 Phase 8-d 範圍，分析 promotion）
 - 8-e-5-a（validate-content 規則分析）
+- 8-e-6-a（validation fixture trigger 可行性分析）
 
 線性歷史，無 amend、無 rebase。
 
@@ -168,6 +172,24 @@ series.id / name / nameEn / number / subtitle / titleTemplate / hashtags
 - §11.3：將原 object-keyed 候選結構替換為實際 array-of-objects 結構，明列「採 array 之原因」
 - §13：從「本批不建立 sample」改為「Phase 8-e-4 已落地」並列出兩個 sample，明確標示**不代表系統行為已啟用**
 
+### 6.5 `content/validation-fixtures/github/posts/`（Phase 8-e-6-b-2 新增）
+
+新增 4 個 validation fixture 檔案，作為 Phase 8-e-5-b 5 條 warning-only 規則之 **regression baseline**：
+
+| Fixture | 觸發規則 |
+|---|---|
+| `_test-series-validation.md` | `series-id-invalid` / `series-number-invalid` / `series-subtitle-invalid-type` |
+| `_test-series-not-object.md` | `series-not-object` |
+| `_test-fb-titleEn.md` + `_test-fb-titleEn.fb.md` | `fb-md-titleEn-invalid-type` |
+
+**設計原則**：
+
+- Fixture 位於 `content/validation-fixtures/`，**僅** Phase 8-e-6-b-1 之 validate-content main entry（commit `e7de6cd`）透過 `loadPosts({ site: 'validation-fixtures/{github,blogger}' })` 掃描
+- **不**被 `build:github` / `build:blogger` / `build:promotion` 之 loader 掃到（三端 loader 路徑為 `content/{site}/posts/`，與 `validation-fixtures/` 完全分離）
+- Fixture frontmatter 補齊 title / slug / date / description / category / cover / tags 等必要欄位，避免觸發 missing-* / unknown-* / mismatch / promotion-* / sidecar-overlap 等非預期 warning
+- 不設 `publishTargets.blogger.enabled` / `promotion.facebook.enabled`，避免概念混淆
+- `.fb.md` body 為純文字無 placeholder，避免觸發 `fb-md-content-missing` / `fb-md-placeholder-unresolved`
+
 ---
 
 ## §7 validate-content 新增 warning-only 規則摘要
@@ -187,7 +209,11 @@ Phase 8-e-5-b（commit `aadecb5`）於 `src/scripts/validate-content.js` 加入 
 - 全部 warning-only，**無新增 error**
 - **不改既有 ready / published 阻擋邏輯**（error 規則完全不動）
 - 觸發範圍與 `invalid-content-kind` / `invalid-primary-platform` 一致（series 規則）或與其他 `fb-md-*` 一致（titleEn 規則）
-- 現有 fixture 無 `series` 區塊、無 `.fb.md` sidecar 之 titleEn，故 **5 條新規則 0 觸發**
+
+**觸發狀態**（Phase 8-e-6 系列補強後，依 fixture 來源區分）：
+
+- **正式文章 fixture**（`content/github/posts/` + `content/blogger/posts/`）：5 條新規則 **0 觸發**（現有正式文章無 `series` 區塊、無 `.fb.md` 含 invalid `titleEn`）
+- **validation fixtures**（`content/validation-fixtures/github/posts/`；Phase 8-e-6-b-2 新增）：5 條新規則 **各 1 次觸發**（共 5 觸發；regression baseline 已建立）
 
 ---
 
@@ -214,21 +240,47 @@ Phase 8-e-5-b（commit `aadecb5`）於 `src/scripts/validate-content.js` 加入 
 
 ## §9 驗證結果摘要
 
-Phase 8-e-5-b 落地時（commit `aadecb5`）已執行完整 sweep：
+### 9.1 Phase 8-e-5-b 落地時驗證（commit `aadecb5`）
 
 | 驗證項目 | 結果 |
 |---|---|
 | `node --check src/scripts/validate-content.js` | ✅ 通過 |
 | `npm run validate:content` | ✅ 0 error / 4 warning（皆為既有 `body-leading-h1` × 2 + `frontmatter-uses-deprecated-type` × 2；**與 Phase 8-e 啟動前基線完全相同**） |
 | `npm run build:github` | ✅ done in 105ms（含 validate 0 error / 2 warning） |
-| `npm run build:blogger` | ✅ done in 46ms（含 validate 0 error / 2 warning；dist-blogger byte-identical modulo timestamps） |
-| `npm run build:promotion` | ✅ done in 42ms（dist-promotion byte-identical modulo `generatedAt` / `generated`） |
-| `dist/.gitkeep` / `dist-blogger/.gitkeep` / `dist-promotion/.gitkeep` | ✅ 無動（無需 restore） |
+| `npm run build:blogger` | ✅ done in 46ms |
+| `npm run build:promotion` | ✅ done in 42ms |
+| `.gitkeep` 三檔 | ✅ 無動 |
+
+**5 條新 warning-only 規則於正式文章 fixture 觸發次數：0**（屬預期行為；無 regression baseline）。
+
+### 9.2 Phase 8-e-6 系列補強後驗證（commits `e7de6cd` / `a6cabd0` / 本批 `8-e-6-c`）
+
+| 驗證項目 | 結果 |
+|---|---|
+| `npm run validate:content` | ✅ **0 error / 9 warning on 5 post(s)** |
+| ─ 既有正式文章 warning | 4 條（`body-leading-h1` × 2 + `frontmatter-uses-deprecated-type` × 2；**維持不變**） |
+| ─ Phase 8-e-6-b-2 fixture warning | **5 條新規則各觸發 1 次**（共 5；regression baseline 已建立） |
+| `npm run build:github` | ✅ 通過；fixtures **未進入** dist |
+| `npm run build:blogger` | ✅ 通過；fixtures **未進入** dist-blogger（filtered 列表僅含 mvp + sample-book-review，**無 fixture 路徑**） |
+| `npm run build:promotion` | ✅ 通過；fixtures **未進入** dist-promotion（total enabled: 1 / total filtered: 2，**無 fixture 路徑**） |
+| `dist/.gitkeep` / `dist-blogger/.gitkeep` / `dist-promotion/.gitkeep` | ✅ **無動**（無需 restore） |
 | JSON 格式檢查（Phase 8-e-4） | ✅ `node -e "JSON.parse(...)"` → OK |
 
-**5 條新 warning-only 規則於現有 fixture 觸發次數：0**（現有 fixture 無 series 區塊、無 `.fb.md` 含 titleEn；屬預期行為）。
+**5 條新 warning-only 規則觸發狀態**：
 
-無任何 dist / build output / 既有 warning / error 變動。
+- 正式文章：**0 觸發**（無 series 區塊、無 invalid titleEn；維持基線乾淨）
+- validation fixtures：**各 1 次觸發**（regression baseline）
+- 整體 validate：**0 error / 9 warning on 5 post(s)**
+
+### 9.3 隔離有效性確認
+
+`content/validation-fixtures/` 目錄路徑隔離有效：
+
+- validate-content（commit `e7de6cd` 之 main entry）透過 `loadPosts({ site: 'validation-fixtures/{github,blogger}' })` 額外掃描 → fixtures 進入 validate 流程
+- build:github / build:blogger / build:promotion 之 loader 路徑為 `content/{site}/posts/`，**不含 `validation-fixtures/`** → fixtures **完全不進** 任何 build pipeline
+- 三端 build output 之 filtered 列表不含任何 fixture 路徑，間接證實隔離
+
+無任何 dist / build output 污染；`.gitkeep` 三檔零變動。
 
 ---
 
@@ -243,10 +295,12 @@ Phase 8-e-5-b 落地時（commit `aadecb5`）已執行完整 sweep：
 
 ### 10.2 候選後續批次（依優先序）
 
+> **註**：本報告初版（commit `7a13891`）撰寫時，下表「Phase 8-e-6 / 8-e-7（候選）」之編號為「Phase 8-e 之後候選批次」之佔位編號；後續 **Phase 8-e-6 標籤實際用於 fixture validation 系列**（8-e-6-a / b-1 / b-2 / 本批 8-e-6-c；詳見 §6.5 / §9.2）。下表原以「Phase 8-e-6 / 8-e-7（候選）」標示之 build script integration / `new:post` 自動序號建議候選，應改為 **Phase 8-f-A / 8-f-B** 之概念編號處理。
+
 | 候選批次 | 範圍 | 風險 | 推薦度 |
 |---|---|---|---|
-| **Phase 8-e-6**（候選） | build script 接入 `content/settings/series.json`：loadSettings 讀取、傳給 build-github / blogger / promotion；`series.titleTemplate` placeholder 解析 | 中（需處理 dist byte-identical） | ⭐ 若希望系列文章自動產生標題，優先做 |
-| **Phase 8-e-7**（候選） | `new:post` 之自動序號建議邏輯（補缺號優先、可手動覆寫） | 低（工具腳本，不影響 build） | ⭐ 若新增系列文章頻繁，優先做 |
+| **Phase 8-f-A**（候選；原 8-e-6 候選） | build script 接入 `content/settings/series.json`：loadSettings 讀取、傳給 build-github / blogger / promotion；`series.titleTemplate` placeholder 解析 | 中（需處理 dist byte-identical） | ⭐ 若希望系列文章自動產生標題，優先做 |
+| **Phase 8-f-B**（候選；原 8-e-7 候選） | `new:post` 之自動序號建議邏輯（補缺號優先、可手動覆寫） | 低（工具腳本，不影響 build） | ⭐ 若新增系列文章頻繁，優先做 |
 | **Phase 8-d-X1**（Phase 8-d 延後項） | `blogger-copy-helper.ejs` / `blogger-publish-checklist.ejs` 接 normalized（Phase 8-d 設計 §12 item 6） | 低 | ⭐ Phase 8-d 收尾，可補完 |
 | **Phase 8-d-X2**（Phase 8-d 延後項） | `validate-content.js` 接 `normalized.validationMeta.warnings` traceability（Phase 8-d 設計 §12 item 5） | 低 | 可選 |
 | **Phase 8-f**（書評文章模組擴充） | `comicGallery` / Book JSON-LD / FAQ JSON-LD / CTA partial（CLAUDE.md §7.6） | 中 | ⭐ 若有書評內容增長需求 |
