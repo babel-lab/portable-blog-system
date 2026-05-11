@@ -308,6 +308,21 @@ export function validateContent({ posts, settings }) {
                   value: `"${s.id}" not found in content/settings/series.json (add entry or check for typo)`,
                 });
               }
+
+              // Phase 8-g-2-d-c：series-block-missing-number（warning-only）
+              //   - 觸發：s.id 為 non-empty string 且 s.number === undefined
+              //   - 位於 series-id-invalid 之 else 分支，保證 id 為 valid non-empty string
+              //   - 既有 series-number-invalid 處理「number 存在但 invalid」；本規則只處理「number 缺漏」
+              //   - 不與既有規則重複觸發；不在 series.id invalid / missing 時觸發
+              //   - per docs/series-schema.md §2.1：series 區塊存在時 series.number 為必填
+              if (s.number === undefined) {
+                issues.push({
+                  severity: 'warning',
+                  type: 'series-block-missing-number',
+                  sourcePath,
+                  value: `series.id="${s.id}"; series.number is required when series.id is set (use new-post.js --series-number to specify)`,
+                });
+              }
             }
           }
           if (s.number !== undefined) {
