@@ -355,6 +355,10 @@ async function main() {
     });
 
     // Phase 3-e-6：收集索引資料（in-memory）
+    // Phase 8-d-3c-8-a：additive 加入 normalized 投影；指向 8-d-2 掛載之 post.normalized。
+    //   - 不重新呼叫 normalizePostOutput；不修改既有 8 個投影欄位之語意
+    //   - 配合 blogger-category-index.ejs 之 per-item view-model 改造
+    //   - blogger-home-index.ejs 之 EJS 改造留待 8-d-3c-8-b（本批先把資料投影備好；blogger-home-index 本批仍不讀 normalized）
     indexPosts.push({
       slug: post.slug,
       title: post.title ?? null,
@@ -364,6 +368,7 @@ async function main() {
       bloggerMode: post.bloggerMode,
       canonicalResolved: canonical.url,
       bloggerPublishedUrl: post.blogger?.publishedUrl || null,
+      normalized: post.normalized ?? null,
     });
   }
 
