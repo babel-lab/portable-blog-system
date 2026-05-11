@@ -350,6 +350,21 @@ export function validateContent({ posts, settings }) {
               value: `typeof=${typeof s.subtitle}`,
             });
           }
+
+          // Phase 8-g-2-d-d：series-subtitle-without-id（warning-only）
+          //   - 觸發：s.subtitle !== undefined 且 s.id === undefined
+          //   - 與既有 series-subtitle-invalid-type 職責互補：
+          //     既有規則處理「subtitle 存在但型別 invalid」；本規則處理「subtitle 有填但 id 缺漏」之語意警告
+          //   - 不在 id 存在（即使 invalid）時觸發：id 為 "" / 非 string 由 series-id-invalid 處理
+          //   - 沿用既有 series 規則範圍（ready / published only）
+          if (s.id === undefined && s.subtitle !== undefined) {
+            issues.push({
+              severity: 'warning',
+              type: 'series-subtitle-without-id',
+              sourcePath,
+              value: 'subtitle exists but series.id is missing (series.subtitle must be paired with series.id)',
+            });
+          }
         }
       }
     }
