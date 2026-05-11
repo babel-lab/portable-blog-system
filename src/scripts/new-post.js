@@ -26,7 +26,7 @@ const idDate = today.replaceAll('-', '');
 const TEMPLATE = `---
 id: "${idDate}-${slugArg}"
 site: "github"
-type: "tech-note"
+contentKind: "tech-note"
 primaryPlatform: "github"
 
 title: "請填寫文章標題（系統會 render 為 article header 的 <h1>）"
