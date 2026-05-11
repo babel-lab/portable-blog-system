@@ -536,7 +536,10 @@ Phase 8-f 系列批次依序完成下列接入點，建構 series metadata 之**
 | 8-f-5-c | （docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §17 copy-helper 接入實況與其他 caller 決策摘要 |
 | 8-f-6-a | （無 commit；純讀取分析）| promotion / Facebook title / titleEn 接入分析（3 方案比較） |
 | **8-f-6-b** | **`7741655`** | **`build-promotion.js buildManifestEntry` 新增 4 個 additive 欄位**：`titleEn` / `fbTitleEn` / `seriesResolvedTitle` / `seriesTitleUnresolvedPlaceholders`（不取代 entry.title / fbTitle；不改 FB .txt；詳見 §18）|
-| 8-f-6-c | （本批 docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §18 promotion manifest 接入實況 |
+| 8-f-6-c | （docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §18 promotion manifest 接入實況 |
+| 8-f-7-a | （無 commit；純讀取分析）| hashtags inheritance / override 分析（4 方案比較） |
+| **8-f-7-b** | **`592d45c`** | **`normalize-post-output.js` 加 post-pass `series.hashtags` inheritance backfill**；僅在 `promotion.facebook.hashtags` 為空 array 且 `seriesOut.hashtags` 非空時觸發；既有 fixture 輸出 byte-identical（詳見 §19）|
+| 8-f-7-c | （本批 docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §19 hashtags inheritance 接入實況 |
 
 ### 15.2 normalized.series 資料形狀
 
@@ -650,14 +653,16 @@ series.resolved        ← computed:settings-lookup
 > - Phase 8-f-4（resolve-series-title helper）已於 commit `e097ac5`（8-f-4-b）落地；詳見 **§16**。
 > - 原 8-f-7 候選之「blogger-copy-helper.ejs 套用 series titleTemplate」已於 commit `abf8c5e`（**Phase 8-f-5-b**）落地；採「**新增 [11] 輔助區塊；不取代 [1] 主標題**」之保守路線。詳見 **§17**。
 > - 原 8-f-6 候選之「build-promotion 輸出 titleEn 至 manifest」之 manifest 層已於 commit `7741655`（**Phase 8-f-6-b**）落地；同步加入 `seriesResolvedTitle` / `seriesTitleUnresolvedPlaceholders` / `fbTitleEn` 共 4 個 additive 欄位；**FB .txt 輸出不變**；詳見 **§18**。
+> - 原「hashtags 繼承」候選之 normalize 層 fallback 已於 commit `592d45c`（**Phase 8-f-7-b**）落地；採「保守 post-pass backfill；僅 FB promotion 端」之路線；既有 fixture byte-identical；詳見 **§19**。
 > - 其他 caller（blogger-post-full / post-detail / publish-checklist / meta.json）之接入決策詳見 **§17.3**。
 
 下列項目**仍屬後續批次規劃**：
 
 | 候選批次 | 範圍 | 依賴 |
 | --- | --- | --- |
-| Phase 8-f-N（hashtags 繼承） | `build-promotion` 從 `normalized.series.hashtags` 繼承至 FB hashtags（單篇可完整覆寫） | normalized.series（已落地） |
 | Phase 8-f-N（FB .txt 顯示）| `facebook-post.ejs` / `facebook-summary.ejs` 顯示 manifest 中之 `titleEn` / `fbTitleEn` / `seriesResolvedTitle`（需考量文案長度與 SEO / 搜尋一致性） | manifest additive 欄位（已落地） |
+| Phase 8-f-N（site default hashtags） | site 層級之 default hashtags 作為最終 fallback | 需設計 settings 欄位（如 `site.config.json defaultHashtags`） |
+| Phase 8-f-N（first article .fb.md hashtags fallback） | 同系列第一篇之 .fb.md hashtags 作為次級 fallback（series-schema §8.2 之 fallback 2） | 需跨文章查找；複雜度較高 |
 | Phase 8-f-9 | `new-post.js` 加 series 區塊 + `type` → `contentKind` 修正 | 無 |
 | Phase 8-f-10 | `new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作） | 8-f-9 |
 
@@ -900,6 +905,82 @@ resolveTitleTemplate(template, context = {})
 - SEO / 搜尋一致性（與 Blogger 主標題、Google 預覽之對應）
 
 **目前 `entry.title` / `entry.fbTitle` 仍是實際 FB 文案主標題來源**；EJS 邏輯維持 `post.fbTitle || post.title` 之 fallback chain（manifest entry view）。
+
+---
+
+## §19 Phase 8-f-7 hashtags inheritance 接入實況
+
+### 19.1 落地細節（Phase 8-f-7-b 落地）
+
+- **已接入**：`src/scripts/normalize-post-output.js`（commit `592d45c`）
+- **修改範圍**：在 series 區塊完成後、return block 之前加 post-pass「inheritance backfill」邏輯
+- **適用範圍**：**僅** `normalized.promotion.facebook.hashtags`（FB promotion 端）
+- **不處理**：Blogger `post.tags`、GitHub list views 之 hashtag 顯示、`build-blogger.js` / EJS 之 hashtag 渲染
+
+### 19.2 優先序
+
+```
+1. .fb.md.hashtags（非空 array；sidecar-first）
+2. legacy frontmatter.promotion.facebook.hashtags（非空 array）
+3. series.hashtags（本批新增；當 1 / 2 皆解為 [] 時觸發）
+4. []（最終 fallback）
+```
+
+實際實作位於 `normalize-post-output.js`：步驟 1 / 2 / 4 為 Phase 8-d-1 之既有邏輯（line ~792）；步驟 3 為 Phase 8-f-7-b 之 post-pass backfill。
+
+### 19.3 設計原則
+
+- **不自動合併** hashtags（採完整 fallback；不做 array merge）
+- **article / sidecar 明確填寫之 hashtags 永遠優先**（既有 prec 不破壞）
+- **`series.hashtags` 只在 FB hashtags 為空時補上**（保守觸發條件）
+- **本批不做 site default hashtags**（屬未來批次；§15.6 候選）
+- **本批不做 first article .fb.md hashtags fallback**（series-schema §8.2 fallback 2；需跨文章查找；複雜度高；屬未來批次）
+- **本批不改 Blogger `post.tags`**（Blogger 標籤為短 slug 格式；FB hashtags 為 `#` prefix；格式不同；不應跨界繼承）
+- **本批不修改** `build-promotion.js` / `build-blogger.js` / EJS
+
+### 19.4 觸發條件（保守 AND 條件）
+
+```js
+if (
+  Array.isArray(promotion.facebook.hashtags) &&
+  promotion.facebook.hashtags.length === 0 &&
+  seriesOut &&
+  Array.isArray(seriesOut.hashtags) &&
+  seriesOut.hashtags.length > 0
+) { ... }
+```
+
+任一條件不滿足 → 不觸發；既有 fallback chain 不變。
+
+### 19.5 traceability
+
+| 觸發狀態 | `fieldSource['promotion.facebook.hashtags']` | `fallbackUsed` |
+|---|---|---|
+| .fb.md.hashtags 命中（既有） | `'fb.md.hashtags'` | 不記 |
+| legacy frontmatter 命中（既有） | `'frontmatter.promotion.facebook.hashtags'` | 不記 |
+| **series.hashtags 命中（本批新增）** | `'computed:series.hashtags'` | 新增 `{ field: 'promotion.facebook.hashtags', from: 'computed:series.hashtags', reason: 'inherited from series.hashtags' }` |
+| 全空（既有） | `'fallback'` | 既有記錄維持 |
+
+未觸發 fallback 時，既有來源記錄維持不變（Phase 8-d-1 行為）。
+
+### 19.6 對 validate 基線與 build output 之影響
+
+| 影響面 | 變動？ | 說明 |
+| --- | --- | --- |
+| `npm run validate:content` 基線 | ❌ 不變 | 維持 `0 error / 9 warning on 5 post(s)`；helper 不新增規則 |
+| `npm run build:github` 輸出 | ❌ 不變 | 不讀 normalized.promotion.facebook |
+| `npm run build:blogger` 輸出 | ❌ 不變 | 不讀 normalized.promotion.facebook |
+| `npm run build:promotion` 輸出（既有 fixture）| ✅ **byte-identical** | 既有 fixture 之 fb hashtags 非空 → 不觸發 backfill |
+| `npm run build:promotion` 輸出（未來 series + 空 fb hashtags fixture）| ⚠️ 預期變動 | 為設計預期；series.hashtags 將出現於 entry.hashtags 與 .txt 輸出 |
+| `.gitkeep` 三檔 | ❌ 不變 | 無 build dist 路徑變動 |
+
+### 19.7 未來候選
+
+- **site default hashtags**：作為最終 fallback（在 series.hashtags 之後）；需設計 `site.config.json` 或專屬 settings 欄位
+- **first article .fb.md hashtags fallback**：series-schema §8.2 之 fallback 2；需跨文章查找邏輯（識別「同系列 series.number 最小者」），複雜度較高
+- **Blogger `post.tags` inheritance**：若未來要實作，應另行設計 slug 格式（如 `series.tags` 短 slug 欄位），**不應直接沿用 FB `#hashtags` 格式**
+
+各候選若未來有實際需求，可獨立另開批次評估。
 
 ---
 
