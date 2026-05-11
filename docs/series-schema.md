@@ -533,7 +533,10 @@ Phase 8-f 系列批次依序完成下列接入點，建構 series metadata 之**
 | 8-f-4-c | （docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §16 helper 設計詳述 |
 | 8-f-5-a | （無 commit；純讀取分析）| Blogger copy-helper 接入設計分析 |
 | **8-f-5-b** | **`abf8c5e`** | **`blogger-copy-helper.ejs` 新增 [11] 系列組合標題輔助區塊**；`build-blogger.js` import `resolveTitleTemplate` + main loop 預計算 + `renderCopyHelper` 簽名擴充（詳見 §17） |
-| 8-f-5-c | （本批 docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §17 copy-helper 接入實況與其他 caller 決策摘要 |
+| 8-f-5-c | （docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §17 copy-helper 接入實況與其他 caller 決策摘要 |
+| 8-f-6-a | （無 commit；純讀取分析）| promotion / Facebook title / titleEn 接入分析（3 方案比較） |
+| **8-f-6-b** | **`7741655`** | **`build-promotion.js buildManifestEntry` 新增 4 個 additive 欄位**：`titleEn` / `fbTitleEn` / `seriesResolvedTitle` / `seriesTitleUnresolvedPlaceholders`（不取代 entry.title / fbTitle；不改 FB .txt；詳見 §18）|
+| 8-f-6-c | （本批 docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §18 promotion manifest 接入實況 |
 
 ### 15.2 normalized.series 資料形狀
 
@@ -646,14 +649,15 @@ series.resolved        ← computed:settings-lookup
 > **註**：
 > - Phase 8-f-4（resolve-series-title helper）已於 commit `e097ac5`（8-f-4-b）落地；詳見 **§16**。
 > - 原 8-f-7 候選之「blogger-copy-helper.ejs 套用 series titleTemplate」已於 commit `abf8c5e`（**Phase 8-f-5-b**）落地；採「**新增 [11] 輔助區塊；不取代 [1] 主標題**」之保守路線。詳見 **§17**。
-> - 其他 caller（blogger-post-full / post-detail / promotion / publish-checklist / meta.json）之接入決策詳見 **§17.3**。
+> - 原 8-f-6 候選之「build-promotion 輸出 titleEn 至 manifest」之 manifest 層已於 commit `7741655`（**Phase 8-f-6-b**）落地；同步加入 `seriesResolvedTitle` / `seriesTitleUnresolvedPlaceholders` / `fbTitleEn` 共 4 個 additive 欄位；**FB .txt 輸出不變**；詳見 **§18**。
+> - 其他 caller（blogger-post-full / post-detail / publish-checklist / meta.json）之接入決策詳見 **§17.3**。
 
 下列項目**仍屬後續批次規劃**：
 
 | 候選批次 | 範圍 | 依賴 |
 | --- | --- | --- |
-| Phase 8-f-5（hashtags 繼承） | `build-promotion` 從 `normalized.series.hashtags` 繼承至 FB hashtags（單篇可完整覆寫） | normalized.series（已落地） |
-| Phase 8-f-6 | `build-promotion` 輸出 `titleEn` 至 manifest（可選顯示） | 無 |
+| Phase 8-f-N（hashtags 繼承） | `build-promotion` 從 `normalized.series.hashtags` 繼承至 FB hashtags（單篇可完整覆寫） | normalized.series（已落地） |
+| Phase 8-f-N（FB .txt 顯示）| `facebook-post.ejs` / `facebook-summary.ejs` 顯示 manifest 中之 `titleEn` / `fbTitleEn` / `seriesResolvedTitle`（需考量文案長度與 SEO / 搜尋一致性） | manifest additive 欄位（已落地） |
 | Phase 8-f-9 | `new-post.js` 加 series 區塊 + `type` → `contentKind` 修正 | 無 |
 | Phase 8-f-10 | `new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作） | 8-f-9 |
 
@@ -841,6 +845,61 @@ resolveTitleTemplate(template, context = {})
 | `build-blogger.js buildMeta()` / `meta.json` | meta.json 屬發布回填層；schema 變動影響下游 tools；series 屬內容屬性不應入 meta.json |
 
 各接入候選若未來有實際需求，可獨立另開批次評估；建議優先考慮 additive 模式（不取代既有欄位）。
+
+---
+
+## §18 Phase 8-f-6 promotion manifest 接入實況
+
+### 18.1 落地細節（Phase 8-f-6-b 落地）
+
+- **已接入**：`src/scripts/build-promotion.js`（commit `7741655`）
+- **修改範圍**：僅 `buildManifestEntry()` 內預計算 4 個 additive 欄位；不動 `classifyFacebook` / `buildFacebookUrl` / `resolvePlaceholders` / `renderAndWriteFacebookText`
+- **新增欄位位置**：插入於 entry 既有 `note` 之後、`baseUrl` 之前；既有 17 個欄位順序與值不變
+
+### 18.2 新增 4 個 additive 欄位來源
+
+| 欄位 | 型別 | 來源 |
+| --- | --- | --- |
+| `titleEn` | `string \| null` | `post.titleEn`（`.md` frontmatter）|
+| `fbTitleEn` | `string \| null` | `post.sidecars?.facebook?.data?.titleEn`（`.fb.md` frontmatter；Phase 8-e-2 schema 落地） |
+| `seriesResolvedTitle` | `string \| null` | `resolveTitleTemplate(normalized.series.titleTemplate, { series, post: { title, titleEn } })` 之 `resolvedText`（與 copy-helper 8-f-5-b 同 pattern） |
+| `seriesTitleUnresolvedPlaceholders` | `Array<{ name, reason }>` | 上 helper 返回之 `unresolvedPlaceholders` array |
+
+### 18.3 設計原則
+
+- **不取代** `entry.title`（normalized 優先 + legacy fallback，沿 Phase 8-d-4-b 設計）
+- **不取代** `entry.fbTitle`（legacy `fb.title` 來源不變）
+- **不修改** `facebook-post.ejs` / `facebook-summary.ejs`
+- **不改** FB `.txt` 實際輸出（EJS 不讀新欄位 → byte-identical）
+- **本批僅資料層 metadata**，供未來 EJS / 下游工具選用
+
+### 18.4 無 series / 無 titleTemplate 時之欄位預期值
+
+| 情境 | `seriesResolvedTitle` | `seriesTitleUnresolvedPlaceholders` |
+| --- | --- | --- |
+| 無 series 區塊 | `null` | `[]` |
+| 有 series 但 `titleTemplate` 為空字串 / null | `null` | `[]` |
+| 有 series 且 `titleTemplate` 非空、完整解析 | 組合標題字串 | `[]` |
+| 有 series 且 `titleTemplate` 部分 unresolved | 含 `{X.Y}` 原文之字串 | `[{ name, reason }, ...]` |
+
+### 18.5 unresolved placeholders 行為
+
+- **不 throw** / **不 process.exit** / **不阻擋 build**（沿用 8-f-4-b helper 設計）
+- 原 `{X.Y}` placeholder **保留於 `seriesResolvedTitle`** 文字內
+- 未解析項目列入 `seriesTitleUnresolvedPlaceholders` array（`name` + `reason`：`missing-value` / `unsupported-placeholder`）
+- **目前不顯示於 FB `.txt`**（EJS 暫不讀；屬未來批次決策）
+- **不寫入** `validationMeta`
+- **不新增** `validate-content` user-visible warning
+
+### 18.6 未來 FB `.txt` 顯示決策
+
+未來若選擇讓 FB `.txt` 顯示 `titleEn` / `fbTitleEn` / `seriesResolvedTitle`，應**另開批次**評估：
+
+- 文案長度（FB 貼文建議標題 < 60 chars；series titleTemplate 套用後可能過長）
+- FB 貼文格式（標題行 / 副標行 / 多語並列等顯示策略）
+- SEO / 搜尋一致性（與 Blogger 主標題、Google 預覽之對應）
+
+**目前 `entry.title` / `entry.fbTitle` 仍是實際 FB 文案主標題來源**；EJS 邏輯維持 `post.fbTitle || post.title` 之 fallback chain（manifest entry view）。
 
 ---
 
