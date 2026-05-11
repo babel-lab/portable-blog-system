@@ -525,6 +525,26 @@ Phase 8-e-1 之 series metadata 規格（`docs/series-schema.md`）所預告之 
 
 **Phase 8-e-2 本批只定義 schema 文件**：`.fb.md` `hashtags` 目前仍為單篇 FB override；`series.hashtags` 預設帶出與繼承邏輯之**實作**屬後續 Phase 8-e 批次（建議 Phase 8-e-6 build script 接入時一併處理），**本批不改 `build-promotion.js` 的 hashtags 行為**。
 
+#### 12.3.1 Phase 8-f-7-b 已落地：normalized 層 series.hashtags fallback
+
+於 commit `592d45c` 落地之 `normalize-post-output.js` post-pass backfill 邏輯，擴充 `normalized.promotion.facebook.hashtags` 之 fallback chain：
+
+```
+1. .fb.md hashtags（非空 array；sidecar-first；本層既有最高優先）
+2. legacy frontmatter.promotion.facebook.hashtags（非空 array）
+3. series.hashtags（Phase 8-f-7-b 新增；當 1 / 2 皆解為 [] 時觸發）
+4. []（最終 fallback）
+```
+
+**設計原則**（與 §8 / §15.6 / §19 對齊）：
+
+- **`.fb.md` hashtags 仍是 FB hashtags 最高優先來源**；本批不破壞單篇 override 設計
+- 若 `.fb.md` hashtags 與 legacy `promotion.facebook.hashtags` **都空**且文章屬 series，則 `normalized.promotion.facebook.hashtags` **fallback 到 `series.hashtags`**
+- **不自動合併**；採完整 fallback（替換空陣列為 series.hashtags）
+- **Blogger `post.tags` 與 FB hashtags 不互通**：Blogger 標籤為短 slug（`github`），FB hashtags 為 `#` prefix；格式不同；本批**不影響** Blogger `post.tags`；若未來要做 Blogger 標籤繼承，應另設 `series.tags` 短 slug 欄位，**不應直接沿用** FB `#hashtags`
+
+詳細落地紀錄詳見 `docs/series-schema.md` §19 與 `docs/phase-8f-completion-report.md`。
+
 ### 12.4 title 與 series 之關係
 
 `.fb.md` frontmatter `title` 與 `titleEn`（§3.1）與 Blogger `.md` frontmatter `title` / `titleEn`、`.publish.json` `seo.metaTitle` 之預設一致性規則、可手動修改原則，詳見 `docs/series-schema.md` §6 與 §7；本檔 §3.4 提供 title metadata 分工總表。摘要：
