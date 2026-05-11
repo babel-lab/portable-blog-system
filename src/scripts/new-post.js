@@ -13,11 +13,25 @@
 //   但從 template 規範可避免每次倚賴 pipeline 後處理。
 //
 // 用法：
-//   node src/scripts/new-post.js [slug]
+//   node src/scripts/new-post.js [slug] [--series-id X] [--series-number N] [--series-subtitle S]
 //   → 印出可貼到 content/{site}/posts/{YYYY-MM-DD}-{slug}.md 的內容
+//   → 若提供 --series-id 但未提供 --series-number，stderr 將顯示建議的 next series.number
+//     （從既有 markdown frontmatter 掃描；不寫入 stdout template）
 //
 // 範例：
 //   node src/scripts/new-post.js my-first-post
+//   node src/scripts/new-post.js my-post --series-id we-media-ai-52
+
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fg from 'fast-glob';
+import matter from 'gray-matter';
+import { suggestSeriesNumberForPosts } from './suggest-series-number.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 const args = process.argv.slice(2);
 let slugArg = null;
@@ -47,6 +61,66 @@ if (seriesId !== null) {
   if (seriesNumber !== null) lines.push(`  number: ${seriesNumber}`);
   if (seriesSubtitle !== null) lines.push(`  subtitle: "${seriesSubtitle}"`);
   SERIES_BLOCK = lines.join('\n') + '\n\n';
+}
+
+// Phase 8-g-2-c-c：next series.number suggestion（stderr-only；不寫入 stdout template）
+//   觸發條件：seriesId 有提供 + seriesNumber 未提供
+//   保守原則：seriesNumber 手動指定時完全不顯示（per 8-g-2-c-c 原則 4）
+//   I/O 失敗 graceful fallback：stderr warning；stdout template 仍正常輸出
+async function maybeSuggestSeriesNumber() {
+  if (seriesId === null) return;
+  if (seriesNumber !== null) return;
+
+  // 掃描範圍：依 8-g-2-c-a §B 之保守正式內容範圍
+  //   納入：blogger / github 之 posts / pages；shared/posts；drafts
+  //   排除：validation-fixtures 與 templates（含 sample-series-post.md，會誤判 #1 已用）
+  //   不含 archive：已歸檔不影響新文章編號；per 8-g-2-c-a §B #7 保守決策
+  const patterns = [
+    'content/blogger/posts/**/*.md',
+    'content/blogger/pages/**/*.md',
+    'content/github/posts/**/*.md',
+    'content/github/pages/**/*.md',
+    'content/shared/posts/**/*.md',
+    'content/drafts/**/*.md',
+  ];
+  const ignore = [
+    'content/validation-fixtures/**',
+    'content/templates/**',
+  ];
+
+  let files;
+  try {
+    files = await fg(patterns, {
+      cwd: PROJECT_ROOT,
+      absolute: true,
+      onlyFiles: true,
+      ignore,
+    });
+  } catch {
+    process.stderr.write('[new-post] Warning: unable to suggest series.number; please set --series-number manually.\n');
+    return;
+  }
+
+  const posts = [];
+  for (const absPath of files) {
+    try {
+      const raw = await fs.readFile(absPath, 'utf-8');
+      const { data } = matter(raw);
+      posts.push(data);
+    } catch {
+      // individual file failure：跳過該檔；繼續掃描其他
+    }
+  }
+
+  const { suggestedNumber, ignored } = suggestSeriesNumberForPosts(posts, seriesId);
+
+  process.stderr.write(`[new-post] Suggested series.number for "${seriesId}": ${suggestedNumber}\n`);
+  process.stderr.write(`[new-post] Add it explicitly with: --series-number ${suggestedNumber}\n`);
+
+  if (ignored.length > 0) {
+    const noun = ignored.length === 1 ? 'value' : 'values';
+    process.stderr.write(`[new-post] Warning: ignored ${ignored.length} invalid series.number ${noun} while scanning.\n`);
+  }
 }
 
 const TEMPLATE = `---
@@ -112,6 +186,8 @@ parse-markdown.js 雖會自動將 body 內 \`<h1>\` 降為 \`<h2>\`，validate-c
 
 文章結尾...
 `;
+
+await maybeSuggestSeriesNumber();
 
 console.log(TEMPLATE);
 console.log('// ---');
