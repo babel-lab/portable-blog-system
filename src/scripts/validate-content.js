@@ -547,6 +547,47 @@ export function validateContent({ posts, settings }) {
     }
   }
 
+  // Phase 8-g-2-d-e-b：series-number-duplicate 全集合掃描（warning-only）
+  //   - 觸發：同 series.id 下 ≥ 2 篇 ready/published posts 共用 series.number
+  //   - 前置：series 為 plain object；series.id 為 valid non-empty string；
+  //     series.number 為 valid positive integer
+  //   - id / number 為 invalid / missing 不參與 grouping，分別由
+  //     series-id-invalid / series-block-missing-number / series-number-invalid 處理
+  //   - id valid 但不在 settings.series.series：仍參與 grouping
+  //     （series-id-not-in-settings 與本規則為獨立面向之 warning，可共存）
+  //   - 範圍：沿用 loadPosts 既有 ready / published 過濾；不處理 draft / archived
+  //   - 沿用 duplicate-slug cross-post pattern；每篇衝突文章皆各自 push 一條 warning
+  const seriesNumberMap = new Map();
+  for (const post of posts) {
+    const s = post.series;
+    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
+    if (typeof s.id !== 'string' || s.id.trim() === '') continue;
+    if (
+      typeof s.number !== 'number' ||
+      !Number.isInteger(s.number) ||
+      s.number <= 0
+    ) continue;
+    const key = `${s.id}::${s.number}`;
+    if (!seriesNumberMap.has(key)) seriesNumberMap.set(key, []);
+    seriesNumberMap.get(key).push({
+      sourcePath: post.sourcePath,
+      id: s.id,
+      number: s.number,
+    });
+  }
+  for (const [, entries] of seriesNumberMap) {
+    if (entries.length >= 2) {
+      for (const entry of entries) {
+        issues.push({
+          severity: 'warning',
+          type: 'series-number-duplicate',
+          sourcePath: entry.sourcePath,
+          value: `series.id="${entry.id}", series.number=${entry.number}`,
+        });
+      }
+    }
+  }
+
   const errors = issues.filter((i) => i.severity === 'error');
   const warnings = issues.filter((i) => i.severity === 'warning');
 
