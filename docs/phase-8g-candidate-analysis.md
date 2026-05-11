@@ -270,9 +270,9 @@ node src/scripts/new-post.js my-slug --series-id we-media-ai-52 --series-number 
 
 | 候選 rule key | 規格依據 | 狀態 | 備註 |
 |---|---|---|---|
-| `series-number-duplicate` | series-schema §5.3 | `candidate`（屬 Phase 8-g-2-d-e）| 需 ≥ 2 篇 same id same number 觸發樣本 + fixture 配套；單獨排程；本系列**未實作**，不應視為已完成 |
+| ~~`series-number-duplicate`~~ | series-schema §5.3 | ✅ `landed`（Phase 8-g-2-d-e-b / e-c）| 規則 commit `89bbbd0`；fixture commit `f97cded`；baseline 變為 0 error / 13 warning on 7 post(s)；詳見 `docs/phase-8g-2-d-completion-report.md` §3.2 / §4 |
 | series report（`dist-reports/series.txt`）| 8-g-0-b §6 候選 #1 | `candidate` | 屬「報表」延伸；與 `series-number-duplicate` 配套；本系列未實作 |
-| Phase 8-g-2-d completion report | — | `candidate`（屬 Phase 8-g-2-d-g）| Phase 8-g-2-d 系列收尾報告；本批僅 docs 補強，未產出 completion report |
+| ~~Phase 8-g-2-d completion report~~ | — | ✅ `landed`（Phase 8-g-2-d-g）| `docs/phase-8g-2-d-completion-report.md`（本批產出）|
 
 ### 11.5 cross-link
 

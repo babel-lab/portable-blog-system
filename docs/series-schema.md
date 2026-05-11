@@ -1152,9 +1152,9 @@ Phase 8-g-2-d 系列於 `src/scripts/validate-content.js` 加入 **3 條 series 
 
 | 候選 rule key | 規格依據 | 狀態 | 備註 |
 | --- | --- | --- | --- |
-| `series-number-duplicate` | 本文件 §5.3 | `candidate`（屬 Phase 8-g-2-d-e）| 需 ≥ 2 篇 same id same number 觸發樣本 + validation-fixtures 配套；屬獨立批次；**本系列未實作，不應視為已完成** |
-| series report（`dist-reports/series.txt`）| `docs/phase-8g-candidate-analysis.md` §6 候選 #1 | `candidate` | 與 `series-number-duplicate` 配套；本系列未實作 |
-| Phase 8-g-2-d completion report | — | `candidate`（屬 Phase 8-g-2-d-g）| Phase 8-g-2-d 系列收尾報告；本批僅 docs 補強，未產出 completion report |
+| ~~`series-number-duplicate`~~ | 本文件 §5.3 | ✅ `landed`（Phase 8-g-2-d-e-b / e-c）| 規則 commit `89bbbd0`；fixture commit `f97cded`；2 個 validation-fixtures（`_test-series-dup-a.md` / `_test-series-dup-b.md`）共用 series.id + series.number 以觸發；baseline 變為 0 error / 13 warning on 7 post(s) |
+| series report（`dist-reports/series.txt`）| `docs/phase-8g-candidate-analysis.md` §6 候選 #1 | `candidate` | 屬「報表」延伸；與 `series-number-duplicate` 配套；本系列未實作 |
+| ~~Phase 8-g-2-d completion report~~ | — | ✅ `landed`（Phase 8-g-2-d-g）| `docs/phase-8g-2-d-completion-report.md`（本批產出）|
 
 ### 21.6 cross-link
 
