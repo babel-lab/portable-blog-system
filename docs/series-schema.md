@@ -527,7 +527,10 @@ Phase 8-f 系列批次依序完成下列接入點，建構 series metadata 之**
 | 8-f-2-b | `2c4682f` | `loadPosts` / `loadBloggerPosts` 加入 optional `settings` 參數；4 個 caller（`validate-content` / `build-github` / `build-blogger` / `build-promotion`）更新為傳入 settings；settings 經 `load-posts → processMarkdownEntry → normalizePostOutput` 之完整通道建立 |
 | 8-f-3-a | （無 commit；純讀取分析） | normalized.series 設計分析 |
 | **8-f-3-b** | **`dfbd35e`** | **`normalize-post-output.js` 加入 normalized.series 區塊**；含 7 種 raw `post.series` 狀態之解析邏輯與 validationMeta 追蹤 |
-| 8-f-3-c | （本批 docs 補強） | 本節 §15 補入；§11.3 同步更新 |
+| 8-f-3-c | （docs 補強） | 本節 §15 補入；§11.3 同步更新 |
+| 8-f-4-a | （無 commit；純讀取分析） | resolve-series-title helper 設計分析 |
+| **8-f-4-b** | **`e097ac5`** | **新增 `src/scripts/resolve-series-title.js`**（純函式 helper；3 個 export；7 個支援 placeholder；詳見 §16） |
+| 8-f-4-c | （本批 docs 補強） | §15.1 commit 清單擴充；§15.6 候選清單調整；新增 §16 helper 設計詳述 |
 
 ### 15.2 normalized.series 資料形狀
 
@@ -637,19 +640,162 @@ series.resolved        ← computed:settings-lookup
 
 ### 15.6 尚未落地（後續批次）
 
-下列項目**不在 Phase 8-f-3-b 範圍**，屬後續批次規劃：
+> **註**：Phase 8-f-4（resolve-series-title helper）已於 commit `e097ac5`（8-f-4-b）落地；詳見 **§16**。下表中原列為依賴「8-f-4」之項目（8-f-7 / 8-f-8）依賴已滿足。
+
+下列項目**不在 Phase 8-f-3-b / 8-f-4-b 範圍**，屬後續批次規劃：
 
 | 候選批次 | 範圍 | 依賴 |
 | --- | --- | --- |
-| Phase 8-f-4 | `series.titleTemplate` placeholder 解析 helper（如 `{series.name}` / `{series.number}` / `{series.subtitle}` / `{series.nameEn}`） | normalized.series（已落地） |
 | Phase 8-f-5 | `build-promotion` 從 `normalized.series.hashtags` 繼承至 FB hashtags（單篇可完整覆寫） | normalized.series（已落地） |
 | Phase 8-f-6 | `build-promotion` 輸出 `titleEn` 至 manifest（可選顯示） | 無 |
-| Phase 8-f-7 | `blogger-copy-helper.ejs` / `blogger-publish-checklist.ejs` 套用 series titleTemplate | 8-f-4 |
-| Phase 8-f-8 | EJS `post-detail.ejs` / `blogger-post-full.ejs` 套用 series titleTemplate | 8-f-4 |
+| Phase 8-f-7 | `blogger-copy-helper.ejs` / `blogger-publish-checklist.ejs` 套用 series titleTemplate | resolve-series-title helper（**已落地**） |
+| Phase 8-f-8 | EJS `post-detail.ejs` / `blogger-post-full.ejs` 套用 series titleTemplate | resolve-series-title helper（**已落地**） |
 | Phase 8-f-9 | `new-post.js` 加 series 區塊 + `type` → `contentKind` 修正 | 無 |
 | Phase 8-f-10 | `new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作） | 8-f-9 |
 
-各批次落地時機由作者依需求安排；亦可調整拆批粒度。
+各批次落地時機由作者依需求安排；亦可調整拆批粒度。**Phase 8-f-7（Blogger copy-helper 接入）為最低風險首選**，因 copy-helper.txt 為純文字 manual reference、非 customer-facing（詳見 §16.9）。
+
+---
+
+## §16 resolve-series-title helper（Phase 8-f-4-b 落地）
+
+### 16.1 檔案位置與狀態
+
+- **檔案**：`src/scripts/resolve-series-title.js`（commit `e097ac5`）
+- **狀態**：**helper 已落地；尚未接入任何 caller**
+- 純函式 module；零外部 import；不修改 input；相同輸入永遠相同輸出
+- 不讀檔 / 不寫檔 / 不 throw / 不 process.exit
+- 不寫 `normalized.validationMeta`（屬 caller 責任，視需要寫入）
+- 不新增 `validate-content` user-visible warning
+
+### 16.2 placeholder 語法
+
+| 維度 | resolve-series-title | resolve-placeholders（`.fb.md` body） | ga4-url-builder expandPattern（UTM） |
+| --- | --- | --- | --- |
+| 大括號 | **單** `{...}` | **雙** `{{...}}` | 單 `{...}` |
+| dot notation | ✅ 支援 | ✅ 支援 | ❌ 不支援（純 word） |
+| 左右空白容忍 | ✅ | ✅ | ❌ |
+| 用途 | series titleTemplate | `.fb.md` body URL placeholder | UTM `campaignPattern` / `contentPattern` |
+
+三套 syntax **設計目的不同**；不互通；不重用既有 helper。
+
+### 16.3 三個 export
+
+```js
+extractTitlePlaceholders(template)
+// 抽出 template 內所有 placeholder name（依首次出現順序去重）
+// 返回：array of string
+
+resolveTitlePlaceholderValue(name, context = {})
+// 解析單一 placeholder
+// 返回：{ resolved: boolean, value: string | null, reason: string | null }
+
+resolveTitleTemplate(template, context = {})
+// 對整段 template 做 placeholder 替換
+// 返回：{ resolvedText, placeholders, replacements, unresolvedPlaceholders }
+```
+
+### 16.4 支援 placeholder 清單
+
+`SUPPORTED_PLACEHOLDERS` Set 含 **7 個 placeholder**：
+
+| Placeholder | Context path | 來源 |
+| --- | --- | --- |
+| `{series.name}` | `context.series.name` | `normalized.series.name` |
+| `{series.nameEn}` | `context.series.nameEn` | `normalized.series.nameEn` |
+| `{series.number}` | `context.series.number` | `normalized.series.number`（轉 string） |
+| `{series.subtitle}` | `context.series.subtitle` | `normalized.series.subtitle` |
+| `{series.id}` | `context.series.id` | `normalized.series.id` |
+| `{post.title}` | `context.post.title` | `post.title`（raw frontmatter） |
+| `{post.titleEn}` | `context.post.titleEn` | `post.titleEn`（raw frontmatter） |
+
+未列於上述者 → `{ resolved: false, reason: 'unsupported-placeholder' }`。
+
+### 16.5 unresolved placeholder 處理策略
+
+| 行為 | 描述 |
+| --- | --- |
+| 保留原文 | unresolved 不替換；`resolvedText` 維持原 `{X.Y}` 字串 |
+| 列入返回值 | `unresolvedPlaceholders`：array of `{ name, reason }` |
+| reason 候選 | `'missing-value'`（context 內對應 path 為 null/undefined）/ `'unsupported-placeholder'`（不在 SUPPORTED_PLACEHOLDERS 集合）|
+| 不 throw | helper 永不中斷流程 |
+| 不 process.exit | 同上 |
+| 不寫 validationMeta | 屬 caller 責任；helper 不操作任何外部 accumulator |
+| 不新增 validate-content warning | 屬未來批次決定 |
+
+**特殊情境**：空字串 `""` 視為**已解析**（替換為空字串）；僅 `null` / `undefined` 觸發 `'missing-value'`。數字 0 / boolean false 同樣視為已解析（轉 string）。
+
+### 16.6 resolveTitleTemplate 回傳資料形狀
+
+**完整解析範例**：
+
+```js
+{
+  resolvedText: '[貝果書屋] 《範例系列》#1(提問筆記本)',
+  placeholders: [
+    'series.name',
+    'series.number',
+    'series.subtitle',
+  ],
+  replacements: [
+    { name: 'series.name', value: '範例系列' },
+    { name: 'series.number', value: '1' },
+    { name: 'series.subtitle', value: '提問筆記本' },
+  ],
+  unresolvedPlaceholders: [],
+}
+```
+
+**含 unresolved 範例**：
+
+```js
+{
+  resolvedText: '《Series Name》#1({series.subtitle})',  // ← 保留原 {series.subtitle}
+  placeholders: ['series.name', 'series.number', 'series.subtitle'],
+  replacements: [
+    { name: 'series.name', value: 'Series Name' },
+    { name: 'series.number', value: '1' },
+  ],
+  unresolvedPlaceholders: [
+    { name: 'series.subtitle', reason: 'missing-value' },
+  ],
+}
+```
+
+### 16.7 目前不支援項目
+
+下列功能屬未來批次規格範圍，**本批不支援**：
+
+- ❌ 條件式 placeholder（如 `{?series.subtitle:(...)}`）
+- ❌ fallback chain（如 `{series.name|post.title}`）
+- ❌ 巢狀 placeholder（如 `{outer.{inner}}`）
+- ❌ subtitle 缺值時智慧括號移除（`{X}()` 仍輸出空括號 `()`；不改寫週邊符號）
+- ❌ 自動改寫 titleTemplate（helper 不改寫；caller 自行決定後處理）
+
+### 16.8 對 validate / build 影響
+
+| 影響面 | 變動？ | 說明 |
+| --- | --- | --- |
+| `npm run validate:content` 基線 | ❌ 不變 | helper 無 caller import；維持 `0 error / 9 warning on 5 post(s)` |
+| `npm run build:github` 輸出 | ❌ 不變 | helper 無 caller import；dist byte-identical |
+| `npm run build:blogger` 輸出 | ❌ 不變 | 同上 |
+| `npm run build:promotion` 輸出 | ❌ 不變 | 同上 |
+| `dist/.gitkeep` / `dist-blogger/.gitkeep` / `dist-promotion/.gitkeep` | ❌ 不變 | helper 不觸 dist |
+
+→ helper 處於「**已可被 caller 引用，但目前尚無 caller**」狀態。
+
+### 16.9 後續接入建議順序
+
+依風險與可逆性，建議由低到高排序：
+
+| 順序 | 接入點 | 風險 | 理由 |
+| --- | --- | --- | --- |
+| 1 | **`blogger-copy-helper.ejs`** | ⭐⭐⭐ 最低 | 純文字 .txt；非 customer-facing；作者手動複製用；錯誤可立即發現；dist-blogger byte-diff 易驗證 |
+| 2 | `blogger-post-full.ejs`（Blogger 主文 HTML） | ⭐⭐ 中 | live HTML；影響貼到 Blogger 平台之內容 |
+| 3 | `post-detail.ejs`（GitHub 主文 HTML） | ⭐ 較高 | live HTML；customer-facing |
+| 4 | `build-promotion.js`（FB 貼文 title / fbTitle） | ⭐⭐ 中 | 影響 FB 推廣文案 |
+
+各接入點屬獨立批次；可依作者實際需求調整順序與粒度。
 
 ---
 
