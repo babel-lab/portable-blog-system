@@ -7,6 +7,7 @@
 # 3. {{ articleUrl }} placeholder 由發布流程或後續工具解析（詳見 docs/fb-sidecar-schema.md §5）。
 # 4. FB 文案只放在 .fb.md；不放 .md frontmatter，也不放 .publish.json。
 # 5. UTM 由 content/settings/promotion.config.json 集中管理；本範本不寫死 UTM。
+# 6. titleEn 為 FB 貼文英文標題 metadata，目前可暫不顯示，但保留供未來 SEO / GitHub / 跨平台轉換使用（詳見 docs/fb-sidecar-schema.md §3.4）。
 # ─────────────────────────────────────────────
 
 enabled: false
@@ -17,6 +18,7 @@ hashtags:
   - "#示範主題"
   - "#示範分類"
 title: ""
+titleEn: ""
 note: "範本檔；複製成 {slug}.fb.md 後請填入實際內容並改 enabled: true。本範本同時適用 posts/ 與 pages/。"
 ---
 
