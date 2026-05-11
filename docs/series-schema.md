@@ -440,7 +440,7 @@ Phase 8-e-4 落地之正式結構（範本 `content/settings/_sample.series.json
 - 陣列可保留作者定義之系列序列，便於日後增加排序屬性
 - 避免 `series.id` 含特殊字元時造成 JSON object key 之表達限制
 
-build 系統尚未自動讀取本檔；**接入屬後續批次**（建議 Phase 8-e-6 之 build script 階段一併處理）。
+`loadSettings()` 已於 **Phase 8-f-1**（commit `e2d50c5`）接入 `series.json`；`normalize-post-output.js` 已於 **Phase 8-f-3-b**（commit `dfbd35e`）透過 `settings.series.series` array 查表並產出 `normalized.series`（詳見 §15）。**EJS / build scripts / promotion / copy-helper 之接入屬後續批次**（詳見 §15.6）。
 
 ---
 
@@ -508,6 +508,148 @@ sample / template 之欄位、預設值、結構必須與本文件 §2 / §11.3 
 | 8-e-5 | `new-post.js` 加入自動建議序號（§5） | §5 已規格化 |
 | 8-e-6 | build script 接入 series titleTemplate / hashtags 繼承（§2.4 / §8） | §2.4 / §8 已規格化 |
 | 8-e-7 | `docs/series-schema.md` completion report | 留待 8-e 系列完成 |
+
+> **註**：上表編列於 Phase 8-e-1 撰寫時為「Phase 8-e 之後候選批次」之佔位編號；後續實際進度由 Phase 8-f 系列承接。當前落地狀態詳見 **§15**。
+
+---
+
+## §15 Phase 8-f 落地狀態（normalized.series 資料層）
+
+### 15.1 已落地批次
+
+Phase 8-f 系列批次依序完成下列接入點，建構 series metadata 之**資料層**（**本階段不接 EJS / build scripts / promotion 行為；dist 完全不變**）：
+
+| 批次 | Commit | 範圍 |
+| --- | --- | --- |
+| 8-f-0 | （無 commit；純讀取分析） | series build pipeline 接入分析 |
+| 8-f-1 | `e2d50c5` | 新增 `content/settings/series.json`（初始 `{ "series": [] }`）；`load-settings.js` SETTINGS_FILES 加入 `['series', 'series.json']`；`loadSettings()` 開始 expose `settings.series` |
+| 8-f-2-a | （無 commit；純讀取分析） | loader plumbing 設計分析 |
+| 8-f-2-b | `2c4682f` | `loadPosts` / `loadBloggerPosts` 加入 optional `settings` 參數；4 個 caller（`validate-content` / `build-github` / `build-blogger` / `build-promotion`）更新為傳入 settings；settings 經 `load-posts → processMarkdownEntry → normalizePostOutput` 之完整通道建立 |
+| 8-f-3-a | （無 commit；純讀取分析） | normalized.series 設計分析 |
+| **8-f-3-b** | **`dfbd35e`** | **`normalize-post-output.js` 加入 normalized.series 區塊**；含 7 種 raw `post.series` 狀態之解析邏輯與 validationMeta 追蹤 |
+| 8-f-3-c | （本批 docs 補強） | 本節 §15 補入；§11.3 同步更新 |
+
+### 15.2 normalized.series 資料形狀
+
+`normalizePostOutput()` 之 return 物件**新增** `series` 欄位（與 `identity` / `display` / `seo` / `publish` / `promotion` / `validationMeta` 同層）；**不修改原 `post.series`**（raw frontmatter 完整保留）。
+
+#### 形狀 1：null（無 series 或 invalid 不可用）
+
+```js
+normalized.series = null
+```
+
+觸發狀態：
+- frontmatter 無 `series:` 區塊（`undefined`）
+- frontmatter `series: null`
+- frontmatter `series` 為非 plain object（string / array / number / boolean）
+- frontmatter `series.id` 為空字串或非 string
+
+#### 形狀 2：object with `resolved: false`（id 找不到 settings）
+
+```js
+normalized.series = {
+  id,                          // string；來自 frontmatter
+  number,                      // number；來自 frontmatter
+  subtitle,                    // string | null；來自 frontmatter
+  name: null,                  // settings 缺
+  nameEn: null,                // settings 缺
+  titleTemplate: null,         // settings 缺
+  hashtags: [],                // 空 array
+  resolved: false,
+}
+```
+
+#### 形狀 3：object with `resolved: true`（id 找得到 settings；含可選之 frontmatter override）
+
+```js
+normalized.series = {
+  id,                          // string；frontmatter
+  number,                      // number；frontmatter
+  subtitle,                    // string | null；frontmatter
+  name,                        // string；frontmatter override 或 settings
+  nameEn,                      // string；frontmatter override 或 settings
+  titleTemplate,               // string；frontmatter override 或 settings
+  hashtags,                    // array；frontmatter override 或 settings
+  resolved: true,
+}
+```
+
+### 15.3 合併優先順序
+
+| 欄位 | 第一優先 | Fallback 1 | Fallback 2 |
+| --- | --- | --- | --- |
+| `id` | `frontmatter.series.id` | — | — |
+| `number` | `frontmatter.series.number` | — | — |
+| `subtitle` | `frontmatter.series.subtitle`（hasValue 檢查） | — | `null` |
+| `name` | `frontmatter.series.name`（override） | `settings.series[id].name` | `null` |
+| `nameEn` | `frontmatter.series.nameEn`（override） | `settings.series[id].nameEn` | `null` |
+| `titleTemplate` | `frontmatter.series.titleTemplate`（override） | `settings.series[id].titleTemplate` | `null` |
+| `hashtags` | `frontmatter.series.hashtags`（**完整覆寫**；非 array merge） | `settings.series[id].hashtags` | `[]` |
+| `resolved` | `computed:settings-lookup` | — | — |
+
+**hashtags 採完整覆寫而非合併** — 沿用 §8.4 之既定原則；避免 hashtag 重複與作者意圖不易反推之問題。
+
+### 15.4 validationMeta 整合
+
+#### 15.4.1 `fieldSource` 記錄
+
+`normalized.validationMeta.fieldSource` 記錄 8 個 series 欄位之來源（與既有 display / seo / publish 同步追蹤；僅在形狀 2 / 3 寫入）：
+
+```
+series.id              ← frontmatter.series.id
+series.number          ← frontmatter.series.number
+series.subtitle        ← frontmatter.series.subtitle  /  fallback:null
+series.name            ← frontmatter.series.name      /  settings.series[id].name      /  fallback:null
+series.nameEn          ← frontmatter.series.nameEn    /  settings.series[id].nameEn    /  fallback:null
+series.titleTemplate   ← frontmatter.series.titleTemplate / settings.series[id].titleTemplate / fallback:null
+series.hashtags        ← frontmatter.series.hashtags  /  settings.series[id].hashtags  /  fallback:empty-array
+series.resolved        ← computed:settings-lookup
+```
+
+#### 15.4.2 `warnings` 內部記錄
+
+`normalized.validationMeta.warnings` 內部記錄 **3 種** invalid / unresolved 情境（**屬 helper-internal traceability**）：
+
+| Type | 觸發條件 | Message |
+| --- | --- | --- |
+| `series-invalid-shape` | `post.series` 為非 plain object（string / array / number / boolean） | `series is not a plain object (typeof=...)` |
+| `series-id-empty` | `post.series` 為 object 但 `series.id` 為空字串或非 string | `series.id is empty or non-string; treated as no usable series` |
+| `series-id-not-resolved` | `series.id` 有值但 `settings.series.series` 找不到對應 id | `series.id="{id}" not found in settings.series; per-post fields preserved, settings-level fields null` |
+
+#### 15.4.3 不升級為 validate-content user-visible warning
+
+本批 helper-internal warnings **不被** `validate-content` 之 user-visible warning 機制讀取；既有 baseline 完全不變。
+
+未來 `validate-content` 接 `normalized.validationMeta.warnings` 之 traceability（屬 `docs/phase-8d-field-mapping-design.md` §12 item 5 之延後項）時，可一併評估是否升級為 user-visible warning。
+
+### 15.5 對 validate 基線與 build output 之影響
+
+| 影響面 | 變動？ | 說明 |
+| --- | --- | --- |
+| `npm run validate:content` 基線 | ❌ 不變 | 維持 `0 error / 9 warning on 5 post(s)`（4 條既有正式文章 warning + 5 條 fixture warning） |
+| `npm run build:github` 輸出 | ❌ 不變 | EJS / build script 暫不讀 `normalized.series`；dist byte-identical（modulo timestamps） |
+| `npm run build:blogger` 輸出 | ❌ 不變 | `buildMeta` / EJS 不寫 `normalized.series`；dist-blogger byte-identical |
+| `npm run build:promotion` 輸出 | ❌ 不變 | `buildManifestEntry` 不讀 series；dist-promotion byte-identical |
+| `dist/.gitkeep` / `dist-blogger/.gitkeep` / `dist-promotion/.gitkeep` | ❌ 不變 | build 不觸及 |
+
+`normalized.series` 已建構並可被 caller 讀取，**目前處於「暫無 caller 使用」狀態**；上層接入屬後續批次。
+
+### 15.6 尚未落地（後續批次）
+
+下列項目**不在 Phase 8-f-3-b 範圍**，屬後續批次規劃：
+
+| 候選批次 | 範圍 | 依賴 |
+| --- | --- | --- |
+| Phase 8-f-4 | `series.titleTemplate` placeholder 解析 helper（如 `{series.name}` / `{series.number}` / `{series.subtitle}` / `{series.nameEn}`） | normalized.series（已落地） |
+| Phase 8-f-5 | `build-promotion` 從 `normalized.series.hashtags` 繼承至 FB hashtags（單篇可完整覆寫） | normalized.series（已落地） |
+| Phase 8-f-6 | `build-promotion` 輸出 `titleEn` 至 manifest（可選顯示） | 無 |
+| Phase 8-f-7 | `blogger-copy-helper.ejs` / `blogger-publish-checklist.ejs` 套用 series titleTemplate | 8-f-4 |
+| Phase 8-f-8 | EJS `post-detail.ejs` / `blogger-post-full.ejs` 套用 series titleTemplate | 8-f-4 |
+| Phase 8-f-9 | `new-post.js` 加 series 區塊 + `type` → `contentKind` 修正 | 無 |
+| Phase 8-f-10 | `new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作） | 8-f-9 |
+
+各批次落地時機由作者依需求安排；亦可調整拆批粒度。
 
 ---
 
