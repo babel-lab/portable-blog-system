@@ -144,7 +144,19 @@ function classifyFacebook(post, fbConfig) {
 // ---- manifest 條目組裝（4-b 不算 finalUrl/UTM）---------------------------
 
 function buildManifestEntry(post, page, fb, settings) {
-  const hashtags = Array.isArray(fb.hashtags) ? fb.hashtags.filter(Boolean) : [];
+  // Phase 8-d-4-b：4 個欄位（title / target / message / hashtags）改讀 normalized 優先 + legacy fallback。
+  //   - 不動 classifyFacebook 過濾 / buildFacebookUrl 呼叫 / ga4-url-builder URL 邏輯
+  //   - 不動 resolvePlaceholders ctx / EJS template 接收結構 / manifest 欄位順序
+  //   - 不動 fbTitle / note / page / site / slug / sourcePath / id / baseUrl / finalUrl / urlSource / urlReason / resolvedFacebookBody / facebookSidecar
+  //   - 不引入 series / titleEn / hashtag 繼承（屬 Phase 8-e 範圍）
+  //   - normalized 欄位來源依 normalize-post-output.js §6 映射；不臆造 normalized.urls 等不存在 schema
+  //   - hashtags 保留既有 filter(Boolean) 處理，僅換來源；若 normalized.promotion.facebook.hashtags 為陣列（即使空），視為 normalized 已明確提供，採用之
+  const normalizedFb = post.normalized?.promotion?.facebook;
+  const normalizedTitle = post.normalized?.display?.title;
+  const hashtagsSource = Array.isArray(normalizedFb?.hashtags)
+    ? normalizedFb.hashtags
+    : fb.hashtags;
+  const hashtags = Array.isArray(hashtagsSource) ? hashtagsSource.filter(Boolean) : [];
   const { baseUrl, finalUrl, urlSource, urlReason } = buildFacebookUrl({
     post,
     fb,
@@ -156,11 +168,11 @@ function buildManifestEntry(post, page, fb, settings) {
     slug: post.slug ?? null,
     sourcePath: post.sourcePath,
     id: post.id ?? null,
-    title: post.title ?? null,
+    title: normalizedTitle || (post.title ?? null),
     page,
     fbTitle: fb.title || null,
-    message: fb.message || null,
-    target: fb.target ?? 'auto',
+    message: normalizedFb?.message || fb.message || null,
+    target: normalizedFb?.target || (fb.target ?? 'auto'),
     hashtags,
     hashtagCount: hashtags.length,
     note: fb.note || null,
