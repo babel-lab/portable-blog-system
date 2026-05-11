@@ -289,6 +289,25 @@ export function validateContent({ posts, settings }) {
                 sourcePath,
                 value: typeof s.id === 'string' ? '(empty)' : `typeof=${typeof s.id}`,
               });
+            } else {
+              // Phase 8-g-2-d-b：series-id-not-in-settings（warning-only）
+              //   - 觸發：s.id 為 non-empty string 且 settings.series.series 找不到對應 id
+              //   - 觸發範圍與既有 series 規則一致（僅 ready/published；drafts/archived 由 load-posts 過濾）
+              //   - 不擴充 settings 載入路徑；不修改 loadPosts；不新增 fixture
+              //   - settings.series 結構 per docs/series-schema.md §11.3：`{ series: [{ id, ... }, ...] }`
+              const seriesEntries = settings.series?.series;
+              const seriesArray = Array.isArray(seriesEntries) ? seriesEntries : [];
+              const found = seriesArray.some(
+                (e) => e && typeof e === 'object' && e.id === s.id,
+              );
+              if (!found) {
+                issues.push({
+                  severity: 'warning',
+                  type: 'series-id-not-in-settings',
+                  sourcePath,
+                  value: `"${s.id}" not found in content/settings/series.json (add entry or check for typo)`,
+                });
+              }
             }
           }
           if (s.number !== undefined) {
