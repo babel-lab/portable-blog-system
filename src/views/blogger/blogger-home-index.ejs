@@ -16,18 +16,31 @@
   <section>
     <h2><%= group.categoryName %>（<%= group.posts.length %> 篇）</h2>
     <ul class="lab-card-grid">
-      <% group.posts.forEach(function(post) { %>
+      <%# Phase 8-d-3c-8-b：最內層 posts loop 之 per-item view-model；資料來源為 build-blogger.js indexPosts 投影（8-d-3c-8-a 已 additive 加入 normalized） %>
+      <%# 沿用 8-d-3c-4～8-a 命名（itemView / itemDisplay / itemPublish / itemBlogger），不臆造 normalized.urls 命名空間 %>
+      <%# normalized 對應欄位之 fallback：title → display.title；description → display.description；bloggerPublishedUrl → publish.blogger.publishedUrl %>
+      <%# 無 normalized 對應之欄位（保留 legacy 讀法）：category（normalized 無此欄位）、date（normalized 僅有 publish.publishedAt，語意不同）、bloggerMode（normalized 無此欄位）、canonicalResolved（含 UTM；normalized.seo.canonicalUrl 為原始 canonical，語意不同） %>
+      <%# 不改 HTML 結構 / class name / 巢狀迴圈 / group.categoryName / group.posts.length / siteName / builtAt 等非 post 區塊 %>
+      <% group.posts.forEach(function(post) {
+        const itemView = post.normalized || {};
+        const itemDisplay = itemView.display || {};
+        const itemPublish = itemView.publish || {};
+        const itemBlogger = itemPublish.blogger || {};
+        const itemTitle = itemDisplay.title || post.title;
+        const itemDescription = itemDisplay.description || post.description;
+        const itemBloggerPublishedUrl = itemBlogger.publishedUrl || post.bloggerPublishedUrl;
+      %>
       <li>
         <article class="lab-post-card">
           <p class="lab-post-card__category"><%= post.category %></p>
-          <h3 class="lab-post-card__title"><%= post.title %></h3>
-          <% if (post.description) { %>
-          <p class="lab-post-card__description"><%= post.description %></p>
+          <h3 class="lab-post-card__title"><%= itemTitle %></h3>
+          <% if (itemDescription) { %>
+          <p class="lab-post-card__description"><%= itemDescription %></p>
           <% } %>
           <p class="lab-post-card__meta">
             <time datetime="<%= post.date %>"><%= post.date %></time>
             ｜mode: <code><%= post.bloggerMode %></code>
-            <% if (post.bloggerPublishedUrl) { %>｜<a href="<%- post.bloggerPublishedUrl %>" rel="noopener noreferrer" target="_blank">已發布</a><% } %>
+            <% if (itemBloggerPublishedUrl) { %>｜<a href="<%- itemBloggerPublishedUrl %>" rel="noopener noreferrer" target="_blank">已發布</a><% } %>
           </p>
           <% if (post.canonicalResolved) { %>
           <a class="lab-post-card__link" href="<%- post.canonicalResolved %>" rel="noopener noreferrer" target="_blank">前往原文（含 UTM）→</a>
