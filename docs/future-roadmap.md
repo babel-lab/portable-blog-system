@@ -28,7 +28,14 @@
 |---|---|---|---|
 | 8-g-0-a | 候選方向初步分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
 | 8-g-0-b | 候選分析與 fixture 風險決策 | ✅ 完成 | `docs/phase-8g-candidate-analysis.md`（commit `77fb764`）|
-| 8-g-0-c | roadmap 更新（本批）| 🔄 進行中 | 本文件 |
+| 8-g-0-c | roadmap 更新 | ✅ 完成 | 本文件（commit `a37d92e`）|
+| 8-g-0-d | new-post.js series prompt 讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
+| 8-g-2-b1 | new-post.js template `type` → `contentKind` 修正 | ✅ 完成 | commit `fa7d825` |
+| 8-g-2-b2 | new-post.js 加 series CLI flags（`--series-id` / `--series-number` / `--series-subtitle`）| ✅ 完成 | commit `bb58b2d` |
+| 8-g-2-c-a | next series.number suggestion 讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
+| 8-g-2-c-b | `suggest-series-number.js` helper 落地（無 caller）| ✅ 完成 | commit `2262938` |
+| 8-g-2-c-c | new-post.js 接入 stderr-only next number suggestion | ✅ 完成 | commit `2507748` |
+| 8-g-2-c-d | new-post.js series suggestion docs 補強（本批）| 🔄 進行中 | 本文件 + `docs/phase-8g-candidate-analysis.md` + `docs/series-schema.md` |
 | 8-g-1 | fixture / sample end-to-end 驗證 | ⏸ deferred | 詳見 §4 |
 
 ### 3.1 Phase 8-g-0-b 決策摘要
@@ -36,6 +43,21 @@
 - **Phase 8-g 定位**：不應急著接 customer-facing 輸出（H1 / FB `.txt` 標題 / publish-checklist 顯示組合標題等）；候選應以「驗證 / 工具 / 報表 / docs」為主。
 - **方案 E（fixture / sample end-to-end 驗證）**：屬「有價值但有部署風險之測試資產」；`content/{site}/posts/` 之 ready fixture 會被 build 掃到並進入 dist / sitemap / promotion；本系統無 noindex / staging dist 機制可隔離。
 - **9 項候選**含狀態定義（`candidate` / `deferred` / `not recommended`）；完整清單見 `docs/phase-8g-candidate-analysis.md` §6。
+
+### 3.2 Phase 8-g-2 落地摘要（new-post.js series prompt + next number suggestion）
+
+- 候選 #2（`new-post.js` series 欄位提示）與候選 #3（series number gap filling）已於 Phase 8-g-2-b1 / b2 / c-b / c-c 共 4 commits 落地：
+  - 8-g-2-b1：模板 `type` → `contentKind`（fix deprecated；commit `fa7d825`）
+  - 8-g-2-b2：series CLI flags（`--series-id` / `--series-number` / `--series-subtitle`；commit `bb58b2d`）
+  - 8-g-2-c-b：`suggest-series-number.js` 純函式 helper（無 caller；commit `2262938`）
+  - 8-g-2-c-c：new-post.js 接入 stderr-only next series.number suggestion（commit `2507748`）
+- **保守設計**：
+  - series CLI flags 為手動輸入；無互動 prompt
+  - next number suggestion 只輸出 stderr；stdout template 不自動寫入 suggested number
+  - 使用者仍須自行加 `--series-number` 才寫入模板
+  - 手動 `--series-number` 永遠優先；提供時不顯示自動建議
+  - **完全不影響 dist / dist-blogger / dist-promotion baseline**
+- 詳細落地紀錄與 CLI 範例：見 `docs/phase-8g-candidate-analysis.md` §10 與 `docs/series-schema.md` §20。
 
 ---
 
@@ -70,9 +92,10 @@
 
 | # | 候選 | 性質 | 影響 dist | 建議起手 |
 |---|---|---|---|---|
-| A | `new-post.js` series 欄位提示分析 | author tooling（stdout-only）| ❌ 不影響 | 先進入「分析批次」（讀取 `new-post.js` 現況 + 設計 series 欄位提示流程）|
-| B | validation / report 補強分析 | validate 規則擴充 / 報表 | ⚠️ 影響 `dist-reports/`（若新增 report）；不影響 `dist` / `dist-blogger` / `dist-promotion` | 先進入「分析批次」（盤點 series 相關 validate 規則缺口；無 fixture 觸發樣本之限制）|
+| ~~A~~ | ~~`new-post.js` series 欄位提示分析~~ | ✅ 已於 Phase 8-g-2-b1 / b2 / c-b / c-c 落地（詳見 §3.2）| — | — |
+| B | validation / report 補強分析（series duplicate-number / id-not-in-settings 等規則）| validate 規則擴充 / 報表 | ⚠️ 影響 `dist-reports/`（若新增 report）；不影響 `dist` / `dist-blogger` / `dist-promotion` | 先進入「分析批次」（盤點 series 相關 validate 規則缺口；無 fixture 觸發樣本之限制）|
 | C | docs consistency / cross-link 補強 | 純文件 | ❌ 不影響 | 先盤點哪些既有 docs 缺 cross-link（如 `phase-8b/c/d/e/f-completion-report.md` 之相互 cross-link 是否完整）|
+| D | Phase 8-g-2 completion report（new-post.js 系列收尾報告）| 純文件 | ❌ 不影響 | 整合 8-g-2-b1 / b2 / c-b / c-c 之完整紀錄、4 個 commit 與保守設計依據 |
 
 ### 5.2 排除原則
 

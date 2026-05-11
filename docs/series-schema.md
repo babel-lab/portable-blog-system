@@ -654,6 +654,7 @@ series.resolved        ← computed:settings-lookup
 > - 原 8-f-7 候選之「blogger-copy-helper.ejs 套用 series titleTemplate」已於 commit `abf8c5e`（**Phase 8-f-5-b**）落地；採「**新增 [11] 輔助區塊；不取代 [1] 主標題**」之保守路線。詳見 **§17**。
 > - 原 8-f-6 候選之「build-promotion 輸出 titleEn 至 manifest」之 manifest 層已於 commit `7741655`（**Phase 8-f-6-b**）落地；同步加入 `seriesResolvedTitle` / `seriesTitleUnresolvedPlaceholders` / `fbTitleEn` 共 4 個 additive 欄位；**FB .txt 輸出不變**；詳見 **§18**。
 > - 原「hashtags 繼承」候選之 normalize 層 fallback 已於 commit `592d45c`（**Phase 8-f-7-b**）落地；採「保守 post-pass backfill；僅 FB promotion 端」之路線；既有 fixture byte-identical；詳見 **§19**。
+> - 原 Phase 8-f-9 / 8-f-10 候選之「`new-post.js` series 區塊 + 自動建議 `series.number`」已於 **Phase 8-g-2** 系列（commits `fa7d825` / `bb58b2d` / `2262938` / `2507748`）以保守 stderr-only 路線落地；詳見 **§20**。
 > - 其他 caller（blogger-post-full / post-detail / publish-checklist / meta.json）之接入決策詳見 **§17.3**。
 
 下列項目**仍屬後續批次規劃**：
@@ -663,8 +664,8 @@ series.resolved        ← computed:settings-lookup
 | Phase 8-f-N（FB .txt 顯示）| `facebook-post.ejs` / `facebook-summary.ejs` 顯示 manifest 中之 `titleEn` / `fbTitleEn` / `seriesResolvedTitle`（需考量文案長度與 SEO / 搜尋一致性） | manifest additive 欄位（已落地） |
 | Phase 8-f-N（site default hashtags） | site 層級之 default hashtags 作為最終 fallback | 需設計 settings 欄位（如 `site.config.json defaultHashtags`） |
 | Phase 8-f-N（first article .fb.md hashtags fallback） | 同系列第一篇之 .fb.md hashtags 作為次級 fallback（series-schema §8.2 之 fallback 2） | 需跨文章查找；複雜度較高 |
-| Phase 8-f-9 | `new-post.js` 加 series 區塊 + `type` → `contentKind` 修正 | 無 |
-| Phase 8-f-10 | `new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作） | 8-f-9 |
+| ~~Phase 8-f-9~~ | ~~`new-post.js` 加 series 區塊 + `type` → `contentKind` 修正~~ | ✅ 已於 Phase 8-g-2-b1 / b2 落地；詳見 **§20** |
+| ~~Phase 8-f-10~~ | ~~`new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作）~~ | ✅ 已於 Phase 8-g-2-c-b / c-c 落地，採 stderr-only 保守路線；詳見 **§20** |
 
 各批次落地時機由作者依需求安排；亦可調整拆批粒度。
 
@@ -981,6 +982,119 @@ if (
 - **Blogger `post.tags` inheritance**：若未來要實作，應另行設計 slug 格式（如 `series.tags` 短 slug 欄位），**不應直接沿用 FB `#hashtags` 格式**
 
 各候選若未來有實際需求，可獨立另開批次評估。
+
+---
+
+## §20 Phase 8-g-2 new-post.js 接入實況（series prompt + next number suggestion）
+
+### 20.1 落地細節
+
+| 子批次 | Commit | 範圍 |
+| --- | --- | --- |
+| 8-g-2-b1 | `fa7d825` | new-post.js 模板 `type` → `contentKind` 修正（Phase 8-a `contentKind` 命名對齊；消除 `frontmatter-uses-deprecated-type` warning 源頭）|
+| 8-g-2-b2 | `bb58b2d` | new-post.js 加 series CLI flags：`--series-id` / `--series-number` / `--series-subtitle`；僅當 `--series-id` 有提供時模板輸出 `series:` 區塊 |
+| **8-g-2-c-b** | **`2262938`** | 新增 `src/scripts/suggest-series-number.js` 純函式 helper；3 個 export（`collectSeriesNumbers` / `suggestNextSeriesNumber` / `suggestSeriesNumberForPosts`）；無 caller |
+| **8-g-2-c-c** | **`2507748`** | new-post.js 接入 helper；觸發 `--series-id` 有 + `--series-number` 無 時，**stderr-only** 輸出 next number 建議；stdout template 不變 |
+
+### 20.2 helper（`src/scripts/suggest-series-number.js`）
+
+- **檔案**：`src/scripts/suggest-series-number.js`（commit `2262938`）
+- **狀態**：純函式 helper；零外部 import；不讀寫檔；不 throw；不 process.exit；輸入不修改
+- **與 series-schema §5 對齊**：實作「**先補最低缺號；若無缺號則 max + 1；空集合則建議 1**」之規格
+
+### 20.3 helper API
+
+| Export | 簽名 | 行為 |
+| --- | --- | --- |
+| `collectSeriesNumbers(posts, targetSeriesId)` | `(Array, string) → { numbers, ignored }` | 過濾 `series.id === targetSeriesId` 之 posts；蒐集合法 number；非數字 / 非整數 / 非正 / NaN / Infinity 記入 `ignored` array 並標 reason code |
+| `suggestNextSeriesNumber(numbers)` | `(Array<number>) → number` | 防禦性 filter（typeof / isFinite / isInteger / > 0）→ dedupe → asc sort → 低位缺號優先 → 無缺號 max+1 → 空集合 1 |
+| `suggestSeriesNumberForPosts(posts, targetSeriesId)` | `(Array, string) → { suggestedNumber, usedNumbers, ignored }` | 上述兩函式之組合 wrapper；`usedNumbers` 為 dedupe + 升序 |
+
+### 20.4 helper 對 posts 輸入之相容 shape
+
+| Shape | 來源範例 |
+| --- | --- |
+| `{ series: {...} }` | `load-posts` entry 之 spread 結果 |
+| `{ data: { series: {...} } }` | gray-matter 原始 `{ data, content }` |
+| `{ frontmatter: { series: {...} } }` | 通用 frontmatter wrapper |
+
+caller（如 8-g-2-c-c 之 new-post.js）以 gray-matter 直接取 frontmatter 後餵入；helper 自動處理多 shape。
+
+### 20.5 規格 recap（series.number auto-suggest）
+
+| 規則 | 行為 |
+| --- | --- |
+| **lowest gap first** | 已有 [1, 2, 4] → 建議 3（補缺）|
+| **else max + 1** | 已有 [1, 2, 3] → 建議 4 |
+| **empty → 1** | 空集合或無匹配 series.id → 建議 1 |
+| **dedupe** | 同系列同編號重複時視為一筆；不擋 |
+| **invalid numbers ignored** | 非 number / 非整數 / 非正 / NaN / Infinity 跳過並計入 `ignored`；helper 不 throw |
+| **status / publishedAt 不影響 number allocation** | 所有 status（draft / ready / published）皆視為「已分配創作編號」；不依發布順序（per §4）|
+| **manual `--series-number` 優先** | 使用者手動指定永遠寫入 stdout template；suggestion 完全不顯示 |
+| **suggestion 不直接寫入 template** | 僅輸出 stderr；stdout template 保持作者意圖之純複製目標 |
+
+### 20.6 new-post.js stderr 訊息格式（Phase 8-g-2-c-c）
+
+成功 suggestion：
+```
+[new-post] Suggested series.number for "we-media-ai-52": 3
+[new-post] Add it explicitly with: --series-number 3
+```
+
+含 invalid numbers（同時顯示）：
+```
+[new-post] Warning: ignored 1 invalid series.number value while scanning.
+```
+
+scan 失敗：
+```
+[new-post] Warning: unable to suggest series.number; please set --series-number manually.
+```
+
+### 20.7 new-post.js 掃描範圍（Phase 8-g-2-c-c）
+
+| 納入 | 排除 |
+| --- | --- |
+| `content/blogger/posts/**/*.md` | `content/validation-fixtures/**` |
+| `content/blogger/pages/**/*.md` | `content/templates/**` |
+| `content/github/posts/**/*.md` | （`content/archive` 不納入；保守決策）|
+| `content/github/pages/**/*.md` | |
+| `content/shared/posts/**/*.md` | |
+| `content/drafts/**/*.md` | |
+
+實作層使用 `fast-glob` + `gray-matter`（既有相依；無新增外部套件）；individual file read/parse 失敗跳過繼續；fast-glob 失敗 graceful fallback 至 stderr warning。`loadPosts()` 不重用，因其預設過濾 draft 並限單一 site，不符合「ALL status / 跨 site」之 series.number 統計需求。
+
+### 20.8 CLI 範例
+
+```bash
+# 一般文章（無 series）
+node src/scripts/new-post.js my-slug
+
+# 系列文章：自動建議 series.number（stderr 顯示）
+node src/scripts/new-post.js my-slug --series-id we-media-ai-52
+# stderr 範例：
+#   [new-post] Suggested series.number for "we-media-ai-52": 3
+#   [new-post] Add it explicitly with: --series-number 3
+
+# 系列文章：手動指定全部欄位（不顯示建議）
+node src/scripts/new-post.js my-slug --series-id we-media-ai-52 --series-number 3 --series-subtitle 提問筆記本
+```
+
+### 20.9 對 validate / build / dist 之影響
+
+| 影響面 | 變動？ | 說明 |
+| --- | --- | --- |
+| `npm run validate:content` 基線 | ❌ 不變 | helper 為純函式；無 validate-content import；new-post.js 屬 author tooling 不參與 validate |
+| `npm run build:github` 輸出 | ❌ 不變 | new-post.js / helper 不參與 build pipeline |
+| `npm run build:blogger` 輸出 | ❌ 不變 | 同上 |
+| `npm run build:promotion` 輸出 | ❌ 不變 | 同上 |
+| `dist` / `dist-blogger` / `dist-promotion` baseline | ❌ 不變 | 無 build 觸發路徑變動 |
+| `package.json` | ❌ 不變 | 無新增 npm script；無新增外部套件（沿用既有 `fast-glob` + `gray-matter`）|
+
+### 20.10 cross-link
+
+- `docs/phase-8g-candidate-analysis.md` §6 候選 #2 / #3 與 §10 詳細落地紀錄
+- `docs/future-roadmap.md` §3 子批次表 + §3.2 落地摘要
 
 ---
 

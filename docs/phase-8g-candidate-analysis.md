@@ -102,8 +102,8 @@
 | # | 候選 | 狀態 | 簡述 |
 |---|---|---|---|
 | 1 | validation / report 補強 | `candidate` | series 相關 validate 規則擴充（如 series number 重複、titleTemplate unresolved 升級為 warning）；可選 series report（`dist-reports/series.txt`）|
-| 2 | `new-post.js` series 欄位提示 | `candidate` | 新建文章流程提示作者選填 series 區塊；純 stdout 工具改良，不影響 dist |
-| 3 | series number gap filling 規則 | `deferred` | 需先有 series fixture / 真實 series posts；無觸發樣本即無法實證 |
+| 2 | `new-post.js` series 欄位提示 | ✅ `landed` | 已於 Phase 8-g-2-b1 / b2 / c-b / c-c 落地（詳見 §10）|
+| 3 | series number gap filling 規則 | ✅ `landed` | 已於 Phase 8-g-2-c-b / c-c 落地，採 stderr-only 保守路線（詳見 §10）|
 | 4 | FB `.txt` 顯示 `titleEn` / `seriesResolvedTitle` | `not recommended` | 屬 Phase 8-f-6-a 既有保守決策（FB 字長受限）；如未來改變需另開規格 |
 | 5 | site default hashtags | `candidate` | 設定層補 site-level 預設 hashtags（hashtags fallback chain 之上游補強）|
 | 6 | first article `.fb.md` hashtags fallback | `candidate` | 系列首篇可繼承上一篇 `.fb.md` hashtags（前篇延續策略）|
@@ -114,6 +114,7 @@
 ### 6.1 狀態定義
 
 - `candidate`：可進入後續 Phase 8-g-X 批次；待作者另行排程；無結構性阻擋。
+- `landed`：已落地；對應實作 commit 與設計細節詳見對應 phase 子批次紀錄。
 - `deferred`：有價值但有風險或前置條件未滿足；待條件成熟（如 fixture 觸發樣本、部署隔離機制等）。
 - `not recommended`：依既有保守決策不建議接入；如未來改變需另開規格。
 
@@ -154,3 +155,65 @@
 - **候選 1 / 5 / 6 / 7** 其中之一（屬 `candidate` 狀態之最小實作批次）。
 
 方案 E（fixture 落地）屬本文件 §5 範圍，建議待部署隔離機制就緒後再執行。
+
+> **追記（Phase 8-g-2-c-d）**：方案 D 已於 Phase 8-g-2-b / c 系列共 4 commits 完整落地（詳見 §10）。下一步候選收斂為：候選 1（validate 規則）、docs consistency（候選 C）、Phase 8-g-2 completion report。詳見 `docs/future-roadmap.md` §5.1。
+
+---
+
+## 10. Phase 8-g-2 落地紀錄（new-post.js series prompt + next number suggestion）
+
+> 批次：Phase 8-g-2-b1 / 8-g-2-b2 / 8-g-2-c-b / 8-g-2-c-c（共 4 commits）
+> 本節屬 Phase 8-g-2-c-d 批次新增之追記；§1-§9 為 Phase 8-g-0-b 之 2026-05-11 原始紀錄，狀態以 §6 更新版為準。
+
+### 10.1 落地子批次清單
+
+| 子批次 | 範圍 | Commit |
+|---|---|---|
+| 8-g-2-b1 | new-post.js 模板 `type` → `contentKind` 修正（修 deprecated）| `fa7d825` |
+| 8-g-2-b2 | new-post.js 加 series CLI flags（`--series-id` / `--series-number` / `--series-subtitle`）| `bb58b2d` |
+| 8-g-2-c-b | `src/scripts/suggest-series-number.js` 純函式 helper 落地（無 caller）| `2262938` |
+| 8-g-2-c-c | new-post.js 接入 stderr-only next series.number suggestion | `2507748` |
+
+### 10.2 保守設計原則
+
+| 維度 | 設計 |
+|---|---|
+| series 區塊輸出條件 | 僅當 `--series-id` 有提供時輸出 series 區塊 |
+| series CLI flags | 純手動輸入；**無互動 prompt**；無 readline / inquirer |
+| next number suggestion 輸出位置 | **僅** `stderr`；stdout template **永不**自動寫入 suggested number |
+| 觸發條件 | `--series-id` 有提供 + `--series-number` **未**提供 |
+| 手動 `--series-number` 行為 | **永遠優先**；提供時**完全不顯示**自動建議 |
+| 使用者最終決定 | 仍須自行加 `--series-number` 才寫入模板 |
+| dist 影響 | ❌ 完全不影響 `dist` / `dist-blogger` / `dist-promotion` baseline |
+| build pipeline 接入 | new-post.js 與 helper 皆不參與 build pipeline |
+| validate baseline | 不變（helper 為純函式；無 validate-content import）|
+| 外部套件 | 無新增；沿用既有 `fast-glob` + `gray-matter` 相依 |
+| I/O 失敗 fallback | scan I/O 失敗 → stderr warning；stdout template 仍正常輸出 |
+
+### 10.3 CLI 範例
+
+```bash
+# 一般文章（無 series；行為與 Phase 8-g-2-b1 前一致）
+node src/scripts/new-post.js my-slug
+
+# 系列文章：提供 series-id，未提供 number → stderr 顯示建議
+node src/scripts/new-post.js my-slug --series-id we-media-ai-52
+
+# 系列文章：手動指定全部欄位（不顯示建議，stdout 直接輸出）
+node src/scripts/new-post.js my-slug --series-id we-media-ai-52 --series-number 3 --series-subtitle 提問筆記本
+```
+
+### 10.4 詳細落地紀錄
+
+詳細規格、helper API、stderr 訊息格式、scan 範圍 / 排除規則、Phase 8-f 既有 normalized.series 資料層之關係，見 `docs/series-schema.md` §20。
+
+### 10.5 對 dist / build / validate 之影響
+
+| 影響面 | 變動？ | 說明 |
+|---|---|---|
+| `npm run build:github` 輸出 | ❌ 不變 | new-post.js 不參與 build pipeline |
+| `npm run build:blogger` 輸出 | ❌ 不變 | 同上 |
+| `npm run build:promotion` 輸出 | ❌ 不變 | 同上 |
+| `npm run validate:content` baseline | ❌ 不變 | helper 為純函式；無 validate-content import |
+| `dist` / `dist-blogger` / `dist-promotion` baseline | ❌ 不變 | 無 build 觸發路徑變動 |
+| `package.json` | ❌ 不變 | 無新增 npm script；無新增相依 |
