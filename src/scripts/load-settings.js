@@ -12,6 +12,7 @@ const SETTINGS_FILES = [
   ['themes',            'themes.json'],
   ['categories',        'categories.json'],
   ['tags',              'tags.json'],
+  ['series',            'series.json'],
   ['ads',               'ads.config.json'],
   ['socialLinks',       'social-links.json'],
   ['promotion',         'promotion.config.json'],
