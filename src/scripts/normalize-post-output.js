@@ -905,6 +905,133 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
     promotion.facebook.utm = utm;
   }
 
+  // ─── series ───────────────────────────────────────────────
+  //
+  // Phase 8-f-3-b：normalized.series 解析（pure function；不修改 post / settings）
+  //   - 設計依據：docs/series-schema.md §2 / §6 / §8 / §11.2 + Phase 8-f-3-a 分析
+  //   - 形狀：null（無 series / 無可用 series）/ object resolved:false（id 找不到 settings）/ object resolved:true（完整解析）
+  //   - 合併優先序：frontmatter.series.* override → settings.series[id].* → fallback
+  //   - hashtags 採「完整覆寫」非合併（per series-schema.md §8.4）
+  //   - 不新增 validate-content user-visible warning；invalid 情境寫入 validationMeta.warnings 作 helper-internal traceability
+  //   - 不實作 series.titleTemplate placeholder 解析（屬後續批次）
+  //   - 不影響 build output（EJS / build scripts 暫不讀 normalized.series）
+
+  let seriesOut = null;
+  {
+    const rawSeries = p.series;
+
+    if (rawSeries === undefined || rawSeries === null) {
+      // 狀態 1 / 2：無 series 區塊；seriesOut = null（不記 warning）
+    } else if (typeof rawSeries !== 'object' || Array.isArray(rawSeries)) {
+      // 狀態 3：series 非 plain object（string / array / number / boolean）
+      recordWarning(
+        meta,
+        'series-invalid-shape',
+        'series',
+        `series is not a plain object (typeof=${Array.isArray(rawSeries) ? 'array' : typeof rawSeries})`,
+      );
+    } else {
+      const id = rawSeries.id;
+      const isValidId = typeof id === 'string' && id.trim() !== '';
+
+      if (!isValidId) {
+        // 狀態 4：id 空字串或非 string；seriesOut = null
+        recordWarning(
+          meta,
+          'series-id-empty',
+          'series.id',
+          'series.id is empty or non-string; treated as no usable series',
+        );
+      } else {
+        // 狀態 5/6/7：id 有值；查 settings.series（結構為 { series: [...] } 含 wrap）
+        const seriesDefs =
+          settings && settings.series && Array.isArray(settings.series.series)
+            ? settings.series.series
+            : [];
+        const def = seriesDefs.find((s) => s && s.id === id) ?? null;
+        const resolved = def !== null;
+
+        const number = rawSeries.number;
+        const subtitle = hasValue(rawSeries.subtitle) ? rawSeries.subtitle : null;
+
+        // 系列層欄位：frontmatter override → settings → fallback:null
+        let name = null;
+        let nameSource = 'fallback:null';
+        if (hasValue(rawSeries.name)) {
+          name = rawSeries.name;
+          nameSource = 'frontmatter.series.name';
+        } else if (def && hasValue(def.name)) {
+          name = def.name;
+          nameSource = 'settings.series[id].name';
+        }
+
+        let nameEn = null;
+        let nameEnSource = 'fallback:null';
+        if (hasValue(rawSeries.nameEn)) {
+          nameEn = rawSeries.nameEn;
+          nameEnSource = 'frontmatter.series.nameEn';
+        } else if (def && hasValue(def.nameEn)) {
+          nameEn = def.nameEn;
+          nameEnSource = 'settings.series[id].nameEn';
+        }
+
+        let titleTemplate = null;
+        let titleTemplateSource = 'fallback:null';
+        if (hasValue(rawSeries.titleTemplate)) {
+          titleTemplate = rawSeries.titleTemplate;
+          titleTemplateSource = 'frontmatter.series.titleTemplate';
+        } else if (def && hasValue(def.titleTemplate)) {
+          titleTemplate = def.titleTemplate;
+          titleTemplateSource = 'settings.series[id].titleTemplate';
+        }
+
+        // hashtags：frontmatter 完整覆寫（非合併；per series-schema.md §8.4）→ settings → fallback:empty-array
+        let hashtags = [];
+        let hashtagsSource = 'fallback:empty-array';
+        if (Array.isArray(rawSeries.hashtags)) {
+          hashtags = rawSeries.hashtags;
+          hashtagsSource = 'frontmatter.series.hashtags';
+        } else if (def && Array.isArray(def.hashtags)) {
+          hashtags = def.hashtags;
+          hashtagsSource = 'settings.series[id].hashtags';
+        }
+
+        seriesOut = {
+          id,
+          number,
+          subtitle,
+          name,
+          nameEn,
+          titleTemplate,
+          hashtags,
+          resolved,
+        };
+
+        recordField(meta, 'series.id', 'frontmatter.series.id');
+        recordField(meta, 'series.number', 'frontmatter.series.number');
+        recordField(
+          meta,
+          'series.subtitle',
+          subtitle !== null ? 'frontmatter.series.subtitle' : 'fallback:null',
+        );
+        recordField(meta, 'series.name', nameSource);
+        recordField(meta, 'series.nameEn', nameEnSource);
+        recordField(meta, 'series.titleTemplate', titleTemplateSource);
+        recordField(meta, 'series.hashtags', hashtagsSource);
+        recordField(meta, 'series.resolved', 'computed:settings-lookup');
+
+        if (!resolved) {
+          recordWarning(
+            meta,
+            'series-id-not-resolved',
+            'series.id',
+            `series.id="${id}" not found in settings.series; per-post fields preserved, settings-level fields null`,
+          );
+        }
+      }
+    }
+  }
+
   // ─── 組裝最終物件 ────────────────────────────────────────
 
   return {
@@ -913,6 +1040,7 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
     seo,
     publish: publishOut,
     promotion,
+    series: seriesOut,
     validationMeta: meta,
   };
 }
