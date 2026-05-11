@@ -12,9 +12,10 @@ import { loadPosts } from './load-posts.js';
 
 const VALID_BLOGGER_MODES = new Set(['full', 'summary', 'redirect-card']);
 
-export async function loadBloggerPosts() {
-  const blogger = await loadPosts({ site: 'blogger' });
-  const github = await loadPosts({ site: 'github' });
+export async function loadBloggerPosts({ settings = {} } = {}) {
+  // Phase 8-f-2-b：plumbing — settings 由 caller 經 loadBloggerPosts 轉發至內部之 loadPosts
+  const blogger = await loadPosts({ site: 'blogger', settings });
+  const github = await loadPosts({ site: 'github', settings });
 
   // 1. blogger 來源全部納入
   const bloggerPosts = blogger.posts.map((p) => ({

@@ -263,7 +263,8 @@ async function main() {
   console.log(`[build-blogger] mode=${mode}`);
 
   const settings = await loadSettings();
-  const blogger = await loadBloggerPosts();
+  // Phase 8-f-2-b：plumbing — settings 經 loadBloggerPosts 轉發至內部 loadPosts → processMarkdownEntry / normalizePostOutput
+  const blogger = await loadBloggerPosts({ settings });
 
   console.log(
     `[build-blogger] sources scanned: blogger=${blogger.bySource.blogger.scanned}, github-cross=${blogger.bySource.githubCross.scanned}`,

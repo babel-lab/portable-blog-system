@@ -252,7 +252,8 @@ async function main() {
   const outputs = [];
 
   const settings = await loadSettings();
-  const githubPosts = await loadPosts({ site: 'github' });
+  // Phase 8-f-2-b：plumbing — settings 經 loadPosts 轉發至 processMarkdownEntry / normalizePostOutput
+  const githubPosts = await loadPosts({ site: 'github', settings });
   const baseData = makeBaseData(settings);
 
   const { warnings } = validateContent({ posts: githubPosts.posts, settings });

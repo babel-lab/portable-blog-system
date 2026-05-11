@@ -570,8 +570,11 @@ if (isMain) {
   const settings = await loadSettings();
   // Phase 4-g：main 模式同時檢查 github + blogger
   // build:github / build:blogger 仍依各自呼叫方傳入的 posts 範圍處理
-  const github = await loadPosts({ site: 'github' });
-  const blogger = await loadPosts({ site: 'blogger' });
+  // Phase 8-f-2-b：plumbing — 將 settings 轉發給 loadPosts → processMarkdownEntry → normalizePostOutput
+  //   - 本批僅資料通道；normalize-post-output 目前仍未使用 settings.series（屬 8-f-3 範圍）
+  //   - validate 規則邏輯零變動；現有 baseline（0 error / 9 warning on 5 post(s)）不變
+  const github = await loadPosts({ site: 'github', settings });
+  const blogger = await loadPosts({ site: 'blogger', settings });
 
   // Phase 8-e-6-b-1：額外掃 content/validation-fixtures/{github,blogger}/posts/
   //   - 透過 loadPosts 之 site 參數傳入相對子路徑（loadPosts 內部 baseDir = content/{site}/posts）
@@ -580,8 +583,9 @@ if (isMain) {
   //   - 不影響 build:github / build:blogger / build:promotion（三端 loader 路徑為 content/{site}/posts，不涉及 validation-fixtures/）
   //   - 本批僅 main entry 修改；不修改 validateContent() 內任何規則；不修改 load-posts.js
   //   - 本批不新增 fixture 檔案、不新增 validation-fixtures 目錄（屬 8-e-6-b-2 範圍）
-  const fixturesGithub = await loadPosts({ site: 'validation-fixtures/github' });
-  const fixturesBlogger = await loadPosts({ site: 'validation-fixtures/blogger' });
+  // Phase 8-f-2-b：fixtures loadPosts 同樣傳入 settings（plumbing 一致性）
+  const fixturesGithub = await loadPosts({ site: 'validation-fixtures/github', settings });
+  const fixturesBlogger = await loadPosts({ site: 'validation-fixtures/blogger', settings });
 
   const posts = [
     ...github.posts,

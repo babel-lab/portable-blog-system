@@ -35,7 +35,7 @@ function toRelative(absPath) {
 //   - 解析 frontmatter（含 8-b-3 contentKind 相容讀取）
 //   - 並行讀取 .publish.json 與 .fb.md sidecar（8-b-4 / 8-b-5）
 //   - sourceCollection 標記來源（'posts' | 'pages'），加在 entry 與 filtered 兩種輸出
-async function processMarkdownEntry(absPath, sourceCollection) {
+async function processMarkdownEntry(absPath, sourceCollection, settings) {
   const raw = await fs.readFile(absPath, 'utf-8');
   const { data, content } = matter(raw);
 
@@ -108,11 +108,13 @@ async function processMarkdownEntry(absPath, sourceCollection) {
 
   // Phase 8-d-2：additive 掛載 entry.normalized
   //   - normalize-post-output 為純函式；不修改 entry 既有欄位
-  //   - 不傳入 settings（依 8-d-2 指令；8-d-3 / 8-d-4 之 caller 端視需要再傳入完整 settings）
   //   - 不啟用 GitHub URL 推導（deriveGithubUrl: false）
   //   - 既有 callers / EJS / build 仍讀 entry 原欄位；entry.normalized 屬 additive runtime 欄位
   //   - 不 console.warn warnings；不 throw；warning 由 entry.normalized.validationMeta.warnings 攜帶供下游使用
-  entry.normalized = normalizePostOutput(entry, {}, { deriveGithubUrl: false });
+  // Phase 8-f-2-b：plumbing — settings 由 caller 經 loadPosts → processMarkdownEntry 轉發至此
+  //   - 本批僅資料通道；normalize-post-output 目前仍未使用 settings.series（屬 8-f-3 範圍）
+  //   - 若 caller 未傳 settings（向後相容），processMarkdownEntry 收到 undefined；normalizePostOutput 之 settings 預設為 {}
+  entry.normalized = normalizePostOutput(entry, settings ?? {}, { deriveGithubUrl: false });
 
   return { included: true, entry };
 }
@@ -126,7 +128,7 @@ function sortByDateThenSlug(a, b) {
   return bd.localeCompare(ad);
 }
 
-export async function loadPosts({ site = 'github' } = {}) {
+export async function loadPosts({ site = 'github', settings = {} } = {}) {
   const baseDir = path.join(PROJECT_ROOT, 'content', site, 'posts');
   const pattern = path.join(baseDir, '**/*.md').split(path.sep).join('/');
 
@@ -145,7 +147,7 @@ export async function loadPosts({ site = 'github' } = {}) {
   const posts = [];
   const filteredOut = [];
   for (const absPath of files) {
-    const result = await processMarkdownEntry(absPath, 'posts');
+    const result = await processMarkdownEntry(absPath, 'posts', settings);
     if (result.included) posts.push(result.entry);
     else filteredOut.push(result.filtered);
   }
@@ -155,7 +157,7 @@ export async function loadPosts({ site = 'github' } = {}) {
   const pages = [];
   const filteredOutPages = [];
   for (const absPath of pagesFiles) {
-    const result = await processMarkdownEntry(absPath, 'pages');
+    const result = await processMarkdownEntry(absPath, 'pages', settings);
     if (result.included) pages.push(result.entry);
     else filteredOutPages.push(result.filtered);
   }

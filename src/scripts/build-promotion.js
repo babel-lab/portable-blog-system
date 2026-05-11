@@ -241,8 +241,9 @@ async function main() {
   const fbGloballyEnabled = fbConfig.enabled === true;
 
   // 兩個 source：github + blogger（status:ready/published 已由 loadPosts 過濾）
-  const github = await loadPosts({ site: 'github' });
-  const blogger = await loadPosts({ site: 'blogger' });
+  // Phase 8-f-2-b：plumbing — settings 經 loadPosts 轉發至 processMarkdownEntry / normalizePostOutput
+  const github = await loadPosts({ site: 'github', settings });
+  const blogger = await loadPosts({ site: 'blogger', settings });
 
   const sources = [
     { site: 'github', loaded: github },
