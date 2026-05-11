@@ -19,6 +19,10 @@ import { loadPosts } from './load-posts.js';
 import { buildFacebookUrl } from './ga4-url-builder.js';
 // Phase 8-c-4：placeholder resolver helper（純函式；對 .fb.md body 做 placeholder 替換）
 import { resolvePlaceholders } from './resolve-placeholders.js';
+// Phase 8-f-6-b：series.titleTemplate placeholder resolver（純函式 helper；Phase 8-f-4-b 落地）
+//   - 僅用於 manifest entry 之 additive 欄位 seriesResolvedTitle 預計算
+//   - 不取代 entry.title / entry.fbTitle；不改 FB .txt 輸出；不影響 EJS template 接收結構
+import { resolveTitleTemplate } from './resolve-series-title.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -157,6 +161,34 @@ function buildManifestEntry(post, page, fb, settings) {
     ? normalizedFb.hashtags
     : fb.hashtags;
   const hashtags = Array.isArray(hashtagsSource) ? hashtagsSource.filter(Boolean) : [];
+
+  // Phase 8-f-6-b：promotion manifest entry additive 欄位（純資料層；不改 FB .txt 輸出）。
+  //   - titleEn：post.titleEn（.md frontmatter）；schema 已存在；本批將其暴露於 manifest 供下游選用
+  //   - fbTitleEn：post.sidecars?.facebook?.data?.titleEn（.fb.md frontmatter；Phase 8-e-2 schema 落地）
+  //   - seriesResolvedTitle：resolveTitleTemplate(normalized.series.titleTemplate, { series, post }) 之 resolvedText；
+  //       無 series 或 titleTemplate 空字串時為 null；部分 unresolved 時保留原 placeholder 於文字內（與 copy-helper 8-f-5-b 同 pattern）
+  //   - seriesTitleUnresolvedPlaceholders：對應之 unresolvedPlaceholders array；無 series 時為空 array
+  //   - 不取代 entry.title / entry.fbTitle / entry.message / entry.target / entry.hashtags 之既有值
+  //   - 不修改 facebook-post.ejs / facebook-summary.ejs；EJS 暫不讀新欄位 → FB .txt byte-identical
+  //   - helper 不 throw / 不 process.exit / 不阻擋 build（沿用 8-f-4-b 設計）
+  const entryTitleEn = post.titleEn ?? null;
+  const entryFbTitleEn = post.sidecars?.facebook?.data?.titleEn ?? null;
+  const seriesNormalized = post.normalized?.series;
+  let entrySeriesResolvedTitle = null;
+  let entrySeriesTitleUnresolvedPlaceholders = [];
+  if (
+    seriesNormalized &&
+    typeof seriesNormalized.titleTemplate === 'string' &&
+    seriesNormalized.titleTemplate !== ''
+  ) {
+    const result = resolveTitleTemplate(seriesNormalized.titleTemplate, {
+      series: seriesNormalized,
+      post: { title: post.title, titleEn: post.titleEn },
+    });
+    entrySeriesResolvedTitle = result.resolvedText;
+    entrySeriesTitleUnresolvedPlaceholders = result.unresolvedPlaceholders;
+  }
+
   const { baseUrl, finalUrl, urlSource, urlReason } = buildFacebookUrl({
     post,
     fb,
@@ -176,6 +208,11 @@ function buildManifestEntry(post, page, fb, settings) {
     hashtags,
     hashtagCount: hashtags.length,
     note: fb.note || null,
+    // Phase 8-f-6-b additive 欄位（純資料層；EJS 暫不讀；FB .txt byte-identical）
+    titleEn: entryTitleEn,
+    fbTitleEn: entryFbTitleEn,
+    seriesResolvedTitle: entrySeriesResolvedTitle,
+    seriesTitleUnresolvedPlaceholders: entrySeriesTitleUnresolvedPlaceholders,
     baseUrl,
     finalUrl,
     urlSource,
