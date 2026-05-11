@@ -101,7 +101,7 @@
 
 | # | 候選 | 狀態 | 簡述 |
 |---|---|---|---|
-| 1 | validation / report 補強 | `candidate` | series 相關 validate 規則擴充（如 series number 重複、titleTemplate unresolved 升級為 warning）；可選 series report（`dist-reports/series.txt`）|
+| 1 | validation / report 補強 | ⚠️ `partially landed` | 3 條 warning 已於 Phase 8-g-2-d-b / c / d 落地（詳見 §11）；剩餘 `series-number-duplicate` 仍 `candidate`（需 fixture 配套）；series report（`dist-reports/series.txt`）仍 `candidate` |
 | 2 | `new-post.js` series 欄位提示 | ✅ `landed` | 已於 Phase 8-g-2-b1 / b2 / c-b / c-c 落地（詳見 §10）|
 | 3 | series number gap filling 規則 | ✅ `landed` | 已於 Phase 8-g-2-c-b / c-c 落地，採 stderr-only 保守路線（詳見 §10）|
 | 4 | FB `.txt` 顯示 `titleEn` / `seriesResolvedTitle` | `not recommended` | 屬 Phase 8-f-6-a 既有保守決策（FB 字長受限）；如未來改變需另開規格 |
@@ -115,6 +115,7 @@
 
 - `candidate`：可進入後續 Phase 8-g-X 批次；待作者另行排程；無結構性阻擋。
 - `landed`：已落地；對應實作 commit 與設計細節詳見對應 phase 子批次紀錄。
+- `partially landed`：部分子規格已落地，仍有候選未完成；對應實作 commit 與剩餘候選詳見對應 phase 子批次紀錄。
 - `deferred`：有價值但有風險或前置條件未滿足；待條件成熟（如 fixture 觸發樣本、部署隔離機制等）。
 - `not recommended`：依既有保守決策不建議接入；如未來改變需另開規格。
 
@@ -217,3 +218,64 @@ node src/scripts/new-post.js my-slug --series-id we-media-ai-52 --series-number 
 | `npm run validate:content` baseline | ❌ 不變 | helper 為純函式；無 validate-content import |
 | `dist` / `dist-blogger` / `dist-promotion` baseline | ❌ 不變 | 無 build 觸發路徑變動 |
 | `package.json` | ❌ 不變 | 無新增 npm script；無新增相依 |
+
+---
+
+## 11. Phase 8-g-2-d 落地紀錄（validate-content series warning 規則）
+
+> 批次：Phase 8-g-2-d-a / 8-g-2-d-b / 8-g-2-d-c / 8-g-2-d-d / 8-g-2-d-f（本節屬 Phase 8-g-2-d-f 批次新增之追記）
+> 範圍：候選 #1（validation / report 補強）之 3 條 series warning 落地紀錄；候選 `series-number-duplicate` 與 series report 仍 `candidate`
+
+### 11.1 落地子批次清單
+
+| 子批次 | Commit | 範圍 |
+|---|---|---|
+| 8-g-2-d-a | （無 commit；對話內分析）| validate series warning 規則讀取分析 |
+| 8-g-2-d-b | `e70af85` | `validate-content.js` 加 `series-id-not-in-settings` warning |
+| 8-g-2-d-c | `bf58364` | `validate-content.js` 加 `series-block-missing-number` warning |
+| 8-g-2-d-d | `ca0381a` | `validate-content.js` 加 `series-subtitle-without-id` warning |
+
+### 11.2 保守設計原則
+
+| 維度 | 設計 |
+|---|---|
+| severity | 皆 `warning`（不升 error；不阻擋 build / `validate:content` exit code）|
+| 觸發範圍 | 與既有 Phase 8-e-5-b series 規則一致（僅 ready / published；drafts / archived 由 `load-posts` 過濾不進）|
+| settings 載入路徑 | 未擴充；`settings.series` 已由 Phase 8-f-2-b plumbing 載入並傳入 `validateContent` |
+| `loadPosts` 行為 | 未修改 |
+| fixture | 未新增（未動 `content/validation-fixtures/`）|
+| baseline 影響 | ❌ 不變（`0 error(s) / 9 warning(s) on 5 post(s)`）|
+| dist 影響 | ❌ 不變 |
+| 外部套件 | 無新增 |
+
+### 11.3 規則邊界（避免重複觸發）
+
+| 場景 | 觸發之規則 |
+|---|---|
+| `series` 非 plain object（string / array / number / boolean / null）| `series-not-object`（既有）|
+| `series` 為 object，`s.id` `defined` 但為空字串 / 非 string | `series-id-invalid`（既有）|
+| `series` 為 object，`s.id` valid，settings 找不到 | **`series-id-not-in-settings`**（8-g-2-d-b；本系列）|
+| `series` 為 object，`s.id` valid，`s.number === undefined` | **`series-block-missing-number`**（8-g-2-d-c；本系列）|
+| `series` 為 object，`s.number` defined 但非正整數 | `series-number-invalid`（既有）|
+| `series` 為 object，`s.subtitle` defined（任何型別）且 `s.id === undefined` | **`series-subtitle-without-id`**（8-g-2-d-d；本系列）|
+| `series` 為 object，`s.subtitle` defined 但非 string | `series-subtitle-invalid-type`（既有）|
+
+關鍵互斥 / 共存保證：
+- `series-id-invalid` ⟷ `series-id-not-in-settings`：互斥。前者在 `s.id` 非 valid 時觸發；後者要求 `s.id` 已通過 valid 檢查
+- `series-id-invalid` ⟷ `series-subtitle-without-id`：互斥。前者要求 `s.id !== undefined`；後者要求 `s.id === undefined`
+- `series-block-missing-number` ⟷ `series-number-invalid`：互斥。前者在 `s.number === undefined` 觸發；後者在 `s.number !== undefined` 但非正整數時觸發
+- `series-subtitle-without-id` ⟷ `series-subtitle-invalid-type`：**可共存**。前者檢查結構配對（subtitle 不論型別 + id 缺漏）；後者檢查型別（subtitle 存在但非 string）。subtitle 為非 string 且 id 缺漏時，兩條 warning 同時觸發
+
+### 11.4 仍未落地之候選
+
+| 候選 rule key | 規格依據 | 狀態 | 備註 |
+|---|---|---|---|
+| `series-number-duplicate` | series-schema §5.3 | `candidate`（屬 Phase 8-g-2-d-e）| 需 ≥ 2 篇 same id same number 觸發樣本 + fixture 配套；單獨排程；本系列**未實作**，不應視為已完成 |
+| series report（`dist-reports/series.txt`）| 8-g-0-b §6 候選 #1 | `candidate` | 屬「報表」延伸；與 `series-number-duplicate` 配套；本系列未實作 |
+| Phase 8-g-2-d completion report | — | `candidate`（屬 Phase 8-g-2-d-g）| Phase 8-g-2-d 系列收尾報告；本批僅 docs 補強，未產出 completion report |
+
+### 11.5 cross-link
+
+- `docs/series-schema.md` §21（Phase 8-g-2-d validate-content series 規則接入實況）
+- `docs/future-roadmap.md` §3.3（Phase 8-g-2-d 落地摘要）
+- `docs/phase-8g-2-completion-report.md`（Phase 8-g-2 new-post.js prompt 系列收尾；scope 不含 8-g-2-d；不在本批修改）

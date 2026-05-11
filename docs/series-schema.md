@@ -1098,4 +1098,70 @@ node src/scripts/new-post.js my-slug --series-id we-media-ai-52 --series-number 
 
 ---
 
+## §21 Phase 8-g-2-d validate-content series 規則接入實況
+
+### 21.1 落地規則清單（warning-only）
+
+Phase 8-g-2-d 系列於 `src/scripts/validate-content.js` 加入 **3 條 series 結構檢查 warning**，補完既有 Phase 8-e-5-b 之 4 條 series 規則（`series-not-object` / `series-id-invalid` / `series-number-invalid` / `series-subtitle-invalid-type`）。組合後 series 相關 warning 共 **7 條**。
+
+| 子批次 | Commit | Rule key | 觸發條件 |
+| --- | --- | --- | --- |
+| 8-g-2-d-b | `e70af85` | `series-id-not-in-settings` | `post.series` 為 plain object；`s.id` 為 non-empty string；`settings.series.series` 找不到對應 id |
+| 8-g-2-d-c | `bf58364` | `series-block-missing-number` | `post.series` 為 plain object；`s.id` 為 non-empty string；`s.number === undefined` |
+| 8-g-2-d-d | `ca0381a` | `series-subtitle-without-id` | `post.series` 為 plain object；`s.subtitle !== undefined`；`s.id === undefined` |
+
+### 21.2 設計原則
+
+- **皆為 warning-only**：不升 error；不阻擋 build / `validate:content` exit code（warning-only → exit 0）
+- **觸發範圍**：與既有 Phase 8-e-5-b series 規則一致（僅 ready / published；drafts / archived 由 `load-posts` 過濾不進；validation-fixtures 之 ready posts 一併掃描）
+- **不擴充 settings 載入路徑**：`settings.series` 已由 Phase 8-f-2-b plumbing 載入並傳入 `validateContent`；本批未動 `load-settings.js` / `load-posts.js`
+- **不新增 fixture**：本系列未動 `content/validation-fixtures/`；既有 fixture 行為與 baseline 完全不變
+- **保守邊界**：每條規則前置條件清晰互斥，避免與既有 series 規則重複觸發；唯一例外為 `series-subtitle-without-id` 與 `series-subtitle-invalid-type` 之刻意可共存（per §21.3）
+
+### 21.3 規則邊界（避免重複觸發 / 刻意共存）
+
+| 場景 | 觸發之規則 |
+| --- | --- |
+| `series` 非 plain object（string / array / number / boolean / null）| `series-not-object`（既有）|
+| `series` 為 object，`s.id` `defined` 但為空字串或非 string | `series-id-invalid`（既有）|
+| `series` 為 object，`s.id` 為 valid non-empty string，settings 找不到 | **`series-id-not-in-settings`**（8-g-2-d-b）|
+| `series` 為 object，`s.id` 為 valid，`s.number === undefined` | **`series-block-missing-number`**（8-g-2-d-c）|
+| `series` 為 object，`s.number` defined 但非正整數 | `series-number-invalid`（既有）|
+| `series` 為 object，`s.subtitle` defined（任何型別）且 `s.id === undefined` | **`series-subtitle-without-id`**（8-g-2-d-d）|
+| `series` 為 object，`s.subtitle` defined 但非 string | `series-subtitle-invalid-type`（既有）|
+
+關鍵互斥 / 共存保證：
+
+- `series-id-invalid` ⟷ `series-id-not-in-settings`：**互斥**（前者要求 id 非 valid；後者要求 id 已通過 valid 檢查）
+- `series-id-invalid` ⟷ `series-subtitle-without-id`：**互斥**（前者要求 `s.id !== undefined`；後者要求 `s.id === undefined`）
+- `series-block-missing-number` ⟷ `series-number-invalid`：**互斥**（前者 `s.number === undefined`；後者 `s.number !== undefined` 但 invalid）
+- `series-subtitle-without-id` ⟷ `series-subtitle-invalid-type`：**可共存**（前者檢查結構配對；後者檢查型別；當 subtitle 為非 string 且 id 缺漏時，兩條同時觸發）
+
+### 21.4 對 validate / build / dist 之影響
+
+| 影響面 | 變動？ | 說明 |
+| --- | --- | --- |
+| `npm run validate:content` baseline | ❌ 不變 | 維持 `0 error(s) / 9 warning(s) on 5 post(s)`；正式 posts 無 series 區塊不觸發新規則；validation-fixtures 之 series 早被既有規則攔下，不進新規則之 else 分支 |
+| `npm run build:github` 輸出 | ❌ 不變 | validate-content 不在 build pipeline 主路徑；新規則為 warning 不阻擋 |
+| `npm run build:blogger` 輸出 | ❌ 不變 | 同上 |
+| `npm run build:promotion` 輸出 | ❌ 不變 | 同上 |
+| `dist` / `dist-blogger` / `dist-promotion` baseline | ❌ 不變 | 無 build 觸發路徑變動 |
+| `package.json` | ❌ 不變 | 無新增 npm script；無新增相依 |
+
+### 21.5 仍未落地之 series 規則候選
+
+| 候選 rule key | 規格依據 | 狀態 | 備註 |
+| --- | --- | --- | --- |
+| `series-number-duplicate` | 本文件 §5.3 | `candidate`（屬 Phase 8-g-2-d-e）| 需 ≥ 2 篇 same id same number 觸發樣本 + validation-fixtures 配套；屬獨立批次；**本系列未實作，不應視為已完成** |
+| series report（`dist-reports/series.txt`）| `docs/phase-8g-candidate-analysis.md` §6 候選 #1 | `candidate` | 與 `series-number-duplicate` 配套；本系列未實作 |
+| Phase 8-g-2-d completion report | — | `candidate`（屬 Phase 8-g-2-d-g）| Phase 8-g-2-d 系列收尾報告；本批僅 docs 補強，未產出 completion report |
+
+### 21.6 cross-link
+
+- `docs/phase-8g-candidate-analysis.md` §6 候選 #1（`partially landed`）/ §11（Phase 8-g-2-d 落地紀錄）
+- `docs/future-roadmap.md` §3 子批次表 / §3.3（Phase 8-g-2-d 落地摘要）
+- 本文件 §5（series.number auto-suggest 規格）/ §15.6（候選批次預告）
+
+---
+
 （本文件結束）

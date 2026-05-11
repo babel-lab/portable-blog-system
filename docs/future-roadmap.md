@@ -35,7 +35,13 @@
 | 8-g-2-c-a | next series.number suggestion 讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
 | 8-g-2-c-b | `suggest-series-number.js` helper 落地（無 caller）| ✅ 完成 | commit `2262938` |
 | 8-g-2-c-c | new-post.js 接入 stderr-only next number suggestion | ✅ 完成 | commit `2507748` |
-| 8-g-2-c-d | new-post.js series suggestion docs 補強（本批）| 🔄 進行中 | 本文件 + `docs/phase-8g-candidate-analysis.md` + `docs/series-schema.md` |
+| 8-g-2-c-d | new-post.js series suggestion docs 補強 | ✅ 完成 | commit `9826bd5` |
+| 8-g-2-e | Phase 8-g-2（new-post.js prompt 系列）completion report | ✅ 完成 | `docs/phase-8g-2-completion-report.md`（commit `3c9b2e3`）|
+| 8-g-2-d-a | validate series warning 規則讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
+| 8-g-2-d-b | validate-content.js 加 `series-id-not-in-settings` warning | ✅ 完成 | commit `e70af85` |
+| 8-g-2-d-c | validate-content.js 加 `series-block-missing-number` warning | ✅ 完成 | commit `bf58364` |
+| 8-g-2-d-d | validate-content.js 加 `series-subtitle-without-id` warning | ✅ 完成 | commit `ca0381a` |
+| 8-g-2-d-f | validate series rules docs 補強（本批）| 🔄 進行中 | 本文件 + `docs/phase-8g-candidate-analysis.md` + `docs/series-schema.md` |
 | 8-g-1 | fixture / sample end-to-end 驗證 | ⏸ deferred | 詳見 §4 |
 
 ### 3.1 Phase 8-g-0-b 決策摘要
@@ -58,6 +64,24 @@
   - 手動 `--series-number` 永遠優先；提供時不顯示自動建議
   - **完全不影響 dist / dist-blogger / dist-promotion baseline**
 - 詳細落地紀錄與 CLI 範例：見 `docs/phase-8g-candidate-analysis.md` §10 與 `docs/series-schema.md` §20。
+
+### 3.3 Phase 8-g-2-d 落地摘要（validate-content series warning 規則）
+
+Phase 8-g-2-d 系列於 `src/scripts/validate-content.js` 加入 3 條 series 結構檢查 warning：
+
+- 8-g-2-d-b：`series-id-not-in-settings`（commit `e70af85`）— s.id 為 valid non-empty string，但 `settings.series.series` 找不到對應 id
+- 8-g-2-d-c：`series-block-missing-number`（commit `bf58364`）— s.id valid 但 `s.number === undefined`
+- 8-g-2-d-d：`series-subtitle-without-id`（commit `ca0381a`）— `s.subtitle !== undefined` 但 `s.id === undefined`
+
+與既有 Phase 8-e-5-b 之 4 條 series warning（`series-not-object` / `series-id-invalid` / `series-number-invalid` / `series-subtitle-invalid-type`）共組成 **7 條 series warning**。
+
+- **皆 warning-only**：不升 error；不阻擋 build / `validate:content` exit code（warning-only → exit 0）
+- **觸發範圍**：與既有 Phase 8-e-5-b series 規則一致（僅 ready / published；drafts / archived 由 `load-posts` 過濾不進）
+- **不擴充 settings 載入路徑**：`settings.series` 已由 Phase 8-f-2-b plumbing 載入
+- **不新增 fixture**：本系列未動 `content/validation-fixtures/`
+- **baseline 不變**：維持 `0 error(s) / 9 warning(s) on 5 post(s)`
+- **未落地候選**：`series-number-duplicate`（屬 Phase 8-g-2-d-e；需 ≥ 2 篇 same id same number 觸發樣本 + fixture 配套）；series report（`dist-reports/series.txt`）；Phase 8-g-2-d completion report（屬 8-g-2-d-g）
+- 詳細落地紀錄與規則邊界：`docs/series-schema.md` §21 / `docs/phase-8g-candidate-analysis.md` §11
 
 ---
 
@@ -93,7 +117,7 @@
 | # | 候選 | 性質 | 影響 dist | 建議起手 |
 |---|---|---|---|---|
 | ~~A~~ | ~~`new-post.js` series 欄位提示分析~~ | ✅ 已於 Phase 8-g-2-b1 / b2 / c-b / c-c 落地（詳見 §3.2）| — | — |
-| B | validation / report 補強分析（series duplicate-number / id-not-in-settings 等規則）| validate 規則擴充 / 報表 | ⚠️ 影響 `dist-reports/`（若新增 report）；不影響 `dist` / `dist-blogger` / `dist-promotion` | 先進入「分析批次」（盤點 series 相關 validate 規則缺口；無 fixture 觸發樣本之限制）|
+| ~~B~~ | ~~validation / report 補強分析~~ ⚠️ **部分已落地** | validate 規則擴充 / 報表 | ❌ 不影響（已落地 3 條）| Phase 8-g-2-d-b / c / d 已落地 3 條 warning（詳見 §3.3）；剩餘 `series-number-duplicate` 候選需 fixture 配套；series report（`dist-reports/series.txt`）仍 candidate |
 | C | docs consistency / cross-link 補強 | 純文件 | ❌ 不影響 | 先盤點哪些既有 docs 缺 cross-link（如 `phase-8b/c/d/e/f-completion-report.md` 之相互 cross-link 是否完整）|
 | D | Phase 8-g-2 completion report（new-post.js 系列收尾報告）| 純文件 | ❌ 不影響 | 整合 8-g-2-b1 / b2 / c-b / c-c 之完整紀錄、4 個 commit 與保守設計依據 |
 
