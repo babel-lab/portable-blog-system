@@ -572,7 +572,23 @@ if (isMain) {
   // build:github / build:blogger 仍依各自呼叫方傳入的 posts 範圍處理
   const github = await loadPosts({ site: 'github' });
   const blogger = await loadPosts({ site: 'blogger' });
-  const posts = [...github.posts, ...blogger.posts];
+
+  // Phase 8-e-6-b-1：額外掃 content/validation-fixtures/{github,blogger}/posts/
+  //   - 透過 loadPosts 之 site 參數傳入相對子路徑（loadPosts 內部 baseDir = content/{site}/posts）
+  //   - 目錄不存在時 fast-glob 返回空陣列；loadPosts graceful 返回空 posts，不報錯
+  //   - fixtures 與正式 posts 合併進 validateContent；既有 validateContent() 規則邏輯零變動
+  //   - 不影響 build:github / build:blogger / build:promotion（三端 loader 路徑為 content/{site}/posts，不涉及 validation-fixtures/）
+  //   - 本批僅 main entry 修改；不修改 validateContent() 內任何規則；不修改 load-posts.js
+  //   - 本批不新增 fixture 檔案、不新增 validation-fixtures 目錄（屬 8-e-6-b-2 範圍）
+  const fixturesGithub = await loadPosts({ site: 'validation-fixtures/github' });
+  const fixturesBlogger = await loadPosts({ site: 'validation-fixtures/blogger' });
+
+  const posts = [
+    ...github.posts,
+    ...blogger.posts,
+    ...fixturesGithub.posts,
+    ...fixturesBlogger.posts,
+  ];
   const result = validateContent({ posts, settings });
   printIssues(result.issues);
   if (result.errorCount > 0) {
