@@ -1032,6 +1032,35 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
     }
   }
 
+  // ─── promotion.facebook.hashtags inheritance backfill ──
+  //
+  // Phase 8-f-7-b：series.hashtags 繼承到 normalized.promotion.facebook.hashtags
+  //   - 沿 docs/series-schema.md §8.2 規範：series.hashtags 為 fallback（fb.md / legacy 之後）
+  //   - 觸發條件保守：promotion.facebook.hashtags 為空 array AND seriesOut.hashtags 非空 array
+  //   - 既有優先序維持：.fb.md.hashtags > legacy frontmatter.promotion.facebook.hashtags > series.hashtags > []
+  //   - 不取代非空之 .fb.md / legacy hashtags（不破壞單篇 override 設計）
+  //   - 不做 array 合併；採完整 fallback（替換空陣列為 series.hashtags）
+  //   - 不影響 Blogger post.tags（不同概念；不跨界）
+  //   - 不支援 site default hashtags / first-article fallback（本批不做）
+  //   - 既有 fixture（已有 fb hashtags）輸出完全不變
+  //   - fieldSource 更新為 'computed:series.hashtags'；fallbackUsed 新增對應記錄
+  if (
+    Array.isArray(promotion.facebook.hashtags) &&
+    promotion.facebook.hashtags.length === 0 &&
+    seriesOut &&
+    Array.isArray(seriesOut.hashtags) &&
+    seriesOut.hashtags.length > 0
+  ) {
+    promotion.facebook.hashtags = seriesOut.hashtags;
+    recordField(meta, 'promotion.facebook.hashtags', 'computed:series.hashtags');
+    recordFallback(
+      meta,
+      'promotion.facebook.hashtags',
+      'computed:series.hashtags',
+      'inherited from series.hashtags',
+    );
+  }
+
   // ─── 組裝最終物件 ────────────────────────────────────────
 
   return {
