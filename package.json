@@ -21,6 +21,7 @@
     "report:drafts": "node src/scripts/report-draft-posts.js",
     "report:missing-tags": "node src/scripts/report-missing-tags.js",
     "report:urls": "node src/scripts/report-published-urls.js",
+    "report:series": "node src/scripts/report-series.js",
     "check:links": "node src/scripts/check-broken-links.js",
     "check:images": "node src/scripts/check-image-links.js"
   },
