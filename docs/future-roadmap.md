@@ -58,7 +58,8 @@
 | 8-g-6-b | content/templates 對齊實作（5 個 markdown post templates）| ✅ 完成 | commit `5976162`；`post-template.md` + `github-tech-note-template.md` + `blogger-book-review-template.md` + `blogger-download-template.md` + `blogger-summary-template.md`（5 檔 +5 / −15）；validate baseline 維持 `0/9/5` |
 | 8-g-7 | future-roadmap 同步 sample/template 對齊收尾 | ✅ 完成 | commit `a9db65b`；本文件（§3 表格 + §3.5 新增 + §5.1 + §7.2 同步）|
 | 8-g-8 | phase-8g-completion-report.md 同步 sample/template/roadmap landings | ✅ 完成 | commit `38a0007`；`docs/phase-8g-completion-report.md`（補入 §3.6 Phase 8-g-5 + §3.7 Phase 8-g-6 + §3.8 Phase 8-g-7 落地紀錄 + §3.1 候選表新增 S/T 列 + §3.2 baseline `0/13/7` → `0/9/5` 收斂 + §5 / §6 / §7 對應更新；+269 / −93 行）|
-| 8-g-9 | future-roadmap 同步 Phase 8-g-7 / 8-g-8 landings（本批）| 🔄 進行中 | 本文件（§3 表格 + §3.5 末段 + §7.2 同步）|
+| 8-g-9 | future-roadmap 同步 Phase 8-g-7 / 8-g-8 landings | ✅ 完成 | commit `ffa0310`；本文件（§3 表格 + §3.5 末段 + §7.2 同步）|
+| 8-g-10 | 修正 8-g-9 roadmap self-reference / sync future-roadmap after `ffa0310`（本批）| 🔄 進行中 | 本文件（§3 表格 8-g-9 列自我參照修正 + 新增 8-g-10 列）|
 | 8-g-1 | fixture / sample end-to-end 驗證 | ⏸ deferred | 詳見 §4 |
 
 ### 3.1 Phase 8-g-0-b 決策摘要
