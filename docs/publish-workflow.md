@@ -248,13 +248,52 @@ FB hashtags fallback chain（5 段；per Phase 8-g-19 後）：
 
 或 legacy 路徑（過渡）：`.md` frontmatter `blogger.publishedUrl` / `bloggerPostId` / `publishedAt`。
 
-**回填後應跑哪些 report / check**：
+**推薦自動化路徑**：`npm run backfill:url`（Phase 9-c-1 落地；commit `f5f71b4`）：
+
+四種常用呼叫範例：
+
+```bash
+# 1. 以 id 識別 post（基本用法）
+npm run backfill:url -- --id "<post-id>" --url "<blogger-url>"
+
+# 2. 以 slug 識別 post
+npm run backfill:url -- --slug "<slug>" --url "<blogger-url>"
+
+# 3. dry-run（只印 plan；不寫入）
+npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --dry-run
+
+# 4. 完整選填（含 bloggerPostId + 自訂 publishedAt）
+npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --blogger-post-id "<id>" --published-at "<iso>"
+```
+
+本工具行為（per `src/scripts/backfill-published-url.js`）：
+
+1. **只寫既有 `.publish.json`**（之 `blogger.publishedUrl` / `publishedAt` / `status: "published"` / `publishYear` / `publishMonth`（由 `publishedAt` 推導）/ `bloggerPostId`（若提供））
+2. **不建立 `.publish.json`**（屬本批未支援之 `--create-sidecar` flag）
+3. **不寫 `.md` frontmatter legacy 欄位**（若 legacy 已存在 `blogger.publishedUrl` → stderr warning，不自動清除）
+4. **不預測 Blogger URL**（`--url` 必須由作者於 Blogger 後台複製貼上；`/yyyy/mm/` pattern 由 Blogger 平台依實際發布時間產生）
+5. **不呼叫 Blogger API**（屬第一版禁區；per CLAUDE.md §29 / §4 技術限制）
+6. **若 `.publish.json` 不存在會失敗並提示作者先建立 sidecar**（exit 1；提示複製 `content/templates/_sample.publish.json`；`--create-sidecar` 屬未來批次）
+7. **若既有 `publishedUrl` 已存在，預設拒絕覆寫；需要 `--force`**（exit 1 unless `--force`；保護作者意外覆蓋）
+
+`--id` / `--slug` 二擇一識別 post；`--dry-run` 可預覽 plan；完整 flag 參考 `npm run backfill:url -- --help`。
+
+**手動路徑**（無工具時 fallback）：直接編輯 `.publish.json` 之 `blogger` 區塊；確保 JSON 格式合法。
+
+**回填後驗收**：
+
+推薦（每次回填皆跑）：
 
 ```bash
 npm run validate:content    # 確認 baseline 不退步
+npm run report:urls         # 確認 target post 從 missing → filled
+```
+
+視需要（本 docs sync 不要求實際執行 build；屬作者於發布流程之選擇性 sanity check）：
+
+```bash
 npm run build:blogger       # 確認 Blogger meta.json 含正確 publishedUrl
 npm run build:promotion     # 確認 FB finalUrl 採用 publishedUrl
-npm run report:urls         # published URL 回填統計
 ```
 
 **不要預測 Blogger URL**：
@@ -326,6 +365,8 @@ npm run report:urls         # published URL 回填統計
 ## 16. 本 Phase 9-b 不做
 
 以下項目**不在本批 scope**；屬後續 Phase 9-c+ 或更晚：
+
+> **註**（Phase 9-c-2 補述）：本 §16 反映 **Phase 9-b 當時**之 scope boundary。其後 **Phase 9-c-1**（commit `f5f71b4`）已**另批**新增 `npm run backfill:url` CLI helper（屬下表 #1 / #2 之「publishedUrl backfill CLI helper / CLI 指令」之具體實作）；該工具之使用方式詳見 **§13「推薦自動化路徑」**。本節之 #1 / #2 描述**不代表 Phase 9 全期不做**；僅指 Phase 9-b 當時之 docs-only 邊界，並保留歷史脈絡。
 
 | # | 項目 | 理由 |
 |---|---|---|
