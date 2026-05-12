@@ -1,7 +1,7 @@
 ---
 id: "{YYYYMMDD-slug}"
 site: "github"
-type: "tech-note"
+contentKind: "tech-note"
 primaryPlatform: "github"
 title: "文章標題"
 titleEn: "GitHub Pages Free Hosting Limits and Blog Planning"
@@ -44,8 +44,6 @@ promotion:
     hashtags: []
     note: ""
 ---
-
-# 文章標題
 
 這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。
 
