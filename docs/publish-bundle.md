@@ -371,21 +371,74 @@ PSD、CLIP、AI、高解析原始 JPG / PNG 等大型素材原始檔，沿用 `C
 
 新增 FB 文案必備規則與 URL placeholder 解析。validate-content 依 §4 之 severity 矩陣判定。
 
-### 7.4 Phase 8-d：Blogger permalink / publishedUrl 規則重整
+### 7.4 Phase 8-d：Blogger permalink / publishedUrl 規則重整（Phase 8-a 撰寫時之預期計畫之一）
 
 `blogger.permalink` 自 `slug` 解耦；`publishedUrl` 為真相來源；copy-helper 與 publish-checklist 依此調整提示。Blogger URL 之 yyyy/mm 路徑僅由 publishedAt 或 publishedUrl 推導，缺則留空，不預測正式 URL。
 
-### 7.5 Phase 8-e：AdSense templates + placements 重構
+**Phase 8-d 實際落地更新**：本節描述為 Phase 8-a 撰寫時之預期計畫之一；**實際 Phase 8-d（commit `12919cf`）之主軸為 normalized post output helper 之建立與漸進採用**：
+
+- **normalized post output helper**：`src/scripts/normalize-post-output.js` 建立；建立 `normalized.display` / `normalized.seo` / `normalized.publish` / `normalized.promotion.facebook` 等資料層 namespace
+- **load-posts 掛入**：`src/scripts/load-posts.js` 於 post 物件附加 `normalized` 欄位（不破壞既有 `post.title` / `post.cover` 等 top-level 欄位）
+- **GitHub / Blogger / promotion 漸進採用 normalized 優先 + legacy fallback 策略**：EJS template 與 build script 之多個接入點採用 `normalized.display.title || post.title` 等 fallback chain；既有 dist 保持 byte-identical
+- **Blogger permalink / publishedUrl 規則**：屬上述 `normalized.publish.blogger` 之 sub-scope（per 本節原文）；非 Phase 8-d 主軸
+
+詳細落地紀錄詳見 `docs/phase-8d-completion-report.md`。
+
+### 7.5 Phase 8-e：AdSense templates + placements 重構（Phase 8-a 撰寫時之預期計畫）
 
 `ads.config.json` 改為 `templates + placements` 模型；文章 `blocks.ads` 改為 placement key 陣列。保留舊 `adsenseTop / adsenseMiddle / adsenseBottom` boolean 之相容層；同一篇文章同時使用新舊兩種寫法時 warning。
 
-### 7.6 Phase 8-f：書評文章模組擴充
+**Phase 8-e 實際落地更新**：本節描述為 Phase 8-a 撰寫時之預期計畫；**實際 Phase 8-e（commit `e5677dd`）採完全不同方向，未執行 AdSense templates + placements 重構**；主軸為：
+
+- **series metadata schema 規格化**：`docs/series-schema.md` 全文（含 §2 欄位字典、§5 auto-suggest 規格、§6/§7/§8 title/titleEn/hashtags 規則、§11 schema 落地點）
+- **`.fb.md` `titleEn` 第 8 欄位補強**：per 本文件 §3.1 / §3.4 title metadata 分工
+- **sample / template / validation-fixtures 落地**：`_sample.series.json` + `_sample-series-post.md` + 多篇 fixtures
+- **`validate-content` 4 條 warning-only 規則**：`series-not-object` / `series-id-invalid` / `series-number-invalid` / `series-subtitle-invalid-type`
+
+AdSense templates + placements 重構**未執行**；屬未來規劃但目前無明確 phase 排程。
+
+詳細落地紀錄詳見 `docs/phase-8e-completion-report.md`。
+
+### 7.6 Phase 8-f：書評文章模組擴充（Phase 8-a 撰寫時之預期計畫）
 
 新增 comicGallery、Book JSON-LD、FAQ JSON-LD、CTA partial 等書評類文章專屬區塊。
 
-### 7.7 Phase 8-g：相容層退場（可選）
+**Phase 8-f 實際落地更新**：本節描述為 Phase 8-a 撰寫時之預期計畫；**實際 Phase 8-f（commit `b1679d1`）採完全不同方向，未執行書評文章模組擴充**；主軸為 **series metadata 接入 build pipeline**：
+
+- **series 設定層**：`content/settings/series.json`（series 之集中設定檔；schema per `docs/series-schema.md` §11.3）
+- **loader plumbing**：`src/scripts/load-posts.js` plumb `settings.series` 至 `normalize-post-output`
+- **`normalized.series` 資料層**：`normalize-post-output.js` 合併 `frontmatter.series` + `settings.series` → `normalized.series.{id, number, subtitle, name, nameEn, titleTemplate, hashtags, resolved}`
+- **`resolve-series-title.js` helper**：純函式 placeholder resolver；支援 `{series.name}` / `{series.nameEn}` / `{series.number}` / `{series.subtitle}` / `{series.id}` / `{post.title}` / `{post.titleEn}` 共 7 個 placeholder（詳見 `docs/series-schema.md` §16）
+- **Blogger copy-helper [11] 區塊接入**：`blogger-copy-helper.ejs` 新增 [11] 系列組合標題輔助區塊（per `docs/series-schema.md` §17）
+- **promotion manifest 4 個 additive 欄位**：`build-promotion.js` 之 manifest entry 新增 `titleEn` / `fbTitleEn` / `seriesResolvedTitle` / `seriesTitleUnresolvedPlaceholders`（per `docs/series-schema.md` §18）
+- **`series.hashtags` inheritance backfill**：`normalize-post-output.js` post-pass 將 `normalized.promotion.facebook.hashtags` 之 fallback chain 擴充至 `series.hashtags`（per `docs/series-schema.md` §19）
+
+書評文章模組（comicGallery / Book JSON-LD / FAQ JSON-LD / CTA partial）**未執行**；屬未來規劃但目前無明確 phase 排程。
+
+詳細落地紀錄詳見 `docs/phase-8f-completion-report.md` + `docs/series-schema.md` §17 / §18 / §19。
+
+### 7.7 Phase 8-g：相容層退場（可選）（Phase 8-a 撰寫時之預期計畫）
 
 待全部文章遷移完成後，評估是否退場 frontmatter fallback、AdSense 舊 boolean、validate 中 deprecated 警告。本階段是否執行由作者另行決定，非 Phase 8 必經階段。
+
+**Phase 8-g 實際落地更新**：本節描述為 Phase 8-a 撰寫時之預期計畫；**實際 Phase 8-g 已擴充為「Phase 8-f 後之候選分析與排程」**（仍 🔄 進行中；per `docs/future-roadmap.md` §2 + `docs/phase-8g-completion-report.md`）。已落地重點：
+
+- **Phase 8-g-0 系列**：候選分析 + roadmap 更新（9 項候選 + 額外 candidate C / S/T / F；含 fixture / sample end-to-end 之 deferred 決策）
+- **Phase 8-g-2 系列**：`new-post.js` series 欄位 CLI flags + stderr-only next number suggestion（保守路線；無互動 prompt）
+- **Phase 8-g-2-d 系列**：`validate-content.js` 4 條新 series structure warning（`series-id-not-in-settings` / `series-block-missing-number` / `series-subtitle-without-id` / `series-number-duplicate`）+ validation-fixtures
+- **Phase 8-g-4 系列（候選 C）**：schema docs ↔ phase reports cross-link 補強（含本文件 §8.1 之 Phase 8 系列完成報告清單）
+- **Phase 8-g-5 / 8-g-6（sample / template alignment）**：2 篇正式 sample posts + 5 個 markdown post templates 之 `type` → `contentKind` + body leading `# 文章標題` 移除
+- **Phase 8-g-12 系列**：`series-title-unresolved` warning rule + validation fixture（升級 `titleTemplate` placeholder 解析之 helper-internal traceability 為 `validate-content` user-visible warning）
+
+**相容層退場未啟動**；屬 **Phase 8-h 或更晚**之 future candidate（per `docs/phase-8g-completion-report.md` §3.6.5 / §3.7.5 / §3.9.6 / §5.5）。所謂相容層包含：
+
+- `src/scripts/load-posts.js` 之 `contentKind ?? data.type` fallback
+- `src/scripts/validate-content.js` 之 `frontmatter-uses-deprecated-type` warning rule
+- `src/scripts/parse-markdown.js` 之 H1 → H2 自動降級
+
+Phase 8-g overall **仍 🔄 進行中**（仍有 candidate 5 / 6 / 7 / series report / Phase 8-g-1 fixture deferred / fb-sidecar §5.2.6 保守決策保留 + 本批 publish-bundle §7 過時描述對齊等 future candidates）；**不應誤標 Phase 8-g 為已全部完成**。
+
+詳細落地紀錄詳見 `docs/phase-8g-completion-report.md`。
 
 ---
 
