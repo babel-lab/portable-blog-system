@@ -629,11 +629,15 @@ series.resolved        ← computed:settings-lookup
 | `series-id-empty` | `post.series` 為 object 但 `series.id` 為空字串或非 string | `series.id is empty or non-string; treated as no usable series` |
 | `series-id-not-resolved` | `series.id` 有值但 `settings.series.series` 找不到對應 id | `series.id="{id}" not found in settings.series; per-post fields preserved, settings-level fields null` |
 
-#### 15.4.3 不升級為 validate-content user-visible warning
+**Phase 8-g-12-b 補述（commit `a73c064`）**：上述 3 條結構性 helper-internal warnings 仍屬 normalize 內部 traceability，**未升級**為 user-visible warning（既有結構性偵測由 Phase 8-e-5-b + Phase 8-g-2-d 之 8 條 series structure warning 覆蓋）。**`titleTemplate` 之 unresolved placeholders 面向**（屬 `resolve-series-title.js` helper 之 traceability，與本 §15.4.2 之 3 條 normalize-internal 不同層）**已升級**為 `validate-content` user-visible warning `series-title-unresolved`，詳見 §15.4.3。
 
-本批 helper-internal warnings **不被** `validate-content` 之 user-visible warning 機制讀取；既有 baseline 完全不變。
+#### 15.4.3 不升級為 validate-content user-visible warning（Phase 8-f-3-b 既有立場；Phase 8-g-12-b 已就 titleTemplate 部分升級）
+
+**歷史脈絡（Phase 8-f-3-b 落地時）**：本批之 helper-internal warnings（§15.4.2 之 3 條結構性 warning）**不被** `validate-content` 之 user-visible warning 機制讀取；既有 baseline 完全不變。
 
 未來 `validate-content` 接 `normalized.validationMeta.warnings` 之 traceability（屬 `docs/phase-8d-field-mapping-design.md` §12 item 5 之延後項）時，可一併評估是否升級為 user-visible warning。
+
+**Phase 8-g-12-b 更新（commit `a73c064`）**：`titleTemplate` 之 unresolved placeholders 偵測**已升級**為 `validate-content` user-visible warning ── 新增 `series-title-unresolved` 規則（warning-only；ready/published 範圍；觸發條件詳見 `src/scripts/validate-content.js` 之 Phase 8-g-12-b 註解區）。本升級**限於 `titleTemplate` placeholder 解析面向**；§15.4.2 之 3 條結構性 helper-internal warnings 仍**不**升級（屬 normalize 內部 traceability；外部偵測由既有 8 條 series structure warning 覆蓋）。Phase 8-g-12-c（commit `78d1f30`）配套新增 `_test-series-title-unresolved.md` fixture 自證；baseline 由 `0 error / 9 warning on 5 post(s)` 變為 `0 error / 11 warning on 6 post(s)`（fixture 同時觸發既有 `series-id-not-in-settings`，per Phase 8-g-2-d-b；屬獨立面向之預期共存）。
 
 ### 15.5 對 validate 基線與 build output 之影響
 
@@ -895,7 +899,9 @@ resolveTitleTemplate(template, context = {})
 - 未解析項目列入 `seriesTitleUnresolvedPlaceholders` array（`name` + `reason`：`missing-value` / `unsupported-placeholder`）
 - **目前不顯示於 FB `.txt`**（EJS 暫不讀；屬未來批次決策）
 - **不寫入** `validationMeta`
-- **不新增** `validate-content` user-visible warning
+- **不新增** `validate-content` user-visible warning（**Phase 8-f-6-b 落地時之表述**）
+
+**Phase 8-g-12-b 補述（commit `a73c064`）**：上述「不新增 `validate-content` user-visible warning」屬 Phase 8-f-6-b 落地時之歷史脈絡；**`validate-content` 已新增 `series-title-unresolved` warning 規則**（基於 `normalized.series.titleTemplate` + `resolveTitleTemplate(...)` 偵測；ready/published 範圍；詳見 §15.4.3）。本 §18.5 描述之 build-promotion 行為（不阻擋 build / 不寫 validationMeta / `seriesResolvedTitle` 保留原 placeholder）仍 valid；validate 升級與 build-promotion 行為**獨立**，不重複觸發 build-time warning。
 
 ### 18.6 未來 FB `.txt` 顯示決策
 

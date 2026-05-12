@@ -59,7 +59,12 @@
 | 8-g-7 | future-roadmap 同步 sample/template 對齊收尾 | ✅ 完成 | commit `a9db65b`；本文件（§3 表格 + §3.5 新增 + §5.1 + §7.2 同步）|
 | 8-g-8 | phase-8g-completion-report.md 同步 sample/template/roadmap landings | ✅ 完成 | commit `38a0007`；`docs/phase-8g-completion-report.md`（補入 §3.6 Phase 8-g-5 + §3.7 Phase 8-g-6 + §3.8 Phase 8-g-7 落地紀錄 + §3.1 候選表新增 S/T 列 + §3.2 baseline `0/13/7` → `0/9/5` 收斂 + §5 / §6 / §7 對應更新；+269 / −93 行）|
 | 8-g-9 | future-roadmap 同步 Phase 8-g-7 / 8-g-8 landings | ✅ 完成 | commit `ffa0310`；本文件（§3 表格 + §3.5 末段 + §7.2 同步）|
-| 8-g-10 | 修正 8-g-9 roadmap self-reference / sync future-roadmap after `ffa0310`（本批）| 🔄 進行中 | 本文件（§3 表格 8-g-9 列自我參照修正 + 新增 8-g-10 列）|
+| 8-g-10 | 修正 8-g-9 roadmap self-reference / sync future-roadmap after `ffa0310` | ✅ 完成 | commit `be4304f`；本文件（§3 表格 8-g-9 列自我參照修正 + 新增 8-g-10 列）|
+| 8-g-11 | fb-sidecar-schema.md §5.2.6 補連 8-c / 8-e phase report 讀取分析 | ✅ 完成（決策維持保守）| 對話內讀取分析；確認維持 Phase 8-g-4-c「不過度 cross-link」保守決策；未新增 link；無 commit |
+| 8-g-12-a | `titleTemplate unresolved` 升級為 user-visible warning 讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
+| 8-g-12-b | `validate-content.js` 加 `series-title-unresolved` warning（warning-only；ready/published 範圍）| ✅ 完成 | commit `a73c064`；`src/scripts/validate-content.js`（+44 行 / import resolveTitleTemplate + 新規則）;baseline 不變 |
+| 8-g-12-c | `_test-series-title-unresolved` fixture 配套（unsupported-placeholder `{post.unknown}`）| ✅ 完成 | commit `78d1f30`；`content/validation-fixtures/github/posts/_test-series-title-unresolved.md`（+22 行）；baseline `0/9/5` → `0/11/6`（+2 warnings / +1 post：`series-id-not-in-settings` + `series-title-unresolved`；屬預期 fixture 變動，非 regression）|
+| 8-g-12-d | docs sync Phase 8-g-12 landings（本批）| 🔄 進行中 | `docs/series-schema.md` §15.4.2 / §15.4.3 / §18.5 + `docs/phase-8g-completion-report.md`（baseline 11/6 + Phase 8-g-12 系列子節 + future candidate 收斂）+ 本文件（§3 表格 + §5 收斂）|
 | 8-g-1 | fixture / sample end-to-end 驗證 | ⏸ deferred | 詳見 §4 |
 
 ### 3.1 Phase 8-g-0-b 決策摘要
@@ -192,6 +197,7 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 | ~~C~~ | ~~docs consistency / cross-link 補強~~ | ✅ 已於 Phase 8-g-4 系列落地（commits `4730152` + `ddae181` + `eec8ff7`；§5.2.6 `fb-sidecar-schema.md` 未補；詳見 §3.4）| — | — |
 | D | Phase 8-g-2 completion report（new-post.js 系列收尾報告）| 純文件 | ❌ 不影響 | 整合 8-g-2-b1 / b2 / c-b / c-c 之完整紀錄、4 個 commit 與保守設計依據 |
 | ~~E~~ | ~~sample / template 對齊（deprecated `type` + body leading H1 cleanup）~~ | ✅ 已於 Phase 8-g-5 / 8-g-6 落地（commits `44c0e8f` + `5976162`；2 篇 sample posts + 5 個 templates；詳見 §3.5）；價值：避免未來複製模板或 sample 再產生 `frontmatter-uses-deprecated-type` / `body-leading-h1` noise warning | — | — |
+| ~~F~~ | ~~`titleTemplate unresolved` 升級為 user-visible warning（per `docs/series-schema.md` §15.4.2）~~ | ✅ 已於 Phase 8-g-12 落地（commits `a73c064` + `78d1f30`；`validate-content.js` 新增 `series-title-unresolved` 規則 + fixture 配套；validate baseline `0/9/5` → `0/11/6`）；現況描述更新為 `0 error / 11 warning on 6 post(s)`；§3.5 之 source code 層 fallback 退場（Phase 8-h 候選）**仍未啟動** | — | — |
 
 ### 5.2 排除原則
 
