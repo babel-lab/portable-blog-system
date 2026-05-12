@@ -3,6 +3,7 @@
 本文件為 Phase 8-d 之整體驗收與完成紀錄。Phase 8-d 建立 normalized post output helper，將 normalized 掛入 `load-posts`，並讓 GitHub / Blogger / promotion 輸出逐步採用 normalized 優先、legacy fallback 之欄位讀取策略；在不改變既有輸出內容之前提下，降低未來欄位分散讀取之風險。
 
 對應之上層規範詳見：
+- `docs/phase-8c-completion-report.md`（前一階段完成基線；含 placeholder resolver helper 與 validate / build-promotion 接入）
 - `docs/phase-8d-field-mapping-design.md`（Phase 8-d-0 之 15 節規格）
 - `docs/publish-bundle.md` §3 / §4（sidecar 勝、frontmatter fallback；severity 矩陣總則）
 - `docs/publish-json-schema.md` §5.3（Blogger URL 不可預測強制規則）

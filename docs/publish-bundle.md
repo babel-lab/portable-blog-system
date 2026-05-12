@@ -401,6 +401,18 @@ PSD、CLIP、AI、高解析原始 JPG / PNG 等大型素材原始檔，沿用 `C
 
 cross-link 補回時不得重寫既有章節，僅以最小篇幅指向新文件。
 
+### 8.1 Phase 8 系列完成報告
+
+下列為 Phase 8-b 起至 Phase 8-g 之完成報告與跨 phase 路線總覽。各 phase 之實作落地紀錄、commit 清單、驗證結果與後續候選排程詳見對應文件：
+
+- `docs/phase-8b-completion-report.md`（Phase 8-b：load-posts sidecar 整合 + `contentKind` 相容 + `pages/` 路徑支援）
+- `docs/phase-8c-completion-report.md`（Phase 8-c：placeholder resolver helper + validate / build-promotion 接入）
+- `docs/phase-8d-completion-report.md`（Phase 8-d：normalized post output helper + 各輸出路徑漸進採用）
+- `docs/phase-8e-completion-report.md`（Phase 8-e：series metadata schema 規格化 + validate warning-only 規則 + validation-fixtures）
+- `docs/phase-8f-completion-report.md`（Phase 8-f：series metadata 接入 build pipeline）
+- `docs/phase-8g-completion-report.md`（Phase 8-g：候選分析 + `new-post.js` series prompt + validate series 規則）
+- `docs/future-roadmap.md`（跨 phase 路線總覽與下一步候選排程）
+
 ---
 
 ## §9 對 Phase 1-7 之承諾

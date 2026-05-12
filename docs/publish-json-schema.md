@@ -513,4 +513,23 @@ content/templates/_sample-from-frontmatter.publish.json
 
 ---
 
+## §12 相關文件
+
+### 12.1 Phase 8 系列完成報告
+
+下列為 Phase 8-b 起至 Phase 8-g 之完成報告，含實作落地紀錄、commit 清單、驗證結果與後續候選排程：
+
+- `docs/phase-8b-completion-report.md`（Phase 8-b：load-posts sidecar 整合）
+- `docs/phase-8c-completion-report.md`（Phase 8-c：placeholder resolver helper + validate / build-promotion 接入）
+- `docs/phase-8d-completion-report.md`（Phase 8-d：normalized post output helper；含本文件 §5.3 Blogger URL 規則之 normalized 接入紀錄）
+- `docs/phase-8e-completion-report.md`（Phase 8-e：series metadata schema 規格化）
+- `docs/phase-8f-completion-report.md`（Phase 8-f：series metadata 接入 build pipeline）
+- `docs/phase-8g-completion-report.md`（Phase 8-g：候選分析 + `new-post.js` series prompt + validate series 規則）
+
+### 12.2 跨 Phase 路線總覽
+
+- `docs/future-roadmap.md`（Phase 8 系列進度與下一步候選排程）
+
+---
+
 （本文件結束）
