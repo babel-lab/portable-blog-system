@@ -19,6 +19,7 @@
 | 8-e | series metadata schema 規格化 + `.fb.md` `titleEn` 補強 + sample / template + validate warning-only 規則 + validation-fixtures | ✅ 完成 | `docs/phase-8e-completion-report.md`（commit `e5677dd`，含 fixture 驗證結果）|
 | 8-f | series metadata 接入 build pipeline（series 設定層 / loader / `normalized.series` / `resolve-series-title.js` / Blogger copy-helper `[11]` / promotion manifest 4 個 additive 欄位 / `series.hashtags` inheritance backfill）| ✅ 完成 | `docs/phase-8f-completion-report.md`（commit `b1679d1`）|
 | 8-g | Phase 8-f 後之候選分析與排程 | 🔄 進行中 | 詳見 §3 |
+| 9 | Phase 8-g pause-state 後之 Direction A + D 起手（author SOP + publishedUrl backfill helper）| 🔄 進行中 | Phase 9-b `a7a467b`（`docs/publish-workflow.md` §8-§16 author SOP）+ Phase 9-c-1 `f5f71b4`（`src/scripts/backfill-published-url.js` CLI helper + `package.json` `backfill:url` npm script）+ Phase 9-c-2 `68c418e`（`docs/publish-workflow.md` §13 / §16 cross-link）+ 本批 Phase 9-d-a roadmap sync（commit 見本批 git log；屬 Phase 9-c closure；**不新增 runtime 功能**）；Phase 8-g pause-state 不變（candidate 6 仍 ⏸ deferred；Phase 8-g-1 fixture 仍 deferred；Phase 8-h 退場仍 pending）|
 
 ---
 
