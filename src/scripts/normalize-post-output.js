@@ -1078,6 +1078,47 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
     );
   }
 
+  // ─── promotion.facebook.hashtags site-default backfill ─
+  //
+  // Phase 8-g-19-c：site default hashtags 接入為 FB hashtags fallback chain step 4
+  //   - 設計依據：docs/promotion-export.md §11 candidate 5 規格
+  //   - 完整 chain（接入後）：
+  //       1. .fb.md.hashtags（sidecar-first；非空 array）
+  //       2. legacy frontmatter.promotion.facebook.hashtags（非空 array）
+  //       3. series.hashtags（Phase 8-f-7-b post-pass backfill；非空 array）
+  //       4. settings.promotion.facebook.defaultHashtags（本批新增；非空 array）
+  //       5. []（最終 fallback）
+  //   - mirror Phase 8-f-7-b series.hashtags backfill pattern（上一 block）
+  //   - 觸發條件保守：promotion.facebook.hashtags 為空 array AND settings.promotion.facebook.defaultHashtags 為非空 array
+  //   - 既有優先序維持：step 1/2/3 命中後不會 fall-through 至本 backfill
+  //   - 不合併；採完整 fallback（per docs/promotion-export.md §11.4 「完整覆蓋；不合併」）
+  //   - 不自動補 #（per §11.2「自動補 # ❌；必須由作者於 settings 明確填入 #」）
+  //   - 不寫入 Blogger tags / GitHub tags / sidecar data（per §11.5 分離原則 / §11.6 scope 邊界）
+  //   - 既有 fixture / dist-promotion：若 settings 預設 [] 或既有 post 已在 step 1/2/3 命中 → byte-identical
+  //   - fieldSource 更新為 'settings.promotion.facebook.defaultHashtags'；fallbackUsed 新增對應記錄
+  {
+    const siteDefaultHashtags = getNestedValue(settings, 'promotion.facebook.defaultHashtags');
+    if (
+      Array.isArray(promotion.facebook.hashtags) &&
+      promotion.facebook.hashtags.length === 0 &&
+      Array.isArray(siteDefaultHashtags) &&
+      siteDefaultHashtags.length > 0
+    ) {
+      promotion.facebook.hashtags = siteDefaultHashtags;
+      recordField(
+        meta,
+        'promotion.facebook.hashtags',
+        'settings.promotion.facebook.defaultHashtags',
+      );
+      recordFallback(
+        meta,
+        'promotion.facebook.hashtags',
+        'settings.promotion.facebook.defaultHashtags',
+        'inherited from site default hashtags',
+      );
+    }
+  }
+
   // ─── publish.blogger.tags 寫入 ──────────────────────────
   //
   // Phase 8-g-18-c：將 post.tags / series.tags 寫入 normalized.publish.blogger.tags
