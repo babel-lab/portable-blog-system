@@ -1,0 +1,402 @@
+#!/usr/bin/env node
+// Phase 9-c-1：publishedUrl backfill CLI helper
+//
+// 用途：
+//   作者於 Blogger 後台手動發布文章後，使用本工具回填 publishedUrl 至對應之 .publish.json sidecar。
+//   不接 Blogger API；不發布；不預測 URL；不建立 sidecar。
+//
+// 設計依據：
+//   - docs/publish-workflow.md §13 publishedUrl backfill SOP（Phase 9-b 落地）
+//   - docs/publish-json-schema.md §5 blogger 區塊（含 §5.3 publishedUrl 不可預測 / §5.4 publishYear/Month 由 publishedAt 推導）
+//   - mirror Phase 8-g-2 之 new-post.js / suggest-series-number.js CLI pattern（process.argv.slice + named flag + stderr-only warning）
+//
+// Phase 9-c-1 限制：
+//   - 不支援 --create-sidecar（若 .publish.json 不存在 → exit 1；提示作者自 content/templates/_sample.publish.json 複製）
+//   - 只寫 .publish.json；不寫 .md frontmatter legacy 欄位
+//   - 不接 build pipeline / 不修改 normalize chain / 不退場 Phase 8-h legacy fallback
+//   - 不解封 Phase 8-g-1 fixture deferred / 不實作 candidate 6
+
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fg from 'fast-glob';
+import matter from 'gray-matter';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+
+const USAGE = `Usage: backfill-published-url --url <url> (--id <id> | --slug <slug>) [options]
+
+Backfill Blogger publishedUrl to corresponding .publish.json sidecar.
+Designed for use AFTER manually publishing on Blogger backstage.
+
+Required:
+  --url <url>              Blogger published URL (http:// or https://)
+  --id <id>                Post identifier (frontmatter id); OR
+  --slug <slug>            Post slug (frontmatter slug)
+
+Optional:
+  --published-at <iso>     ISO 8601 publish timestamp; default: now
+  --blogger-post-id <id>   Blogger internal post ID (numeric string)
+  --dry-run                Print plan; do not write
+  --force                  Overwrite existing publishedUrl
+  --help                   Print this usage
+
+Behavior:
+  - Writes only to .publish.json (blogger.publishedUrl / publishedAt / status / publishYear / publishMonth / [bloggerPostId])
+  - Does NOT touch .md frontmatter
+  - If .publish.json does not exist, exits with error (--create-sidecar is NOT supported in this batch)
+  - Atomic write: writes to .tmp then renames
+  - Does NOT predict Blogger URLs; --url must be provided by author
+
+Examples:
+  npm run backfill:url -- --id "20260504-my-post" --url "https://yourblog.blogspot.com/2026/05/my-slug.html"
+  npm run backfill:url -- --slug "my-slug" --url "https://yourblog.blogspot.com/2026/05/my-slug.html" --dry-run
+`;
+
+// ─── flag parsing ───────────────────────────────────────────
+
+function parseArgs(argv) {
+  const args = argv.slice(2);
+  const opts = {
+    url: null,
+    id: null,
+    slug: null,
+    publishedAt: null,
+    bloggerPostId: null,
+    dryRun: false,
+    force: false,
+    help: false,
+    unknown: [],
+  };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    switch (a) {
+      case '--url':
+        opts.url = args[++i] ?? null;
+        break;
+      case '--id':
+        opts.id = args[++i] ?? null;
+        break;
+      case '--slug':
+        opts.slug = args[++i] ?? null;
+        break;
+      case '--published-at':
+        opts.publishedAt = args[++i] ?? null;
+        break;
+      case '--blogger-post-id':
+        opts.bloggerPostId = args[++i] ?? null;
+        break;
+      case '--dry-run':
+        opts.dryRun = true;
+        break;
+      case '--force':
+        opts.force = true;
+        break;
+      case '--help':
+      case '-h':
+        opts.help = true;
+        break;
+      default:
+        opts.unknown.push(a);
+    }
+  }
+  return opts;
+}
+
+// ─── validators ─────────────────────────────────────────────
+
+function isHttpUrl(s) {
+  if (typeof s !== 'string') return false;
+  return /^https?:\/\//.test(s.trim());
+}
+
+function hasBloggerYyyyMmPattern(url) {
+  if (typeof url !== 'string') return false;
+  return /\/\d{4}\/\d{2}\//.test(url);
+}
+
+function isParseableDate(s) {
+  if (typeof s !== 'string') return false;
+  if (s.trim() === '') return false;
+  const d = new Date(s);
+  return !Number.isNaN(d.getTime());
+}
+
+function isNumericString(s) {
+  if (typeof s !== 'string') return false;
+  return /^\d+$/.test(s);
+}
+
+function deriveYearMonth(isoStr) {
+  const d = new Date(isoStr);
+  if (Number.isNaN(d.getTime())) return { year: '', month: '' };
+  const y = String(d.getUTCFullYear());
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return { year: y, month: m };
+}
+
+function toRel(p) {
+  return path.relative(PROJECT_ROOT, p).split(path.sep).join('/');
+}
+
+// ─── post discovery ─────────────────────────────────────────
+
+async function findPosts({ id, slug }) {
+  const patterns = [
+    'content/blogger/posts/**/*.md',
+    'content/blogger/pages/**/*.md',
+    'content/github/posts/**/*.md',
+    'content/github/pages/**/*.md',
+  ];
+  const files = await fg(patterns, { cwd: PROJECT_ROOT, absolute: true });
+  const matches = [];
+  for (const file of files) {
+    let raw;
+    try {
+      raw = await fs.readFile(file, 'utf-8');
+    } catch (err) {
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = matter(raw);
+    } catch (err) {
+      continue;
+    }
+    const fm = parsed.data || {};
+    if (id != null && fm.id === id) {
+      matches.push({ file, frontmatter: fm });
+    } else if (slug != null && fm.slug === slug) {
+      matches.push({ file, frontmatter: fm });
+    }
+  }
+  return matches;
+}
+
+// ─── main ───────────────────────────────────────────────────
+
+async function main() {
+  const opts = parseArgs(process.argv);
+
+  if (opts.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
+
+  // unknown args → stderr warning（mirror new-post.js 寬鬆容錯）
+  for (const a of opts.unknown) {
+    process.stderr.write(`[backfill-published-url] WARN: unknown arg ignored: ${a}\n`);
+  }
+
+  // ── basic flag validation ──
+  if (!opts.url) {
+    process.stderr.write('[backfill-published-url] ERROR: --url is required\n');
+    process.stderr.write(USAGE);
+    return 1;
+  }
+  if (opts.id == null && opts.slug == null) {
+    process.stderr.write('[backfill-published-url] ERROR: --id or --slug is required\n');
+    process.stderr.write(USAGE);
+    return 1;
+  }
+  if (opts.id != null && opts.slug != null) {
+    process.stderr.write(
+      '[backfill-published-url] ERROR: --id and --slug are mutually exclusive\n',
+    );
+    return 1;
+  }
+  if (!isHttpUrl(opts.url)) {
+    process.stderr.write(
+      `[backfill-published-url] ERROR: --url must start with http:// or https:// (got: ${opts.url})\n`,
+    );
+    return 1;
+  }
+  if (!hasBloggerYyyyMmPattern(opts.url)) {
+    process.stderr.write(
+      '[backfill-published-url] WARN: --url does not contain /yyyy/mm/ pattern; may not be a Blogger post URL (this is OK for type=="page", continuing)\n',
+    );
+  }
+
+  const publishedAt = opts.publishedAt ?? new Date().toISOString();
+  if (!isParseableDate(publishedAt)) {
+    process.stderr.write(
+      `[backfill-published-url] ERROR: --published-at is not parseable as a date (got: ${publishedAt})\n`,
+    );
+    return 1;
+  }
+
+  if (opts.bloggerPostId != null && !isNumericString(opts.bloggerPostId)) {
+    process.stderr.write(
+      `[backfill-published-url] ERROR: --blogger-post-id must be a numeric string (got: ${opts.bloggerPostId})\n`,
+    );
+    return 1;
+  }
+
+  // ── find post ──
+  const matches = await findPosts({ id: opts.id, slug: opts.slug });
+  if (matches.length === 0) {
+    const ident = opts.id != null ? `id="${opts.id}"` : `slug="${opts.slug}"`;
+    process.stderr.write(`[backfill-published-url] ERROR: no post found matching ${ident}\n`);
+    return 1;
+  }
+  if (matches.length > 1) {
+    const ident = opts.id != null ? `id="${opts.id}"` : `slug="${opts.slug}"`;
+    process.stderr.write(
+      `[backfill-published-url] ERROR: multiple posts found matching ${ident}:\n`,
+    );
+    for (const m of matches) {
+      process.stderr.write(`  - ${toRel(m.file)}\n`);
+    }
+    return 1;
+  }
+
+  const post = matches[0];
+  const mdFile = post.file;
+  const dir = path.dirname(mdFile);
+  const ext = path.extname(mdFile);
+  const stem = path.basename(mdFile, ext);
+  const publishJsonPath = path.join(dir, `${stem}.publish.json`);
+
+  // ── .publish.json must exist（Phase 9-c-1 不支援 --create-sidecar）──
+  let publishExists = false;
+  try {
+    await fs.access(publishJsonPath, fs.constants.F_OK);
+    publishExists = true;
+  } catch (err) {
+    publishExists = false;
+  }
+  if (!publishExists) {
+    process.stderr.write(
+      `[backfill-published-url] ERROR: .publish.json does not exist: ${toRel(publishJsonPath)}\n`,
+    );
+    process.stderr.write(
+      '  Note: --create-sidecar is NOT supported in Phase 9-c-1.\n',
+    );
+    process.stderr.write(
+      '  Please create .publish.json manually (copy content/templates/_sample.publish.json as reference), or wait for future batch with sidecar creation support.\n',
+    );
+    return 1;
+  }
+
+  // ── read existing .publish.json ──
+  let publishData;
+  try {
+    const raw = await fs.readFile(publishJsonPath, 'utf-8');
+    publishData = JSON.parse(raw);
+  } catch (err) {
+    process.stderr.write(
+      `[backfill-published-url] ERROR: failed to read/parse .publish.json: ${toRel(publishJsonPath)}: ${err.message}\n`,
+    );
+    return 1;
+  }
+
+  // ── safety: existing publishedUrl ──
+  const existingUrl = publishData?.blogger?.publishedUrl;
+  const hasExistingUrl =
+    typeof existingUrl === 'string' && existingUrl.trim() !== '';
+  if (hasExistingUrl && !opts.force) {
+    process.stderr.write(
+      `[backfill-published-url] ERROR: existing publishedUrl found: ${existingUrl}\n`,
+    );
+    process.stderr.write('  Use --force to overwrite.\n');
+    return 1;
+  }
+
+  // ── safety: legacy frontmatter publishedUrl ──
+  const legacyFmUrl = post.frontmatter?.blogger?.publishedUrl;
+  if (typeof legacyFmUrl === 'string' && legacyFmUrl.trim() !== '') {
+    process.stderr.write(
+      `[backfill-published-url] WARN: legacy frontmatter blogger.publishedUrl exists: ${legacyFmUrl}\n`,
+    );
+    process.stderr.write(
+      '  This tool does not automatically clear legacy frontmatter values; please consider manual migration.\n',
+    );
+  }
+
+  // ── compute new blogger block ──
+  const { year, month } = deriveYearMonth(publishedAt);
+  const existingBlogger =
+    publishData.blogger && typeof publishData.blogger === 'object'
+      ? publishData.blogger
+      : {};
+  const newBlogger = {
+    ...existingBlogger,
+    publishedUrl: opts.url,
+    publishedAt,
+    status: 'published',
+    publishYear: year,
+    publishMonth: month,
+  };
+  if (opts.bloggerPostId != null) {
+    newBlogger.bloggerPostId = opts.bloggerPostId;
+  }
+  const newPublishData = { ...publishData, blogger: newBlogger };
+
+  // ── summary plan ──
+  const summary = {
+    post: toRel(mdFile),
+    sidecar: toRel(publishJsonPath),
+    changes: {
+      'blogger.publishedUrl': opts.url,
+      'blogger.publishedAt': publishedAt,
+      'blogger.status': 'published',
+      'blogger.publishYear': year,
+      'blogger.publishMonth': month,
+    },
+  };
+  if (opts.bloggerPostId != null) {
+    summary.changes['blogger.bloggerPostId'] = opts.bloggerPostId;
+  }
+  if (hasExistingUrl) {
+    summary.changes['(overwriting previous blogger.publishedUrl)'] = existingUrl;
+  }
+
+  // ── dry-run ──
+  if (opts.dryRun) {
+    process.stdout.write('[backfill-published-url] DRY-RUN plan:\n');
+    process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
+    process.stdout.write('[backfill-published-url] No changes written.\n');
+    return 0;
+  }
+
+  // ── atomic write ──
+  const jsonStr = JSON.stringify(newPublishData, null, 2) + '\n';
+  const tmpPath = publishJsonPath + '.tmp';
+  try {
+    await fs.writeFile(tmpPath, jsonStr, 'utf-8');
+    await fs.rename(tmpPath, publishJsonPath);
+  } catch (err) {
+    try {
+      await fs.unlink(tmpPath);
+    } catch (_) {
+      // ignore cleanup failure
+    }
+    process.stderr.write(
+      `[backfill-published-url] ERROR: write failed: ${err.message}\n`,
+    );
+    return 1;
+  }
+
+  process.stdout.write('[backfill-published-url] OK\n');
+  process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
+  return 0;
+}
+
+// ─── entry ──────────────────────────────────────────────────
+
+const isMain =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+if (isMain) {
+  main()
+    .then((code) => {
+      process.exit(typeof code === 'number' ? code : 0);
+    })
+    .catch((err) => {
+      process.stderr.write(
+        `[backfill-published-url] UNEXPECTED ERROR: ${err.stack || err.message || err}\n`,
+      );
+      process.exit(1);
+    });
+}

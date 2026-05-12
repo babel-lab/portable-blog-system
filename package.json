@@ -17,6 +17,7 @@
     "build:blogger-theme": "node src/scripts/build-blogger-theme-css.js",
     "validate:content": "node src/scripts/validate-content.js",
     "new:post": "node src/scripts/new-post.js",
+    "backfill:url": "node src/scripts/backfill-published-url.js",
     "report:build": "node src/scripts/export-build-report.js",
     "report:drafts": "node src/scripts/report-draft-posts.js",
     "report:missing-tags": "node src/scripts/report-missing-tags.js",
