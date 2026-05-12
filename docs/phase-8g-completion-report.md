@@ -1,15 +1,15 @@
 # Phase 8-g Completion Report — overall
 
-> 批次系列：Phase 8-g-0 系列 + Phase 8-g-2 系列 + Phase 8-g-2-d 系列 + Phase 8-g-3 + Phase 8-g-4 系列 + Phase 8-g-5 + Phase 8-g-6 + Phase 8-g-7 ~ 8-g-10（sample/template/roadmap sync）+ Phase 8-g-11（fb-sidecar §5.2.6 讀取分析；維持保守）+ Phase 8-g-12 系列（`series-title-unresolved` warning + fixture + docs sync）+ Phase 8-g-13 / 8-g-14 / 8-g-15（publish-bundle §7 對齊讀取分析 + 實作 + docs sync）+ Phase 8-g-16（剩餘項目短盤點）+ Phase 8-g-17 系列（series report 讀取分析 + 實作 + docs sync）+ Phase 8-g-18 系列（candidate 7 Blogger tags inheritance：docs spec + normalize data-layer + build-blogger 接入）+ 本批（Phase 8-g-18-e docs sync）
-> 範圍：Phase 8-g 整體統整收尾報告；含 Phase 8-g-18 candidate 7 Blogger tags inheritance 三段落地後之 docs sync；本批僅修改 `docs/future-roadmap.md` / `docs/phase-8g-completion-report.md`
+> 批次系列：Phase 8-g-0 系列 + Phase 8-g-2 系列 + Phase 8-g-2-d 系列 + Phase 8-g-3 + Phase 8-g-4 系列 + Phase 8-g-5 + Phase 8-g-6 + Phase 8-g-7 ~ 8-g-10（sample/template/roadmap sync）+ Phase 8-g-11（fb-sidecar §5.2.6 讀取分析；維持保守）+ Phase 8-g-12 系列（`series-title-unresolved` warning + fixture + docs sync）+ Phase 8-g-13 / 8-g-14 / 8-g-15（publish-bundle §7 對齊讀取分析 + 實作 + docs sync）+ Phase 8-g-16（剩餘項目短盤點）+ Phase 8-g-17 系列（series report 讀取分析 + 實作 + docs sync）+ Phase 8-g-18 系列（candidate 7 Blogger tags inheritance：docs spec + normalize data-layer + build-blogger 接入 + docs sync）+ Phase 8-g-19 系列（candidate 5 site default hashtags：讀取分析 + docs spec + normalize fallback）+ 本批（Phase 8-g-19-d docs sync）
+> 範圍：Phase 8-g 整體統整收尾報告；含 Phase 8-g-19 candidate 5 site default hashtags 兩段落地（docs spec + normalize fallback）後之 docs sync；本批僅修改 `docs/future-roadmap.md` / `docs/phase-8g-completion-report.md`
 > 起點 HEAD：`b1679d1`（Phase 8-f-8-b completion report）
-> 終點 HEAD：`a66da18`（Phase 8-g-18-d `build-blogger.js` 接入 `normalized.publish.blogger.tags`；本批前 HEAD）
-> Phase 8-g 已落地 commits：**35**（不含本批；含 Phase 8-g-3 `c3b6c63` + Phase 8-g-4 系列 4 commits + Phase 8-g-5 `44c0e8f` + Phase 8-g-6 `5976162` + Phase 8-g-7 `a9db65b` + Phase 8-g-8 `38a0007` + Phase 8-g-9 `ffa0310` + Phase 8-g-10 `be4304f` + Phase 8-g-12 系列 3 commits + Phase 8-g-14 `108de25` + Phase 8-g-15 `d81e515` + Phase 8-g-17-b `f21da58` + Phase 8-g-17-c `e5f1520` + Phase 8-g-18-b `15c8252` + Phase 8-g-18-c `48b90af` + Phase 8-g-18-d `a66da18` + Phase 8-g-0 系列 2 commits + Phase 8-g-2 系列 6 commits + Phase 8-g-2-d 系列 7 commits）
-> `dist` / `dist-blogger` / `dist-promotion` baseline：**主軸 byte-identical**；Phase 8-g-5 sample posts 對齊**間接**影響 2 個 `dist/posts/{slug}/index.html`；其餘批次（含 Phase 8-g-12 / 14 / 17 / 18）皆不影響 dist baseline；Phase 8-g-18-d 之 `build-blogger.js` 接入對既有無 `series.tags` 之 posts 之 `dist-blogger/posts/{slug}/meta.json` 為 byte-identical（normalized 路徑與 legacy `post.tags` 路徑回傳相同陣列）
+> 終點 HEAD：`dc64a3f`（Phase 8-g-19-c `normalize-post-output.js` 接入 site default hashtags fallback；本批前 HEAD）
+> Phase 8-g 已落地 commits：**38**（不含本批；含 Phase 8-g-3 `c3b6c63` + Phase 8-g-4 系列 4 commits + Phase 8-g-5 `44c0e8f` + Phase 8-g-6 `5976162` + Phase 8-g-7 `a9db65b` + Phase 8-g-8 `38a0007` + Phase 8-g-9 `ffa0310` + Phase 8-g-10 `be4304f` + Phase 8-g-12 系列 3 commits + Phase 8-g-14 `108de25` + Phase 8-g-15 `d81e515` + Phase 8-g-17-b `f21da58` + Phase 8-g-17-c `e5f1520` + Phase 8-g-18-b `15c8252` + Phase 8-g-18-c `48b90af` + Phase 8-g-18-d `a66da18` + Phase 8-g-18-e `564d812` + Phase 8-g-19-b `092ac56` + Phase 8-g-19-c `dc64a3f` + Phase 8-g-0 系列 2 commits + Phase 8-g-2 系列 6 commits + Phase 8-g-2-d 系列 7 commits）
+> `dist` / `dist-blogger` / `dist-promotion` baseline：**主軸 byte-identical**；Phase 8-g-5 sample posts 對齊**間接**影響 2 個 `dist/posts/{slug}/index.html`；其餘批次（含 Phase 8-g-12 / 14 / 17 / 18 / 19）皆不影響 dist baseline；Phase 8-g-18-d 之 `build-blogger.js` 接入對既有無 `series.tags` 之 posts 之 `dist-blogger/posts/{slug}/meta.json` 為 byte-identical（normalized 路徑與 legacy `post.tags` 路徑回傳相同陣列）；Phase 8-g-19-c 之 `normalize-post-output.js` site default backfill 對既有 FB-enabled post 之 `dist-promotion/facebook/{site}/{slug}.txt` 為 byte-identical（settings `promotion.facebook.defaultHashtags` 未設定 → backfill 條件不觸發 + 既有 post 已於 step 2 legacy frontmatter 命中 hashtags）
 > `dist-reports` 新增產物：`series-report.txt` + `series-report.json`（Phase 8-g-17-b 之 `npm run report:series` 產出；屬 `.gitignore` 範圍；不算 git baseline）
-> `npm run validate:content` baseline：**`0 error / 11 warning on 6 post(s)`**（per Phase 8-g-12-c fixture 落地；Phase 8-g-13 ~ 8-g-18 各批 docs-only / normalize / build-blogger，baseline 不變）
+> `npm run validate:content` baseline：**`0 error / 11 warning on 6 post(s)`**（per Phase 8-g-12-c fixture 落地；Phase 8-g-13 ~ 8-g-19 各批 docs-only / normalize / build-blogger，baseline 不變）
 > git status：clean（working tree 無 modified / untracked / deleted；本批 commit 後仍 clean）
-> 未 push、未設 remote、未 amend（per Phase 8-g 起手批次規範；既有 35 個 commits 皆為新建，未 amend / rebase）
+> 未 push、未設 remote、未 amend（per Phase 8-g 起手批次規範；既有 38 個 commits 皆為新建，未 amend / rebase）
 
 ---
 
@@ -32,12 +32,18 @@ Phase 8-g 之核心目的：
     - **8-g-18-c**（commit `48b90af`；`src/scripts/normalize-post-output.js` +53 / 0）：normalize 接入 `series.tags` 解析（mirror Phase 8-f-7-b `series.hashtags` backfill pattern）+ 寫入 `normalized.publish.blogger.tags`；fallback chain：`post.tags` (non-empty) → `seriesOut.tags` (non-empty) → `[]`；**不影響 `promotion.facebook.hashtags`**（per §22.5 分離原則；本欄不讀 `series.hashtags`）
     - **8-g-18-d**（commit `a66da18`；`src/scripts/build-blogger.js` +16 / −1）：`buildMeta()` 之 `tags` 欄位來源由 `post.tags` 改為「`normalized.publish.blogger.tags` 優先 + legacy `post.tags` fallback」；mirror Phase 8-d normalized-priority pattern；**保留 legacy `post.tags` fallback**（per Phase 8-g-18-d 特別禁止 13：不退場相容層）；既有無 `series.tags` 之 posts 之 `dist-blogger/posts/{slug}/meta.json` byte-identical
     - **未影響 dist / validate baseline**：validate 仍 `0/11/6`；既有無 series posts 之 Blogger meta byte-identical
-    - 本批 Phase 8-g-18-e docs sync 將上述反映於 `docs/future-roadmap.md` + 本文件
+    - Phase 8-g-18-e docs sync（commit `564d812`）將上述反映於 `docs/future-roadmap.md` + 本文件
+12. **candidate 5 site default hashtags 落地（Phase 8-g-19 系列）**：補完 FB hashtags fallback chain 之最終 site-level fallback，兩段落地：
+    - **8-g-19-b**（commit `092ac56`；`docs/promotion-export.md` +147 + `docs/series-schema.md` +2 / -2）：新增 `docs/promotion-export.md` §11 規格化 **`promotion.facebook.defaultHashtags`** `string[]` 欄位（**含 `#`**；位於 `content/settings/promotion.config.json`，**非** `site.config.json`；per §11.2）；§11.4 明列完整 5 段 fallback chain；§11.5 分離原則表格明示與 `series.hashtags`（FB series-level）/ `series.tags`（Blogger）之嚴格分離（**三者不可混用 / 不做格式轉換互用**）；§11.6 scope 邊界（不接 Blogger / GitHub / sidecar / validate rule / build pipeline）；同步於 `docs/series-schema.md` §15.6 表格 + §19.7 bullet 兩處 strikethrough 並 redirect 至 §11
+    - **8-g-19-c**（commit `dc64a3f`；`src/scripts/normalize-post-output.js` +41 / 0）：normalize 接入 FB hashtags fallback chain step 4 site default backfill（mirror Phase 8-f-7-b `series.hashtags` post-pass backfill pattern）；觸發條件保守（`promotion.facebook.hashtags.length === 0` AND `settings.promotion.facebook.defaultHashtags` 為非空 array）；**不自動補 `#`**（per §11.2）；**不合併**（採完整覆寫；per §11.4）；**不寫入 Blogger tags / GitHub tags / sidecar data**（per §11.5 分離原則 / §11.6 scope 邊界）；fieldSource 標記 `'settings.promotion.facebook.defaultHashtags'`
+    - **未影響 dist / validate baseline**：validate 仍 `0/11/6`；既有 FB-enabled post（當前唯一 `github-pages-blog-planning`）已於 step 2 legacy frontmatter 命中 4 hashtags；不會 fall-through 至 step 4；`dist-promotion/facebook/{site}/{slug}.txt` byte-identical；settings `defaultHashtags` 未設定 → backfill 條件不觸發
+    - **未來預期功能差異**：若作者於 `promotion.config.json` 設定非空 `defaultHashtags` + 新增「FB-enabled 但 .fb.md / legacy / series.hashtags 皆空」之 post → 該 post 之 `entry.hashtags` 與 `.txt` 會 backfill site default；**屬本 candidate 之預期功能差異，不是 regression**
+    - 本批 Phase 8-g-19-d docs sync 將上述反映於 `docs/future-roadmap.md` + 本文件
 
 Phase 8-g 與既有 Phase 8-f 之分工：
 
 - **Phase 8-f**：series metadata 之 build pipeline 接入（資料層 + 既有 customer-facing surface）
-- **Phase 8-g**：基於 Phase 8-f 既有資料層之「工具 / 驗證 / 報表 / docs cross-link / sample-template cleanup / titleTemplate validate 升級 / schema 規格 prose 對齊 / series report / Blogger tags inheritance」延伸 + 候選排程 — 屬「不擴大 customer-facing surface」之保守延伸。
+- **Phase 8-g**：基於 Phase 8-f 既有資料層之「工具 / 驗證 / 報表 / docs cross-link / sample-template cleanup / titleTemplate validate 升級 / schema 規格 prose 對齊 / series report / Blogger tags inheritance / site default hashtags fallback」延伸 + 候選排程 — 屬「不擴大 customer-facing surface」之保守延伸。
 
 ---
 
@@ -163,15 +169,29 @@ Phase 8-g 與既有 Phase 8-f 之分工：
 | 8-g-18-c | `48b90af` | feat | normalize series tags for Blogger inheritance（`src/scripts/normalize-post-output.js` +53；series.tags 解析 + 寫入 `normalized.publish.blogger.tags`；fallback chain：post.tags → series.tags → []）|
 | 8-g-18-d | `a66da18` | feat | wire normalized blogger tags into build-blogger（`src/scripts/build-blogger.js` +16 / −1；`buildMeta()` 改為 normalized 優先 + legacy `post.tags` fallback；保留 legacy fallback；既有無 series posts byte-identical）|
 
-### 2.15 本批（Phase 8-g-18-e docs sync）
+### 2.15 Phase 8-g-18-e（docs sync candidate 7 Blogger tags inheritance landing）
 
 | 子批次 | Commit | 類型 | 摘要 |
 | --- | --- | --- | --- |
-| 8-g-18-e | （未 commit；待批准）| docs | sync docs with series.tags inheritance landing |
+| 8-g-18-e | `564d812` | docs | sync docs with series.tags inheritance landing |
 
-### 2.16 合計
+### 2.16 Phase 8-g-19 系列（candidate 5 site default hashtags）
 
-- **Phase 8-g 已落地 commits：35**（不含本批）
+| 子批次 | Commit | 類型 | 摘要 |
+| --- | --- | --- | --- |
+| 8-g-19-a | （無 commit）| 對話內 | candidate 5 site default hashtags 讀取分析；確認位置 `promotion.config.json` `facebook.defaultHashtags`、含 `#`、fallback chain step 4、與 candidate 6 / 7 之分離、build-promotion 不需另接（既有已讀 normalized）|
+| 8-g-19-b | `092ac56` | docs | add site default hashtags spec（`docs/promotion-export.md` 新增 §11 共 9 子節 +147 / 0；`docs/series-schema.md` §15.6 表格 + §19.7 bullet 兩處 strikethrough +2 / −2）|
+| 8-g-19-c | `dc64a3f` | feat | normalize site default hashtags fallback（`src/scripts/normalize-post-output.js` +41；新增獨立 backfill block；mirror Phase 8-f-7-b `series.hashtags` post-pass backfill pattern；fieldSource `'settings.promotion.facebook.defaultHashtags'`）|
+
+### 2.17 本批（Phase 8-g-19-d docs sync）
+
+| 子批次 | Commit | 類型 | 摘要 |
+| --- | --- | --- | --- |
+| 8-g-19-d | （未 commit；待批准）| docs | sync docs with site default hashtags landing |
+
+### 2.18 合計
+
+- **Phase 8-g 已落地 commits：38**（不含本批）
   - Phase 8-g-0 系列：2
   - Phase 8-g-2 系列：6
   - Phase 8-g-2-d 系列：7
@@ -191,7 +211,10 @@ Phase 8-g 與既有 Phase 8-f 之分工：
   - Phase 8-g-18-b：1
   - Phase 8-g-18-c：1
   - Phase 8-g-18-d：1
-- 對話內讀取分析批次（無 commit）：**14**（8-g-0-a / 8-g-0-d / 8-g-2-c-a / 8-g-2-d-a / 8-g-2-d-e-a / 8-g-4-a / 8-g-5-a / 8-g-6-a / 8-g-11 / 8-g-12-a / 8-g-13 / 8-g-16 / 8-g-17-a / 8-g-18-a）
+  - Phase 8-g-18-e：1
+  - Phase 8-g-19-b：1
+  - Phase 8-g-19-c：1
+- 對話內讀取分析批次（無 commit）：**15**（8-g-0-a / 8-g-0-d / 8-g-2-c-a / 8-g-2-d-a / 8-g-2-d-e-a / 8-g-4-a / 8-g-5-a / 8-g-6-a / 8-g-11 / 8-g-12-a / 8-g-13 / 8-g-16 / 8-g-17-a / 8-g-18-a / 8-g-19-a）
 - 本批新增 commit：**1**（待作者批准）
 
 ---
@@ -208,7 +231,7 @@ per `docs/phase-8g-candidate-analysis.md` §6 + 各 Phase 8-g 子批次落地：
 | 2 | `new-post.js` series 欄位提示 | ✅ `landed` | Phase 8-g-2-b1 / b2 / c-c 落地 |
 | 3 | series number gap filling 規則 | ✅ `landed` | Phase 8-g-2-c-b / c-c 落地（stderr-only 保守路線）|
 | 4 | FB `.txt` 顯示 `titleEn` / `seriesResolvedTitle` | `not recommended` | per Phase 8-f-6-a 既有保守決策（FB 字長受限）|
-| 5 | site default hashtags | `candidate` | 未進讀取分析 |
+| **5** | **site default hashtags（`promotion.facebook.defaultHashtags` 為 FB hashtags fallback chain step 4）** | ✅ **`landed`** | Phase 8-g-19 系列落地（2 commits）；詳見 §3.13：<br>① `docs/promotion-export.md` §11：`promotion.facebook.defaultHashtags` 規格（commit `092ac56`）<br>② `src/scripts/normalize-post-output.js`：FB hashtags fallback chain step 4 接入（commit `dc64a3f`）|
 | 6 | first article `.fb.md` hashtags fallback | `candidate` | 未進讀取分析 |
 | **7** | **Blogger tags inheritance（`series.tags` 繼承為 Blogger `post.tags`）** | ✅ **`landed`** | Phase 8-g-18 系列落地（3 commits）；詳見 §3.12：<br>① `docs/series-schema.md` §22：`series.tags` 短 slug 規格化（commit `15c8252`）<br>② `src/scripts/normalize-post-output.js`：寫入 `normalized.publish.blogger.tags`（commit `48b90af`）<br>③ `src/scripts/build-blogger.js`：normalized 優先 + legacy `post.tags` fallback（commit `a66da18`）|
 | 8 | H1 接 series `titleTemplate` | `not recommended` | per Phase 8-f-5-c §17.3 既有保守決策（SEO 風險 / 字長風險）|
@@ -258,6 +281,7 @@ per 既有結構（不重述）：
 - §3.9：Phase 8-g-12 系列（`series-title-unresolved` warning + fixture + docs sync；3 commits）
 - §3.10：Phase 8-g-13 / 14 / 15（publish-bundle §7 過時描述對齊；採「保留歷史脈絡 + 補述實際落地」pattern；2 commits）
 - §3.12：Phase 8-g-18 系列（candidate 7 Blogger tags inheritance：docs spec + normalize + build-blogger；3 commits）
+- §3.13：Phase 8-g-19 系列（candidate 5 site default hashtags：docs spec + normalize fallback；2 commits）
 
 詳細紀錄詳見各 commit message + cross-link 至對應 phase report。
 
@@ -390,10 +414,105 @@ Phase 8-g-18 將原 §3.1 candidate 7（Blogger tags inheritance）由 `candidat
 
 #### 3.12.5 未來可選補強（不在本批 scope）
 
-- candidate 5（site default hashtags）— 未進讀取分析；屬獨立批次
+- ~~candidate 5（site default hashtags）— 未進讀取分析；屬獨立批次~~ ✅ 已於 Phase 8-g-19 系列落地（commits `092ac56` + `dc64a3f`）；詳見 §3.13
 - candidate 6（系列首篇 `.fb.md` hashtags fallback）— 未進讀取分析；屬獨立批次
 - 退場 `build-blogger.js` 之 legacy `post.tags` fallback — 屬 Phase 8-h 或更晚（與 `load-posts.js` `contentKind ?? type` / `validate-content.js` `frontmatter-uses-deprecated-type` / `parse-markdown.js` H1 → H2 同屬相容層退場大型工作）
 - `series.tags` 接入 GitHub tags inheritance — per §22.6 `series.tags` scope 限於 Blogger；若未來 GitHub 端要做類似繼承，應另設計（如 `series.githubTags` 或共用 `series.tags`）；屬獨立讀取分析批次
+
+### 3.13 Phase 8-g-19 系列：candidate 5 site default hashtags 落地紀錄
+
+Phase 8-g-19 將原 §3.1 candidate 5（site default hashtags）由 `candidate` 改為 ✅ `landed`。3 個 sub-batches（1 讀取分析 + 2 實作 + 本批 docs sync）：
+
+| 子批次 | Commit | 摘要 |
+|---|---|---|
+| 8-g-19-a | （無 commit）| 讀取分析；確認位置 `promotion.config.json` `facebook.defaultHashtags`（非 `site.config.json`）；含 `#`；fallback chain step 4；與 candidate 6 / 7 之分離；build-promotion 不需另接（既有已讀 normalized）|
+| 8-g-19-b | `092ac56` | `docs/promotion-export.md` §11 新節規格化 `promotion.facebook.defaultHashtags`（string[]；含 `#`；fallback chain 5 段；scope 邊界；與 `series.hashtags` / `series.tags` 之分離原則）+ `docs/series-schema.md` §15.6 表格 + §19.7 bullet 兩處 strikethrough |
+| 8-g-19-c | `dc64a3f` | `src/scripts/normalize-post-output.js` 接入 FB hashtags fallback chain step 4（mirror Phase 8-f-7-b series.hashtags post-pass backfill pattern）|
+| 8-g-19-d | （本批；未 commit）| docs sync |
+
+#### 3.13.1 設計重點
+
+| 維度 | 設計 |
+|---|---|
+| 欄位名稱 | `promotion.facebook.defaultHashtags`（per `docs/promotion-export.md` §11.2）|
+| 位置 | `content/settings/promotion.config.json` 之 `facebook` namespace（**非** `site.config.json`）|
+| 型別 | `string[]`；選填；預設 `[]`（視同未設定）|
+| 格式 | `#` prefix hashtag（同 `series.hashtags` / `.fb.md.hashtags`；per §11.2）|
+| **是否含 `#`** | ✅ **含**（與 `series.hashtags` 一致；與 `series.tags` Blogger 短 slug 嚴格分離）|
+| 自動補 `#` | ❌ **不自動補**；必須由作者於 settings 明確填入 `#`；normalize 不做格式轉換 |
+| 服務對象 | Facebook promotion hashtags（FB-only）|
+| 寫入欄位 | `normalized.promotion.facebook.hashtags`（step 4 backfill）|
+| build 接入 | 不需要（既有 `build-promotion.js` line 158-163 已讀 `normalized.promotion.facebook.hashtags`）|
+| validate-content 規則 | ❌ **未新增**（選填；空值合理；非陣列亦回退至 empty 不 error / 不 warning）|
+
+#### 3.13.2 完整 FB hashtags fallback chain（接入後 5 段）
+
+```
+[step 1] .fb.md.hashtags                                       （非空 array；sidecar-first）
+[step 2] legacy frontmatter.promotion.facebook.hashtags        （非空 array）
+[step 3] series.hashtags（Phase 8-f-7-b post-pass backfill）    （非空 array）
+[step 4] settings.promotion.facebook.defaultHashtags（本批新增）（非空 array）
+[step 5] []
+```
+
+關鍵點：
+
+- step 4 位於 `series.hashtags` 之後、`[]` 之前；屬「最終實質 fallback」
+- **空陣列視同未設定**（per §11.2）；不阻擋 chain 下傳至 step 5
+- **完整覆蓋；不合併**（mirror Phase 8-f-7-b `series.hashtags` backfill 之既有原則）
+- **既有優先序維持**：step 1/2/3 命中後不會 fall-through 至本 backfill
+- 不影響既有 candidate 7 之 Blogger tags inheritance（`series.tags`；走 `normalized.publish.blogger.tags`；獨立 chain）
+
+#### 3.13.3 與 candidate 6 / candidate 7 之分離
+
+| 維度 | `promotion.facebook.defaultHashtags`（candidate 5；本批）| `series.hashtags`（Phase 8-f-7-b）| **candidate 6** `.fb.md` first-article fallback（仍 pending）| `series.tags`（candidate 7；Phase 8-g-18）|
+|---|---|---|---|---|
+| 層級 | **site-level**（全站 fallback）| **series-level**（系列繼承）| **series-level**（系列首篇繼承）| **series-level**（系列繼承）|
+| 服務對象 | Facebook hashtags | Facebook hashtags | Facebook hashtags | **Blogger** tags / labels |
+| 格式 | `#` prefix | `#` prefix | `#` prefix | **短 slug；不含 `#`** |
+| fallback chain 位置 | step 4（本批）| step 3（已落地）| series-schema §8.2 fallback 2（未落地）| 獨立 chain `normalized.publish.blogger.tags` |
+| 集中設定 | `promotion.config.json` `facebook.defaultHashtags` | `series.json` 之 entry `hashtags` | （需跨文章查找）| `series.json` 之 entry `tags` |
+| build 接入 | `build-promotion.js`（既有；不需改）| `build-promotion.js`（既有；Phase 8-d-4-b 已讀 normalized）| 未實作 | `build-blogger.js`（Phase 8-g-18-d）|
+
+**核心原則**：
+
+1. **defaultHashtags 僅限 FB promotion**；不影響 Blogger tags / GitHub tags
+2. **Blogger tags 仍走 `series.tags`**（per Phase 8-g-18 candidate 7）；嚴格與 defaultHashtags 分離
+3. **Facebook series-level fallback 仍走 `series.hashtags`**（per Phase 8-f-7-b）；step 3 優先
+4. **site-level fallback 走 `promotion.facebook.defaultHashtags`**（本批；step 4）
+5. **candidate 6（first-article fallback）仍 pending**；屬獨立批次規格；本批不接
+
+#### 3.13.4 對 dist / build / validate 之影響
+
+| 影響面 | 變動？ |
+|---|---|
+| `npm run validate:content` baseline | ❌ 不變（仍 `0/11/6`；未新增 validate 規則）|
+| `npm run build:github` 輸出 | ❌ 不變（scope 不接）|
+| `npm run build:blogger` 輸出 | ❌ 不變（scope 不接）|
+| `npm run build:promotion` 輸出（既有唯一 FB-enabled post）| ❌ **byte-identical**（既有 `github-pages-blog-planning` 已於 step 2 legacy frontmatter 命中 4 hashtags；不會 fall-through 至 step 4；且 `promotion.config.json` 之 `facebook.defaultHashtags` 未設定 → `getNestedValue` 回傳 `undefined` → backfill 條件不觸發）|
+| `npm run build:promotion` 輸出（未來 FB-enabled 且 step 1+2+3 皆空 + settings `defaultHashtags` 非空之 post）| ⚠️ **預期變動**；該 post 之 `manifest entry.hashtags` 與 `dist-promotion/facebook/{site}/{slug}.txt` 會 backfill site default；**屬本 candidate 之預期功能差異，不是 regression** |
+| `npm run build:sitemap` 輸出 | ❌ 不變 |
+| `dist-reports/*` baseline | ❌ 不變 |
+| `package.json` | ❌ 不變 |
+| `content/settings/promotion.config.json` 既有 JSON 內容 | ❌ 本批不變（本批僅 docs 規格化 + normalize 接入；不修改 settings JSON 實際內容；既有 `defaultHashtags` 欄位不存在於該檔，由作者未來自行加入）|
+| `content/settings/series.json` / `.publish.json` / `.fb.md` schema | ❌ 不變 |
+
+#### 3.13.5 保守邊界
+
+- ❌ **不退場 legacy frontmatter `promotion.facebook.hashtags` fallback**：normalize-post-output 仍保留 step 2 之 legacy fallback；屬 Phase 8-h 或更晚之相容層退場大型工作
+- ❌ **不接 candidate 6**（系列首篇 `.fb.md` hashtags fallback）：屬獨立批次規格；本批不混批
+- ❌ **不接 Blogger / GitHub tags inheritance**（per §3.13.3 分離原則 4）：scope 限於 FB
+- ❌ **不修改 `.publish.json` / `.fb.md` schema**
+- ❌ **不修改 `promotion.config.json` 實際 JSON 內容**（本批僅文件 + normalize；作者需自行決定何時加入 `defaultHashtags` 值）
+- ❌ **不新增 validate rule / fixture / sample**
+- ❌ **不補 aggregator**（`export-build-report.js` 不擴；屬 nice-to-have）
+- ❌ **不進 source code fallback 退場**（屬 Phase 8-h）
+
+#### 3.13.6 未來可選補強（不在本批 scope）
+
+- candidate 6（系列首篇 `.fb.md` hashtags fallback）— 需跨文章查找邏輯（識別「同系列 series.number 最小者」）；複雜度較高；屬獨立讀取分析批次
+- 退場 `normalize-post-output.js` 之 legacy frontmatter `promotion.facebook.hashtags` fallback — 屬 Phase 8-h（與 source code 層 legacy `post.tags` fallback / `load-posts.js` `contentKind ?? type` / `parse-markdown.js` H1 → H2 同屬相容層退場大型工作）
+- 作者實際填入 `promotion.config.json` 之 `defaultHashtags` 值 — 屬 author-driven content 決策；不在本 candidate 落地必要 scope；可獨立操作
 
 ---
 
@@ -424,11 +543,11 @@ per `docs/phase-8g-candidate-analysis.md` §6 + `docs/future-roadmap.md` §5：
 
 | # | 候選 | 性質 | 影響面 |
 |---|---|---|---|
-| 5 | site default hashtags | settings fallback chain | promotion baseline |
 | 6 | 系列首篇 `.fb.md` hashtags fallback | normalize-post-output 改 | promotion baseline |
 
 > ~~series report `dist-reports/series-report.{txt,json}`~~：✅ 已於 Phase 8-g-17-b 落地（commit `f21da58`）；詳見 §3.11；從本表移除。
 > ~~7 Blogger tags inheritance~~：✅ 已於 Phase 8-g-18 系列落地（commits `15c8252` + `48b90af` + `a66da18`）；詳見 §3.12；從本表移除。**`series.tags` 為 Blogger 專用短 slug 欄位（不含 `#`）；與 `series.hashtags`（FB promotion 專用）嚴格分離；legacy `post.tags` fallback 保留**。
+> ~~5 site default hashtags~~：✅ 已於 Phase 8-g-19 系列落地（commits `092ac56` + `dc64a3f`）；詳見 §3.13；從本表移除。**`promotion.facebook.defaultHashtags` 為 FB hashtags fallback chain step 4（site-level）；與 `series.hashtags`（series-level）/ `series.tags`（Blogger）嚴格分離；含 `#`；不影響 Blogger / GitHub tags**。
 
 ### 5.3 not recommended
 
@@ -457,6 +576,7 @@ per `docs/phase-8g-candidate-analysis.md` §6 + `docs/future-roadmap.md` §5：
 > ~~`titleTemplate unresolved` 升級為 user-visible warning~~：✅ 已於 Phase 8-g-12 落地
 > ~~series report~~：✅ 已於 Phase 8-g-17-b 落地
 > ~~candidate 7 Blogger tags inheritance（`series.tags`）~~：✅ 已於 Phase 8-g-18 系列落地（commits `15c8252` + `48b90af` + `a66da18`）；詳見 §3.12
+> ~~candidate 5 site default hashtags（`promotion.facebook.defaultHashtags`）~~：✅ 已於 Phase 8-g-19 系列落地（commits `092ac56` + `dc64a3f`）；詳見 §3.13
 
 ---
 
@@ -470,8 +590,8 @@ per `docs/phase-8g-candidate-analysis.md` §6 + `docs/future-roadmap.md` §5：
 
 依優先序：
 
-1. **candidate 5 / 6**：建議**分別**做讀取分析批次（不混批）；皆屬會影響 promotion baseline 之 settings / normalize 改動；優先序由作者決定（candidate 7 Blogger tags inheritance 已於 Phase 8-g-18 系列落地；詳見 §3.12）
-2. **source code 層 legacy fallback 退場**（Phase 8-h 或更晚）；含 `load-posts.js` `contentKind ?? type` / `validate-content.js` `frontmatter-uses-deprecated-type` / `parse-markdown.js` H1 → H2 / `build-blogger.js` legacy `post.tags` fallback（per §3.12.4 保守邊界）
+1. **candidate 6**（系列首篇 `.fb.md` hashtags fallback）：建議獨立讀取分析批次；屬「跨文章查找邏輯」（識別「同系列 series.number 最小者」之 `.fb.md.hashtags`）；複雜度高於 candidate 5 之 settings lookup；屬 series-schema §8.2 之 fallback 2 候選；本批不接（candidate 5 已於 Phase 8-g-19 系列落地，詳見 §3.13）
+2. **source code 層 legacy fallback 退場**（Phase 8-h 或更晚）；含 `load-posts.js` `contentKind ?? type` / `validate-content.js` `frontmatter-uses-deprecated-type` / `parse-markdown.js` H1 → H2 / `build-blogger.js` legacy `post.tags` fallback / `normalize-post-output.js` legacy frontmatter `promotion.facebook.hashtags` fallback（per §3.12.4 / §3.13.5 保守邊界）
 
 ### 6.3 建議暫緩
 
@@ -486,49 +606,54 @@ per `docs/future-roadmap.md` §5.3：每個候選首批應為**純讀取分析 +
 
 ## §7 不變項 / 安全邊界
 
-### 7.1 本批（Phase 8-g-18-e）明確未修改之範圍
+### 7.1 本批（Phase 8-g-19-d）明確未修改之範圍
 
 | 範圍 | 狀態 |
 |---|---|
-| `src/scripts/normalize-post-output.js`（Phase 8-g-18-c 對齊對象）| ❌ **本批未修改**（commit `48b90af` 已落地；本批不重觸碰）|
-| `src/scripts/build-blogger.js`（Phase 8-g-18-d 對齊對象）| ❌ **本批未修改**（commit `a66da18` 已落地；本批不重觸碰）|
-| `src/scripts/build-github.js` / `src/scripts/build-promotion-manifest.js` / `src/scripts/build-sitemap.js` | ❌ 本批未修改（candidate 7 不接 GitHub tags / promotion / sitemap）|
-| `src/scripts/validate-content.js` | ❌ 本批未修改（candidate 7 不新增 validate 規則）|
+| `src/scripts/normalize-post-output.js`（Phase 8-g-19-c 對齊對象）| ❌ **本批未修改**（commit `dc64a3f` 已落地；本批不重觸碰）|
+| `src/scripts/build-promotion.js` / `src/scripts/build-promotion-manifest.js` | ❌ 本批未修改（candidate 5 不需另接 build；既有已讀 `normalized.promotion.facebook.hashtags`）|
+| `src/scripts/build-blogger.js`（Phase 8-g-18-d 對齊對象）| ❌ 本批未修改（candidate 5 不接 Blogger tags）|
+| `src/scripts/build-github.js` / `src/scripts/build-sitemap.js` | ❌ 本批未修改（candidate 5 不接 GitHub tags / sitemap）|
+| `src/scripts/validate-content.js` | ❌ 本批未修改（candidate 5 不新增 validate 規則）|
 | `src/scripts/load-posts.js` / `src/scripts/parse-markdown.js` | ❌ 本批未修改（source code 層 legacy fallback 退場屬 Phase 8-h）|
 | `src/scripts/report-series.js`（Phase 8-g-17-b 對齊對象）| ❌ 本批未修改 |
 | `src/scripts/export-build-report.js`（aggregator）| ❌ 本批未修改 |
 | `src/views/*` / `src/styles/*` / `src/js/*` | ❌ 未修改 |
 | `content/github/posts/*` | ❌ 未修改 |
 | `content/blogger/posts/*` / `content/blogger/pages/*` / `content/github/pages/*` | ❌ 未修改 |
-| 任何 `.publish.json` / `.fb.md` sidecar | ❌ 未修改（per §3.12 `series.tags` 不放 sidecar）|
-| `content/settings/*`（含 `series.json`；既有 `{"series":[]}` 不變）| ❌ 未修改 |
+| 任何 `.publish.json` / `.fb.md` sidecar | ❌ 未修改（per §3.13 `defaultHashtags` 不放 sidecar）|
+| `content/settings/promotion.config.json` 實際 JSON 內容 | ❌ **本批未修改**（per Phase 8-g-19-d 特別禁止 5；既有 `defaultHashtags` 欄位不存在於該檔；由作者未來自行加入）|
+| `content/settings/*` 其他檔案（含 `series.json`；既有 `{"series":[]}` 不變）| ❌ 未修改 |
 | `content/templates/*` | ❌ 未修改 |
-| `content/validation-fixtures/*` | ❌ 未修改（candidate 7 不新增 fixture）|
+| `content/validation-fixtures/*` | ❌ 未修改（candidate 5 不新增 fixture）|
 | `package.json` / `package-lock.json` | ❌ 未修改 |
 | 任何 EJS / SCSS | ❌ 未修改 |
-| `dist/` / `dist-blogger/` / `dist-promotion/` / `dist-reports/` | ❌ 未修改（本批未執行 build；既有 dist-blogger 對既有無 `series.tags` posts 之 `meta.json` byte-identical 已於 Phase 8-g-18-d 驗證）|
-| `docs/series-schema.md`（Phase 8-g-18-b 對齊對象）| ❌ **本批未修改**（commit `15c8252` 已落地；本批不重觸碰）|
+| `dist/` / `dist-blogger/` / `dist-promotion/` / `dist-reports/` | ❌ 未修改（本批未執行 build；既有 dist-promotion 對既有 FB-enabled post 之 `.txt` byte-identical 已於 Phase 8-g-19-c 驗證）|
+| `docs/promotion-export.md`（Phase 8-g-19-b 對齊對象）| ❌ **本批未修改**（commit `092ac56` 已落地；本批不重觸碰）|
+| `docs/series-schema.md`（Phase 8-g-18-b / 8-g-19-b 對齊對象）| ❌ **本批未修改**（commits `15c8252` / `092ac56` 已落地；本批不重觸碰）|
 | `docs/publish-bundle.md` / `docs/publish-json-schema.md` / `docs/fb-sidecar-schema.md` | ❌ 本批未修改 |
 | `docs/phase-8b-completion-report.md` ~ `docs/phase-8f-completion-report.md` | ❌ 本批未修改 |
 | `docs/phase-8g-2-completion-report.md` / `docs/phase-8g-2-d-completion-report.md` | ❌ 未修改（frozen）|
 | `docs/phase-8g-candidate-analysis.md` | ❌ 未修改 |
-| `docs/migration-from-frontmatter.md` / `docs/promotion-export.md` | ❌ 未修改 |
+| `docs/migration-from-frontmatter.md` | ❌ 未修改 |
 
 ### 7.2 本批明確未引入之機制
 
 - ❌ 新 fixture / 新 sample
 - ❌ 新 validate 規則
-- ❌ 新 source code（normalize-post-output / build-blogger 已於前 commits `48b90af` / `a66da18` 落地；本批 docs-only）
+- ❌ 新 source code（normalize-post-output 已於前 commit `dc64a3f` 落地；本批 docs-only）
 - ❌ baseline 變動（仍為 `0 error / 11 warning on 6 post(s)`；docs-only）
 - ❌ 新 npm script 或外部相依
 - ❌ Phase 8-g-1 fixture deferred 解封（仍 `deferred`）
-- ❌ 啟動 source code 層 legacy fallback 退場（屬 Phase 8-h 或更晚；含 `build-blogger.js` legacy `post.tags` fallback）
-- ❌ aggregator 補強（`export-build-report.js` 加 series sub-summary；屬 nice-to-have；可選後續批次）
-- ❌ GitHub tags inheritance / promotion / FB sidecar 接入（per §3.12 `series.tags` scope 限於 Blogger）
-- ❌ `.publish.json` / `.fb.md` schema 變動（per §3.12.1 `series.tags` 不放 sidecar）
-- ❌ 進入 candidate 5（site default hashtags）或 candidate 6（系列首篇 `.fb.md` hashtags fallback）
-- ❌ 重動 `docs/series-schema.md`（已於 8-g-18-b 完成；本批不重改）
-- ❌ 將 Phase 8-g overall 狀態標成「完全完成」（仍有 candidate 5/6 / Phase 8-g-1 fixture deferred / source code fallback 退場 / fb-sidecar §5.2.6 / nice-to-have 後續批次等 future candidates；overall 狀態仍為 🔄 進行中）
+- ❌ 啟動 source code 層 legacy fallback 退場（屬 Phase 8-h 或更晚；含 `build-blogger.js` legacy `post.tags` fallback / `normalize-post-output.js` legacy frontmatter `promotion.facebook.hashtags` fallback）
+- ❌ aggregator 補強（`export-build-report.js`；屬 nice-to-have；可選後續批次）
+- ❌ Blogger tags inheritance / GitHub tags / FB sidecar schema 變動（per §3.13 `defaultHashtags` scope 限於 FB；Blogger tags 走 `series.tags` per Phase 8-g-18；FB series-level 走 `series.hashtags` per Phase 8-f-7-b）
+- ❌ `.publish.json` / `.fb.md` schema 變動（per §3.13.1 `defaultHashtags` 不放 sidecar）
+- ❌ `content/settings/promotion.config.json` 實際 JSON 內容變動（per 本批特別禁止 5；屬 author-driven content 決策）
+- ❌ 進入 candidate 6（系列首篇 `.fb.md` hashtags fallback）
+- ❌ 重動 `docs/promotion-export.md`（已於 8-g-19-b 完成；本批不重改）
+- ❌ 重動 `docs/series-schema.md`（已於 8-g-18-b / 8-g-19-b 完成；本批不重改）
+- ❌ 將 Phase 8-g overall 狀態標成「完全完成」（仍有 candidate 6 / Phase 8-g-1 fixture deferred / source code fallback 退場 / fb-sidecar §5.2.6 / nice-to-have 後續批次等 future candidates；overall 狀態仍為 🔄 進行中）
 
 ### 7.3 git 操作確認
 
@@ -537,7 +662,7 @@ per `docs/future-roadmap.md` §5.3：每個候選首批應為**純讀取分析 +
 | `git status` | 本批 commit 後 working tree 將回到 clean |
 | `git remote` | **未設定** |
 | `git push` | **未執行** |
-| `git commit --amend` / `git rebase` | **未執行**（既有 35 個 commits 皆未被 amend / rebase）|
+| `git commit --amend` / `git rebase` | **未執行**（既有 38 個 commits 皆未被 amend / rebase）|
 | 本批 commit | **未 commit**（待作者批准）|
 
 ---
@@ -556,16 +681,16 @@ per `docs/future-roadmap.md` §5.3：每個候選首批應為**純讀取分析 +
 
 ### 8.3 規格與設計文件
 
-- `docs/series-schema.md`（含 Phase 8-g-12-b 補述；**Phase 8-g-18-b 新增 §22 `series.tags` 規格化**，commit `15c8252`；series report 規格之新節屬 nice-to-have 後續批次）
-- `docs/promotion-export.md`
-- `docs/fb-sidecar-schema.md`（Phase 8-g-4-c / 8-g-11 §5.2.6 維持保守；§12.3.1 為 Phase 8-g-18-b 之規格依據之一）
+- `docs/series-schema.md`（含 Phase 8-g-12-b 補述；**Phase 8-g-18-b 新增 §22 `series.tags` 規格化**，commit `15c8252`；**Phase 8-g-19-b §15.6 表格 + §19.7 bullet 兩處 strikethrough 並 redirect 至 `promotion-export.md` §11**，commit `092ac56`；series report 規格之新節屬 nice-to-have 後續批次）
+- `docs/promotion-export.md`（**Phase 8-g-19-b 新增 §11 `promotion.facebook.defaultHashtags` 規格化** + 完整 5 段 fallback chain + 與 `series.hashtags` / `series.tags` 之分離原則，commit `092ac56`）
+- `docs/fb-sidecar-schema.md`（Phase 8-g-4-c / 8-g-11 §5.2.6 維持保守；§12.3.1 為 Phase 8-g-18-b 之規格依據之一；§3.1 hashtags 格式「建議帶 `#` 號」為 Phase 8-g-19-b 之 `defaultHashtags` 含 `#` 規格依據）
 - `docs/publish-bundle.md`（§8.1 含 Phase 8-g-4-b 新增之 phase report 清單；§7.4-§7.7 含 Phase 8-g-14 之「實際落地更新」補述）
 - `docs/publish-json-schema.md`（§12 含 Phase 8-g-4-b 新增之相關文件節）
 - `docs/migration-from-frontmatter.md`
 
 ### 8.4 Roadmap
 
-- `docs/future-roadmap.md`（已於 Phase 8-g-7 ~ 8-g-18-e 系列各批 sync；§2 Phase 8-g 仍 🔄 進行中；§5.1 候選表含 ~~B~~（全數落地）/ ~~C~~ / ~~E~~ / ~~F~~ / ~~G~~ / ~~H~~ / ~~7~~ 皆 landed）
+- `docs/future-roadmap.md`（已於 Phase 8-g-7 ~ 8-g-19-d 系列各批 sync；§2 Phase 8-g 仍 🔄 進行中；§5.1 候選表含 ~~B~~（全數落地）/ ~~C~~ / ~~E~~ / ~~F~~ / ~~G~~ / ~~H~~ / ~~7~~ / ~~5~~ 皆 landed）
 
 ### 8.5 Series Report 工具
 
@@ -578,9 +703,20 @@ per `docs/future-roadmap.md` §5.3：每個候選首批應為**純讀取分析 +
 - **docs spec**：`docs/series-schema.md` §22（Phase 8-g-18-b；commit `15c8252`）
 - **normalize data-layer**：`src/scripts/normalize-post-output.js` 之 `normalized.publish.blogger.tags` 寫入（Phase 8-g-18-c；commit `48b90af`）
 - **build-blogger 接入**：`src/scripts/build-blogger.js` `buildMeta()` `tags` 欄位 normalized 優先 + legacy `post.tags` fallback（Phase 8-g-18-d；commit `a66da18`）
-- **本批 docs sync**：Phase 8-g-18-e（本文件 + `docs/future-roadmap.md`）
-- **本批未重動 source code**：normalize-post-output.js 與 build-blogger.js 已於前 commits 落地；本批僅 docs-only
+- **docs sync**：Phase 8-g-18-e（commit `564d812`）
 - **既有 dist-blogger 對既有無 `series.tags` posts byte-identical**（per §3.12.3）
+
+### 8.7 Candidate 5 site default hashtags（Phase 8-g-19 系列）
+
+- **docs spec**：`docs/promotion-export.md` §11 + `docs/series-schema.md` §15.6 表格 / §19.7 bullet 兩處 strikethrough（Phase 8-g-19-b；commit `092ac56`）
+- **normalize data-layer**：`src/scripts/normalize-post-output.js` 之 FB hashtags fallback chain step 4 接入（Phase 8-g-19-c；commit `dc64a3f`）
+- **build-promotion 不需另接**：既有 `build-promotion.js` line 158-163 已讀 `normalized.promotion.facebook.hashtags`；step 4 backfill 經 normalize 自動套用
+- **本批 docs sync**：Phase 8-g-19-d（本文件 + `docs/future-roadmap.md`）
+- **本批未重動 source code**：`normalize-post-output.js` 已於前 commit `dc64a3f` 落地；本批僅 docs-only
+- **本批未重動 `docs/promotion-export.md` / `docs/series-schema.md`**：兩檔已於前 commit `092ac56` 落地；本批不重改
+- **既有 dist-promotion 對既有 FB-enabled post 之 `.txt` byte-identical**（per §3.13.4；settings `defaultHashtags` 未設定 + 既有 post 已於 step 2 命中）
+- **defaultHashtags 僅限 FB promotion**；Blogger tags 仍走 `series.tags`（per Phase 8-g-18）；Facebook series-level fallback 仍走 `series.hashtags`（per Phase 8-f-7-b）；site-level fallback 走 `promotion.facebook.defaultHashtags`（本系列）
+- **candidate 6 仍 pending**（系列首篇 `.fb.md` hashtags fallback；屬獨立批次規格）
 
 ---
 
