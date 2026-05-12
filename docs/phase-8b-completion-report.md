@@ -452,6 +452,8 @@ validate-content.js syntax-ok
 - 一次合併 8-c + 8-d：影響範圍過大，回歸測試成本高
 - 跳過 schema 驗證直接合併欄位：欄位語意錯誤可能寫入錯誤 build output
 
+下一階段已於 `docs/phase-8c-completion-report.md` 落地。
+
 ---
 
 （本文件結束）

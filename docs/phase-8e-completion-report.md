@@ -313,6 +313,8 @@ Phase 8-e-5-b（commit `aadecb5`）於 `src/scripts/validate-content.js` 加入 
 - byte-identical（modulo timestamps）為硬性承諾
 - 規則新增以 warning-only 為主，避免引入新 error
 
+下一階段已於 `docs/phase-8f-completion-report.md` 落地。
+
 ---
 
 ## §11 安全限制確認

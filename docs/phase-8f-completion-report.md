@@ -184,6 +184,8 @@ Phase 8-f-8-b 落地時執行完整 sweep：
 - 規則新增以 warning-only 為主，避免引入新 error
 - 拆 a 分析 / b 實作 / c docs 三段
 
+下一階段已於 `docs/phase-8g-completion-report.md` 落地。
+
 ---
 
 （本文件結束）

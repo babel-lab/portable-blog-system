@@ -258,6 +258,8 @@ Phase 8-d 僅接入目前 `normalize-post-output.js` 既有 `normalized.promotio
 
 兩項皆**非阻塞**，可依工作排序自由安排。
 
+下一階段已於 `docs/phase-8e-completion-report.md` 落地。
+
 ---
 
 （本文件結束）

@@ -544,6 +544,8 @@ Phase 8-d 之初步建議方向（**僅建議，不在本批實作**）：
 - 日期格式化（`publishedAt` 之 ISO / 本地化）
 - settings lookup（`siteName` / `category` 之 categories.json 對照）
 
+下一階段已於 `docs/phase-8d-completion-report.md` 落地。
+
 ---
 
 （本文件結束）
