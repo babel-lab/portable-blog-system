@@ -1,7 +1,7 @@
 ---
 id: "20260504-github-pages-blog-planning"
 site: "github"
-type: "tech-note"
+contentKind: "tech-note"
 primaryPlatform: "github"
 title: "GitHub Pages 免費空間限制與部落格規劃"
 titleEn: "GitHub Pages Free Hosting Limits and Blog Planning"
@@ -48,7 +48,5 @@ promotion:
       - "#靜態網站"
     note: "4-a schema 驗收樣本；4-c 起會改用解析後的正式 URL。"
 ---
-
-# GitHub Pages 免費空間限制與部落格規劃
 
 這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。

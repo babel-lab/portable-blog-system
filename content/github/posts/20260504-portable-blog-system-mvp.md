@@ -1,7 +1,7 @@
 ---
 id: "20260504-portable-blog-system-mvp"
 site: "github"
-type: "tech-note"
+contentKind: "tech-note"
 primaryPlatform: "github"
 
 title: "Portable Blog System MVP 開發筆記"
@@ -47,8 +47,6 @@ blocks:
   relatedPosts: false
   sidebar: false
 ---
-
-# Portable Blog System MVP 開發筆記
 
 這是 Phase 1-A 新增的第一篇 ready 範例文章，目的是驗證 Markdown frontmatter 讀取與 draft 過濾流程。
 
