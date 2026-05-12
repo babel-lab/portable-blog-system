@@ -51,7 +51,12 @@
 | 8-g-4-b | 候選 C §5.1 必要補強（schema docs → phase reports cross-link）| ✅ 完成 | commit `4730152`；`phase-8d-completion-report.md` + `publish-bundle.md` §8.1 + `publish-json-schema.md` §12（3 檔 +32 行）|
 | 8-g-4-c | 候選 C §5.2 可選後向 link（phase-8b ~ 8-f）| ✅ 完成 | commit `ddae181`；5 檔各補 1 行（+10 行）；§5.2.6 `fb-sidecar-schema.md` 依保守決策未補 |
 | 8-g-4-d | Phase 8-g overall completion report 更新（含候選 C landings）| ✅ 完成 | commit `eec8ff7`；`docs/phase-8g-completion-report.md`（補入 §3.5 candidate C 落地紀錄 + §5 / §6 / §7 對應更新）|
-| 8-g-4-e | Phase 8-g-4 候選 C 落地後之 roadmap 同步（本批）| 🔄 進行中 | 本文件（§3 表格 + §3.4 新增 + §5.1 + §7.2 同步）|
+| 8-g-4-e | Phase 8-g-4 候選 C 落地後之 roadmap 同步 | ✅ 完成 | commit `5d38d46`；本文件（§3 表格 + §3.4 新增 + §5.1 + §7.2 同步）|
+| 8-g-5-a | sample post H1 + deprecated type 對齊讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
+| 8-g-5-b | sample post H1 + deprecated type 對齊實作（2 篇 github sample posts）| ✅ 完成 | commit `44c0e8f`；`20260504-github-pages-blog-planning.md` + `20260504-portable-blog-system-mvp.md`（2 檔 +2 / −6）；validate baseline 從 `0/13/7` 收斂回 `0/9/5` |
+| 8-g-6-a | content/templates 對齊讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
+| 8-g-6-b | content/templates 對齊實作（5 個 markdown post templates）| ✅ 完成 | commit `5976162`；`post-template.md` + `github-tech-note-template.md` + `blogger-book-review-template.md` + `blogger-download-template.md` + `blogger-summary-template.md`（5 檔 +5 / −15）；validate baseline 維持 `0/9/5` |
+| 8-g-7 | future-roadmap 同步 sample/template 對齊收尾（本批）| 🔄 進行中 | 本文件（§3 表格 + §3.5 新增 + §5.1 + §7.2 同步）|
 | 8-g-1 | fixture / sample end-to-end 驗證 | ⏸ deferred | 詳見 §4 |
 
 ### 3.1 Phase 8-g-0-b 決策摘要
@@ -110,6 +115,42 @@ Phase 8-g-4 系列補完 docs cross-link 缺口（per `docs/phase-8g-candidate-a
 
 詳細落地紀錄詳見 `docs/phase-8g-completion-report.md` §3.5。
 
+### 3.5 Phase 8-g-5 / 8-g-6 落地摘要（sample post + template 對齊）
+
+Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type` 與 body leading H1 cleanup（per `docs/phase-8g-completion-report.md` §5.2 之 sample 對齊候選與 Phase 8-g-6 讀取分析）：
+
+- **Phase 8-g-5（sample posts 對齊；commit `44c0e8f`）**：對齊 2 篇正式 ready sample post：
+  - `content/github/posts/20260504-github-pages-blog-planning.md`
+  - `content/github/posts/20260504-portable-blog-system-mvp.md`
+  - 每篇兩處變更：`type: "tech-note"` → `contentKind: "tech-note"`（不保留 legacy `type`）；body 開頭 `# 文章標題` 移除（含尾隨空白行）
+  - **validate baseline 變化**：`0 error / 13 warning on 7 post(s)` → **`0 error / 9 warning on 5 post(s)`**（−4 warnings / −2 posts；兩篇 sample 之 `body-leading-h1` + `frontmatter-uses-deprecated-type` 共 4 條消除；剩餘 9 warnings 全為 5 篇 validation fixtures）
+
+- **Phase 8-g-6（content/templates 對齊；commit `5976162`）**：對齊 5 個 markdown post 範本：
+  - `content/templates/post-template.md`
+  - `content/templates/github-tech-note-template.md`
+  - `content/templates/blogger-book-review-template.md`
+  - `content/templates/blogger-download-template.md`
+  - `content/templates/blogger-summary-template.md`
+  - 每檔同樣兩處變更：`type` → `contentKind` + 移除 body `# 文章標題` placeholder
+  - **validate baseline 維持** `0 error / 9 warning on 5 post(s)`（templates 不在 validate scan path）
+  - 範圍排除：`_sample-series-post.md`（已現代化）/ `_sample.fb.md`（FB sidecar schema）/ `*.publish.json`（JSON schema）
+
+**對 dist / build / validate 之影響**：
+
+- Phase 8-g-5：兩篇 sample post 改變 source；dist 變動限於 `dist/posts/{slug}/index.html` 各少一個 `<h2>` 重複 title 行（per `parse-markdown.js` 既有 H1 → H2 自動降級邏輯）；其他 dist 產物 byte-identical
+- Phase 8-g-6：純 docs/templates；不被 `build:*` 掃到；dist 完全不變
+
+**保守決策保留**：本對齊只清理 **sample / template 來源層**，**不等同 source code 層 legacy fallback 退場**：
+
+- `src/scripts/load-posts.js` 之 `contentKind ?? type` fallback **仍存在**
+- `src/scripts/validate-content.js` 之 `frontmatter-uses-deprecated-type` warning 規則**仍存在**
+- `src/scripts/parse-markdown.js` 之 body H1 → H2 自動降級**仍存在**
+- 上述 source code 層之相容層退場屬 Phase 8-h 或更晚（per §5.2「相容層退場」之既有立場）
+
+`new-post.js` 之 inline TEMPLATE 已於 Phase 8-g-2-b1（commit `fa7d825`）對齊 `contentKind`；與本批之 `content/templates/*.md` 範本獨立。
+
+詳細落地紀錄詳見 commits `44c0e8f` / `5976162` 之 message 與本文件 §3 表格之 8-g-5 / 8-g-6 列；overall completion report 之 §5 / §6 同步待 Phase 8-g-8（後續可選批次）。
+
 ---
 
 ## 4. Phase 8-g-1 fixture / sample end-to-end 驗證（deferred）
@@ -147,6 +188,7 @@ Phase 8-g-4 系列補完 docs cross-link 缺口（per `docs/phase-8g-candidate-a
 | ~~B~~ | ~~validation / report 補強分析~~ ⚠️ **部分已落地** | validate 規則擴充 / 報表 | ❌ 不影響（已落地 3 條）| Phase 8-g-2-d-b / c / d 已落地 3 條 warning（詳見 §3.3）；剩餘 `series-number-duplicate` 候選需 fixture 配套；series report（`dist-reports/series.txt`）仍 candidate |
 | ~~C~~ | ~~docs consistency / cross-link 補強~~ | ✅ 已於 Phase 8-g-4 系列落地（commits `4730152` + `ddae181` + `eec8ff7`；§5.2.6 `fb-sidecar-schema.md` 未補；詳見 §3.4）| — | — |
 | D | Phase 8-g-2 completion report（new-post.js 系列收尾報告）| 純文件 | ❌ 不影響 | 整合 8-g-2-b1 / b2 / c-b / c-c 之完整紀錄、4 個 commit 與保守設計依據 |
+| ~~E~~ | ~~sample / template 對齊（deprecated `type` + body leading H1 cleanup）~~ | ✅ 已於 Phase 8-g-5 / 8-g-6 落地（commits `44c0e8f` + `5976162`；2 篇 sample posts + 5 個 templates；詳見 §3.5）；價值：避免未來複製模板或 sample 再產生 `frontmatter-uses-deprecated-type` / `body-leading-h1` noise warning | — | — |
 
 ### 5.2 排除原則
 
@@ -185,7 +227,7 @@ Phase 8-g-4 系列補完 docs cross-link 缺口（per `docs/phase-8g-candidate-a
 - `docs/phase-8g-candidate-analysis.md`（Phase 8-g-0-b 候選分析與 fixture 風險決策）
 - `docs/phase-8g-2-completion-report.md`（Phase 8-g-2 new-post.js prompt 系列收尾；commit `3c9b2e3`）
 - `docs/phase-8g-2-d-completion-report.md`（Phase 8-g-2-d validate-content series warning 規則收尾；commit `c29f63b`）
-- `docs/phase-8g-completion-report.md`（Phase 8-g overall 收尾報告；初版 commit `c3b6c63`；候選 C 落地後更新 commit `eec8ff7`；含 §3.5 Phase 8-g-4 candidate C 落地紀錄；8-g-1 fixture 仍 deferred）
+- `docs/phase-8g-completion-report.md`（Phase 8-g overall 收尾報告；初版 commit `c3b6c63`；候選 C 落地後更新 commit `eec8ff7`；含 §3.5 Phase 8-g-4 candidate C 落地紀錄；8-g-1 fixture 仍 deferred。註：sample/template 對齊已於 `44c0e8f` / `5976162` 落地；overall completion report 之 §5 / §6 待後續獨立批次同步）
 
 ### 7.3 規格與設計文件
 
