@@ -67,7 +67,11 @@
 | 8-g-12-d | docs sync Phase 8-g-12 landings | ✅ 完成 | commit `662bcdf`；`docs/series-schema.md` §15.4.2 / §15.4.3 / §18.5 + `docs/phase-8g-completion-report.md`（baseline 11/6 + Phase 8-g-12 系列子節 + future candidate 收斂）+ 本文件（§3 表格 + §5 收斂）|
 | 8-g-13 | publish-bundle §7.5-§7.7 過時描述對齊讀取分析 | ✅ 完成 | 對話內讀取分析；推薦選項 B（保留歷史脈絡 + 補述實際落地；per Phase 8-g-12-b §15.4.3 pattern）；無 commit |
 | 8-g-14 | publish-bundle §7.4-§7.7 實際落地對齊（docs-only 實作）| ✅ 完成 | commit `108de25`；`docs/publish-bundle.md`（4 節補述「Phase 8-X 實際落地更新」段落 + cross-link 至 phase-8d/e/f/g-completion-report.md；+57 / −4；§7.1-§7.3 / §8 / §9 未動）|
-| 8-g-15 | docs sync publish-bundle §7 對齊收尾 + roadmap 同步（本批）| 🔄 進行中 | 本文件（§3 表格 + §5.1）+ `docs/phase-8g-completion-report.md`（Header / §1 / §2 / §3 / §5.5 / §7 同步）|
+| 8-g-15 | docs sync publish-bundle §7 對齊收尾 + roadmap 同步 | ✅ 完成 | commit `d81e515`；本文件（§3 表格 + §5.1）+ `docs/phase-8g-completion-report.md`（Header / §1 / §2 / §3 / §5.5 / §7 同步）|
+| 8-g-16 | Phase 8-g 剩餘項目短盤點 | ✅ 完成 | 對話內讀取盤點；確認 4 項已完成（Phase 8-g-12 / 14+15 / F3 維持保守 / titleTemplate 升級）+ 9 項仍 pending；推薦下一步 Top 3：B-剩餘（series report）/ candidate 7 / candidate 5 / 6；無 commit |
+| 8-g-17-a | B-剩餘 series report `dist-reports/series.txt` 讀取分析 | ✅ 完成 | 對話內讀取分析；確認 dual-output / 獨立 npm script / 含 drafts 排除 archived & fixtures / dual-channel 與 validate warnings；推薦命名 `src/scripts/report-series.js`；無 commit |
+| 8-g-17-b | series report script 實作（`src/scripts/report-series.js` + `package.json`）| ✅ 完成 | commit `f21da58`；新增 standalone script 採 `fast-glob` + `gray-matter` 直接掃描；含 status filter + series resolution + resolveTitleTemplate 接入 + group-level missing/duplicate/unresolved 標示；輸出 `dist-reports/series-report.{txt,json}`（ignored）；2 檔 +457 / −0；validate baseline 維持 `0/11/6` |
+| 8-g-17-c | docs sync Phase 8-g-17 series report landing（本批）| 🔄 進行中 | 本文件（§3 表格 + §5.1 ~~B~~ 更新 + ~~H~~ 新增）+ `docs/phase-8g-completion-report.md`（Header / §1 / §2 / §3 / §5 / §7 同步；candidate 1 改為 ✅ landed）|
 | 8-g-1 | fixture / sample end-to-end 驗證 | ⏸ deferred | 詳見 §4 |
 
 ### 3.1 Phase 8-g-0-b 決策摘要
@@ -196,12 +200,13 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 | # | 候選 | 性質 | 影響 dist | 建議起手 |
 |---|---|---|---|---|
 | ~~A~~ | ~~`new-post.js` series 欄位提示分析~~ | ✅ 已於 Phase 8-g-2-b1 / b2 / c-b / c-c 落地（詳見 §3.2）| — | — |
-| ~~B~~ | ~~validation / report 補強分析~~ ⚠️ **部分已落地** | validate 規則擴充 / 報表 | ❌ 不影響（已落地 3 條）| Phase 8-g-2-d-b / c / d 已落地 3 條 warning（詳見 §3.3）；剩餘 `series-number-duplicate` 候選需 fixture 配套；series report（`dist-reports/series.txt`）仍 candidate |
+| ~~B~~ | ~~validation / report 補強分析~~ | ✅ **已全數落地** | validate 規則擴充 / 報表 | Phase 8-g-2-d-b / c / d / e-b 共 4 條 series structure warning 落地（詳見 §3.3）+ Phase 8-g-12-b `series-title-unresolved` 升級為 user-visible warning（詳見 §3.5 candidate F）+ Phase 8-g-17-b series report 落地（詳見 §3.5 candidate H）；本候選之 3 個子議題（structure warnings / titleTemplate unresolved / series report）皆已完成 |
 | ~~C~~ | ~~docs consistency / cross-link 補強~~ | ✅ 已於 Phase 8-g-4 系列落地（commits `4730152` + `ddae181` + `eec8ff7`；§5.2.6 `fb-sidecar-schema.md` 未補；詳見 §3.4）| — | — |
 | D | Phase 8-g-2 completion report（new-post.js 系列收尾報告）| 純文件 | ❌ 不影響 | 整合 8-g-2-b1 / b2 / c-b / c-c 之完整紀錄、4 個 commit 與保守設計依據 |
 | ~~E~~ | ~~sample / template 對齊（deprecated `type` + body leading H1 cleanup）~~ | ✅ 已於 Phase 8-g-5 / 8-g-6 落地（commits `44c0e8f` + `5976162`；2 篇 sample posts + 5 個 templates；詳見 §3.5）；價值：避免未來複製模板或 sample 再產生 `frontmatter-uses-deprecated-type` / `body-leading-h1` noise warning | — | — |
 | ~~F~~ | ~~`titleTemplate unresolved` 升級為 user-visible warning（per `docs/series-schema.md` §15.4.2）~~ | ✅ 已於 Phase 8-g-12 落地（commits `a73c064` + `78d1f30`；`validate-content.js` 新增 `series-title-unresolved` 規則 + fixture 配套；validate baseline `0/9/5` → `0/11/6`）；現況描述更新為 `0 error / 11 warning on 6 post(s)`；§3.5 之 source code 層 fallback 退場（Phase 8-h 候選）**仍未啟動** | — | — |
 | ~~G~~ | ~~`docs/publish-bundle.md` §7.4-§7.7 過時描述對齊（Phase 8-a 撰寫時預期計畫 vs 實際 Phase 8-d/e/f/g landings）~~ | ✅ 已於 Phase 8-g-13 / 8-g-14 落地（commit `108de25`；採「保留歷史脈絡 + 補述實際落地」pattern；4 節各加「Phase 8-X 實際落地更新」段落 + cross-link 至對應 phase report；§7.1-§7.3 / §8 / §9 未動；validate baseline 仍維持 `0/11/6`）；source code 層 fallback 退場（Phase 8-h 候選）**仍未啟動** | — | — |
+| ~~H~~ | ~~series report `dist-reports/series-report.{txt,json}`（candidate 1 / validation / report 補強之最後一片）~~ | ✅ 已於 Phase 8-g-17-b 落地（commit `f21da58`；新增 `src/scripts/report-series.js` + `package.json` 之 `npm run report:series`；採 `fast-glob` + `gray-matter` 直接掃描；含 draft + ready + published；排除 archived + validation-fixtures；依 series.id 分群並標示 missing / duplicate / unresolved；dual-output `.txt + .json`；屬 visibility / dump channel，不接 build pipeline / 不新增 validate 規則；validate baseline 維持 `0/11/6`）；與 candidate ~~B~~ 一同完整收尾 candidate 1 validation / report 補強 | — | — |
 
 ### 5.2 排除原則
 
