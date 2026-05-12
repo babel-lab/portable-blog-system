@@ -15,6 +15,10 @@ import { loadSettings } from './load-settings.js';
 import { loadPosts } from './load-posts.js';
 // Phase 8-c-3：placeholder resolver helper（純函式；只用於 .fb.md body 檢查）
 import { resolvePlaceholders } from './resolve-placeholders.js';
+// Phase 8-g-12-b：series.titleTemplate placeholder resolver helper（Phase 8-f-4-b 落地之 pure function）
+//   - 用於 series-title-unresolved warning 規則之 placeholder 偵測
+//   - 與 normalize-post-output / build-promotion 共用同一 helper（資料一致性）
+import { resolveTitleTemplate } from './resolve-series-title.js';
 
 // Phase 5-g-3：ERROR 規則常數
 const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
@@ -365,6 +369,46 @@ export function validateContent({ posts, settings }) {
               value: 'subtitle exists but series.id is missing (series.subtitle must be paired with series.id)',
             });
           }
+        }
+      }
+
+      // Phase 8-g-12-b：series-title-unresolved（warning-only）
+      //   - 觸發：post.normalized.series 存在且為 plain object；series.titleTemplate 為非空 string；
+      //     resolveTitleTemplate(...) 返回之 unresolvedPlaceholders.length > 0
+      //   - 觸發範圍與既有 series 規則一致（僅 ready/published；drafts/archived 由 load-posts 過濾不進此處）
+      //   - 沿用 normalize-post-output 既有之 normalized.series 結構（per Phase 8-f-3-b）；本批不動 normalize
+      //   - 不重複觸發既有 series 結構規則：
+      //     - series 非 plain object → normalize 不建 normalized.series；本規則前置守門過濾
+      //     - series.id invalid / missing → normalize 不建 valid normalized.series；本規則自動不觸發
+      //     - 本規則屬「placeholder 解析」面向，與 series-id-not-in-settings（settings 配置）/
+      //       series-number-duplicate（編號規劃）獨立；可共存
+      //   - 與 fb-md-placeholder-unresolved 形成對稱（後者針對 .fb.md body；本規則針對 series.titleTemplate）
+      //   - 沿用 resolve-series-title.js（Phase 8-f-4-b）pure function helper；不修改 helper / normalize / build-promotion
+      const normalizedSeries = post.normalized?.series;
+      if (
+        normalizedSeries &&
+        typeof normalizedSeries === 'object' &&
+        !Array.isArray(normalizedSeries) &&
+        typeof normalizedSeries.titleTemplate === 'string' &&
+        normalizedSeries.titleTemplate !== ''
+      ) {
+        const resolved = resolveTitleTemplate(normalizedSeries.titleTemplate, {
+          series: normalizedSeries,
+          post: { title: post.title, titleEn: post.titleEn },
+        });
+        if (resolved.unresolvedPlaceholders.length > 0) {
+          const names = resolved.unresolvedPlaceholders
+            .map((u) => `{${u.name}}`)
+            .join(', ');
+          const reasons = resolved.unresolvedPlaceholders
+            .map((u) => `${u.name}=${u.reason}`)
+            .join(', ');
+          issues.push({
+            severity: 'warning',
+            type: 'series-title-unresolved',
+            sourcePath,
+            value: `series.id="${normalizedSeries.id ?? ''}"; titleTemplate has unresolved placeholders: ${names} (reasons: ${reasons})`,
+          });
         }
       }
     }
