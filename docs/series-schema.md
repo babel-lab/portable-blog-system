@@ -985,7 +985,7 @@ if (
 
 - **site default hashtags**：作為最終 fallback（在 series.hashtags 之後）；需設計 `site.config.json` 或專屬 settings 欄位
 - **first article .fb.md hashtags fallback**：series-schema §8.2 之 fallback 2；需跨文章查找邏輯（識別「同系列 series.number 最小者」），複雜度較高
-- **Blogger `post.tags` inheritance**：若未來要實作，應另行設計 slug 格式（如 `series.tags` 短 slug 欄位），**不應直接沿用 FB `#hashtags` 格式**
+- ~~**Blogger `post.tags` inheritance**：若未來要實作，應另行設計 slug 格式（如 `series.tags` 短 slug 欄位），**不應直接沿用 FB `#hashtags` 格式**~~ → **已於 Phase 8-g-18-b 規格化為 `series.tags` 欄位**（詳見 §22）；本 §19.7 條目保留歷史脈絡。normalize / build-blogger 接入屬 Phase 8-g-18-c / 8-g-18-d 後續批次。
 
 各候選若未來有實際需求，可獨立另開批次評估。
 
@@ -1167,6 +1167,146 @@ Phase 8-g-2-d 系列於 `src/scripts/validate-content.js` 加入 **3 條 series 
 - `docs/phase-8g-candidate-analysis.md` §6 候選 #1（`partially landed`）/ §11（Phase 8-g-2-d 落地紀錄）
 - `docs/future-roadmap.md` §3 子批次表 / §3.3（Phase 8-g-2-d 落地摘要）
 - 本文件 §5（series.number auto-suggest 規格）/ §15.6（候選批次預告）
+
+---
+
+## §22 Blogger tags inheritance（`series.tags`）
+
+### 22.1 動機與規格依據
+
+Phase 8-f-7-b 已落地 FB hashtags 之 `series.hashtags` inheritance（per §19）；Blogger 端之 tag inheritance 屬 §19.7 之既有 future candidate，**未實作**。
+
+per `docs/fb-sidecar-schema.md` §12.3.1（Phase 8-f-7-b 落地時補述）：
+
+> 「**Blogger `post.tags` 與 FB hashtags 不互通**：Blogger 標籤為短 slug（`github`），FB hashtags 為 `#` prefix；格式不同；本批**不影響** Blogger `post.tags`；若未來要做 Blogger 標籤繼承，**應另設 `series.tags` 短 slug 欄位**，**不應直接沿用** FB `#hashtags`」
+
+per 本文件 §19.7（Phase 8-f-7-b 落地時之 future candidate）：
+
+> 「**Blogger `post.tags` inheritance**：若未來要實作，應另行設計 slug 格式（如 `series.tags` 短 slug 欄位），**不應直接沿用 FB `#hashtags` 格式**」
+
+→ 本 §22 正式規格化 `series.tags` 欄位。**本批（Phase 8-g-18-b）僅規格化 schema 文件**；normalize 接入屬後續批次 Phase 8-g-18-c；build-blogger 接入屬後續批次 Phase 8-g-18-d。
+
+### 22.2 `series.tags` 欄位定義
+
+| 維度 | 規格 |
+|---|---|
+| 名稱 | `series.tags` |
+| 型別 | `string[]`（陣列；每元素為 string）|
+| 必填 / 選填 | **選填**（同 `series.hashtags` 之選填模式）|
+| 預設值 | `[]`（未定義時視同空陣列）|
+| 空陣列語意 | **視同未設定**（不觸發 inheritance；fallback 至下層；per §22.4 之 chain）|
+| 格式 | **短 slug / tag**（同 `.md` frontmatter `tags` 之既有格式；per §8.1）|
+| **是否含 `#`** | ❌ **不含**（per §22.5 與 `series.hashtags` 分離原則）|
+| 字元 | 可為英文 slug（如 `github`、`vite`、`static-site`）或中文 tag（如 `AI`、`自媒體`、`ChatGPT`）|
+| 集中設定位置 | `content/settings/series.json` 之 series entry 內 `tags` 欄位 |
+| 文章層 override | `frontmatter.series.tags`（per §11.2 hybrid 策略；可選；屬「文章層覆寫優先 + settings fallback」之既有合併路線）|
+
+### 22.3 範例
+
+`content/settings/series.json`：
+
+```json
+{
+  "series": [
+    {
+      "id": "we-media-ai-52",
+      "name": "我媒體 AI 52 篇",
+      "tags": ["AI", "自媒體", "ChatGPT"],
+      "hashtags": ["#AI", "#自媒體", "#ChatGPT", "#提問筆記本"]
+    }
+  ]
+}
+```
+
+說明：
+
+- `tags`：Blogger labels / 短 slug；**不含 `#`**
+- `hashtags`：FB promotion hashtags；**含 `#`**
+- 同一 series 之 `tags` 與 `hashtags` **內容可一致 / 略異 / 完全不同**（per §8.1「內容語意相同；格式略異」之既有原則）；作者可決定是否完全對應或加減
+
+### 22.4 inheritance 原則
+
+per §11.2 之 hybrid 策略 + §19 既有 hashtags inheritance pattern：
+
+**未來 normalize 接入後之 fallback chain**（per §22.7 之後續批次規格）：
+
+```
+1. post.tags（frontmatter；文章層最高優先；非空 array）
+2. frontmatter.series.tags（文章層 series override；非空 array）
+3. settings.series[id].tags（系列定義層；非空 array）
+4. []（最終 fallback）
+```
+
+關鍵點：
+
+- **`post.tags` 仍是文章層最高優先**（per §8.3「單篇可 override」；維持作者單篇控制）
+- 未來若文章層 `post.tags` 為空，可由 `series.tags` fallback（per §22.7 後續 normalize 接入）
+- **空陣列視同未設定**（per §22.2；不阻擋 fallback chain 下傳）
+- **完整覆蓋；不合併**（mirror §8.4 既有 hashtags inheritance 原則）
+- **本批僅定義規格**；normalize / build-blogger 接入屬 Phase 8-g-18-c / 8-g-18-d 後續批次
+
+### 22.5 `series.tags` 與 `series.hashtags` 分離原則
+
+| 維度 | `series.tags` | `series.hashtags` |
+|---|---|---|
+| 服務對象 | **Blogger tags / labels**（Blogger 平台貼文之 labels）| **Facebook promotion hashtags**（FB 推廣文案）|
+| 格式 | 短 slug / tag；**不含 `#`** | `#` prefix 形式 |
+| 範例 | `["github", "vite"]` 或 `["AI", "自媒體"]` | `["#GitHub", "#Vite"]` 或 `["#AI", "#自媒體"]` |
+| 接入點 | `normalize.publish.blogger.tags`（未來；per §22.7）| `normalize.promotion.facebook.hashtags`（per §19.1 Phase 8-f-7-b 已落地）|
+| build 輸出 | `build-blogger.js` → `meta.json` `tags` 欄位（per §22.7 後續批次）| `build-promotion.js` → manifest entry / `facebook-post.ejs` |
+| 對應之 frontmatter | `frontmatter.tags`（per §8.1）| `frontmatter.promotion.facebook.hashtags`（per §19）|
+
+**核心原則**：
+
+1. **兩者不互通**：Blogger labels 與 FB hashtags 為**獨立資料**；同一 series 之兩欄位**內容可一致 / 略異 / 完全不同**，由作者決定
+2. **不做格式轉換互用**：實作上**不應**將 `series.hashtags` 之 `#` 去除後當 `series.tags`；亦**不應**將 `series.tags` 加 `#` 後當 `series.hashtags`
+3. **不直接沿用**：candidate 7 之 Blogger inheritance 實作**必須**以 `series.tags` 為資料來源；**不得**直接讀 `series.hashtags`
+4. **避免設計層誤用**：normalize / build-blogger 之未來接入應嚴格走 `series.tags` namespace；不引入 `series.hashtags` 之 cross-reference
+
+### 22.6 scope 邊界
+
+`series.tags` 之 scope 邊界（per series-schema §9 / §10 既有原則）：
+
+| 範圍 | 是否接入 | 理由 |
+|---|---|---|
+| `.publish.json` | ❌ **不放** | per §9.1「series 屬內容屬性，不放 .publish.json」 |
+| `.fb.md` | ❌ **不放** | per §10.1「.fb.md frontmatter 第一版 7 欄位 + Phase 8-e-2 之 titleEn 第 8 欄位；不含 series 相關欄位」 |
+| GitHub 站之 tag 頁 | ❌ **不影響** | GitHub 站之 tag 頁生成沿用 `frontmatter.tags`；本規格不擴張至 GitHub |
+| Facebook promotion / `.fb.md` | ❌ **不影響** | per §22.5 分離原則；FB 端走 `series.hashtags`；本規格不擴張至 FB |
+| validate-content 規則 | ❌ **不新增** | `series.tags` 屬選填；空值合理；沿用 `series.hashtags` 之既有「無 validate 規則」處理 |
+| build pipeline | ❌ **本批不接** | Phase 8-g-18-b 僅 docs 規格化；不動 build-blogger / build-github / build-promotion / build-sitemap |
+
+### 22.7 後續接入批次（不在本批 scope）
+
+| 批次 | 範圍 | 預期 |
+|---|---|---|
+| Phase 8-g-18-c | `normalize-post-output.js` 接入 `series.tags` 解析 + post-pass backfill `normalized.publish.blogger.tags` | mirror Phase 8-f-7-b 之 hashtags backfill pattern；**資料層 only**；不接 build-blogger；dist byte-identical |
+| Phase 8-g-18-d（可選）| `build-blogger.js` 改 tags 來源為 `normalized.publish.blogger.tags` 優先 + legacy `post.tags` fallback | mirror Phase 8-d 之 normalized 優先 + legacy fallback pattern；對既有 posts（無 series）dist 完全 byte-identical；對未來 series posts 啟用 inheritance |
+| Phase 8-g-18-e | docs sync（future-roadmap + phase-8g-completion-report）| sync candidate 7 ✅ landed |
+
+各後續批次屬獨立排程；本 §22 規格化批次完成後可依優先序逐批進行。
+
+### 22.8 對 validate / build / dist 之影響
+
+per 本批 docs only：
+
+| 影響面 | 變動？ |
+|---|---|
+| `npm run validate:content` baseline | ❌ 不變（純 docs）|
+| `npm run build:*` 輸出 | ❌ 不變 |
+| `dist` / `dist-blogger` / `dist-promotion` baseline | ❌ 不變 |
+| `package.json` | ❌ 不變 |
+| `content/settings/series.json` 既有 `{"series":[]}` | ❌ 不變（`series.tags` 屬選填；既有 empty array 仍 valid）|
+
+### 22.9 cross-link
+
+- `docs/fb-sidecar-schema.md` §12.3.1（Phase 8-f-7-b 落地時補述「Blogger post.tags 與 FB hashtags 不互通」之規格依據）
+- 本文件 §8 hashtags 規則（與 `series.tags` 之短 slug 格式對齊）
+- 本文件 §9 與 `.publish.json` 之分工（series 不放 sidecar）
+- 本文件 §10 與 `.fb.md` 之分工（series 不放 sidecar）
+- 本文件 §11.2 series 集中管理位置（hybrid 策略；文章層覆寫優先）
+- 本文件 §19 Phase 8-f-7 hashtags inheritance 接入實況（normalize backfill pattern；mirror 對象）
+- 本文件 §19.7 未來候選（原 Blogger `post.tags` inheritance bullet 已標 strikethrough 並指向本 §22）
 
 ---
 
