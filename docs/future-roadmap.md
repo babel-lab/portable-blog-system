@@ -56,7 +56,9 @@
 | 8-g-5-b | sample post H1 + deprecated type 對齊實作（2 篇 github sample posts）| ✅ 完成 | commit `44c0e8f`；`20260504-github-pages-blog-planning.md` + `20260504-portable-blog-system-mvp.md`（2 檔 +2 / −6）；validate baseline 從 `0/13/7` 收斂回 `0/9/5` |
 | 8-g-6-a | content/templates 對齊讀取分析 | ✅ 完成 | 對話內分析；未產出獨立文件 |
 | 8-g-6-b | content/templates 對齊實作（5 個 markdown post templates）| ✅ 完成 | commit `5976162`；`post-template.md` + `github-tech-note-template.md` + `blogger-book-review-template.md` + `blogger-download-template.md` + `blogger-summary-template.md`（5 檔 +5 / −15）；validate baseline 維持 `0/9/5` |
-| 8-g-7 | future-roadmap 同步 sample/template 對齊收尾（本批）| 🔄 進行中 | 本文件（§3 表格 + §3.5 新增 + §5.1 + §7.2 同步）|
+| 8-g-7 | future-roadmap 同步 sample/template 對齊收尾 | ✅ 完成 | commit `a9db65b`；本文件（§3 表格 + §3.5 新增 + §5.1 + §7.2 同步）|
+| 8-g-8 | phase-8g-completion-report.md 同步 sample/template/roadmap landings | ✅ 完成 | commit `38a0007`；`docs/phase-8g-completion-report.md`（補入 §3.6 Phase 8-g-5 + §3.7 Phase 8-g-6 + §3.8 Phase 8-g-7 落地紀錄 + §3.1 候選表新增 S/T 列 + §3.2 baseline `0/13/7` → `0/9/5` 收斂 + §5 / §6 / §7 對應更新；+269 / −93 行）|
+| 8-g-9 | future-roadmap 同步 Phase 8-g-7 / 8-g-8 landings（本批）| 🔄 進行中 | 本文件（§3 表格 + §3.5 末段 + §7.2 同步）|
 | 8-g-1 | fixture / sample end-to-end 驗證 | ⏸ deferred | 詳見 §4 |
 
 ### 3.1 Phase 8-g-0-b 決策摘要
@@ -149,7 +151,7 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 
 `new-post.js` 之 inline TEMPLATE 已於 Phase 8-g-2-b1（commit `fa7d825`）對齊 `contentKind`；與本批之 `content/templates/*.md` 範本獨立。
 
-詳細落地紀錄詳見 commits `44c0e8f` / `5976162` 之 message 與本文件 §3 表格之 8-g-5 / 8-g-6 列；overall completion report 之 §5 / §6 同步待 Phase 8-g-8（後續可選批次）。
+詳細落地紀錄詳見 commits `44c0e8f` / `5976162` 之 message 與本文件 §3 表格之 8-g-5 / 8-g-6 列；overall completion report 之 §5 / §6 已於 Phase 8-g-8（commit `38a0007`）同步至最新狀態（含 §3.6 Phase 8-g-5 + §3.7 Phase 8-g-6 + §3.8 Phase 8-g-7 落地紀錄）。
 
 ---
 
@@ -227,7 +229,7 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 - `docs/phase-8g-candidate-analysis.md`（Phase 8-g-0-b 候選分析與 fixture 風險決策）
 - `docs/phase-8g-2-completion-report.md`（Phase 8-g-2 new-post.js prompt 系列收尾；commit `3c9b2e3`）
 - `docs/phase-8g-2-d-completion-report.md`（Phase 8-g-2-d validate-content series warning 規則收尾；commit `c29f63b`）
-- `docs/phase-8g-completion-report.md`（Phase 8-g overall 收尾報告；初版 commit `c3b6c63`；候選 C 落地後更新 commit `eec8ff7`；含 §3.5 Phase 8-g-4 candidate C 落地紀錄；8-g-1 fixture 仍 deferred。註：sample/template 對齊已於 `44c0e8f` / `5976162` 落地；overall completion report 之 §5 / §6 待後續獨立批次同步）
+- `docs/phase-8g-completion-report.md`（Phase 8-g overall 收尾報告；初版 commit `c3b6c63`；候選 C 落地後更新 commit `eec8ff7`；sample/template/roadmap landings 同步 commit `38a0007`；含 §3.5 Phase 8-g-4 candidate C + §3.6 Phase 8-g-5 sample post + §3.7 Phase 8-g-6 templates + §3.8 Phase 8-g-7 roadmap 落地紀錄；8-g-1 fixture 仍 deferred；Phase 8-g overall 仍 🔄 進行中）
 
 ### 7.3 規格與設計文件
 
