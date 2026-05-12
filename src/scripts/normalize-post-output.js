@@ -996,6 +996,21 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
           hashtagsSource = 'settings.series[id].hashtags';
         }
 
+        // tags：frontmatter override → settings → fallback:empty-array
+        //   - 設計依據：docs/series-schema.md §22 candidate 7 規格
+        //   - 短 slug 格式（per §22.2）；不含 #；與 hashtags 分離（per §22.5）
+        //   - 空陣列視同未設定（per §22.2）；非陣列亦回退至 empty
+        //   - 不新增 validate-content warning（per §22.6）
+        let tags = [];
+        let tagsSource = 'fallback:empty-array';
+        if (Array.isArray(rawSeries.tags)) {
+          tags = rawSeries.tags;
+          tagsSource = 'frontmatter.series.tags';
+        } else if (def && Array.isArray(def.tags)) {
+          tags = def.tags;
+          tagsSource = 'settings.series[id].tags';
+        }
+
         seriesOut = {
           id,
           number,
@@ -1004,6 +1019,7 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
           nameEn,
           titleTemplate,
           hashtags,
+          tags,
           resolved,
         };
 
@@ -1018,6 +1034,7 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
         recordField(meta, 'series.nameEn', nameEnSource);
         recordField(meta, 'series.titleTemplate', titleTemplateSource);
         recordField(meta, 'series.hashtags', hashtagsSource);
+        recordField(meta, 'series.tags', tagsSource);
         recordField(meta, 'series.resolved', 'computed:settings-lookup');
 
         if (!resolved) {
@@ -1059,6 +1076,42 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
       'computed:series.hashtags',
       'inherited from series.hashtags',
     );
+  }
+
+  // ─── publish.blogger.tags 寫入 ──────────────────────────
+  //
+  // Phase 8-g-18-c：將 post.tags / series.tags 寫入 normalized.publish.blogger.tags
+  //   - 設計依據：docs/series-schema.md §22 candidate 7 規格
+  //   - fallback chain：post.tags (non-empty) → seriesOut.tags (non-empty) → []
+  //     1. frontmatter.tags 為文章層最高優先（per §22.4；維持作者單篇控制）
+  //     2. seriesOut.tags 為系列繼承（已於 series 區塊解析 frontmatter.series.tags / settings.series[id].tags）
+  //     3. 兩者皆無 → []
+  //   - mirror Phase 8-f-7-b promotion.facebook.hashtags backfill pattern
+  //   - 與 promotion.facebook.hashtags 嚴格分離（per §22.5）：本欄不讀 series.hashtags；series.hashtags 不讀本欄
+  //   - 本批不影響 build-blogger.js（仍讀 post.tags；屬 Phase 8-g-18-d 接入）
+  //   - 既有無 post.tags / 無 series 之 posts → []；對 dist 無影響（build-blogger 未接）
+  //   - 不接 GitHub tags / promotion / FB sidecar / .publish.json schema / .fb.md schema
+  //   - 不新增 validate rule / fixture / sample（per §22.6 / §22.8）
+  {
+    let value = [];
+    let source = 'fallback:empty-array';
+    if (Array.isArray(p.tags) && p.tags.length > 0) {
+      value = p.tags;
+      source = 'frontmatter.tags';
+    } else if (seriesOut && Array.isArray(seriesOut.tags) && seriesOut.tags.length > 0) {
+      value = seriesOut.tags;
+      source = 'computed:series.tags';
+    }
+    publishOut.blogger.tags = value;
+    recordField(meta, 'publish.blogger.tags', source);
+    if (source === 'computed:series.tags') {
+      recordFallback(
+        meta,
+        'publish.blogger.tags',
+        'computed:series.tags',
+        'inherited from series.tags (post.tags empty)',
+      );
+    }
   }
 
   // ─── 組裝最終物件 ────────────────────────────────────────
