@@ -666,7 +666,7 @@ series.resolved        ← computed:settings-lookup
 | 候選批次 | 範圍 | 依賴 |
 | --- | --- | --- |
 | Phase 8-f-N（FB .txt 顯示）| `facebook-post.ejs` / `facebook-summary.ejs` 顯示 manifest 中之 `titleEn` / `fbTitleEn` / `seriesResolvedTitle`（需考量文案長度與 SEO / 搜尋一致性） | manifest additive 欄位（已落地） |
-| Phase 8-f-N（site default hashtags） | site 層級之 default hashtags 作為最終 fallback | 需設計 settings 欄位（如 `site.config.json defaultHashtags`） |
+| ~~Phase 8-f-N（site default hashtags）~~ | ~~site 層級之 default hashtags 作為最終 fallback~~ | ✅ 已於 **Phase 8-g-19-b** 規格化為 `promotion.facebook.defaultHashtags`（位於 `content/settings/promotion.config.json`，**非** `site.config.json`；格式含 `#`；為 FB promotion 最終 fallback，位於 `series.hashtags` 之後；**與 `series.tags`（Blogger tags inheritance；Phase 8-g-18）無關**）；完整規格詳見 `docs/promotion-export.md` §11；normalize 接入屬 **Phase 8-g-19-c** 後續批次 |
 | Phase 8-f-N（first article .fb.md hashtags fallback） | 同系列第一篇之 .fb.md hashtags 作為次級 fallback（series-schema §8.2 之 fallback 2） | 需跨文章查找；複雜度較高 |
 | ~~Phase 8-f-9~~ | ~~`new-post.js` 加 series 區塊 + `type` → `contentKind` 修正~~ | ✅ 已於 Phase 8-g-2-b1 / b2 落地；詳見 **§20** |
 | ~~Phase 8-f-10~~ | ~~`new-post.js` 自動建議 `series.number`（補缺號 / max+1；§5 規格化邏輯實作）~~ | ✅ 已於 Phase 8-g-2-c-b / c-c 落地，採 stderr-only 保守路線；詳見 **§20** |
@@ -983,7 +983,7 @@ if (
 
 ### 19.7 未來候選
 
-- **site default hashtags**：作為最終 fallback（在 series.hashtags 之後）；需設計 `site.config.json` 或專屬 settings 欄位
+- ~~**site default hashtags**：作為最終 fallback（在 series.hashtags 之後）；需設計 `site.config.json` 或專屬 settings 欄位~~ → **已於 Phase 8-g-19-b 規格化為 `promotion.facebook.defaultHashtags`**（位於 `content/settings/promotion.config.json`，**非** `site.config.json`；含 `#`；FB promotion only；與 `series.tags`（Phase 8-g-18）無關；詳見 `docs/promotion-export.md` §11）；本 §19.7 條目保留歷史脈絡。normalize 接入屬 Phase 8-g-19-c 後續批次。
 - **first article .fb.md hashtags fallback**：series-schema §8.2 之 fallback 2；需跨文章查找邏輯（識別「同系列 series.number 最小者」），複雜度較高
 - ~~**Blogger `post.tags` inheritance**：若未來要實作，應另行設計 slug 格式（如 `series.tags` 短 slug 欄位），**不應直接沿用 FB `#hashtags` 格式**~~ → **已於 Phase 8-g-18-b 規格化為 `series.tags` 欄位**（詳見 §22）；本 §19.7 條目保留歷史脈絡。normalize / build-blogger 接入屬 Phase 8-g-18-c / 8-g-18-d 後續批次。
 
