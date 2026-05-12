@@ -232,7 +232,7 @@ per `docs/phase-8g-candidate-analysis.md` §6 + 各 Phase 8-g 子批次落地：
 | 3 | series number gap filling 規則 | ✅ `landed` | Phase 8-g-2-c-b / c-c 落地（stderr-only 保守路線）|
 | 4 | FB `.txt` 顯示 `titleEn` / `seriesResolvedTitle` | `not recommended` | per Phase 8-f-6-a 既有保守決策（FB 字長受限）|
 | **5** | **site default hashtags（`promotion.facebook.defaultHashtags` 為 FB hashtags fallback chain step 4）** | ✅ **`landed`** | Phase 8-g-19 系列落地（2 commits）；詳見 §3.13：<br>① `docs/promotion-export.md` §11：`promotion.facebook.defaultHashtags` 規格（commit `092ac56`）<br>② `src/scripts/normalize-post-output.js`：FB hashtags fallback chain step 4 接入（commit `dc64a3f`）|
-| 6 | first article `.fb.md` hashtags fallback | `candidate` | 未進讀取分析 |
+| 6 | first article `.fb.md` hashtags fallback | ⏸ **`nice-to-have / Phase 8-h+`**（per Phase 8-g-20-a 讀取分析 + Phase 8-g-20-final 保守延後決策）| 屬「跨文章查找邏輯」之 implicit ergonomic shortcut；**不屬 Phase 8-g 必要收尾**；既有 explicit FB hashtags fallback chain（Phase 8-f-7-b `series.hashtags` / Phase 8-g-19 `defaultHashtags` / Phase 8-g-18 `series.tags`（Blogger 獨立 namespace） / Phase 8-g-17 series report visibility）已覆蓋主要使用情境；§8.2 之 fallback 2 spec 概念保留但**尚未接入 normalize chain**；未來若要落地需先補完整 docs spec（trigger conditions / self-ref guard / tie-break / draft 排除 / cross-site 邊界皆 underspecified）|
 | **7** | **Blogger tags inheritance（`series.tags` 繼承為 Blogger `post.tags`）** | ✅ **`landed`** | Phase 8-g-18 系列落地（3 commits）；詳見 §3.12：<br>① `docs/series-schema.md` §22：`series.tags` 短 slug 規格化（commit `15c8252`）<br>② `src/scripts/normalize-post-output.js`：寫入 `normalized.publish.blogger.tags`（commit `48b90af`）<br>③ `src/scripts/build-blogger.js`：normalized 優先 + legacy `post.tags` fallback（commit `a66da18`）|
 | 8 | H1 接 series `titleTemplate` | `not recommended` | per Phase 8-f-5-c §17.3 既有保守決策（SEO 風險 / 字長風險）|
 | C | docs cross-link 補強 | ✅ `landed` | Phase 8-g-4-b / 4-c 落地；§5.2.6 `fb-sidecar-schema.md` 經 Phase 8-g-11 維持保守 |
@@ -415,7 +415,7 @@ Phase 8-g-18 將原 §3.1 candidate 7（Blogger tags inheritance）由 `candidat
 #### 3.12.5 未來可選補強（不在本批 scope）
 
 - ~~candidate 5（site default hashtags）— 未進讀取分析；屬獨立批次~~ ✅ 已於 Phase 8-g-19 系列落地（commits `092ac56` + `dc64a3f`）；詳見 §3.13
-- candidate 6（系列首篇 `.fb.md` hashtags fallback）— 未進讀取分析；屬獨立批次
+- ~~candidate 6（系列首篇 `.fb.md` hashtags fallback）— 未進讀取分析；屬獨立批次~~ → ⏸ **已於 Phase 8-g-20-a 讀取分析後保守延後為 `nice-to-have / Phase 8-h+`**（per Phase 8-g-20-final docs sync）；詳見 §5.5
 - 退場 `build-blogger.js` 之 legacy `post.tags` fallback — 屬 Phase 8-h 或更晚（與 `load-posts.js` `contentKind ?? type` / `validate-content.js` `frontmatter-uses-deprecated-type` / `parse-markdown.js` H1 → H2 同屬相容層退場大型工作）
 - `series.tags` 接入 GitHub tags inheritance — per §22.6 `series.tags` scope 限於 Blogger；若未來 GitHub 端要做類似繼承，應另設計（如 `series.githubTags` 或共用 `series.tags`）；屬獨立讀取分析批次
 
@@ -510,7 +510,7 @@ Phase 8-g-19 將原 §3.1 candidate 5（site default hashtags）由 `candidate` 
 
 #### 3.13.6 未來可選補強（不在本批 scope）
 
-- candidate 6（系列首篇 `.fb.md` hashtags fallback）— 需跨文章查找邏輯（識別「同系列 series.number 最小者」）；複雜度較高；屬獨立讀取分析批次
+- ~~candidate 6（系列首篇 `.fb.md` hashtags fallback）— 需跨文章查找邏輯（識別「同系列 series.number 最小者」）；複雜度較高；屬獨立讀取分析批次~~ → ⏸ **已於 Phase 8-g-20-a 讀取分析後保守延後為 `nice-to-have / Phase 8-h+`**（per Phase 8-g-20-final docs sync）；詳見 §5.5
 - 退場 `normalize-post-output.js` 之 legacy frontmatter `promotion.facebook.hashtags` fallback — 屬 Phase 8-h（與 source code 層 legacy `post.tags` fallback / `load-posts.js` `contentKind ?? type` / `parse-markdown.js` H1 → H2 同屬相容層退場大型工作）
 - 作者實際填入 `promotion.config.json` 之 `defaultHashtags` 值 — 屬 author-driven content 決策；不在本 candidate 落地必要 scope；可獨立操作
 
@@ -543,11 +543,12 @@ per `docs/phase-8g-candidate-analysis.md` §6 + `docs/future-roadmap.md` §5：
 
 | # | 候選 | 性質 | 影響面 |
 |---|---|---|---|
-| 6 | 系列首篇 `.fb.md` hashtags fallback | normalize-post-output 改 | promotion baseline |
+| —（本層級當前無待辦項；candidate 5 / 6 / 7 皆已收尾）| — | — | — |
 
 > ~~series report `dist-reports/series-report.{txt,json}`~~：✅ 已於 Phase 8-g-17-b 落地（commit `f21da58`）；詳見 §3.11；從本表移除。
 > ~~7 Blogger tags inheritance~~：✅ 已於 Phase 8-g-18 系列落地（commits `15c8252` + `48b90af` + `a66da18`）；詳見 §3.12；從本表移除。**`series.tags` 為 Blogger 專用短 slug 欄位（不含 `#`）；與 `series.hashtags`（FB promotion 專用）嚴格分離；legacy `post.tags` fallback 保留**。
 > ~~5 site default hashtags~~：✅ 已於 Phase 8-g-19 系列落地（commits `092ac56` + `dc64a3f`）；詳見 §3.13；從本表移除。**`promotion.facebook.defaultHashtags` 為 FB hashtags fallback chain step 4（site-level）；與 `series.hashtags`（series-level）/ `series.tags`（Blogger）嚴格分離；含 `#`；不影響 Blogger / GitHub tags**。
+> ~~6 first article `.fb.md` hashtags fallback~~：⏸ 已於 **Phase 8-g-20-a 讀取分析 + Phase 8-g-20-final docs sync** 後保守延後為 **`nice-to-have / Phase 8-h+`** 候選；屬「跨文章查找邏輯」之 implicit ergonomic shortcut；**不屬 Phase 8-g 必要收尾**；既有 explicit FB hashtags fallback chain（Phase 8-f-7-b `series.hashtags` / Phase 8-g-19 `defaultHashtags` / Phase 8-g-18 `series.tags`（Blogger 獨立） / Phase 8-g-17 series report visibility）已覆蓋主要使用情境；§8.2 之 fallback 2 spec 概念保留但**尚未接入 normalize chain**；未來若要落地需先補完整 docs spec；詳見 §5.5 之 deferred 條目。**從本表移除**。
 
 ### 5.3 not recommended
 
@@ -571,6 +572,25 @@ per `docs/phase-8g-candidate-analysis.md` §6 + `docs/future-roadmap.md` §5：
 - **`export-build-report.js` aggregator 補 series sub-summary**：屬 nice-to-have；本批 Phase 8-g-17-b 之刻意 scope 邊界；可獨立後續批次
 - **`docs/series-schema.md` 新節記錄 series report 規格**：屬 nice-to-have；本批 Phase 8-g-17-c 之刻意 scope 邊界（per spec 不修 series-schema）
 - **series report 之 sidecar 讀取**：擴讀 `.publish.json` 以提供更精準 `publishedAt` / `publishedUrl`；屬 nice-to-have
+- ⏸ **candidate 6 first article `.fb.md` hashtags fallback**（per series-schema.md §8.2 之 fallback 2 spec 概念）：屬 **nice-to-have / Phase 8-h+** 候選；經 **Phase 8-g-20-a 讀取分析 + Phase 8-g-20-final docs sync** 後保守延後不在 Phase 8-g 內落地。決策依據：
+  - **屬 implicit ergonomic shortcut**（「作者於系列首篇 `.fb.md` 設 hashtags 後，其他同系列文章自動繼承」），**不屬 Phase 8-g 必要收尾**
+  - **既有 explicit FB hashtags fallback chain 已覆蓋主要使用情境**：
+    - **Phase 8-f-7-b `series.hashtags`**（series-level explicit；於 `content/settings/series.json` 或 frontmatter override；chain step 3）
+    - **Phase 8-g candidate 5 `promotion.facebook.defaultHashtags`**（site-level explicit；於 `content/settings/promotion.config.json`；chain step 4）
+    - **Phase 8-g candidate 7 `series.tags`**（Blogger 獨立 namespace；per §22.5 分離原則；不與 FB hashtags 互通）
+    - **Phase 8-g-17 series report visibility**（dual-channel；標示 series 缺漏與 unresolved；補上「作者忘了設 series.hashtags」之偵測）
+  - **§8.2 既有 spec 概念保留**（series.hashtags 之 fallback 2 為「同系列第一篇文章之 `.fb.md` `hashtags`」之語意層概念），但 **尚未接入 normalize chain**（既有 5 段 chain 為 step 1-4 + `[]`；本 candidate 之 step 4 first-article backfill 未實作）
+  - **未來若要落地需先補完整 docs spec**：trigger conditions / self-reference guard / duplicate `series.number` tie-break / `draft` 排除 / cross-site lookup（github vs blogger）/ chain 插入位置（建議 step 4，將 defaultHashtags 推至 step 5）等多處 underspecified；屬「規格層待補完」之 candidate，不應在 spec 不足時硬實作
+  - **架構成本高**：normalize-post-output.js 為 per-post 純函式（per `src/scripts/normalize-post-output.js` line 111；接收單一 post + settings）；跨文章 lookup 需破壞此設計（4th param `seriesContext` / second-pass walker / 或移至 build-promotion.js）；屬「Phase 8-g 第一次出現之跨文章邏輯」，與 Phase 8-g「不擴大 customer-facing surface + 不影響 dist baseline + 小批次保守」風格不符
+  - **fixture 驗證受 Phase 8-g-1 deferred 阻擋**：candidate 6 為跨文章邏輯；單篇 fixture 無法驗證；dual-fixture 需多篇同 series.id 之 sample posts；屬 `_sample-` 內容會被 build 掃到之部署風險；依 Phase 8-g-1 deferred 既有決策保留
+  - **作者心智模型負擔**：5 → 6 段 chain；非首篇之作者修改 `.fb.md.hashtags` 時不會預期「首篇之 hashtags 會被自動套用」之語意；屬「降低明確性」之 trade-off
+  - **建議**：列為 nice-to-have / Phase 8-h+ 候選；若未來作者實際有「系列首篇定義 hashtags 後其他篇自動繼承」之強需求，再開獨立 spec 批次釘死規格後實作
+
+> ~~`docs/publish-bundle.md` §7.5 / §7.6 / §7.7 過時描述對齊~~：✅ 已於 Phase 8-g-13 / 14 落地
+> ~~`titleTemplate unresolved` 升級為 user-visible warning~~：✅ 已於 Phase 8-g-12 落地
+> ~~series report~~：✅ 已於 Phase 8-g-17-b 落地
+> ~~candidate 7 Blogger tags inheritance（`series.tags`）~~：✅ 已於 Phase 8-g-18 系列落地（commits `15c8252` + `48b90af` + `a66da18`）；詳見 §3.12
+> ~~candidate 5 site default hashtags（`promotion.facebook.defaultHashtags`）~~：✅ 已於 Phase 8-g-19 系列落地（commits `092ac56` + `dc64a3f`）；詳見 §3.13
 
 > ~~`docs/publish-bundle.md` §7.5 / §7.6 / §7.7 過時描述對齊~~：✅ 已於 Phase 8-g-13 / 14 落地
 > ~~`titleTemplate unresolved` 升級為 user-visible warning~~：✅ 已於 Phase 8-g-12 落地
@@ -590,8 +610,9 @@ per `docs/phase-8g-candidate-analysis.md` §6 + `docs/future-roadmap.md` §5：
 
 依優先序：
 
-1. **candidate 6**（系列首篇 `.fb.md` hashtags fallback）：建議獨立讀取分析批次；屬「跨文章查找邏輯」（識別「同系列 series.number 最小者」之 `.fb.md.hashtags`）；複雜度高於 candidate 5 之 settings lookup；屬 series-schema §8.2 之 fallback 2 候選；本批不接（candidate 5 已於 Phase 8-g-19 系列落地，詳見 §3.13）
+1. ⏸ **candidate 6 已於 Phase 8-g-20 系列保守延後**（per Phase 8-g-20-a 讀取分析 + Phase 8-g-20-final docs sync；改列為 `nice-to-have / Phase 8-h+`；詳見 §5.5）；**不在 Phase 8-g 下一步建議範圍**
 2. **source code 層 legacy fallback 退場**（Phase 8-h 或更晚）；含 `load-posts.js` `contentKind ?? type` / `validate-content.js` `frontmatter-uses-deprecated-type` / `parse-markdown.js` H1 → H2 / `build-blogger.js` legacy `post.tags` fallback / `normalize-post-output.js` legacy frontmatter `promotion.facebook.hashtags` fallback（per §3.12.4 / §3.13.5 保守邊界）
+3. **其他 nice-to-have 候選**（皆屬可選；非必要）：`export-build-report.js` aggregator 補 series sub-summary / `docs/series-schema.md` 新節記錄 series report 規格 / series report 之 sidecar 讀取 / 作者於 `promotion.config.json` 實際填入 `defaultHashtags` 值（屬 author-driven content 決策）/ candidate 6 first-article fallback（per §5.5 之 nice-to-have / Phase 8-h+ 條目；需先補完整 docs spec 釘死規格）
 
 ### 6.3 建議暫緩
 
