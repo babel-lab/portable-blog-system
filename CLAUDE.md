@@ -1116,6 +1116,7 @@ affiliate:
 
 See also:
 - `docs/book-schema.md`（書籍 / 雜誌 / 來源實體 metadata 完整規格；含 `book.mediaType` / `book.titleEn` / `book.volume` / `book.issue` / `book.authors[]` / `book.publishedYear` 等 additive 欄位字典與 fallback chain）
+- `docs/phase-9f-c-completion-report.md`（Phase 9-f-c **子系列**收尾紀錄：Blogger manual posting helper —— copy-helper [12] book metadata 區塊 + publish-checklist book-review / magazine 內容檢查區塊；含 4 commits + 2 純分析；⚠️ 註：本**子系列**收尾**不等於** Phase 9-f 整體收尾 —— Phase 9-f-e / 9-f-f / 9-f-g 仍未啟動，Phase 9 overall 仍 🔄 進行中）
 
 ---
 
