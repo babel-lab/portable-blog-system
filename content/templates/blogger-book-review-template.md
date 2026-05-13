@@ -1,30 +1,27 @@
 ---
 id: "{YYYYMMDD-slug}"
-site: "github"
-contentKind: "tech-note"
-primaryPlatform: "github"
-title: "文章標題"
-titleEn: "GitHub Pages Free Hosting Limits and Blog Planning"
-slug: "github-pages-blog-planning"
-date: "2026-05-04"
-updated: "2026-05-04"
+site: "blogger"
+contentKind: "book-review"
+primaryPlatform: "blogger"
+title: "《書名》讀後心得"
+titleEn: ""
+slug: "{book-slug}"
+date: "{YYYY-MM-DD}"
+updated: "{YYYY-MM-DD}"
 author: "Dean"
-category: "tech-note"
-tags: ["github", "vite", "static-site"]
-description: "整理 GitHub Pages 免費空間限制與可搬家部落格規劃。"
-searchDescription: "GitHub Pages 免費空間、Vite 靜態網站、Markdown 部落格、Google AdSense 與搬家規劃。"
+category: "book-review"
+tags: ["book"]
+description: "{書評摘要；2-3 句話}"
+searchDescription: "{搜尋說明；含書名 / 作者 / 核心關鍵字}"
 cover: ""
 coverAlt: ""
 status: "draft"
 draft: true
 canonical: "auto"
 publishTargets:
-  github:
-    enabled: true
-    mode: "full"
   blogger:
     enabled: true
-    mode: "summary"
+    mode: "full"
 blocks:
   toc: false
   adsenseTop: true
@@ -34,6 +31,31 @@ blocks:
   socialFollow: true
   relatedPosts: true
   sidebar: true
+book:
+  title: ""
+  titleEn: ""
+  originalTitle: ""
+  author: ""
+  authors:
+    - displayName: ""
+      localName: ""
+      originalName: ""
+      role: "author"
+  publisher: ""
+  publishedYear: null
+  volume: null
+  volumeLabel: ""
+  isbn: ""
+  coverImage: ""
+  coverAlt: ""
+  showBookPhoto: true
+affiliate:
+  enabled: true
+  disclosure: "本文包含聯盟行銷連結。若你透過連結購買，本站可能取得少量回饋。"
+  position:
+    top: true
+    bottom: true
+  links: []
 promotion:
   facebook:
     enabled: false
@@ -45,5 +67,4 @@ promotion:
     note: ""
 ---
 
-這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。
-
+請在此撰寫書評內容。
