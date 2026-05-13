@@ -43,6 +43,11 @@ const VALID_CANONICAL_RE = /^https?:\/\//;
 //   - 缺省值為 "book"（per docs/book-schema.md §5.1；於 getBookMediaType 處理）
 const VALID_BOOK_MEDIA_TYPE = new Set(['book', 'magazine']);
 
+// Phase 9-e-d-c：book authors role 列舉
+//   - 列舉值 per docs/book-schema.md §4.5
+//   - role 缺省為 "author"（於 book-authors-invalid-role 規則內處理：undefined 不觸發）
+const VALID_BOOK_AUTHOR_ROLE = new Set(['author', 'translator', 'illustrator', 'editor', 'other']);
+
 // Phase 8-b-6：sidecar / frontmatter 欄位衝突 warning 之欄位清單
 //   採 presence-only 檢查（兩邊都有同名欄位即 warn，不比較值）；
 //   sidecar 不存在或 sidecar data 缺漏時略過該 sidecar 之檢查。
@@ -93,6 +98,22 @@ function isNonEmptyString(value) {
 function getBookMediaType(book) {
   if (!book || typeof book !== 'object' || Array.isArray(book)) return undefined;
   return book.mediaType === undefined ? 'book' : book.mediaType;
+}
+
+// Phase 9-e-d-c：book authors / volume / publishedYear validate helpers（inline）
+//   - isIntegerOrNull：integer 或 null 視為合法；用於 volume / publishedYear 型別檢查
+//   - hasAnyAuthorName：authorEntry 之 displayName / localName / originalName 任一為 non-empty trimmed string；
+//     authorEntry 非 plain object 時返回 false（呼叫者已加前置 guard）
+function isIntegerOrNull(value) {
+  return value === null || Number.isInteger(value);
+}
+function hasAnyAuthorName(authorEntry) {
+  if (!authorEntry || typeof authorEntry !== 'object' || Array.isArray(authorEntry)) return false;
+  return (
+    isNonEmptyString(authorEntry.displayName) ||
+    isNonEmptyString(authorEntry.localName) ||
+    isNonEmptyString(authorEntry.originalName)
+  );
 }
 
 // Phase 8-c-3：FB sidecar placeholder / content 之 status × severity 矩陣
@@ -469,6 +490,83 @@ export function validateContent({ posts, settings }) {
             sourcePath,
             value: `book.issn is set but mediaType="${effectiveMediaType}"`,
           });
+        }
+
+        // Phase 9-e-d-c：book.volume 型別檢查（warning-only）
+        //   - book.volume 存在但非 integer / 非 null → book-volume-invalid-type
+        //   - undefined 不觸發；null 合法；integer 合法；
+        //     其他（string / float / boolean / array / object）→ warning
+        if (book.volume !== undefined && !isIntegerOrNull(book.volume)) {
+          issues.push({
+            severity: 'warning',
+            type: 'book-volume-invalid-type',
+            sourcePath,
+            value:
+              typeof book.volume === 'number'
+                ? `${book.volume} (non-integer)`
+                : `typeof=${typeof book.volume}`,
+          });
+        }
+
+        // Phase 9-e-d-c：book.publishedYear 型別檢查（warning-only）
+        //   - mirror book.volume 型別檢查
+        if (book.publishedYear !== undefined && !isIntegerOrNull(book.publishedYear)) {
+          issues.push({
+            severity: 'warning',
+            type: 'book-published-year-invalid-type',
+            sourcePath,
+            value:
+              typeof book.publishedYear === 'number'
+                ? `${book.publishedYear} (non-integer)`
+                : `typeof=${typeof book.publishedYear}`,
+          });
+        }
+
+        // Phase 9-e-d-c：book.authors[] role 列舉值檢查（warning-only）
+        //   - book.authors 為 array 時逐 entry 檢查 role
+        //   - role === undefined 不觸發（缺省為 "author"，per docs/book-schema.md §4.5）
+        //   - role 存在但不在 VALID_BOOK_AUTHOR_ROLE → warning
+        //   - authors 非 array 不處理（per 9-e-d-c 限制：不新增 book-authors-invalid-type）
+        if (Array.isArray(book.authors)) {
+          for (let i = 0; i < book.authors.length; i++) {
+            const entry = book.authors[i];
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+              if (entry.role !== undefined && !VALID_BOOK_AUTHOR_ROLE.has(entry.role)) {
+                issues.push({
+                  severity: 'warning',
+                  type: 'book-authors-invalid-role',
+                  sourcePath,
+                  value:
+                    typeof entry.role === 'string'
+                      ? `authors[${i}].role="${entry.role}"`
+                      : `authors[${i}].role typeof=${typeof entry.role}`,
+                });
+              }
+            }
+          }
+        }
+
+        // Phase 9-e-d-c：book.authors[] entry 空名稱檢查（warning-only）
+        //   - book.authors 為 array 時逐 entry 檢查；entry 為 plain object 時：
+        //     displayName / localName / originalName 全空 → warning
+        //   - **legacy fallback 邊界**：當 i === 0 且 legacy book.author 為 non-empty string 時
+        //     不觸發（per docs/book-schema.md §7.1：第 0 位作者可 fallback 到 legacy book.author）
+        //   - i ≥ 1 不適用此 fallback（per §7.1：第 1 位以後不回頭抓 legacy book.author）
+        if (Array.isArray(book.authors)) {
+          for (let i = 0; i < book.authors.length; i++) {
+            const entry = book.authors[i];
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+              if (!hasAnyAuthorName(entry)) {
+                if (i === 0 && isNonEmptyString(book.author)) continue;
+                issues.push({
+                  severity: 'warning',
+                  type: 'book-authors-entry-empty',
+                  sourcePath,
+                  value: `authors[${i}] has no displayName / localName / originalName`,
+                });
+              }
+            }
+          }
         }
       }
     }
