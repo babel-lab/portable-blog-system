@@ -115,3 +115,77 @@ canonical URL（已含 blogger→github UTM）：
 - 本區塊僅為人工貼文輔助；本系統不取代 [1] Blogger 標題之原 post.title
 - 若 series.json 或 frontmatter series 欄位有變動，下次 build 會自動更新本區塊
 <% } %>
+<%# Phase 9-f-c-b：書籍 / 內容來源 metadata 區塊（書評類文章參考） -%>
+<%# - 僅當 post.book 為 plain object 時顯示；無 book block 之 post → 本區塊不渲染 → byte-identical -%>
+<%# - mediaType-aware：book / magazine 顯示不同欄位組合（per docs/book-schema.md §5.2） -%>
+<%# - 空欄位不顯示（mirror CLAUDE.md §12「不輸出空白區塊」精神 + report-book.js 欄位呈現原則） -%>
+<%# - authors[] fallback chain inline 實作（per docs/book-schema.md §7.1；不接 normalize-post-output） -%>
+<%# - 不接 build pipeline 之 normalize；EJS 直接讀 post.book（plumbing 已由 build-blogger.js renderCopyHelper 提供） -%>
+<%# - subtitle 未列入第一版（per Phase 9-f-c-b spec C：docs §9 列為 future candidate 未正式定義） -%>
+<%# - legacy book.author 僅作 authors[0] 之 fallback；不獨立輸出 -%>
+<%# - 所有 EJS 標籤採 trim-newline 模式：non-book post 之 copy-helper.txt 對本區塊前後完全 byte-identical -%>
+<% if (post.book && typeof post.book === 'object' && !Array.isArray(post.book)) { -%>
+  const book = post.book;
+  const mediaTypeExplicit = book.mediaType !== undefined;
+  const effectiveMediaType = mediaTypeExplicit ? book.mediaType : 'book';
+  const isBook = effectiveMediaType === 'book';
+  const isMagazine = effectiveMediaType === 'magazine';
+
+  const isNonEmptyStr = function(v) { return typeof v === 'string' && v.trim() !== ''; };
+
+  function resolveAuthor(entry, index) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    let name = null;
+    if (isNonEmptyStr(entry.displayName)) name = entry.displayName.trim();
+    else if (isNonEmptyStr(entry.localName)) name = entry.localName.trim();
+    else if (isNonEmptyStr(entry.originalName)) name = entry.originalName.trim();
+    else if (index === 0 && isNonEmptyStr(book.author)) name = book.author.trim();
+    if (name === null) return null;
+    return { name: name, role: typeof entry.role === 'string' ? entry.role : 'author' };
+  }
+
+  const authorEntries = [];
+  if (Array.isArray(book.authors) && book.authors.length > 0) {
+    for (let i = 0; i < book.authors.length; i++) {
+      const r = resolveAuthor(book.authors[i], i);
+      if (r !== null) authorEntries.push(r);
+    }
+  } else if (isNonEmptyStr(book.author)) {
+    authorEntries.push({ name: book.author.trim(), role: 'author' });
+  }
+  const authorsStr = authorEntries.map(function(e) {
+    return e.role === 'author' ? e.name : (e.name + '（' + e.role + '）');
+  }).join('、');
+
+  const lines = [];
+  lines.push('媒體類型（mediaType）：' + effectiveMediaType + (mediaTypeExplicit ? '' : ' (default)'));
+  if (isNonEmptyStr(book.title)) lines.push('書名／刊名（title）：' + book.title);
+  if (isNonEmptyStr(book.titleEn)) lines.push('英文書名／刊名（titleEn）：' + book.titleEn);
+  if (isNonEmptyStr(book.originalTitle)) lines.push('原文書名／刊名（originalTitle）：' + book.originalTitle);
+  if (authorsStr !== '') lines.push('作者（authors）：' + authorsStr);
+  if (isNonEmptyStr(book.publisher)) lines.push('出版社（publisher）：' + book.publisher);
+  if (typeof book.publishedYear === 'number') lines.push('出版年（publishedYear）：' + book.publishedYear);
+  if (isBook && isNonEmptyStr(book.isbn)) lines.push('ISBN（isbn）：' + book.isbn);
+  if (isMagazine && isNonEmptyStr(book.issn)) lines.push('ISSN（issn）：' + book.issn);
+  if (isMagazine && isNonEmptyStr(book.issue)) lines.push('期數（issue）：' + book.issue);
+  if (isBook && (typeof book.volume === 'number' || isNonEmptyStr(book.volumeLabel))) {
+    const hasV = typeof book.volume === 'number';
+    const hasL = isNonEmptyStr(book.volumeLabel);
+    let str;
+    if (hasV && hasL) str = book.volume + '（' + book.volumeLabel + '）';
+    else if (hasV) str = String(book.volume);
+    else str = book.volumeLabel;
+    lines.push('集數／卷數（volume）：' + str);
+  }
+%>
+
+----------------------------------------
+[12] 書籍 / 內容來源 metadata（書評類文章參考）
+----------------------------------------
+<%= lines.join('\n') %>
+
+提示：
+- 上述為 .md frontmatter book block 之直接傾印，供 Blogger 後台貼文時對照
+- 空欄位（缺漏）未顯示；請於 .md frontmatter 補齊
+- 完整欄位字典詳見 docs/book-schema.md §4
+<% } -%>
