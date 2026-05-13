@@ -23,6 +23,7 @@
     "report:missing-tags": "node src/scripts/report-missing-tags.js",
     "report:urls": "node src/scripts/report-published-urls.js",
     "report:series": "node src/scripts/report-series.js",
+    "report:book": "node src/scripts/report-book.js",
     "check:links": "node src/scripts/check-broken-links.js",
     "check:images": "node src/scripts/check-image-links.js"
   },
