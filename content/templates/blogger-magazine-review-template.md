@@ -1,16 +1,16 @@
 ---
-id: "20260504-sample-book-review"
+id: "{YYYYMMDD-slug}"
 site: "blogger"
 contentKind: "book-review"
 primaryPlatform: "blogger"
-title: "書評文章範例"
-slug: "sample-book-review"
-date: "2026-05-04"
-updated: "2026-05-04"
+title: "{雜誌名}{期別}讀後筆記"
+slug: "{magazine-slug-yyyy-mm}"
+date: "{YYYY-MM-DD}"
+updated: "{YYYY-MM-DD}"
 author: "Dean"
 category: "book-review"
-tags: ["book"]
-description: "Blogger 書評文章範例。"
+tags: ["magazine"]
+description: "{雜誌特輯讀後筆記摘要}"
 status: "draft"
 draft: true
 publishTargets:
@@ -18,6 +18,7 @@ publishTargets:
     enabled: true
     mode: "full"
 book:
+  mediaType: "magazine"
   title: ""
   titleEn: ""
   originalTitle: ""
@@ -26,12 +27,11 @@ book:
     - displayName: ""
       localName: ""
       originalName: ""
-      role: "author"
+      role: "editor"
   publisher: ""
   publishedYear: null
-  volume: null
-  volumeLabel: ""
-  isbn: ""
+  issue: ""
+  issn: ""
   coverImage: ""
   coverAlt: ""
   showBookPhoto: true
@@ -42,6 +42,15 @@ affiliate:
     top: true
     bottom: true
   links: []
+promotion:
+  facebook:
+    enabled: false
+    page: "fan1"
+    title: ""
+    message: ""
+    target: "auto"
+    hashtags: []
+    note: ""
 ---
 
-請在此撰寫書評內容。
+請在此撰寫雜誌特輯讀後筆記。
