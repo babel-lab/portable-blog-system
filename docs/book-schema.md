@@ -727,4 +727,99 @@ Phase 9-e-d-d-b（commit `63aa497`）落地 **7 個 fixtures** 於 `content/vali
 
 ---
 
+## §12 Visibility / report channel（Phase 9-f-b-1 落地）
+
+### 12.1 範圍與性質
+
+於 Phase 9-f-b-1（commit `de6071a`），book metadata 之 **visibility / diagnostic report** 落地。屬 **visibility channel**，與既有 validate channel（§11）形成 **dual-channel**：
+
+- 屬 **visibility / diagnostic**，**不**屬 **blocking validation**
+- **不**新增 warning / error
+- **不**影響 `npm run validate:content` 之 exit code
+- **不**阻擋 build
+- **不**接 `build:github` / `build:blogger` / `build:promotion` / `build:sitemap`
+- **不**修改任何 content / settings / docs / source
+- **不**重複觸發既有 7 條 validate warnings（per §11.2）
+
+### 12.2 Phase 9-f-b-1 落地內容
+
+| 項目 | 內容 |
+| --- | --- |
+| 新增 script | `src/scripts/report-book.js`（411 行；mirror Phase 8-g-17-b `src/scripts/report-series.js` pattern）|
+| 新增 npm script | `package.json` 加入 `"report:book": "node src/scripts/report-book.js"` |
+| commit | `de6071a` `feat(phase-9): add book report script (9-f-b-1)` |
+| 觸發 | `npm run report:book` |
+| 輸出 | `dist-reports/book-report.txt`（human-readable）+ `dist-reports/book-report.json`（machine-readable）|
+| dist-reports 版控 | ❌ gitignored；**不納入 commit**（per `.gitignore` 既有規則 + Phase 8-g-17-c series report 模式）|
+
+### 12.3 報告用途
+
+book report 提供作者人工檢視書評 / 雜誌 metadata 完整性之 **5 大面向**：
+
+1. **所有 book metadata posts 之集中盤點**（依 `frontmatter.book` 為 plain object 過濾）
+2. **mediaType 分組視圖**（依 effective mediaType；`"book"` / `"magazine"`；缺省為 `"book"`）
+3. **書籍欄位逐一展示**：`book.title` / `titleEn` / `originalTitle` / `subtitle` / `authors` / `publisher` / `publishedYear` / `isbn` / `issn` / `volume` / `volumeLabel` / `issue`
+4. **authors fallback chain 解析後之 display 名稱**（per §7.1 之 5 步 fallback；inline 實作於 `report-book.js`，不接 normalize-post-output）
+5. **missing 欄位摘要**（共通：`title` / `authors` / `publisher` / `publishedYear`；book 專屬：`isbn`；magazine 專屬：`issn` / `issue`；含 per-post 與 全 report `missingTotals` 兩層）
+
+### 12.4 報告輸出格式
+
+#### 12.4.1 txt（human-readable）
+
+- header（`generatedAt` / `totalPosts` / `totalGroups`）
+- visibility / 範圍說明
+- `Missing fields summary`（全 report 各 missing 欄位之總數）
+- 依 mediaType 分群之 `--- mediaType = ... ---` 區段
+- 每 post entry：status / 書名 / source path / site / slug / contentKind / book.* 欄位 / authors / missing list（以 `⚠` 標示）
+- 空欄位**不顯示**（per CLAUDE.md §12 既有「不輸出空白區塊」精神）
+
+#### 12.4.2 json（machine-readable）
+
+- `generatedAt` / `totalPosts` / `totalGroups`
+- `missingTotals`：各 missing 欄位之全 report 計數 map
+- `groups[]`：每 mediaType 之 `{ mediaType, postsLength, missingCount, posts[] }`
+- `posts[]` 內含原始 frontmatter book 欄位之拷貝 + `authors`（resolved summary）+ `missing[]`
+
+### 12.5 與 validate channel 之 dual-channel 關係
+
+| 維度 | report channel（本節）| validate channel（§11）|
+| --- | --- | --- |
+| 觸發 | `npm run report:book` | `npm run validate:content` |
+| 範圍 status | draft + ready + published | ready + published only |
+| draft 含否 | ✅ 含 | ❌ 不含（per `load-posts` 過濾 + validate `READY_STATUS` 守門）|
+| 影響 exit code | ❌ 不影響（純 visibility）| ✅ 影響（warning-only → exit 0；error → exit 1）|
+| 新增 warning / error | ❌ 不新增 | ✅ 7 條 warning-only（per §11.2）|
+| 接 build pipeline | ❌ 不接 | ❌ 不接（validate 亦獨立）|
+| 修改 content | ❌ 不改 | ❌ 不改 |
+| 與另一 channel 互補性 | 提供 visibility / 設計階段檢視 | 提供 release-gate / 結構檢查 |
+
+**重要邊界**：本節之 **report 規則屬 diagnostic visibility，不應寫成 validate rules**。任何 missing / problematic 欄位之偵測**僅作報告呈現**；要進入 validate 之 blocking gate 需經 §11 之獨立決策路徑與 warning-only rule 規劃（per Phase 9-e-d-a 之候選評估流程）。
+
+### 12.6 目前驗證結果（Phase 9-f-b-1 commit `de6071a` 之 receipt）
+
+| 項目 | 結果 |
+| --- | --- |
+| `npm run report:book` exit code | 0 |
+| 偵測到之 book metadata posts | **1 篇** |
+| 對應檔 | `content/blogger/posts/20260504-sample-book-review.md` |
+| 該 post status | `draft`（validate 看不到；report 看得到——dual-channel 差異之驗證）|
+| 該 post effective mediaType | `book`（default；frontmatter 未顯式宣告 mediaType）|
+| 該 post missing 欄位 | `title` / `authors` / `publisher` / `publishedYear` / `isbn` 共 5 項（sample 為占位範本；皆空欄位）|
+| 輸出檔 | `dist-reports/book-report.txt`（30 行）+ `dist-reports/book-report.json`（57 行）|
+| 對 validate baseline 影響 | ❌ 0 影響（baseline 維持 `0 error / 18 warning on 13 post(s)`）|
+| 對 dist 影響 | ❌ 0 影響（report 不接 build pipeline）|
+
+### 12.7 邊界聲明
+
+- ❌ **不**修改 `src/scripts/validate-content.js`
+- ❌ **不**修改任何既有 build script
+- ❌ **不**接 `src/scripts/normalize-post-output.js`（per §11.7 既有邊界 + Phase 9-f-a Q5 決策「normalize-post-output 暫不動」）
+- ❌ **不**新建 `src/scripts/normalize-book-authors.js`（per §11.6 / Phase 9-e-d-b Q2 決策；維持 inline helper 模式）
+- ❌ **不**新建 `content/settings/books.json`（per Phase 9-e-a 決策 4）
+- ❌ **不**接 EJS render / SCSS / Blogger output / GitHub output（per Phase 9-f-a A.2 推薦保守路線；customer-facing render 延後至有 ready book review post 後評估）
+- ❌ **不**接 FB sidecar / FB promotion（per §8.4 既有設計）
+- ❌ **不**寫入 JSON-LD / SEO 結構化資料（per §9 deferred future candidate；屬 Phase 5 SEO 整體規劃）
+
+---
+
 （本文件結束）
