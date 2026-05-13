@@ -597,7 +597,8 @@ authors[N].role → "author"
 | 作者索引頁 | 站內自動生成之作者列表頁 / 作者詳細頁 | 需要跨文章作者導覽（例：「該作者之其他書評」）|
 | Structured data（JSON-LD）| 於 GitHub 站輸出 `Book` / `Periodical` / `Person` JSON-LD（SEO）| Phase 5 SEO / JSON-LD 子議題之延伸；屬 customer-facing 輸出，per `docs/future-roadmap.md` §5.2 排除原則之保守路線 |
 | `book.author` legacy warning | 升級為 warning-only validate 規則 `book-author-uses-legacy-string` | Phase 8-h+ 相容層退場批次；與其他 legacy fallback 同批評估 |
-| book schema 進階 validation rules | 例：ISBN 格式檢查、ISSN 8 碼檢查、`publishedYear` 區間檢查、`authors[].role` 列舉值嚴格檢查 | 視作者使用模式與 false-positive 風險評估後決定 |
+| book schema 進階 validation rules | 例：ISBN 格式檢查、ISSN 8 碼檢查、`publishedYear` 區間檢查（皆未落地）；`authors[].role` 列舉值嚴格檢查**已於 Phase 9-e-d-c 落地**（詳見 §11.2 rule 6）| 視作者使用模式與 false-positive 風險評估後決定 |
+| 3 條經評估不落地之 rules（`book-isbn-with-magazine-mediatype` / `book-volume-label-empty-with-volume-number` / `book-author-and-authors-both-present`）| 屬與 docs spec 衝突或誤觸風險高之候選；詳見 §11.5 deferred rules | Phase 9-e-d-a 評估後 9-e-d 系列不落地；未來如政策調整可再評估 |
 | `book.publishedDate`（完整日期）| `YYYY-MM-DD` 或 `YYYY-MM` | 書評類文章通常不需細粒度日期；雜誌或可受益（已可由 `book.issue` 字串攜帶）|
 | `book.volumeLabelEn` | 英文集數標籤 | 若未來確有國際版輸出需求 |
 | `book.subtitle` | 書本副標 | 若作者使用率高且 `title` 不足表達 |
@@ -639,6 +640,90 @@ authors[N].role → "author"
 - Phase 9-e-e：Phase 9-e 收尾 + roadmap 同步
 
 各子批之預期修改檔案、dist 影響、validate baseline 影響詳見 Phase 9-e-a 分析回報之 F 段。
+
+---
+
+## §11 已落地之 validate rules（Phase 9-e-d 系列）
+
+### 11.1 範圍與性質
+
+於 Phase 9-e-d-b（commit `95437a3`）與 Phase 9-e-d-c（commit `4f37cbc`），共 **7 條 warning-only validate rules** 落地於 `src/scripts/validate-content.js`。
+
+- **全部 warning-only**：不阻擋 `npm run validate:content` 之 exit code（warning-only → exit 0）
+- **全部不阻擋 build**：與 `build:github` / `build:blogger` / `build:promotion` pipeline 無關（validate-content 為純檢查工具）
+- **全部不改 dist**：不寫入 `dist/` / `dist-blogger/` / `dist-promotion/` / `dist-reports/`
+- **作用範圍**：所有規則嚴格 **ready / published only**（draft / archived 由 `load-posts` 過濾不進）
+- **前置 guard**：所有規則共用 `if (post.book && typeof post.book === 'object' && !Array.isArray(post.book))` — `book` 區塊不存在或非 plain object 時全部不觸發
+
+### 11.2 規則清單
+
+| # | rule type | severity | 落地 commit | trigger condition |
+| --- | --- | --- | --- | --- |
+| 1 | `book-mediatype-invalid` | warning | `95437a3` (9-e-d-b) | `book.mediaType` 存在且不在 `{"book","magazine"}` |
+| 2 | `book-issue-without-magazine-mediatype` | warning | `95437a3` (9-e-d-b) | `book.issue` 為非空字串且 effective mediaType !== `"magazine"`（mediaType 缺省為 `"book"`）|
+| 3 | `book-issn-without-magazine-mediatype` | warning | `95437a3` (9-e-d-b) | `book.issn` 為非空字串且 effective mediaType !== `"magazine"` |
+| 4 | `book-volume-invalid-type` | warning | `4f37cbc` (9-e-d-c) | `book.volume` 存在且非 integer / 非 null |
+| 5 | `book-published-year-invalid-type` | warning | `4f37cbc` (9-e-d-c) | `book.publishedYear` 存在且非 integer / 非 null |
+| 6 | `book-authors-invalid-role` | warning | `4f37cbc` (9-e-d-c) | `book.authors[N].role` 存在且不在 `{author, translator, illustrator, editor, other}`；`role === undefined` 不觸發（缺省為 `"author"`）|
+| 7 | `book-authors-entry-empty` | warning | `4f37cbc` (9-e-d-c) | `book.authors[N]` 之 `displayName` / `localName` / `originalName` 三欄全空；entry 0 額外加 legacy `book.author` fallback 守門（per §7.1）|
+
+### 11.3 對應 validation fixtures
+
+Phase 9-e-d-d-b（commit `63aa497`）落地 **7 個 fixtures** 於 `content/validation-fixtures/blogger/posts/`，每檔嚴格只觸發 1 條指定 book schema warning：
+
+| fixture 路徑 | 對應規則 |
+| --- | --- |
+| `content/validation-fixtures/blogger/posts/_test-book-mediatype-invalid.md` | `book-mediatype-invalid` |
+| `content/validation-fixtures/blogger/posts/_test-book-issue-without-magazine.md` | `book-issue-without-magazine-mediatype` |
+| `content/validation-fixtures/blogger/posts/_test-book-issn-without-magazine.md` | `book-issn-without-magazine-mediatype` |
+| `content/validation-fixtures/blogger/posts/_test-book-volume-invalid-type.md` | `book-volume-invalid-type` |
+| `content/validation-fixtures/blogger/posts/_test-book-published-year-invalid-type.md` | `book-published-year-invalid-type` |
+| `content/validation-fixtures/blogger/posts/_test-book-authors-invalid-role.md` | `book-authors-invalid-role` |
+| `content/validation-fixtures/blogger/posts/_test-book-authors-entry-empty.md` | `book-authors-entry-empty` |
+
+✅ **這 7 個新增 warning 皆來自 book schema validation fixtures，每檔 fixture 嚴格只觸發 1 條指定 warning**（per Phase 9-e-d-d-b 回報 C 段對照表驗證）。
+
+### 11.4 validate baseline 變動紀錄
+
+| 階段 | error | warning | post 數 |
+| --- | --- | --- | --- |
+| Phase 9-e-d-c 收尾後（fixture 落地前）| 0 | 11 | 6 |
+| Phase 9-e-d-d-b 收尾後（本系列 fixture 落地後）| 0 | **18** | **13** |
+| **變動** | 0 | **+7 warnings** | **+7 posts** |
+
+**性質**：✅ **預期變動，非 regression**。每 fixture 觸發 1 條 book warning + 計入 `byPath.size`；既有 6 篇 github fixture 之 11 條 warning 完全 byte-identical（mirror Phase 8-g-12-c / 8-g-2-d-e-c 之 fixture 落地推 baseline 模式）。
+
+### 11.5 deferred rules（評估後 9-e-d 系列不落地）
+
+於 Phase 9-e-d-a 分析後評估為**與 docs spec 衝突或誤觸風險高**，依 Phase 9-e-d-b Q1 決策不落地：
+
+| 候選 rule | 不落地理由 |
+| --- | --- |
+| `book-isbn-with-magazine-mediatype` | §4.9 明文「特殊雜誌情形除外」（bookazine / 特刊常見同時有 ISBN）；warning 會與 docs spec 之 carve-out 衝突 |
+| `book-volume-label-empty-with-volume-number` | §4.7 明文「兩欄獨立填寫；可單獨存在」；warning 會與 docs spec 直接衝突 |
+| `book-author-and-authors-both-present` | §6.2 之並存策略明確允許兩者共存（`authors[]` 勝出）；warning 會與 docs spec 直接衝突；Phase 9-e-a 決策 2 已明確「不標 deprecated、不警告」|
+
+上述 3 條保留於 §9 future candidate 紀錄；未來如政策調整可再評估。
+
+### 11.6 helpers / constants（inline at validate-content.js）
+
+於 Phase 9-e-d-b 與 9-e-d-c 共新增 2 組常數 + 4 個 inline helpers，全部 inline 於 `src/scripts/validate-content.js`（per Phase 9-e-d-b Q2 決策；不抽 helper 模組；不新檔；不新建 `normalize-book-authors.js`）：
+
+| 項目 | 落地批 | 用途 |
+| --- | --- | --- |
+| `VALID_BOOK_MEDIA_TYPE` (Set) | 9-e-d-b | mediaType 列舉值 |
+| `VALID_BOOK_AUTHOR_ROLE` (Set) | 9-e-d-c | `authors[].role` 列舉值 |
+| `isNonEmptyString(value)` | 9-e-d-b | non-empty trimmed string 守門 |
+| `getBookMediaType(book)` | 9-e-d-b | effective mediaType（缺省 `"book"`）|
+| `isIntegerOrNull(value)` | 9-e-d-c | integer / null 型別檢查 |
+| `hasAnyAuthorName(authorEntry)` | 9-e-d-c | `authors[]` entry 名稱欄 OR 檢查 |
+
+### 11.7 不接 normalize-post-output / build pipeline
+
+- 7 條 validate rules **純** validate 內部；**不**接 `src/scripts/normalize-post-output.js`
+- **不**新建 `src/scripts/normalize-book-authors.js`（per Phase 9-e-d-b Q2 決策）
+- **不**新建 `content/settings/books.json`（per Phase 9-e-a 決策 4）
+- 所有 `book.*` 之 fallback chain（per §7）為 docs 規格定義；實作落地待未來如 customer-facing 輸出接入時再評估
 
 ---
 
