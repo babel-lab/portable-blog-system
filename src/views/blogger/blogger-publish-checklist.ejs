@@ -40,6 +40,23 @@ builtAt: <%= meta.build.builtAt %>
 <% } else { %>
 [ ] （placeholder 模式，無 mode-aware 內容檢查）
 <% } %>
+<%# Phase 9-f-c-c-b：書籍 / 雜誌內容檢查（book-review 類；conditional） -%>
+<%# - 僅當 post.book 為 plain object 時顯示整段；無 book block 之 post → byte-identical -%>
+<%# - 第 3 項額外 conditional：effectiveMediaType === 'magazine'；mediaType 缺省為 "book"（per docs §5.1） -%>
+<%# - 所有 EJS 標籤採 trim-newline 模式；non-book post 之 publish-checklist.txt 對本區塊前後完全 byte-identical -%>
+<% if (post.book && typeof post.book === 'object' && !Array.isArray(post.book)) {
+  const effectiveMediaType = post.book.mediaType === undefined ? 'book' : post.book.mediaType;
+-%>
+
+----------------------------------------
+書籍 / 雜誌內容檢查（book-review 類）
+----------------------------------------
+[ ] 已對照 copy-helper [12] 書籍 / 內容來源 metadata，確認 frontmatter book 欄位正確
+[ ] 若有 book.coverImage / 書封圖，已確認圖片已上傳至外部空間，且 URL 可正常開啟
+<% if (effectiveMediaType === 'magazine') { -%>
+[ ] 雜誌文章已確認 issue / ISSN / Blogger 標籤 / 標題期數標示正確
+<% } -%>
+<% } -%>
 
 ----------------------------------------
 SEO 檢查（5-f）
