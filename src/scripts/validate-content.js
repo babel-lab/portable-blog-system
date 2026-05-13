@@ -39,6 +39,10 @@ const DESCRIPTION_MAX = 160;
 const SEARCH_DESCRIPTION_MAX = 200;
 const VALID_CANONICAL_RE = /^https?:\/\//;
 
+// Phase 9-e-d-b：book schema mediaType 列舉
+//   - 缺省值為 "book"（per docs/book-schema.md §5.1；於 getBookMediaType 處理）
+const VALID_BOOK_MEDIA_TYPE = new Set(['book', 'magazine']);
+
 // Phase 8-b-6：sidecar / frontmatter 欄位衝突 warning 之欄位清單
 //   採 presence-only 檢查（兩邊都有同名欄位即 warn，不比較值）；
 //   sidecar 不存在或 sidecar data 缺漏時略過該 sidecar 之檢查。
@@ -77,6 +81,18 @@ function bodyStartsWithAtxH1(body) {
     return /^#\s+/.test(line);
   }
   return false;
+}
+
+// Phase 9-e-d-b：book schema validate helpers（inline）
+//   - isNonEmptyString：non-empty trimmed string 守門；用於 book.issue / book.issn 檢查
+//   - getBookMediaType：返回 effective mediaType（缺省 "book"；per docs/book-schema.md §5.1）；
+//     book 非 plain object 時返回 undefined（呼叫者已加前置 guard，理論上不會走到 undefined 分支）
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim() !== '';
+}
+function getBookMediaType(book) {
+  if (!book || typeof book !== 'object' || Array.isArray(book)) return undefined;
+  return book.mediaType === undefined ? 'book' : book.mediaType;
 }
 
 // Phase 8-c-3：FB sidecar placeholder / content 之 status × severity 矩陣
@@ -408,6 +424,50 @@ export function validateContent({ posts, settings }) {
             type: 'series-title-unresolved',
             sourcePath,
             value: `series.id="${normalizedSeries.id ?? ''}"; titleTemplate has unresolved placeholders: ${names} (reasons: ${reasons})`,
+          });
+        }
+      }
+
+      // Phase 9-e-d-b：book schema metadata 結構檢查（warning-only）
+      //   - book.mediaType 存在但非 "book"/"magazine" → book-mediatype-invalid
+      //   - book.issue 非空字串但 effective mediaType !== "magazine" → book-issue-without-magazine-mediatype
+      //   - book.issn 非空字串但 effective mediaType !== "magazine" → book-issn-without-magazine-mediatype
+      //   - mediaType 缺省為 "book"（per docs/book-schema.md §5.1）
+      //   - 觸發範圍：與既有 series 規則一致（僅 ready/published；drafts/archived 由 load-posts 過濾）
+      //   - book 區塊不存在或非 plain object 時：全部規則不觸發
+      //   - 不接 normalize-post-output / build pipeline（純 validate 內部）
+      if (post.book && typeof post.book === 'object' && !Array.isArray(post.book)) {
+        const book = post.book;
+
+        if (book.mediaType !== undefined && !VALID_BOOK_MEDIA_TYPE.has(book.mediaType)) {
+          issues.push({
+            severity: 'warning',
+            type: 'book-mediatype-invalid',
+            sourcePath,
+            value:
+              typeof book.mediaType === 'string'
+                ? book.mediaType
+                : `typeof=${typeof book.mediaType}`,
+          });
+        }
+
+        const effectiveMediaType = getBookMediaType(book);
+
+        if (isNonEmptyString(book.issue) && effectiveMediaType !== 'magazine') {
+          issues.push({
+            severity: 'warning',
+            type: 'book-issue-without-magazine-mediatype',
+            sourcePath,
+            value: `book.issue is set but mediaType="${effectiveMediaType}"`,
+          });
+        }
+
+        if (isNonEmptyString(book.issn) && effectiveMediaType !== 'magazine') {
+          issues.push({
+            severity: 'warning',
+            type: 'book-issn-without-magazine-mediatype',
+            sourcePath,
+            value: `book.issn is set but mediaType="${effectiveMediaType}"`,
           });
         }
       }
