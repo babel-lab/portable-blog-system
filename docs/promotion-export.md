@@ -518,6 +518,62 @@ per 本批 docs only + per Phase 8-g-19-a 讀取分析：
 - 本文件 §10.2（Phase 8-f-7 `series.hashtags` fallback chain；本批之延伸對象）
 - 本文件 §9.2（Phase 8-d-4-b manifest entry 接入 normalized；本批接入後仍沿用既有 normalized-priority 路徑）
 
+## 12. Phase 9-f：book schema 與 FB promotion / sidecar 之邊界
+
+### 12.1 邊界原則
+
+book schema（`docs/book-schema.md`）屬**文章內容來源 / 書籍資料 schema**，與 FB promotion / `.fb.md` sidecar 之 schema 在設計上**完全分離**：
+
+- **`book.*` 為文章所評論 / 引用之書本 / 雜誌實體 metadata**（per `docs/book-schema.md` §1.1）
+- **FB promotion 欄位**（`promotion.facebook.*` / `.fb.md` frontmatter + body）為**作者手動撰寫之社群貼文文案**
+- 兩 schema **皆共存於同一 post 之 frontmatter 或 sidecar**，但**輸出邏輯互不相通**
+
+### 12.2 FB promotion / sidecar 不自動推導 / 展開 book metadata
+
+下列為硬性原則（per `docs/book-schema.md` §8.4 + §13.1 + §14.1 既有邊界聲明）：
+
+- `book.*` **不**參與 `promotion.facebook.hashtags` fallback chain（fallback 由 `series.hashtags` / `promotion.facebook.hashtags` / `promotion.facebook.defaultHashtags` 處理；per §11.4 之 5 段）
+- `book.title` / `book.titleEn` / `book.originalTitle` **不**自動寫入 `promotion.facebook.title` 或 `.fb.md` body
+- `book.authors[]` / `book.publisher` / `book.publishedYear` **不**自動推導 FB 貼文文案
+- `book.coverImage` **不**自動成為 FB OG image（FB OG image 由 post-level `cover` 提供）
+
+### 12.3 FB 貼文文案之管理路徑
+
+作者撰寫 FB 貼文時，**僅**透過下列既有 channels：
+
+- `promotion.facebook.title` / `excerpt`（frontmatter；per §2 既有 schema）
+- `promotion.facebook.hashtags`（含 §11.4 之 5 段 fallback chain）
+- `.fb.md` body（per `docs/fb-sidecar-schema.md` + `docs/publish-bundle.md` §2.6.3）
+
+若作者希望 FB 貼文提到書名 / 作者 / 出版社等書籍資料，**請手動於上述欄位內撰寫**；系統**不**自動填入。
+
+### 12.4 book metadata 僅作為內容背景，不直接變成 FB 貼文欄位
+
+book metadata 之輸出 channels 嚴格限於以下既有路徑（per `docs/book-schema.md` §13.7 quadruple-channel 視角）：
+
+- ✅ Validate channel：`npm run validate:content`（7 條 warning-only rules；per book-schema §11）
+- ✅ Report channel：`npm run report:book` → `dist-reports/book-report.{txt,json}`（per book-schema §12）
+- ✅ Blogger copy-helper [12] book metadata 區塊（per book-schema §13）
+- ✅ Blogger publish-checklist book-review 區段（per book-schema §14）
+- ✅ Blogger `meta.json` 之 `book` 欄位（per book-schema §13.2；屬資料層 spread，不解析）
+
+下列**不**屬 book metadata 之輸出 channels（per 本批邊界聲明）：
+
+- ❌ FB promotion manifest entry / `.fb.md` sidecar / FB `.txt` 輸出（per 本節 §12.1-§12.3）
+- ❌ Blogger 公開 HTML `post.html` 之 book 欄位渲染擴充（屬 Phase 9-f-e 延後候選；per `docs/future-roadmap.md` Phase 9 row）
+- ❌ GitHub 公開 HTML 之 book card（屬 Phase 9-f-f 延後候選）
+- ❌ JSON-LD Book / Periodical structured data（屬 Phase 9-f-g 延後候選；per `docs/book-schema.md` §9 future candidate）
+
+### 12.5 cross-link
+
+- `docs/book-schema.md` §1.3（book 不屬平台發布 / 推廣資料；列「不是 FB 推廣文案；與 `.fb.md` 無關」之硬性原則）
+- `docs/book-schema.md` §8.4（不推導 Blogger / FB / GitHub 發布資料；含「book.* 不用於推導 FB hashtags / tags」明文）
+- `docs/book-schema.md` §13.1 / §13.8（copy-helper [12] 邊界聲明：「不接 FB sidecar / FB promotion」）
+- `docs/book-schema.md` §14.1 / §14.8（publish-checklist book-review 區段邊界聲明：「不接 FB promotion / sidecar」）
+- 本文件 §2（既有 `promotion.facebook` frontmatter schema；本批不修改）
+- 本文件 §11.4 / §11.5（既有 FB hashtags fallback chain 5 段 + 分離原則；本批不修改）
+- 本文件 §10.2（Phase 8-f-7 `series.hashtags` fallback chain；本批不修改）
+
 ---
 
 See also:
