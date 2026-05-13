@@ -1114,6 +1114,9 @@ affiliate:
 4. 聯盟連結需自動套用 `sponsored nofollow noopener noreferrer`。
 5. 聯盟連結需加 GA4 event data attributes。
 
+See also:
+- `docs/book-schema.md`（書籍 / 雜誌 / 來源實體 metadata 完整規格；含 `book.mediaType` / `book.titleEn` / `book.volume` / `book.issue` / `book.authors[]` / `book.publishedYear` 等 additive 欄位字典與 fallback chain）
+
 ---
 
 # 13. 下載文章規則
