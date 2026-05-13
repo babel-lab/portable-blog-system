@@ -261,6 +261,8 @@ See also:
 - `docs/publish-bundle.md` §2.5（`posts/` 與 `pages/` 皆適用 publish bundle）
 - `docs/publish-json-schema.md` §5.3（Blogger URL 規則，含 post / page 分支）
 - `docs/publish-json-schema.md` §5.6（`blogger.type`）
+- `docs/book-schema.md` §13（Blogger copy-helper [12] book metadata 區塊；book-review 文章之 Blogger manual posting 輔助已包含書名 / 作者 / 出版社 / 出版年 / ISBN / 雜誌 issue 等欄位之純文字傾印；conditional show；mediaType-aware）
+- `docs/book-schema.md` §14（Blogger publish-checklist 已包含 book-review / magazine 內容檢查區塊：copy-helper [12] 對照確認 / `book.coverImage` URL 確認 / mediaType=magazine 期數標示確認；conditional show；mediaType-aware）
 
 ---
 
