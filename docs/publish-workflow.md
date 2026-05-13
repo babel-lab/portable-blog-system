@@ -187,6 +187,14 @@ npm run new:post -- --slug "my-new-post" --series-id "we-media-ai-52" --series-n
 - `publishedUrl` 為 `null` 直到作者手動回填；屬「Blogger 發布完成後的正式回填」步驟
 - 即使作者預期之 `yyyy/mm`（如 5 月發布），亦**不應**預填 placeholder URL
 
+**書評 / 雜誌類文章（`contentKind: "book-review"`）補述**（per Phase 9-f-c 落地之 manual posting helper）：
+
+書評 / 雜誌類文章手動貼到 Blogger 時，除上述基本檢查項外，可另參考：
+
+- `dist-blogger/posts/{slug}/copy-helper.txt` 之 **[12] 書籍 / 內容來源 metadata** 區塊（per `docs/book-schema.md` §13）：書名 / 作者 / 出版社 / 出版年 / ISBN / 雜誌 issue 等欄位之純文字傾印；conditional show（僅 `post.book` 為 plain object 時顯示）；mediaType-aware
+- `dist-blogger/posts/{slug}/publish-checklist.txt` 之 **書籍 / 雜誌內容檢查（book-review 類）** 區塊（per `docs/book-schema.md` §14）：3 項 checkbox（copy-helper [12] 對照確認 / `book.coverImage` URL 確認 / mediaType=magazine 期數標示確認）
+- 完整收尾紀錄：`docs/phase-9f-c-completion-report.md`（Phase 9-f-c **子系列**收尾；⚠️ 註：本子系列收尾**不等於** Phase 9-f 整體收尾 —— Phase 9-f-e / 9-f-f / 9-f-g 仍未啟動，Phase 9 overall 仍 🔄 進行中）
+
 ---
 
 ## 12. Facebook promotion 流程 SOP（補強 §4.3）
