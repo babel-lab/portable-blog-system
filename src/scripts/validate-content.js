@@ -48,6 +48,11 @@ const VALID_BOOK_MEDIA_TYPE = new Set(['book', 'magazine']);
 //   - role 缺省為 "author"（於 book-authors-invalid-role 規則內處理：undefined 不觸發）
 const VALID_BOOK_AUTHOR_ROLE = new Set(['author', 'translator', 'illustrator', 'editor', 'other']);
 
+// Phase 9-g-c-c：relatedLinks / otherLinks entry kind 列舉
+//   - per docs/related-links-schema.md §3.2 / §4.1
+//   - 用於 related-links-entry-kind-invalid 規則之檢查
+const VALID_LINK_KIND = new Set(['internal', 'external']);
+
 // Phase 8-b-6：sidecar / frontmatter 欄位衝突 warning 之欄位清單
 //   採 presence-only 檢查（兩邊都有同名欄位即 warn，不比較值）；
 //   sidecar 不存在或 sidecar data 缺漏時略過該 sidecar 之檢查。
@@ -114,6 +119,63 @@ function hasAnyAuthorName(authorEntry) {
     isNonEmptyString(authorEntry.localName) ||
     isNonEmptyString(authorEntry.originalName)
   );
+}
+
+// Phase 9-g-c-c：relatedLinks / otherLinks 結構檢查 helper（warning-only；4 條 critical 規則）
+//   - fieldName: 'relatedLinks' | 'otherLinks'（用於 warning value 前綴；mirror book.authors[${i}] 之 既有 pattern）
+//   - value: post[fieldName]
+//   - undefined 不觸發；空 array 不觸發（per docs/related-links-schema.md §3.1）
+//   - non-array → related-links-not-array；skip entry-level（per Phase 9-g-c-c-a §7.1）
+//   - entry 非 plain object（含 array / null / 非 object）→ skip 該 entry
+//     （mirror book.authors 既有 pattern；不新增 entry-not-object 規則 per Phase 9-g-c-c-a §7.1）
+//   - missing-kind 與 kind-invalid **互斥**：empty string / undefined 算 missing-kind；其他非合法值算 kind-invalid
+//     （避免同一 entry 重複噪音；per Phase 9-g-c-c-a §7 之表格）
+//   - relatedLinks 與 otherLinks 共用同一 helper（schema 完全相同 per docs §3.1）
+function validateRelatedLinksField(fieldName, value, sourcePath, issues) {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    issues.push({
+      severity: 'warning',
+      type: 'related-links-not-array',
+      sourcePath,
+      value: `${fieldName} typeof=${value === null ? 'null' : typeof value}`,
+    });
+    return;
+  }
+  for (let i = 0; i < value.length; i++) {
+    const entry = value[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+
+    const kindMissing =
+      entry.kind === undefined ||
+      (typeof entry.kind === 'string' && entry.kind.trim() === '');
+    if (kindMissing) {
+      issues.push({
+        severity: 'warning',
+        type: 'related-links-entry-missing-kind',
+        sourcePath,
+        value: `${fieldName}[${i}] kind missing or empty`,
+      });
+    } else if (!VALID_LINK_KIND.has(entry.kind)) {
+      issues.push({
+        severity: 'warning',
+        type: 'related-links-entry-kind-invalid',
+        sourcePath,
+        value: `${fieldName}[${i}].kind=${
+          typeof entry.kind === 'string' ? `"${entry.kind}"` : `typeof=${typeof entry.kind}`
+        } (must be internal/external)`,
+      });
+    }
+
+    if (!isNonEmptyString(entry.url)) {
+      issues.push({
+        severity: 'warning',
+        type: 'related-links-entry-missing-url',
+        sourcePath,
+        value: `${fieldName}[${i}] url missing or empty`,
+      });
+    }
+  }
 }
 
 // Phase 8-c-3：FB sidecar placeholder / content 之 status × severity 矩陣
@@ -569,6 +631,15 @@ export function validateContent({ posts, settings }) {
           }
         }
       }
+
+      // Phase 9-g-c-c：relatedLinks / otherLinks 結構檢查（warning-only；4 條 critical 規則）
+      //   - 沿用既有 series / book 規則範圍：僅 ready / published（drafts/archived 由 loadPosts 過濾）
+      //   - relatedLinks 與 otherLinks 共用同一 helper（schema 完全相同）
+      //   - undefined / 空 array 合法；non-array → related-links-not-array；entry 非 plain object → skip 該 entry
+      //   - missing-kind 與 kind-invalid 互斥（避免同 entry 重複噪音）
+      //   - per docs/related-links-schema.md §3.3 / §4.1 / §9.1
+      validateRelatedLinksField('relatedLinks', post.relatedLinks, sourcePath, issues);
+      validateRelatedLinksField('otherLinks', post.otherLinks, sourcePath, issues);
     }
 
     if (post.category) {
