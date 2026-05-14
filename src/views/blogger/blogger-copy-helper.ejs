@@ -189,3 +189,59 @@ canonical URL（已含 blogger→github UTM）：
 - 空欄位（缺漏）未顯示；請於 .md frontmatter 補齊
 - 完整欄位字典詳見 docs/book-schema.md §4
 <% } -%>
+<%# Phase 9-g-d-c：相關連結 / 其他連結 區塊（作者對照確認用） -%>
+<%# - 僅當 relatedLinks 或 otherLinks 至少有 1 個 renderable item 時顯示；無此兩欄位之 post → byte-identical -%>
+<%# - renderable pre-filter 與 blogger-post-full.ejs 9-g-d-b 完全一致：plain object + url non-empty + title non-empty -%>
+<%# - 純文字確認清單；不輸出 Blogger HTML（[5] 已 reference postFile） -%>
+<%# - sub-section 分為「相關連結（relatedLinks）」與「其他連結（otherLinks）」；任一 array 為空則 skip 該 sub-section -%>
+<%# - platform 非空 → [Platform] 前綴；platform 空 → 直接顯示 title -%>
+<%# - description 非空 → 縮排對齊獨立一行；kind 不顯示（避免 copy-helper 雜訊） -%>
+<%# - 沿用 [12] book metadata 之 inline JS helpers + lines build pattern + -%> trim-newline -%>
+<%
+  function pickRenderableLinks(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(function(item) {
+      return item && typeof item === 'object' && !Array.isArray(item)
+        && typeof item.url === 'string' && item.url.trim() !== ''
+        && typeof item.title === 'string' && item.title.trim() !== '';
+    });
+  }
+  function formatLinkLines(item, idx) {
+    const platform = (typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '';
+    const platformPrefix = platform ? '[' + platform + '] ' : '';
+    const out = ['  ' + (idx + 1) + '. ' + platformPrefix + item.title];
+    out.push('     ' + item.url);
+    if (typeof item.description === 'string' && item.description.trim() !== '') {
+      out.push('     ' + item.description.trim());
+    }
+    return out.join('\n');
+  }
+  const renderableRelated = pickRenderableLinks(post.relatedLinks);
+  const renderableOther = pickRenderableLinks(post.otherLinks);
+-%>
+<% if (renderableRelated.length > 0 || renderableOther.length > 0) {
+  const sections = [];
+  if (renderableRelated.length > 0) {
+    const s = ['相關連結（relatedLinks）：'];
+    renderableRelated.forEach(function(item, i) { s.push(formatLinkLines(item, i)); });
+    sections.push(s.join('\n'));
+  }
+  if (renderableOther.length > 0) {
+    const s = ['其他連結（otherLinks）：'];
+    renderableOther.forEach(function(item, i) { s.push(formatLinkLines(item, i)); });
+    sections.push(s.join('\n'));
+  }
+%>
+
+----------------------------------------
+[13] 相關連結 / 其他連結（作者手動指定）
+----------------------------------------
+<%= sections.join('\n\n') %>
+
+提示：
+- 上述連結已自動包含於 HTML body 之「相關連結 / 其他連結」區塊
+- 無需手動貼到 Blogger；本區塊僅供作者對照確認
+- url 為空或 title 為空之 item 已自動 skip
+- internal 連結之 url 應為已發布後回填之真實 URL
+- external 連結於 HTML render 時會自動加 target="_blank" rel="nofollow noopener"
+<% } -%>
