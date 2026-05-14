@@ -1,0 +1,71 @@
+// Phase 9-g-d-b：relatedLinks / otherLinks render styles
+//
+// 對應 docs/related-links-schema.md §8.2 之預期 markup。
+// 兩個 BEM 命名空間共用同一套規則：
+//   .lab-related-links  — 「相關連結」H2 區塊（作者手動指定之延伸閱讀 / 系列文章 / 重要參考資源）
+//   .lab-other-links    — 「其他連結」H2 區塊（次要補充 / 來源 / 引用）
+//
+// 樣式保持簡潔（per Phase 9-g-d-b spec）：
+//   - spacing：container gap / margin-top
+//   - list reset：移除 default ul margin / padding / list-style
+//   - platform spacing：margin-right + muted 色 + 較小字級
+//   - description spacing：font-size / color / line-height
+//   - 不加複雜 hover / card / border 效果
+//   - focus-visible 保留作標準 a11y（非視覺裝飾）
+//
+// 視覺一致性：與 _related-posts.scss / _affiliate-box.scss 之既有 component pattern 對齊。
+
+@use '../abstracts/mixins' as mx;
+
+.lab-related-links,
+.lab-other-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lab-space-3);
+  margin-top: var(--lab-space-6);
+}
+
+.lab-related-links__title,
+.lab-other-links__title {
+  margin: 0;
+  font-size: var(--lab-font-size-xl);
+  font-weight: var(--lab-font-weight-bold);
+  color: var(--lab-color-text);
+}
+
+.lab-related-links__list,
+.lab-other-links__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lab-related-links__item,
+.lab-other-links__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lab-space-1);
+}
+
+.lab-related-links__link:focus-visible,
+.lab-other-links__link:focus-visible {
+  @include mx.lab-focus-ring;
+}
+
+.lab-related-links__platform,
+.lab-other-links__platform {
+  margin-right: var(--lab-space-1);
+  color: var(--lab-color-muted);
+  font-size: var(--lab-font-size-sm);
+}
+
+.lab-related-links__description,
+.lab-other-links__description {
+  margin: 0;
+  font-size: var(--lab-font-size-sm);
+  color: var(--lab-color-muted);
+  line-height: var(--lab-line-height-relaxed);
+}
