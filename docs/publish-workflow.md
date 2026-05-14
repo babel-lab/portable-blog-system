@@ -195,6 +195,22 @@ npm run new:post -- --slug "my-new-post" --series-id "we-media-ai-52" --series-n
 - `dist-blogger/posts/{slug}/publish-checklist.txt` 之 **書籍 / 雜誌內容檢查（book-review 類）** 區塊（per `docs/book-schema.md` §14）：3 項 checkbox（copy-helper [12] 對照確認 / `book.coverImage` URL 確認 / mediaType=magazine 期數標示確認）
 - 完整收尾紀錄：`docs/phase-9f-c-completion-report.md`（Phase 9-f-c **子系列**收尾；⚠️ 註：本子系列收尾**不等於** Phase 9-f 整體收尾 —— Phase 9-f-e / 9-f-f / 9-f-g 仍未啟動，Phase 9 overall 仍 🔄 進行中）
 
+**相關連結 / 其他連結補述**（per Phase 9-g-d / 9-g-e 落地之 manual posting helper）：
+
+含 `relatedLinks` / `otherLinks` 之文章手動貼到 Blogger 時，除上述基本檢查項外，可另參考：
+
+- `dist-blogger/posts/{slug}/post.html` 之「相關連結 / 其他連結」區塊（per Phase 9-g-d-b）：HTML body 已自動輸出 `<aside class="lab-related-links">` / `<aside class="lab-other-links">`；複製 HTML 整段時即包含
+- `dist-blogger/posts/{slug}/copy-helper.txt` 之 **[13] 相關連結 / 其他連結**（per Phase 9-g-d-c）：純文字確認清單；**只供作者對照，不需手動貼到 Blogger**
+- `dist-blogger/posts/{slug}/publish-checklist.txt` 之 **相關連結 / 其他連結內容檢查** 區塊（per Phase 9-g-e-b）：僅當文章有 renderable `relatedLinks` / `otherLinks` 時顯示；含連結數量 / external rel auto / internal url 提醒 / url-title 空 item skip 提示
+- 完整 schema 詳見 `docs/related-links-schema.md`
+
+注意事項：
+
+- **internal link 之 url 應為已發布後回填之真實 URL**（per `docs/publish-json-schema.md` §5.3 Blogger URL 不可預測禁則）；若目標 Blogger 文章尚未發布，可先不加入或讓 url 保持空值，render 會 skip 該 item
+- **external link 之 `target="_blank"` / `rel="nofollow noopener"` 由 render 階段依 `kind` 自動套用**，作者**不需手填**
+- **`[Youtube]` / `[台北市立圖書館]` 等顯示前綴應拆入 `platform` 欄位**，**不**併入 `title`
+- **`relatedLinks` / `otherLinks` 屬內容屬性**，**不放** `.publish.json` 與 `.fb.md`（per `docs/publish-bundle.md` §2.6.4 硬性原則）
+
 ---
 
 ## 12. Facebook promotion 流程 SOP（補強 §4.3）
@@ -367,6 +383,8 @@ npm run build:promotion     # 確認 FB finalUrl 採用 publishedUrl
 | `publish.blogger.publishedUrl` | published 後 | 必填（已發布之 Blogger 文章） | 正式 URL；canonical / FB finalUrl 依賴此 | 不可預測；屬發布後回填 |
 | `publish.blogger.publishedAt` | published 後 | 建議 | 實際發布時間 | ISO 8601 |
 | `publish.blogger.bloggerPostId` | published 後 | 建議 | Blogger 內部 post ID | 用於未來工具識別 |
+| `relatedLinks` | ready 前 | 選填 | 作者手動指定之延伸閱讀 / 系列文章 / 來源連結 array | platform 不要併入 title；internal link url 應為已回填之真實 URL |
+| `otherLinks` | ready 前 | 選填 | 作者手動指定之次要補充 / 館藏 / 影片 array | 同 relatedLinks 規則 |
 
 ---
 
