@@ -4,7 +4,11 @@
 
 **更新歷程**：本文件原於 commit `a44ace8` 建立為 Phase 9-g overall snapshot；其後 9-g-f-a / 9-g-f-b / 9-g-f-c 系列啟動，於 9-g-f-c 擴充記錄 GitHub render 落地（§4.12）與更新 §3 / §5.2 / §8 / §9。
 
-**後續系列**：Phase 9-g 之後已另開 **Phase 9-h 系列**（GitHub article block parity；首批 9-h-b-b 落地 GitHub Affiliate Box top / bottom；commit `f16457e`）；後續候選含 GitHub Download Box / Hashtag / Book Photo / 兩端 Related Posts auto；詳見 `docs/future-roadmap.md` §2 Phase 9 row 之 Phase 9-h 區段。本文件不擴大記錄 9-h 內容；Phase 9-h 之完整紀錄另由 future-roadmap + 未來可能之 `docs/phase-9h-completion-report.md` 承擔。
+**後續系列**：Phase 9-g 之後已另開 **Phase 9-h 系列**（GitHub article block parity）；至本文件更新時已落地 2 個子系列：
+- **9-h-b 子系列**：GitHub Affiliate Box top / bottom（commit `f16457e`；docs sync `c356a2b`）
+- **9-h-c 子系列**：GitHub Download Box（commit `6f06f28`；docs sync 為 Phase 9-h-c-c 本批）
+
+後續候選含 GitHub Hashtag / Book Photo / 兩端 Related Posts auto；詳見 `docs/future-roadmap.md` §2 Phase 9 row 之 Phase 9-h 區段。本文件不擴大記錄 9-h 內容；Phase 9-h 之完整紀錄另由 future-roadmap + 未來可能之 `docs/phase-9h-completion-report.md` 承擔。
 
 對應之上層紀錄詳見：
 - `docs/related-links-schema.md` §9.1（已落地之子批進度完整 table）

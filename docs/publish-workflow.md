@@ -217,6 +217,11 @@ npm run new:post -- --slug "my-new-post" --series-id "we-media-ai-52" --series-n
 - GitHub 端現在除 `relatedLinks` / `otherLinks` 外，若文章 frontmatter 有 `affiliate.enabled: true` 與 `affiliate.position.top: true` 或 `affiliate.position.bottom: true`，`dist/posts/{slug}/index.html` 也會自動輸出「立即購買」affiliate box（mirror Blogger `lab-affiliate-box` BEM；`rel="sponsored nofollow noopener noreferrer"` + `target="_blank"` 由 render 自動套用）
 - Blogger 端原 affiliate 流程**完全不變**（per `src/views/blogger/blogger-post-full.ejs` 既有 `<aside class="lab-affiliate-box">` 區塊；無修改）
 
+**教具下載 download box GitHub 端補述**（per Phase 9-h-c-b 落地之 GitHub article block parity）：
+
+- GitHub 端現在若文章 frontmatter 有 `download.enabled: true` 且 `download.fileUrl` 有值，`dist/posts/{slug}/index.html` 也會自動輸出 Download Box（mirror Blogger `lab-download-box` BEM；`<a class="lab-download-box__cta">` 使用 HTML5 `download` 屬性，**不**加 `target` / `rel`；可選 `title` / `description` / `fileType` badge / `licenseNote` 條件渲染）
+- Blogger 端原 download 流程**完全不變**（per `src/views/blogger/blogger-post-full.ejs` 既有 `<aside class="lab-download-box">` 區塊；無修改）
+
 ---
 
 ## 12. Facebook promotion 流程 SOP（補強 §4.3）
