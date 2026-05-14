@@ -34,6 +34,16 @@ blocks:
   socialFollow: true
   relatedPosts: true
   sidebar: true
+relatedLinks:
+  - kind: external
+    platform: "官方文件"
+    title: "{官方 doc 標題}"
+    url: ""
+otherLinks:
+  - kind: external
+    platform: "GitHub"
+    title: "{相關 repo 名稱}"
+    url: ""
 ---
 
 這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。

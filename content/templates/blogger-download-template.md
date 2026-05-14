@@ -34,6 +34,16 @@ blocks:
   socialFollow: true
   relatedPosts: true
   sidebar: true
+relatedLinks:
+  - kind: internal
+    platform: "blogger"
+    title: "{相關教具下載文章}"
+    url: "" # 待目標文章發布後回填正式 URL
+otherLinks:
+  - kind: external
+    platform: "Youtube"
+    title: "{教具使用示範影片}"
+    url: ""
 ---
 
 這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。

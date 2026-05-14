@@ -65,6 +65,24 @@ promotion:
     target: "auto"
     hashtags: []
     note: ""
+relatedLinks:
+  - kind: internal
+    platform: "blogger"
+    title: "{同系列前一篇書評標題}"
+    url: "" # 待目標文章發布後回填正式 URL
+  - kind: external
+    platform: "出版社官網"
+    title: "{出版社《書名》介紹頁}"
+    url: ""
+otherLinks:
+  - kind: external
+    platform: "台北市立圖書館"
+    title: "書籍館藏頁"
+    url: ""
+  - kind: external
+    platform: "Youtube"
+    title: "{相關講座 / 作者訪談影片}"
+    url: ""
 ---
 
 請在此撰寫書評內容。

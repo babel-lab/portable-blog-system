@@ -43,6 +43,8 @@ promotion:
     target: "auto"
     hashtags: []
     note: ""
+relatedLinks: []
+otherLinks: []
 ---
 
 這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。
