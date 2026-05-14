@@ -212,6 +212,11 @@ npm run new:post -- --slug "my-new-post" --series-id "we-media-ai-52" --series-n
 - **`[Youtube]` / `[台北市立圖書館]` 等顯示前綴應拆入 `platform` 欄位**，**不**併入 `title`
 - **`relatedLinks` / `otherLinks` 屬內容屬性**，**不放** `.publish.json` 與 `.fb.md`（per `docs/publish-bundle.md` §2.6.4 硬性原則）
 
+**聯盟連結 affiliate box GitHub 端補述**（per Phase 9-h-b-b 落地之 GitHub article block parity）：
+
+- GitHub 端現在除 `relatedLinks` / `otherLinks` 外，若文章 frontmatter 有 `affiliate.enabled: true` 與 `affiliate.position.top: true` 或 `affiliate.position.bottom: true`，`dist/posts/{slug}/index.html` 也會自動輸出「立即購買」affiliate box（mirror Blogger `lab-affiliate-box` BEM；`rel="sponsored nofollow noopener noreferrer"` + `target="_blank"` 由 render 自動套用）
+- Blogger 端原 affiliate 流程**完全不變**（per `src/views/blogger/blogger-post-full.ejs` 既有 `<aside class="lab-affiliate-box">` 區塊；無修改）
+
 ---
 
 ## 12. Facebook promotion 流程 SOP（補強 §4.3）
