@@ -404,10 +404,17 @@ otherLinks:
 | 9-g-c-a | sample / template update analysis（純分析） | ✅ completed |
 | 9-g-c-b | 5 個 `content/templates/*.md` 補入 `relatedLinks` / `otherLinks` frontmatter sample | ✅ completed（commit `fbe6597`） |
 | 9-g-c-c-a | validate rules + fixtures landing analysis（純分析；推薦方案 A 4 條 critical 規則） | ✅ completed |
-| 9-g-c-c | 4 條 warning-only validate 規則 + 4 個 fixtures（per §3.3） | ✅ completed（commit `b05240b`） |
-| 9-g-c-d | docs sync：本文件 §3.3 / §9 + `docs/future-roadmap.md` Phase 9-g row 同步 9-g-c-b / 9-g-c-c landings 與 baseline 更新 | ✅ completed（本批） |
-| 9-g-d | Blogger render / copy-helper EJS 接入；build-blogger plumbing；Blogger SCSS 樣式 | ⏳ 尚未啟動 |
-| 9-g-e | publish-checklist EJS 區塊 + workflow docs 同步 | ⏳ 尚未啟動 |
+| 9-g-c-c | 4 條 warning-only validate 規則 + 4 個 fixtures（per §3.3） | ✅ completed（commit `b05240b`；baseline `0/18/13` → `0/22/17`） |
+| 9-g-c-d | docs sync：本文件 §3.3 / §9 + `docs/future-roadmap.md` Phase 9-g row 同步 9-g-c-b / 9-g-c-c landings 與 baseline 更新 | ✅ completed（commit `1c77b96`） |
+| 9-g-d-a | Blogger render / copy-helper analysis（純分析） | ✅ completed |
+| 9-g-d-b | Blogger post HTML render（`blogger-post-full.ejs` 在 Affiliate Box bottom 與 Hashtag 之間新增 `<aside class="lab-related-links">` / `<aside class="lab-other-links">` 兩個 conditional 區塊）+ SCSS（新增 `src/styles/components/_related-links.scss` + Blogger mirror + `main.scss` import） | ✅ completed（commit `500df12`） |
+| 9-g-d-c-a | blogger-copy-helper [13] analysis（純分析） | ✅ completed |
+| 9-g-d-c | blogger-copy-helper [13] 區塊（純文字確認清單；mirror [12] book metadata 之 conditional + inline JS + trim-newline pattern） | ✅ completed（commit `f7cd5b9`；含後續 9-g-d-c-fix 修正之 EJS comment delimiter leak） |
+| **9-g-d-c-fix** | **修正 commit `f7cd5b9` 之 `blogger-copy-helper.ejs` line 199 comment 內嵌 EJS delimiter 字串**（EJS parser 命中第一個內嵌 delimiter 提早關閉 comment，導致 `trim-newline` 文字漏出於所有 ready posts 之 copy-helper.txt）；移除內嵌 delimiter 字串；不改 [13] 邏輯（diff +1/-1）；build:blogger sanity check **pass**：copy-helper.txt 不再含 `trim-newline` 漏出文字，無意外 [13] 區塊 | ✅ completed（commit `b97c57a`） |
+| 9-g-e-a | publish-checklist / workflow sync analysis（純分析） | ✅ completed |
+| 9-g-e-b | `blogger-publish-checklist.ejs` 新增「相關連結 / 其他連結內容檢查」conditional 區塊（mirror book-review checklist pattern；4 條 always-show checkbox + 1 條 internal nested conditional checkbox）；**含同類 EJS comment fix inline**（同源於 9-g-d-c-fix 模式；本批 commit 內預先修正）；build:blogger sanity check **pass** | ✅ completed（commit `97e2c56`） |
+| 9-g-e-c | docs sync：`docs/checklists/blogger-publish-checklist.md` +1 行 checkbox + `docs/publish-workflow.md` §11 末段「相關連結 / 其他連結補述」（4 cross-link + 4 注意事項 bullets；mirror 9-f-c 書評補述結構）+ §15 表格 2 列 | ✅ completed（commit `3aa8a9a`） |
+| 9-g-e-d | docs sync：本文件 §9 全面更新含 9-g-d / 9-g-d-c-fix / 9-g-e 全部 landings 與 commit hashes + `docs/future-roadmap.md` Phase 9-g row 同步；屬 **Phase 9-g-e 系列收尾** | ✅ completed（本批） |
 | 9-g-f（可選） | GitHub render | ⏳ 尚未啟動 |
 | 9-g-g（可選 / deferred） | JSON-LD `mentions` / `isPartOf` structured data | ⏸ deferred（與 Phase 9-f-g 同步保守原則：等真實 ready post 可做 Google Rich Results Test 後再評估） |
 
@@ -417,6 +424,7 @@ baseline 演進：
 
 - Phase 9-g-c-c 前：`0/18/13`
 - Phase 9-g-c-c 後：`0/22/17`
+- Phase 9-g-c-d 至 9-g-e-d 期間：**baseline 維持 `0/22/17`**（本期間 9-g-d-b / 9-g-d-c / 9-g-d-c-fix / 9-g-e-b 之 EJS template 變更不在 validate scan path；9-g-c-d / 9-g-e-c / 本批 9-g-e-d 為純 docs；validate 不掃 EJS / SCSS / docs）
 - 變動原因：+4 個 validation fixtures（`_test-related-links-*.md`），每 fixture 各觸發 1 條 dedicated warning，無 noise
 - 屬 fixture 落地之**預期變動**，**非 regression**（mirror 既有 book / series fixture pattern）
 
@@ -426,9 +434,7 @@ baseline 演進：
 
 | 子批次 | 範圍 | 起手條件 |
 | --- | --- | --- |
-| Phase 9-g-d | Blogger render：`src/views/blogger/blogger-post-full.ejs` 加 related-links / other-links 區塊；`blogger-copy-helper.ejs` 加 [13] 區塊；可選 `build-blogger.js` plumbing；Blogger SCSS | 9-g-c-d 已 commit |
-| Phase 9-g-e | `blogger-publish-checklist.ejs` 加檢查區塊；`docs/publish-workflow.md` §11 / §15 補述；`docs/checklists/blogger-publish-checklist.md` 同步 | 9-g-d 已 commit |
-| Phase 9-g-f（可選） | GitHub render：`src/views/pages/post-detail.ejs` 加區塊；新增 `src/styles/components/_related-links.scss` | 9-g-d 已 commit；作者決定是否啟動 |
+| Phase 9-g-f（可選） | GitHub render：`src/views/pages/post-detail.ejs` 加 related-links / other-links 區塊；可重用 9-g-d-b 落地之 `src/styles/components/_related-links.scss`（已於 `main.scss` import；GitHub 端直接套用即可） | 作者決定是否啟動 |
 | Phase 9-g-g（可選 / deferred） | JSON-LD `mentions` / `isPartOf` structured data | 與 Phase 9-f-g 同步保守原則：等真實 ready post 可做 Google Rich Results Test 後再評估 |
 
 ### 9.3 不接 normalize-post-output（第一版）
@@ -441,15 +447,26 @@ baseline 演進：
 
 如未來有跨文章 / 跨平台繼承需求，再評估接入 normalize；屬第二階段。
 
-### 9.4 dist baseline
+### 9.4 dist baseline / sanity check 紀錄
 
-未啟動 9-g-d 之前，`dist` / `dist-blogger` / `dist-promotion` / `dist-reports` 完全不變：
+各子批之 dist-blogger 變動範圍：
 
-- **9-g-b** / **9-g-c-d**：純 docs；dist 不變
+- **9-g-b** / **9-g-c-d** / **9-g-e-c** / **9-g-e-d**：純 docs；dist 完全不變
 - **9-g-c-b**：僅 `content/templates/*.md`（templates 不被 `build:*` 掃描，per Phase 8-g-6 紀錄）；dist 不變
 - **9-g-c-c**：僅 `src/scripts/validate-content.js` + `content/validation-fixtures/blogger/posts/`（validation-fixtures 目錄不被 `build:*` 掃描，per Phase 8-e-6-b-1 紀錄）；dist 不變
+- **9-g-d-b**：Blogger post HTML render + SCSS；對含 `relatedLinks` / `otherLinks` 之 post 之 `post.html` 新增 `<aside class="lab-related-links">` / `<aside class="lab-other-links">` 區塊；對無此兩欄位之既有 ready post，`post.html` 理論上維持 **byte-identical-modulo-builtAt**（mirror Phase 9-f-c-b book metadata 之保守原則）
+- **9-g-d-c**：blogger-copy-helper [13] 區塊；對含 `relatedLinks` / `otherLinks` 之 post 之 `copy-helper.txt` 新增 [13] 純文字確認清單；首次 build:blogger 後發現 9-g-d-c 之 EJS comment 內嵌 delimiter 導致 `trim-newline` 漏出（於 9-g-d-c-fix 修正）
+- **9-g-d-c-fix**：移除 9-g-d-c 之 EJS comment 內嵌 delimiter 字串；build:blogger sanity check **pass**：對既有無 `relatedLinks` / `otherLinks` 之 ready post，`copy-helper.txt` 不再含 `trim-newline` 漏出文字、不意外輸出 [13] 區塊、達成 byte-identical-modulo-builtAt
+- **9-g-e-b**：blogger-publish-checklist 新增「相關連結 / 其他連結內容檢查」conditional 區塊；對含 `relatedLinks` / `otherLinks` 之 post 之 `publish-checklist.txt` 新增該區塊；本批含同類 EJS comment fix（commit 內 inline 修正）；build:blogger sanity check **pass**：對既有無此兩欄位之 ready post，`publish-checklist.txt` 不含 `trim-newline` 漏出、不意外輸出新區塊、達成 byte-identical-modulo-builtAt
 
-**9-g-d 之後**將開始影響 dist-blogger：含 `relatedLinks` / `otherLinks` 之 post 變動；對無此欄位之既有 ready post 應採 **byte-identical-modulo-builtAt** 設計（mirror Phase 9-f-c-b book metadata 區塊之保守原則）。
+當前 dist-blogger 整體狀態：
+
+- 對既有無 `relatedLinks` / `otherLinks` 之 ready posts：`post.html` / `copy-helper.txt` / `publish-checklist.txt` / `meta.json` 皆 **byte-identical-modulo-builtAt**
+- 無 leaked text（兩個 EJS comment delimiter bug 皆已於 9-g-d-c-fix / 9-g-e-b 修復）
+- 無意外 `[13]` 區塊 / 無意外「相關連結 / 其他連結內容檢查」checklist 區塊
+- validate baseline 維持 **`0/22/17`**
+
+未啟動之 **9-g-f / 9-g-g** 屬 GitHub render / JSON-LD 範疇，與 dist-blogger 無關。
 
 ---
 
