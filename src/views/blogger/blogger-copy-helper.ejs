@@ -196,7 +196,7 @@ canonical URL（已含 blogger→github UTM）：
 <%# - sub-section 分為「相關連結（relatedLinks）」與「其他連結（otherLinks）」；任一 array 為空則 skip 該 sub-section -%>
 <%# - platform 非空 → [Platform] 前綴；platform 空 → 直接顯示 title -%>
 <%# - description 非空 → 縮排對齊獨立一行；kind 不顯示（避免 copy-helper 雜訊） -%>
-<%# - 沿用 [12] book metadata 之 inline JS helpers + lines build pattern + -%> trim-newline -%>
+<%# - 沿用 [12] book metadata 之 inline JS helpers + lines build pattern + trim-newline -%>
 <%
   function pickRenderableLinks(arr) {
     if (!Array.isArray(arr)) return [];
