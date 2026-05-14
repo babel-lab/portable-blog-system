@@ -222,6 +222,12 @@ npm run new:post -- --slug "my-new-post" --series-id "we-media-ai-52" --series-n
 - GitHub 端現在若文章 frontmatter 有 `download.enabled: true` 且 `download.fileUrl` 有值，`dist/posts/{slug}/index.html` 也會自動輸出 Download Box（mirror Blogger `lab-download-box` BEM；`<a class="lab-download-box__cta">` 使用 HTML5 `download` 屬性，**不**加 `target` / `rel`；可選 `title` / `description` / `fileType` badge / `licenseNote` 條件渲染）
 - Blogger 端原 download 流程**完全不變**（per `src/views/blogger/blogger-post-full.ejs` 既有 `<aside class="lab-download-box">` 區塊；無修改）
 
+**Hashtag GitHub 端補述**（per Phase 9-h-d-b 落地之 GitHub article block parity）：
+
+- GitHub 端現在若文章 frontmatter 有 `blocks.hashtags: true` 且 `tags` 非空 array，`dist/posts/{slug}/index.html` 也會自動輸出 Hashtag 區塊（mirror Blogger `lab-hashtags` / `lab-hashtag` BEM；`<ul class="lab-hashtags">` 內每 tag 渲染為 `<li><span class="lab-hashtag">#tag</span></li>`）
+- Hashtag 為 **display-only span**，**不是連結**；**不**加 `href` / `target` / `rel`（mirror Blogger 之 non-link pattern；hashtag link / GA4 tag_click event 屬未來增強候選）
+- Blogger 端原 hashtag 流程**完全不變**（per `src/views/blogger/blogger-post-full.ejs` 既有 `<ul class="lab-hashtags">` 區塊；無修改）
+
 ---
 
 ## 12. Facebook promotion 流程 SOP（補強 §4.3）
