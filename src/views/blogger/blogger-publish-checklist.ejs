@@ -57,6 +57,41 @@ builtAt: <%= meta.build.builtAt %>
 [ ] 雜誌文章已確認 issue / ISSN / Blogger 標籤 / 標題期數標示正確
 <% } -%>
 <% } -%>
+<%# Phase 9-g-e-b：相關連結 / 其他連結內容檢查（含 relatedLinks / otherLinks 之文章；conditional） -%>
+<%# - 僅當 relatedLinks 或 otherLinks 至少有 1 個 renderable item 時顯示；無此兩欄位之 post → byte-identical -%>
+<%# - renderable pre-filter 與 blogger-post-full.ejs 9-g-d-b / blogger-copy-helper.ejs 9-g-d-c 完全一致：plain object + url non-empty + title non-empty -%>
+<%# - 「frontmatter 有但全部 url 空 / title 空」之情境由 9-g-c-c validate warnings 處理（related-links-entry-missing-url 等），不在本 checklist 重複提醒 -%>
+<%# - internal link 提醒做 nested conditional：僅當至少 1 個 item.kind === 'internal' 時才顯示；全部 external 時不顯示 -%>
+<%# - 不列平台 / title / url 明細（避免 checklist 太長）；細節由 copy-helper [13] 提供 -%>
+<%# - 沿用 book-review conditional checklist 之 inline JS helper + outer if guard + trim-newline pattern -%>
+<%
+  function pickRenderableLinksForChecklist(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(function(item) {
+      return item && typeof item === 'object' && !Array.isArray(item)
+        && typeof item.url === 'string' && item.url.trim() !== ''
+        && typeof item.title === 'string' && item.title.trim() !== '';
+    });
+  }
+  const renderableRelated = pickRenderableLinksForChecklist(post.relatedLinks);
+  const renderableOther = pickRenderableLinksForChecklist(post.otherLinks);
+  const hasInternalLink = renderableRelated.concat(renderableOther).some(function(item) {
+    return item.kind === 'internal';
+  });
+-%>
+<% if (renderableRelated.length > 0 || renderableOther.length > 0) { -%>
+
+----------------------------------------
+相關連結 / 其他連結內容檢查（含 relatedLinks / otherLinks 之文章）
+----------------------------------------
+[ ] HTML body 已正常顯示「相關連結」/「其他連結」區塊（共 <%= renderableRelated.length %> 個相關連結 / <%= renderableOther.length %> 個其他連結）
+[ ] 已對照 copy-helper [13] 確認 frontmatter relatedLinks / otherLinks 欄位正確
+[ ] external link 之 target="_blank" rel="nofollow noopener" 由 render 自動套用，無需手動加
+<% if (hasInternalLink) { -%>
+[ ] internal link 之 url 為「已發布後回填之真實 URL」（per docs/publish-json-schema.md §5.3 Blogger URL 不可預測禁則）
+<% } -%>
+[ ] url 為空 / title 為空之 item 已自動 skip（如有疑問請對照 .md frontmatter）
+<% } -%>
 
 ----------------------------------------
 SEO 檢查（5-f）
