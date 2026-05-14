@@ -46,9 +46,52 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   </div>
   <% } %>
 
+  <%# Phase 9-h-b-b：聯盟販售連結 Box 前置（mirror Blogger 端 post-full.ejs 之 affiliate top） -%>
+  <%# 5 條 AND guard：affiliate 存在 / enabled 為 true / links 非空 array / position 存在 / position.top 為 true -%>
+  <%# 對無 affiliate 或 5 條 guard 不通過之既有 ready post，本區塊完全不渲染 -%>
+  <%# 沿用 lab-affiliate-box BEM；SCSS 已於 Phase 2-2-p 落地（_affiliate-box.scss + main.scss import 已就位） -%>
+  <%# rel 固定 sponsored nofollow noopener noreferrer；target 固定 _blank；無 author override -%>
+  <%# trim-newline pattern：對無 affiliate 之 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
+  <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 9-g-d-c-fix / 9-g-f-b 既有預防經驗） -%>
+  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(post.affiliate.links) && post.affiliate.links.length > 0 && post.affiliate.position && post.affiliate.position.top) { %>
+  <div class="lab-container">
+    <aside class="lab-affiliate-box">
+      <h3 class="lab-affiliate-box__title">立即購買</h3>
+      <% if (post.affiliate.disclosure) { %>
+      <p class="lab-affiliate-box__disclosure"><%= post.affiliate.disclosure %></p>
+      <% } %>
+      <ul class="lab-affiliate-box__links">
+        <% post.affiliate.links.forEach(function(link) { %>
+        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+        <% }); %>
+      </ul>
+    </aside>
+  </div>
+  <% } -%>
+
   <div class="lab-article__body lab-container">
     <%- bodyHtml %>
   </div>
+
+  <%# Phase 9-h-b-b：聯盟販售連結 Box 後置（mirror Blogger 端 post-full.ejs 之 affiliate bottom） -%>
+  <%# 5 條 AND guard：affiliate 存在 / enabled 為 true / links 非空 array / position 存在 / position.bottom 為 true -%>
+  <%# 對無 affiliate 或 5 條 guard 不通過之既有 ready post，本區塊完全不渲染 -%>
+  <%# 同 affiliate top 之 markup pattern；沿用 lab-affiliate-box BEM；不接 normalize-post-output -%>
+  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(post.affiliate.links) && post.affiliate.links.length > 0 && post.affiliate.position && post.affiliate.position.bottom) { %>
+  <div class="lab-container">
+    <aside class="lab-affiliate-box">
+      <h3 class="lab-affiliate-box__title">立即購買</h3>
+      <% if (post.affiliate.disclosure) { %>
+      <p class="lab-affiliate-box__disclosure"><%= post.affiliate.disclosure %></p>
+      <% } %>
+      <ul class="lab-affiliate-box__links">
+        <% post.affiliate.links.forEach(function(link) { %>
+        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+        <% }); %>
+      </ul>
+    </aside>
+  </div>
+  <% } -%>
 
   <%# Phase 9-g-f-b：相關連結（作者手動指定；mirror Blogger 9-g-d-b pattern） -%>
   <%# renderable pre-filter：plain object 且 url 非空 且 title 非空 才渲染；其餘 skip -%>
