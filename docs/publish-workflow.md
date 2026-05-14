@@ -202,6 +202,7 @@ npm run new:post -- --slug "my-new-post" --series-id "we-media-ai-52" --series-n
 - `dist-blogger/posts/{slug}/post.html` 之「相關連結 / 其他連結」區塊（per Phase 9-g-d-b）：HTML body 已自動輸出 `<aside class="lab-related-links">` / `<aside class="lab-other-links">`；複製 HTML 整段時即包含
 - `dist-blogger/posts/{slug}/copy-helper.txt` 之 **[13] 相關連結 / 其他連結**（per Phase 9-g-d-c）：純文字確認清單；**只供作者對照，不需手動貼到 Blogger**
 - `dist-blogger/posts/{slug}/publish-checklist.txt` 之 **相關連結 / 其他連結內容檢查** 區塊（per Phase 9-g-e-b）：僅當文章有 renderable `relatedLinks` / `otherLinks` 時顯示；含連結數量 / external rel auto / internal url 提醒 / url-title 空 item skip 提示
+- **GitHub 端**：`dist/posts/{slug}/index.html` 之「相關連結 / 其他連結」區塊（per Phase 9-g-f-b）：HTML body 已自動輸出（包覆 `<div class="lab-container">`）；GitHub Pages 部署後讀者直接看到，**無需手動操作**
 - 完整 schema 詳見 `docs/related-links-schema.md`
 
 注意事項：
