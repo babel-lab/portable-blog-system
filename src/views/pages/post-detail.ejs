@@ -73,6 +73,34 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     <%- bodyHtml %>
   </div>
 
+  <%# Phase 9-h-c-b：教具下載 Box（mirror Blogger 端 post-full.ejs 之 download box） -%>
+  <%# 3 條 AND guard：download 存在 / enabled 為 true / fileUrl 有值 -%>
+  <%# 對無 download 或 3 條 guard 不通過之既有 ready post，本區塊完全不渲染 -%>
+  <%# 沿用 lab-download-box BEM；SCSS 已於 Phase 2-2-o 落地（_download-box.scss + main.scss import 已就位） -%>
+  <%# a 標籤使用 HTML5 download 屬性；不加 target；不加 rel（mirror Blogger pattern；download 為自家教具非聯盟） -%>
+  <%# title / description / fileType / licenseNote 皆選填；有值才輸出對應元素 -%>
+  <%# 本批不加 per-item filter / URL 驗證 / validate rule / GA4 event；mirror Blogger 既有 pattern -%>
+  <%# trim-newline pattern：對無 download 之 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
+  <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 9-g-d-c-fix / 9-g-f-b / 9-h-b-b 既有預防經驗） -%>
+  <% if (post.download && post.download.enabled && post.download.fileUrl) { %>
+  <div class="lab-container">
+    <aside class="lab-download-box">
+      <% if (post.download.title) { %>
+      <h3 class="lab-download-box__title"><%= post.download.title %></h3>
+      <% } %>
+      <% if (post.download.description) { %>
+      <p class="lab-download-box__description"><%= post.download.description %></p>
+      <% } %>
+      <a class="lab-download-box__cta" href="<%= post.download.fileUrl %>" download>
+        <% if (post.download.fileType) { %><span class="lab-download-box__filetype"><%= post.download.fileType %></span><% } %>下載檔案
+      </a>
+      <% if (post.download.licenseNote) { %>
+      <p class="lab-download-box__license"><%= post.download.licenseNote %></p>
+      <% } %>
+    </aside>
+  </div>
+  <% } -%>
+
   <%# Phase 9-h-b-b：聯盟販售連結 Box 後置（mirror Blogger 端 post-full.ejs 之 affiliate bottom） -%>
   <%# 5 條 AND guard：affiliate 存在 / enabled 為 true / links 非空 array / position 存在 / position.bottom 為 true -%>
   <%# 對無 affiliate 或 5 條 guard 不通過之既有 ready post，本區塊完全不渲染 -%>
