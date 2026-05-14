@@ -4,12 +4,13 @@
 
 **更新歷程**：本文件原於 commit `a44ace8` 建立為 Phase 9-g overall snapshot；其後 9-g-f-a / 9-g-f-b / 9-g-f-c 系列啟動，於 9-g-f-c 擴充記錄 GitHub render 落地（§4.12）與更新 §3 / §5.2 / §8 / §9。
 
-**後續系列**：Phase 9-g 之後已另開 **Phase 9-h 系列**（GitHub article block parity）；至本文件更新時已落地 3 個子系列：
+**後續系列**：Phase 9-g 之後已另開 **Phase 9-h 系列**（GitHub article block parity）；至本文件更新時已落地 4 個子系列：
 - **9-h-b 子系列**：GitHub Affiliate Box top / bottom（commit `f16457e`；docs sync `c356a2b`）
 - **9-h-c 子系列**：GitHub Download Box（commit `6f06f28`；docs sync `7961a73`）
-- **9-h-d 子系列**：GitHub Hashtag（commit `0ddeda6`；docs sync 為 Phase 9-h-d-c 本批）
+- **9-h-d 子系列**：GitHub Hashtag（commit `0ddeda6`；docs sync `6ae08c1`）
+- **9-h-e 子系列**：GitHub Book Photo（commit `5824a6d`；docs sync 為 Phase 9-h-e-c 本批；**dormant render**：目前 `content/github/posts/` 無 ready book-review post，4 條 AND guard 之 ① contentKind 即 fail，dist 對既有 ready posts 完全不輸出；**無 ready book-review GitHub post live test**；infrastructure ready 待未來 ready book-review post 激活）
 
-後續候選含 GitHub Book Photo / 兩端 Related Posts auto；詳見 `docs/future-roadmap.md` §2 Phase 9 row 之 Phase 9-h 區段。本文件不擴大記錄 9-h 內容；Phase 9-h 之完整紀錄另由 future-roadmap + 未來可能之 `docs/phase-9h-completion-report.md` 承擔。
+後續候選含 兩端 Related Posts auto；詳見 `docs/future-roadmap.md` §2 Phase 9 row 之 Phase 9-h 區段。本文件不擴大記錄 9-h 內容；Phase 9-h 之完整紀錄另由 future-roadmap + 未來可能之 `docs/phase-9h-completion-report.md` 承擔。
 
 對應之上層紀錄詳見：
 - `docs/related-links-schema.md` §9.1（已落地之子批進度完整 table）

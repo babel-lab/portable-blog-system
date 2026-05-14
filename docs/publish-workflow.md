@@ -228,6 +228,12 @@ npm run new:post -- --slug "my-new-post" --series-id "we-media-ai-52" --series-n
 - Hashtag 為 **display-only span**，**不是連結**；**不**加 `href` / `target` / `rel`（mirror Blogger 之 non-link pattern；hashtag link / GA4 tag_click event 屬未來增強候選）
 - Blogger 端原 hashtag 流程**完全不變**（per `src/views/blogger/blogger-post-full.ejs` 既有 `<ul class="lab-hashtags">` 區塊；無修改）
 
+**Book Photo GitHub 端補述**（per Phase 9-h-e-b 落地之 GitHub article block parity）：
+
+- GitHub 端現在若文章 frontmatter `contentKind: "book-review"` 且 `book.showBookPhoto: true` 與 `book.coverImage` 有值，`dist/posts/{slug}/index.html` 也會自動輸出 Book Photo 區塊（mirror Blogger `lab-book-photo` BEM；`<figure class="lab-book-photo">` + `<img class="lab-book-photo__image">`；title 有值時輸出 `<figcaption class="lab-book-photo__caption">《title》` 含可選 ` — publisher` nested append；img alt 三層 fallback `coverAlt → title → 空字串`）
+- 本功能目前為 **dormant render**：因 `content/github/posts/` 無 ready book-review post（兩篇 ready posts 均為 `contentKind: tech-note`），4 條 AND guard 之 ① 即 fail，dist 對既有 ready posts 完全不輸出；infrastructure ready 當未來新增 ready book-review GitHub post 時自動激活 render
+- Blogger 端原 book photo 流程**完全不變**（per `src/views/blogger/blogger-post-full.ejs` 既有 `<figure class="lab-book-photo">` 區塊；無修改）
+
 ---
 
 ## 12. Facebook promotion 流程 SOP（補強 §4.3）
