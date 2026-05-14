@@ -186,6 +186,24 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   </div>
   <% } -%>
 
+  <%# Phase 9-h-d-b：Hashtag 區塊（mirror Blogger 端 post-full.ejs 之 hashtag pattern） -%>
+  <%# 4 條 AND guard：post.blocks 存在 / post.blocks.hashtags 為 truthy / post.tags 是 array / post.tags.length 大於 0 -%>
+  <%# 對無 tags 或 blocks.hashtags 不為 true 之既有 ready post，本區塊完全不渲染 -%>
+  <%# 沿用 lab-hashtags / lab-hashtag BEM；SCSS 已於 Phase 2-2-g 落地（_hashtag.scss + main.scss line 23 import 已就位） -%>
+  <%# hashtag 本批採 display-only span 設計（mirror Blogger）；不加 hashtag link / target / rel / GA4 event -%>
+  <%# 本批不接 normalize-post-output；直接讀 post.tags（mirror Blogger 既有 pattern） -%>
+  <%# trim-newline pattern：對無 hashtag 之 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
+  <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 9-g-d-c-fix / 9-g-f-b / 9-h-b-b / 9-h-c-b 既有預防經驗） -%>
+  <% if (post.blocks && post.blocks.hashtags && Array.isArray(post.tags) && post.tags.length > 0) { %>
+  <div class="lab-container">
+    <ul class="lab-hashtags">
+      <% post.tags.forEach(function(tag) { %>
+      <li><span class="lab-hashtag">#<%= tag %></span></li>
+      <% }); %>
+    </ul>
+  </div>
+  <% } -%>
+
   <% if (typeof ads !== 'undefined' && ads && ads.enabled === true && post.blocks && post.blocks.adsenseBottom) { %>
   <div class="lab-container">
     <%- await include('../ads/adsense-post-bottom', { ads }) %>
