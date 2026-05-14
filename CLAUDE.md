@@ -189,6 +189,7 @@ blocks:
 See also:
 - `docs/publish-bundle.md` §2.6.1（`.md` frontmatter 內容屬性欄位列表）
 - `docs/migration-from-frontmatter.md` §4（舊 frontmatter → `.md` frontmatter 對照）
+- `docs/related-links-schema.md`（`relatedLinks` / `otherLinks` 欄位字典；屬內容屬性，**不放** `.publish.json` 與 `.fb.md`；`[Youtube]` / `[台北市立圖書館]` 等顯示前綴拆入 `platform` 欄位，**不**併入 `title`）
 
 ## 3.2 站台設定
 
@@ -1226,6 +1227,25 @@ utm_medium=internal_referral
 utm_campaign=github_to_blogger
 utm_content={slug}
 ```
+
+## 16.5 relatedLinks / otherLinks 連結處理
+
+文章 frontmatter 之 `relatedLinks` / `otherLinks` 屬作者手動指定之兩個連結分區（與 §17 之 Related Posts 自動推薦區塊為兩套獨立機制；不互相 fallback）。
+
+連結處理規則：
+
+```text
+kind: internal  → 不加 nofollow；不加 UTM；同分頁開啟（沿用 §16.3）
+kind: external  → 自動套 target="_blank" rel="nofollow noopener"（沿用 §16.1）
+```
+
+作者**不需手填** `target` / `rel`；由 build / render 階段依 `kind` 自動套。
+
+internal link 之 `url` 應使用**已發布後回填**之真實 URL（對 Blogger 文章為 `blogger.publishedUrl`，per §24）；不可預測 Blogger URL（per `docs/publish-json-schema.md` §5.3）。
+
+`[Youtube]` / `[台北市立圖書館]` 等顯示前綴應拆入 `platform` 欄位，**不**併入 `title`。
+
+完整欄位字典詳見 `docs/related-links-schema.md`。
 
 ---
 

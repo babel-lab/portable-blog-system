@@ -206,6 +206,8 @@ Blogger Page URL **不一定遵守文章年月規則**。Page URL 之形式由 B
 
 See also：`series` 之完整欄位字典、跨平台共用原則、`series.id` 穩定性、自動建議序號、Blogger / FB title 與 `titleEn` 分工，詳見 `docs/series-schema.md`（Phase 8-e-1）。`series` 屬內容屬性，**不放** `.publish.json` 與 `.fb.md`（沿用 §1.1 / §2.6.4 之硬性原則）。
 
+See also：`relatedLinks` / `otherLinks` 之完整欄位字典、`kind`（internal / external）自動 `target` / `rel` 規則、與 `blocks.relatedPosts` 自動推薦機制之 two-track 區分、與 `affiliate.links` 之語意分界、internal link 與 `publishedUrl` 之關係，詳見 `docs/related-links-schema.md`（Phase 9-g-b）。`relatedLinks` / `otherLinks` 屬內容屬性，**不放** `.publish.json` 與 `.fb.md`（沿用 §1.1 / §2.6.4 之硬性原則）。
+
 #### 2.6.2 `.publish.json`：發布狀態 / 平台回填 / 平台輸出
 
 放置「發布後才回填、會頻繁變動」之資料：

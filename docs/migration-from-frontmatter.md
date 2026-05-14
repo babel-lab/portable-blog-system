@@ -149,6 +149,8 @@ contentKind: page
 
 具體欄位字典（型別、選填性、巢狀結構）留待後續 content-schema 文件批次定義；本文件僅提供遷移對照。
 
+See also：`relatedLinks` / `otherLinks` 之完整欄位字典、`kind`（internal / external）自動 `target` / `rel` 規則、internal link 之 `url` 與 `publishedUrl` 之關係（不可預測 Blogger URL）、與 `blocks.relatedPosts` 自動推薦之 two-track 區分、與 `affiliate.links` 之語意分界，詳見 `docs/related-links-schema.md`（Phase 9-g-b）。遷移時若舊文章末段已有手動「相關連結 / 其他連結」段落，建議拆解成 `relatedLinks` / `otherLinks` 結構化資料：將 `[Youtube]` / `[台北市立圖書館]` 等顯示前綴拆入 `platform` 欄位，**不**併入 `title`。
+
 ---
 
 ## §5 舊 frontmatter / 舊發布欄位 → `.publish.json` 對照
