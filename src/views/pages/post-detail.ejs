@@ -40,6 +40,26 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   </div>
   <% } %>
 
+  <%# Phase 9-h-e-b：Book Photo 區塊（mirror Blogger 端 post-full.ejs 之 book photo pattern） -%>
+  <%# 4 條 AND guard：post.contentKind 為 book-review / post.book 存在 / post.book.showBookPhoto 為 truthy / post.book.coverImage 有值 -%>
+  <%# 對非 book-review 或 4 條 guard 不通過之既有 ready post，本區塊完全不渲染 -%>
+  <%# 沿用 lab-book-photo BEM；SCSS 已就位（_book-photo.scss + main.scss line 28 import 已就位） -%>
+  <%# img alt 三層 fallback：post.book.coverAlt → post.book.title → 空字串（mirror Blogger） -%>
+  <%# figcaption 條件渲染：僅當 post.book.title 有值時輸出；publisher 為 nested optional append -%>
+  <%# 本批不接 normalize-post-output；直接讀 post.contentKind（mirror 9-h-b-b / 9-h-c-b / 9-h-d-b 既有 pattern） -%>
+  <%# trim-newline pattern：對非 book-review 之 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
+  <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 9-g-d-c-fix / 9-g-f-b / 9-h-b-b / 9-h-c-b / 9-h-d-b 既有預防經驗） -%>
+  <% if (post.contentKind === 'book-review' && post.book && post.book.showBookPhoto && post.book.coverImage) { %>
+  <div class="lab-container">
+    <figure class="lab-book-photo">
+      <img class="lab-book-photo__image" src="<%= post.book.coverImage %>" alt="<%= post.book.coverAlt || post.book.title || '' %>">
+      <% if (post.book.title) { %>
+      <figcaption class="lab-book-photo__caption">《<%= post.book.title %>》<% if (post.book.publisher) { %> — <%= post.book.publisher %><% } %></figcaption>
+      <% } %>
+    </figure>
+  </div>
+  <% } -%>
+
   <% if (typeof ads !== 'undefined' && ads && ads.enabled === true && post.blocks && post.blocks.adsenseTop) { %>
   <div class="lab-container">
     <%- await include('../ads/adsense-post-top', { ads }) %>
