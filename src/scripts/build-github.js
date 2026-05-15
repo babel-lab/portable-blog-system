@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import ejs from 'ejs';
 
 import { loadSettings } from './load-settings.js';
-import { loadPosts } from './load-posts.js';
+import { loadGithubPosts } from './load-github-posts.js';
 import { renderBody } from './parse-markdown.js';
 import { validateContent, printWarnings } from './validate-content.js';
 
@@ -129,6 +129,15 @@ function buildCanonicalUrl({ pageType, post, slug, settings }) {
     case 'post-detail': {
       const raw = post?.canonical;
       if (raw && raw !== 'auto' && /^https?:\/\//.test(raw)) return raw;
+      // Phase 9-i-f-b：cross-source mirror page → Blogger publishedUrl as canonical
+      //   per docs/phase-9h-known-blockers.md §3（Blocker #1）
+      //   對稱於 build-blogger.js 之 Phase 9-i-b2 修正
+      if (post?.primaryPlatform === 'blogger') {
+        const bloggerPublishedUrl = post.publish?.blogger?.publishedUrl;
+        if (typeof bloggerPublishedUrl === 'string' && bloggerPublishedUrl !== '') {
+          return bloggerPublishedUrl;
+        }
+      }
       return `${base}/posts/${post.slug}/`;
     }
     case 'category-list':
@@ -253,7 +262,9 @@ async function main() {
 
   const settings = await loadSettings();
   // Phase 8-f-2-b：plumbing — settings 經 loadPosts 轉發至 processMarkdownEntry / normalizePostOutput
-  const githubPosts = await loadPosts({ site: 'github', settings });
+  // Phase 9-i-f-b：改用 loadGithubPosts() cross-source aggregator；mirror loadBloggerPosts 既有模式
+  //   含 github 原生 source + content/blogger/posts 中 publishTargets.github.enabled === true 之 cross-source
+  const githubPosts = await loadGithubPosts({ settings });
   const baseData = makeBaseData(settings);
 
   const { warnings } = validateContent({ posts: githubPosts.posts, settings });
