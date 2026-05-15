@@ -126,13 +126,25 @@ function buildIndexText({ generatedAt, mode, stats, enabledEntries, fbGloballyEn
 // ---- 過濾邏輯 ------------------------------------------------------------
 
 // 回傳 { include: bool, reason: string, page: string|null, fb: object|null }
+// Phase 9-i-d-b：.fb.md sidecar 優先；fallback 至 legacy post.promotion.facebook
+//   per docs/phase-9h-known-blockers.md §5（Blocker #3）
 function classifyFacebook(post, fbConfig) {
-  const promo = post.promotion;
-  if (!promo) return { include: false, reason: 'no-promotion-block' };
+  const fbSidecar = post.sidecars?.facebook;
+  const sidecarData =
+    fbSidecar &&
+    fbSidecar.exists === true &&
+    fbSidecar.data &&
+    typeof fbSidecar.data === 'object' &&
+    !Array.isArray(fbSidecar.data)
+      ? fbSidecar.data
+      : null;
+  const legacyFb =
+    post.promotion?.facebook && typeof post.promotion.facebook === 'object'
+      ? post.promotion.facebook
+      : null;
+  const fb = sidecarData || legacyFb;
 
-  const fb = promo.facebook;
-  if (!fb || typeof fb !== 'object') return { include: false, reason: 'no-facebook-block' };
-
+  if (!fb) return { include: false, reason: 'no-promotion-block' };
   if (fb.enabled !== true) return { include: false, reason: 'facebook-not-enabled' };
 
   const page = fb.page || fbConfig.defaultPage || null;
