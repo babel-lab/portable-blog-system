@@ -13,11 +13,11 @@
 
 | 項目 | 值 |
 |---|---|
-| **HEAD** | `31ae053 fix(promotion): use .fb.md sidecar as facebook source when present` |
+| **HEAD** | `7986d58 fix(github): cross-build blogger posts with publishTargets.github.enabled` |
 | **working tree** | clean |
 | **validate baseline** | `0 error / 22 warning / 17 warning-posts`（per validate-content.js byPath.size 定義；17 為「有 warning/error 之 post 數」非「總載入 post 數」；新 migration post 載入且 clean，**不**列入此 17 計數）|
 | **第 1 篇 migration post commit** | `8332d82 feat(content): migrate blogger article we-media-myself2`（3 檔；170 insertions）|
-| **已解除 blocker commits** | `7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block`（per §6.A）+ `eced408 fix(settings): replace site.config.json placeholder URLs` + `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger`（per §6.B；Blocker #2 完全解除）+ `31ae053 fix(promotion): use .fb.md sidecar as facebook source when present`（per §6.C；Blocker #3 完全解除）|
+| **已解除 blocker commits** | `7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block`（per §6.A）+ `eced408 fix(settings): replace site.config.json placeholder URLs` + `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger`（per §6.B；Blocker #2 完全解除）+ `31ae053 fix(promotion): use .fb.md sidecar as facebook source when present`（per §6.C；Blocker #3 完全解除）+ `7986d58 fix(github): cross-build blogger posts with publishTargets.github.enabled`（per §6.D；Blocker #1 完全解除；**Phase 9-h known blockers 3/3 completed**）|
 
 ---
 
@@ -63,7 +63,12 @@
 
 ---
 
-## §3 Known Blocker 1：GitHub cross-source dist 未產出
+## §3 Known Blocker 1：GitHub cross-source dist 未產出 ✅ COMPLETED
+
+**狀態**：✅ **完全解除**（resolved on 2026-05-15）
+**修復 commit**：`7986d58 fix(github): cross-build blogger posts with publishTargets.github.enabled`（Phase 9-i-f-b）
+
+詳細修復紀錄見 §6.D（已解除 blockers）。本節以下保留原問題分析；§3.3 推測根因標 ✅ 已修；§3.5 / §3.6 之後續候選批次與優先級已過期，僅作歷史紀錄。
 
 ### 3.1 現象
 
@@ -78,7 +83,7 @@
 
 `dist/posts/` 只包含 `content/github/posts/` 來源之文章；**不**含 `content/blogger/posts/we-media-myself2.md`（即使其 `publishTargets.github.enabled: true`）。
 
-### 3.3 推測根因
+### 3.3 推測根因 ✅ 已修（commit `7986d58`）
 
 `build-github.js`（vite build 之 prebuild）似乎只掃描 `content/github/posts/`，**未**掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 的文章。
 
@@ -95,13 +100,13 @@
 - ❌ 跨平台 article block parity **無法驗證**（per Phase 9-h 達成之 100% conditional article blocks parity 設計理想）
 - ❌ GitHub Pages 站之文章列表 / 卡片頁無此 migration post
 
-### 3.5 後續候選批次
+### 3.5 後續候選批次（歷史；已過期）
 
-- **Phase 9-h-fix-build-github-cross-source**
+- ~~**Phase 9-h-fix-build-github-cross-source**~~ → ✅ **landed as Phase 9-i-f-b**（commit `7986d58`）
 
-### 3.6 優先級
+### 3.6 優先級（歷史；已過期）
 
-**Medium-High**
+~~**Medium-High**~~ → ✅ **completed on 2026-05-15**
 
 ---
 
@@ -226,11 +231,12 @@ https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 
 ## §6 已解除 blockers
 
-本節記錄**已解除之 blockers**（共 3 條）：
+本節記錄**已解除之 blockers**（共 4 條；含 1 個 pre-existing EJS bug + 3 個 Phase 9-h known blockers）：
 
 - **§6.A**：blogger-copy-helper.ejs book metadata EJS scriptlet bug（commit `7212ccd`）
 - **§6.B**：Blocker #2 canonical.resolved → example.com / GitHub path（commits `eced408` + `7be40a7`；於 2026-05-15 完全解除）
 - **§6.C**：Blocker #3 build:promotion sidecar attach 未生效（commit `31ae053`；於 2026-05-15 完全解除）
+- **§6.D**：Blocker #1 GitHub cross-source dist 未產出（commit `7986d58`；於 2026-05-15 完全解除；**Phase 9-h known blockers 3/3 completed**）
 
 ---
 
@@ -380,14 +386,100 @@ ReferenceError: lines is not defined
 
 ---
 
+### §6.D GitHub cross-source dist 未產出（Blocker #1）
+
+#### 6.16 原問題
+
+`dist/posts/we-media-myself2/index.html` **不存在**；`build-github.js`（vite build 之 prebuild）只掃描 `content/github/posts/`，**未**掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 之 cross-source 文章；publishTargets.github.enabled 對 blogger 來源文章為 **dead metadata**。
+
+詳見 §3（原 Blocker #1 描述）。
+
+#### 6.17 兩個根因（per Phase 9-i-f-a 純讀取分析）
+
+| 根因 | 影響 | 修復細節 |
+|---|---|---|
+| **根因 1**：`build-github.js:256` 僅呼叫 `loadPosts({ site: 'github', settings })`；**完全沒讀** `content/blogger/posts/`；architecture asymmetry vs build-blogger.js 之 cross-source 設計 | blogger source 文章（即使含 `publishTargets.github.enabled: true`）不會進入 GitHub dist 產出 | 新增 `src/scripts/load-github-posts.js`（mirror load-blogger-posts.js）+ build-github.js swap loadPosts → loadGithubPosts |
+| **根因 2**：`buildCanonicalUrl()` post-detail 分支未考慮 cross-source post（primaryPlatform=blogger 但於 GitHub dist 之 mirror page）之 canonical 策略；應指向 Blogger publishedUrl 而非 GitHub URL | mirror page 之 canonical / JSON-LD 指向錯誤站台；duplicate content 風險 | build-github.js `buildCanonicalUrl()` post-detail 分支加 cross-source 分支（mirror Phase 9-i-b2 對稱實作）|
+
+#### 6.18 修復摘要
+
+- **`7986d58` fix(github): cross-build blogger posts with publishTargets.github.enabled**
+  - **新增** `src/scripts/load-github-posts.js`（99 行）：
+    - mirror `load-blogger-posts.js` 結構（方向相反）
+    - 兩 loadPosts call：`site: 'github'`（primary）+ `site: 'blogger'`（cross）
+    - cross-source filter：`p.publishTargets?.github?.enabled === true` → `sourceSite: 'blogger-cross'`
+    - slug 衝突偵測 + warnings + filteredOut 整合 + 排序
+    - 不加 `githubMode`（per Phase 9-i-a §6.2 確認 `publishTargets.github.mode` 為 dead metadata）
+  - **修改** `src/scripts/build-github.js`（+13 / -2；3 處 edit）：
+    - line 8 import swap：`loadPosts` → `loadGithubPosts`
+    - line 264-266 main flow swap：`loadPosts({ site: 'github' })` → `loadGithubPosts({ settings })`
+    - line 129-138 `buildCanonicalUrl()` post-detail 分支：加 cross-source canonical 分支（`post.primaryPlatform === 'blogger'` + `post.publish?.blogger?.publishedUrl` 存在 → return Blogger publishedUrl；對稱 Phase 9-i-b2 之 build-blogger.js 修正）
+  - 既有原生 GitHub posts 行為**完全保留**（fallback chain）
+  - 既有 GitHub posts 之 canonical 仍指向 `https://babel-lab.github.io/posts/{slug}/`
+  - 對 Blogger build / Promotion build **無影響**（commit 範圍嚴格限於 build-github.js + load-github-posts.js）
+
+#### 6.19 驗證摘要
+
+| 維度 | 結果 |
+|---|---|
+| **validate baseline** | ✅ `0 error / 22 warning / 17 post(s)`（維持；無 regression）|
+| **`dist/posts/we-media-myself2/index.html` 產出** | ✅ 11,035 bytes |
+| **GitHub mirror page canonical** | ✅ `https://babel-lab.blogspot.com/2026/05/we-media-myself2.html` |
+| **GitHub mirror page JSON-LD `@id` / `mainEntityOfPage`** | ✅ 同 canonical |
+| **GitHub mirror page `og:url`** | ✅ 同 canonical |
+| **GitHub mirror page article content** | ✅ 含 文章標題 + relatedLinks / otherLinks aside + hashtags + 5 張 Comic 圖；book photo / affiliate / download 正確 dormant |
+| **dist/index.html / categories / tags 含 we-media-myself2** | ✅（home: 1 / categories/book-review: 1 / tags/book-review + reading-notes + self-growth: 各 1）|
+| **既有 GitHub posts canonical** | ✅ 仍指向 `https://babel-lab.github.io/posts/{slug}/`（無 regression）|
+| **Blogger / Promotion regression** | ✅ 無 regression（per Phase 9-i-f-verify §G）|
+| **example.com 全域殘留** | ✅ **0 命中**（dist / dist-blogger / dist-promotion / dist-reports 皆 0）|
+
+#### 6.20 修正後狀態
+
+✅ Blocker #1 之兩個根因**完全解除**。
+
+- 修復日期：**2026-05-15**
+- 修復 commit：`7986d58`
+- GitHub Pages 站之 cross-source mirror page 流程已生產可用
+- Phase 1 之**跨平台 article block parity 100%** 達成（Blogger + GitHub 兩端皆可產出對應 post detail page）
+- Phase 9-h 之 conditional article blocks 設計理想於 cross-source 場景**完整生效**
+
+🎉 **Phase 9-h known blockers 3/3 全部完成驗證並 commit**：
+- ✅ Blocker #1（GitHub cross-source；commit `7986d58`）
+- ✅ Blocker #2（canonical → example.com；commits `eced408` + `7be40a7`）
+- ✅ Blocker #3（promotion sidecar attach；commit `31ae053`）
+
+---
+
 ## §7 建議後續處理順序
 
 | 順序 | 批次 | 範圍 | 優先級 |
 |---|---|---|---|
 | ~~**1**~~ | ~~**Phase 9-h-fix-canonical-resolver + Phase 9-h-fix-site-config-urls**~~ | ~~修 build-blogger.js canonical 邏輯 + 修 site.config.json placeholder URLs~~ | ✅ **completed**（Phase 9-i-b1 + 9-i-b2；commits `eced408` + `7be40a7`） |
 | ~~**2**~~ | ~~**Phase 9-h-fix-build-promotion-sidecar**~~ | ~~修 build-promotion.js / load-posts.js 之 .fb.md sidecar attach 邏輯~~ | ✅ **completed**（Phase 9-i-d-b；commit `31ae053`；實際根因為 `classifyFacebook()` 未讀 sidecar；無需動 load-posts.js）|
-| **3**（→ 改為 1）| **Phase 9-h-fix-build-github-cross-source** | 修 build-github.js 使其掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 之文章 | 🟠 Medium-High |
-| **4**（→ 改為 2）| **視需要再更新 `docs/phase-1-completion-report.md` / `docs/phase-1-completion-checklist.md`** | 同步 known blockers 之修復狀態 + 視情況升級 completion report 為正式 final | — |
+| ~~**3**~~ | ~~**Phase 9-h-fix-build-github-cross-source**~~ | ~~修 build-github.js 使其掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 之文章~~ | ✅ **completed**（Phase 9-i-f-b；commit `7986d58`；新增 `load-github-posts.js` mirror 既有 cross-source 模式；含 GitHub mirror page canonical 對稱修正）|
+| **4**（→ 改為 1）| **視需要再更新 `docs/phase-1-completion-report.md` / `docs/phase-1-completion-checklist.md`** | 同步 known blockers 之修復狀態 + 視情況升級 completion report 為正式 final | — |
+
+---
+
+### §7.1 Phase 9-h known blockers 完整收尾
+
+🎉 **Phase 9-h known blockers 3/3 全部解除**（2026-05-15）：
+
+| Blocker | 修復 commits | docs 標記 commits | 狀態 |
+|---|---|---|---|
+| #1 GitHub cross-source dist 未產出 | `7986d58` | （本批 Phase 9-i-g）| ✅ completed |
+| #2 canonical → example.com / GitHub path | `eced408` + `7be40a7` | `4514de6` | ✅ completed |
+| #3 build:promotion sidecar attach | `31ae053` | `ee52544` | ✅ completed |
+
+**remaining open blockers**：**0**（無 open blocker）
+
+**後續候選**：
+
+- **Phase 9-z / Phase 1 final report sync**：考慮升級 `docs/phase-1-completion-report.md` 為正式 final（移除 "candidate" 標註）；前提是 §10 真實作者試寫流程已完成（per phase-1 completion-checklist.md）
+- **Phase 8-h legacy 退場系列**：per `docs/phase-8h-pre-analysis.md`；trigger condition 已滿足（per Phase 9-z-c §11 順序 3：「final report 已封存後啟動 8-h 退場」）
+- **Phase 9-g-g JSON-LD `mentions` / `isPartOf`**：deferred；觸發條件「真實 ready post 可做 Google Rich Results Test」**已滿足**（per 本 session 之 we-media-myself2 + Phase 9-i-b 之 canonical 修正）
+- **Phase 9-f-g Book / Periodical structured data**：deferred；同上觸發條件已滿足
+- **idle freeze**：本 session 已達 7+ commits；可作收尾
 
 **保守原則**：每批次獨立 commit；不混合多 blocker 修正於同一 commit。
 
