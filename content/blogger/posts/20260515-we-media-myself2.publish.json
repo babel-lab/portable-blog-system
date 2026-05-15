@@ -1,0 +1,34 @@
+{
+  "$comment": "Phase 8-a publish bundle sidecar. Migration 舊文：blogger.status=published；publishedUrl 已知。",
+
+  "canonical": {
+    "source": "auto",
+    "url": ""
+  },
+
+  "blogger": {
+    "type": "post",
+    "permalink": "we-media-myself2",
+    "status": "published",
+    "publishedUrl": "https://babel-lab.blogspot.com/2026/05/we-media-myself2.html",
+    "publishedAt": "2026-05-15",
+    "publishYear": 2026,
+    "publishMonth": 5,
+    "bloggerPostId": ""
+  },
+
+  "github": {
+    "enabled": true,
+    "path": "/posts/we-media-myself2/",
+    "publishedUrl": ""
+  },
+
+  "seo": {
+    "metaTitle": "",
+    "metaDescription": "",
+    "ogImage": {
+      "url": "",
+      "alt": ""
+    }
+  }
+}
