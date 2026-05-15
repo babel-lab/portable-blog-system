@@ -13,11 +13,11 @@
 
 | 項目 | 值 |
 |---|---|
-| **HEAD** | `7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block` |
+| **HEAD** | `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger` |
 | **working tree** | clean |
 | **validate baseline** | `0 error / 22 warning / 17 warning-posts`（per validate-content.js byPath.size 定義；17 為「有 warning/error 之 post 數」非「總載入 post 數」；新 migration post 載入且 clean，**不**列入此 17 計數）|
 | **第 1 篇 migration post commit** | `8332d82 feat(content): migrate blogger article we-media-myself2`（3 檔；170 insertions）|
-| **歷史性 blocker 已修復 commit** | `7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block`（per §6）|
+| **已解除 blocker commits** | `7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block`（per §6.A）+ `eced408 fix(settings): replace site.config.json placeholder URLs` + `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger`（per §6.B；Blocker #2 完全解除）|
 
 ---
 
@@ -105,7 +105,14 @@
 
 ---
 
-## §4 Known Blocker 2：canonical.resolved 指向 example.com / GitHub path
+## §4 Known Blocker 2：canonical.resolved 指向 example.com / GitHub path ✅ COMPLETED
+
+**狀態**：✅ **完全解除**（resolved on 2026-05-15）
+**修復 commits**：
+- `eced408 fix(settings): replace site.config.json placeholder URLs`（Phase 9-i-b1；根因 1）
+- `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger`（Phase 9-i-b2；根因 2）
+
+詳細修復紀錄見 §6.B（已解除 blockers）。本節以下保留原問題分析；§4.3 / §4.4 根因標 ✅ 已修；§4.7 優先級已過期，僅作歷史紀錄。
 
 ### 4.1 現象
 
@@ -123,7 +130,7 @@ https://example.com/posts/we-media-myself2/?utm_source=blogger&utm_medium=intern
 https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 ```
 
-### 4.3 已確認根因 1：site.config.json placeholder
+### 4.3 已確認根因 1：site.config.json placeholder ✅ 已修（commit `eced408`）
 
 `content/settings/site.config.json` 中 `githubSiteUrl` / `bloggerSiteUrl` 仍是 `https://example.com` placeholder：
 
@@ -140,7 +147,7 @@ https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 
 → 計算之 canonical URL 之 host 為 `example.com`。
 
-### 4.4 推測根因 2：build-blogger.js canonical resolver 邏輯不正確
+### 4.4 推測根因 2：build-blogger.js canonical resolver 邏輯不正確 ✅ 已修（commit `7be40a7`）
 
 `build-blogger.js` 之 canonical resolver **未優先使用** `.publish.json` 之 `blogger.publishedUrl`，而 fallback 至 `buildBloggerToGithubUrl()` 之 cross-platform 邏輯（per build-blogger.js line 96-104 之既有設計）。
 
@@ -159,9 +166,9 @@ https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 
 可合併為單批或分開；兩者皆需處理才能完整解決。
 
-### 4.7 優先級
+### 4.7 優先級（歷史；已過期）
 
-**High**
+~~**High**~~ → ✅ **completed on 2026-05-15**
 
 ---
 
@@ -208,16 +215,25 @@ https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 
 ---
 
-## §6 已解除 blocker：blogger-copy-helper.ejs book metadata EJS scriptlet bug
+## §6 已解除 blockers
 
-### 6.1 原錯誤
+本節記錄**已解除之 blockers**（共 2 條）：
+
+- **§6.A**：blogger-copy-helper.ejs book metadata EJS scriptlet bug（commit `7212ccd`）
+- **§6.B**：Blocker #2 canonical.resolved → example.com / GitHub path（commits `eced408` + `7be40a7`；於 2026-05-15 完全解除）
+
+---
+
+### §6.A blogger-copy-helper.ejs book metadata EJS scriptlet bug
+
+#### 6.1 原錯誤
 
 ```
 ReferenceError: lines is not defined
   at eval ("src/views/blogger/blogger-copy-helper.ejs":185)
 ```
 
-### 6.2 原因
+#### 6.2 原因
 
 `src/views/blogger/blogger-copy-helper.ejs` line 127 之 EJS scriptlet 過早關閉：
 
@@ -225,18 +241,73 @@ ReferenceError: lines is not defined
 - Lines 128-179 之 JS 程式碼（`const book` / `const lines` / `lines.push(...)` 等）被視為 raw template text
 - Line 185 `<%= lines.join('\n') %>` 嘗試 access `lines` 變數 → `ReferenceError`
 
-### 6.3 為何之前未發現
+#### 6.3 為何之前未發現
 
 該分支觸發條件為 `post.book` 為 plain object（即 `contentKind: book-review` + 含 `book` block）。Phase 9-f-c-b 之前無 ready post 含 `book` block；該程式分支從未執行。本 migration post 為**第一篇** ready book-review post 觸發此程式碼。
 
-### 6.4 修正
+#### 6.4 修正
 
 - **commit**：`7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block`
 - **修改**：1 檔 1 行（`src/views/blogger/blogger-copy-helper.ejs` line 127：移除 `-%>` 中之 `-` 與 `>`，改為 `{` 不關閉 scriptlet；讓 scriptlet 延伸至 line 180 `%>` 才關閉）
 
-### 6.5 修正後狀態
+#### 6.5 修正後狀態
 
 ✅ `build:blogger` 對含 `book` block 之 ready post **已成功**；`copy-helper.txt` 之 `[12]` book metadata 區塊**正確輸出**（per §2.4）。
+
+---
+
+### §6.B canonical.resolved → example.com / GitHub path（Blocker #2）
+
+#### 6.6 原問題
+
+`dist-blogger/posts/we-media-myself2/meta.json` 之 `canonical.resolved` 為 `https://example.com/posts/we-media-myself2/?utm_source=blogger&utm_medium=internal_referral&utm_campaign=blogger_to_github&utm_content=we-media-myself2`，**未**指向 Blogger publishedUrl `https://babel-lab.blogspot.com/2026/05/we-media-myself2.html`。
+
+詳見 §4（原 Blocker #2 描述）。
+
+#### 6.7 兩個根因
+
+| 根因 | 影響 | 修復批次 |
+|---|---|---|
+| **根因 1**：`content/settings/site.config.json` 之 `githubSiteUrl` / `bloggerSiteUrl` 為 `https://example.com` placeholder | host 全為 example.com（影響所有 dist 之 JSON-LD / canonical / OG URL） | **Phase 9-i-b1**（commit `eced408`）|
+| **根因 2**：`src/scripts/build-blogger.js` 之 `resolveCanonicalUrl()` **永遠** cross-link 至 GitHub URL + 加 `blogger_to_github` UTM；未優先使用 `post.publish?.blogger?.publishedUrl` | path 為 `/posts/{slug}/` 含 UTM（非 Blogger publishedUrl 之 `/yyyy/mm/{slug}.html`）| **Phase 9-i-b2**（commit `7be40a7`）|
+
+#### 6.8 修復摘要
+
+- **`eced408` fix(settings): replace site.config.json placeholder URLs**
+  - `githubSiteUrl`: `https://example.com` → `https://babel-lab.github.io`
+  - `bloggerSiteUrl`: `https://example.com` → `https://babel-lab.blogspot.com`
+  - diff +2 / -2；commit message scope `(settings)`
+
+- **`7be40a7` fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger**
+  - `src/scripts/build-blogger.js` `resolveCanonicalUrl()` 新增 fall-through 條件分支：
+    - 若 `post.primaryPlatform === 'blogger'`
+    - 且 `canonical` 為 `"auto"` 或缺漏
+    - 且 `post.publish?.blogger?.publishedUrl` 為非空字串
+    - → 直接 `return { url: bloggerPublishedUrl, warning: null }`（不 cross-link、不加 UTM）
+  - 既有邏輯（手動 canonical URL / 缺 publishedUrl fallback）完全保留
+  - 取值路徑：`post.publish?.blogger?.publishedUrl`（sidecar attach；per `load-posts.js:105-106`；**不是** legacy `post.blogger?.publishedUrl`）
+  - diff +13 / -0；commit message scope `(blogger)`
+
+#### 6.9 驗證摘要
+
+| 維度 | 結果 |
+|---|---|
+| **validate baseline** | ✅ `0 error / 22 warning / 17 post(s)`（維持；無 regression） |
+| **example.com 全域殘留** | ✅ **0 命中**（dist / dist-blogger / dist-promotion / dist-reports 皆 0） |
+| **we-media-myself2 BlogPosting JSON-LD `@id`** | ✅ `https://babel-lab.blogspot.com/2026/05/we-media-myself2.html` |
+| **we-media-myself2 BlogPosting JSON-LD `mainEntityOfPage`** | ✅ 同上 |
+| **we-media-myself2 canonical link** | ✅ 同上 |
+| **blogger_to_github UTM** | ✅ **完全移除** |
+| **GitHub 端 WebSite + BlogPosting JSON-LD** | ✅ host 為 `https://babel-lab.github.io/`（無 regression） |
+| **既有無 publishedUrl 之 post** | ✅ 行為不變（既有 cross-link 邏輯保留） |
+
+#### 6.10 修正後狀態
+
+✅ Blocker #2 之兩個根因**完全解除**。
+
+- 修復日期：**2026-05-15**
+- 修復 commits：`eced408` + `7be40a7`
+- Phase 1 之 SEO canonical 正確性已達生產可驗證狀態（可送 Google Rich Results Test）
 
 ---
 
@@ -244,10 +315,10 @@ ReferenceError: lines is not defined
 
 | 順序 | 批次 | 範圍 | 優先級 |
 |---|---|---|---|
-| **1** | **Phase 9-h-fix-canonical-resolver + Phase 9-h-fix-site-config-urls** | 修 build-blogger.js canonical 邏輯 + 修 site.config.json placeholder URLs | 🔴 High |
-| **2** | **Phase 9-h-fix-build-promotion-sidecar** | 修 build-promotion.js / load-posts.js 之 .fb.md sidecar attach 邏輯 | 🟠 Medium |
-| **3** | **Phase 9-h-fix-build-github-cross-source** | 修 build-github.js 使其掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 之文章 | 🟠 Medium-High |
-| **4** | **視需要再更新 `docs/phase-1-completion-report.md` / `docs/phase-1-completion-checklist.md`** | 同步 known blockers 之修復狀態 + 視情況升級 completion report 為正式 final | — |
+| ~~**1**~~ | ~~**Phase 9-h-fix-canonical-resolver + Phase 9-h-fix-site-config-urls**~~ | ~~修 build-blogger.js canonical 邏輯 + 修 site.config.json placeholder URLs~~ | ✅ **completed**（Phase 9-i-b1 + 9-i-b2；commits `eced408` + `7be40a7`） |
+| **2**（→ 改為 1）| **Phase 9-h-fix-build-promotion-sidecar** | 修 build-promotion.js / load-posts.js 之 .fb.md sidecar attach 邏輯 | 🟠 Medium |
+| **3**（→ 改為 2）| **Phase 9-h-fix-build-github-cross-source** | 修 build-github.js 使其掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 之文章 | 🟠 Medium-High |
+| **4**（→ 改為 3）| **視需要再更新 `docs/phase-1-completion-report.md` / `docs/phase-1-completion-checklist.md`** | 同步 known blockers 之修復狀態 + 視情況升級 completion report 為正式 final | — |
 
 **保守原則**：每批次獨立 commit；不混合多 blocker 修正於同一 commit。
 
