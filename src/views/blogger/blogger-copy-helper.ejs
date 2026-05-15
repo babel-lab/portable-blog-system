@@ -124,7 +124,7 @@ canonical URL（已含 blogger→github UTM）：
 <%# - subtitle 未列入第一版（per Phase 9-f-c-b spec C：docs §9 列為 future candidate 未正式定義） -%>
 <%# - legacy book.author 僅作 authors[0] 之 fallback；不獨立輸出 -%>
 <%# - 所有 EJS 標籤採 trim-newline 模式：non-book post 之 copy-helper.txt 對本區塊前後完全 byte-identical -%>
-<% if (post.book && typeof post.book === 'object' && !Array.isArray(post.book)) { -%>
+<% if (post.book && typeof post.book === 'object' && !Array.isArray(post.book)) {
   const book = post.book;
   const mediaTypeExplicit = book.mediaType !== undefined;
   const effectiveMediaType = mediaTypeExplicit ? book.mediaType : 'book';
