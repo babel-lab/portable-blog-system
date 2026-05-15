@@ -13,11 +13,11 @@
 
 | 項目 | 值 |
 |---|---|
-| **HEAD** | `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger` |
+| **HEAD** | `31ae053 fix(promotion): use .fb.md sidecar as facebook source when present` |
 | **working tree** | clean |
 | **validate baseline** | `0 error / 22 warning / 17 warning-posts`（per validate-content.js byPath.size 定義；17 為「有 warning/error 之 post 數」非「總載入 post 數」；新 migration post 載入且 clean，**不**列入此 17 計數）|
 | **第 1 篇 migration post commit** | `8332d82 feat(content): migrate blogger article we-media-myself2`（3 檔；170 insertions）|
-| **已解除 blocker commits** | `7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block`（per §6.A）+ `eced408 fix(settings): replace site.config.json placeholder URLs` + `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger`（per §6.B；Blocker #2 完全解除）|
+| **已解除 blocker commits** | `7212ccd fix(blogger): repair copy-helper EJS scriptlet for book metadata block`（per §6.A）+ `eced408 fix(settings): replace site.config.json placeholder URLs` + `7be40a7 fix(blogger): use Blogger publishedUrl as canonical when primaryPlatform=blogger`（per §6.B；Blocker #2 完全解除）+ `31ae053 fix(promotion): use .fb.md sidecar as facebook source when present`（per §6.C；Blocker #3 完全解除）|
 
 ---
 
@@ -172,7 +172,12 @@ https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 
 ---
 
-## §5 Known Blocker 3：build:promotion sidecar attach 未生效
+## §5 Known Blocker 3：build:promotion sidecar attach 未生效 ✅ COMPLETED
+
+**狀態**：✅ **完全解除**（resolved on 2026-05-15）
+**修復 commit**：`31ae053 fix(promotion): use .fb.md sidecar as facebook source when present`（Phase 9-i-d-b）
+
+詳細修復紀錄見 §6.C（已解除 blockers）。本節以下保留原問題分析；§5.3 推測根因標 ✅ 已修；§5.5 / §5.6 之後續候選批次與優先級已過期，僅作歷史紀錄。
 
 ### 5.1 現象
 
@@ -191,7 +196,11 @@ https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 - `20260515-we-media-myself2.fb.md` 被當作獨立 post 載入；無 `status` 欄位 → 預設 `draft` → 過濾
 - `20260515-we-media-myself2.md` 被判定 `no-promotion-block`（.md frontmatter 無 `promotion.facebook.*` block；per Phase 8-a 設計用 `.fb.md` sidecar）
 
-### 5.3 推測根因
+### 5.3 推測根因 ✅ 已修（commit `31ae053`）
+
+⚠️ Phase 9-i-d-a 純讀取分析後**修正**之根因：實際 root cause **非** load-posts.js / buildManifestEntry 之 sidecar attach 邏輯（兩者皆已正確運作），而是 `build-promotion.js` 之 `classifyFacebook()` **只讀 legacy `post.promotion?.facebook?.enabled`**，**未讀** `post.sidecars?.facebook?.data?.enabled`。詳見 §6.C。
+
+以下原推測根因保留為歷史紀錄：
 
 `build-promotion.js` / `load-posts.js` **未正確**將 `.fb.md` sidecar attach 到主 `.md` post：
 
@@ -205,22 +214,23 @@ https://babel-lab.blogspot.com/2026/05/we-media-myself2.html
 - ❌ Phase 8-a 之 sidecar bundle 三檔設計於 promotion 流程**未完整生效**
 - ❌ 本 migration post 之 FB 推廣手動流程**缺失對應 dist 輸出**
 
-### 5.5 後續候選批次
+### 5.5 後續候選批次（歷史；已過期）
 
-- **Phase 9-h-fix-build-promotion-sidecar**
+- ~~**Phase 9-h-fix-build-promotion-sidecar**~~ → ✅ **landed as Phase 9-i-d-b**（commit `31ae053`）
 
-### 5.6 優先級
+### 5.6 優先級（歷史；已過期）
 
-**Medium**
+~~**Medium**~~ → ✅ **completed on 2026-05-15**
 
 ---
 
 ## §6 已解除 blockers
 
-本節記錄**已解除之 blockers**（共 2 條）：
+本節記錄**已解除之 blockers**（共 3 條）：
 
 - **§6.A**：blogger-copy-helper.ejs book metadata EJS scriptlet bug（commit `7212ccd`）
 - **§6.B**：Blocker #2 canonical.resolved → example.com / GitHub path（commits `eced408` + `7be40a7`；於 2026-05-15 完全解除）
+- **§6.C**：Blocker #3 build:promotion sidecar attach 未生效（commit `31ae053`；於 2026-05-15 完全解除）
 
 ---
 
@@ -311,14 +321,73 @@ ReferenceError: lines is not defined
 
 ---
 
+### §6.C build:promotion sidecar attach 未生效（Blocker #3）
+
+#### 6.11 原問題
+
+`dist-promotion/facebook/blogger/we-media-myself2.txt` **不存在**；`build:promotion` log 顯示 we-media-myself2 之 `.md` 被 filter 為 `no-promotion-block` + 其 `.fb.md` 被 filter 為 `status:draft`（雙重過濾）。
+
+詳見 §5（原 Blocker #3 描述）。
+
+#### 6.12 真實根因（Phase 9-i-d-a 純讀取分析修正）
+
+⚠️ **Phase 9-i-d-a 純讀取分析確認原 §5.3 推測根因不準確**：
+
+- ✅ `load-posts.js` （line 74-77, 93-99）**已正確** attach `.fb.md` 至 `post.sidecars.facebook`
+- ✅ `build-promotion.js` `buildManifestEntry()`（line 228-264）**已有** sidecar 處理邏輯（Phase 8-c-4 既有）
+- ❌ **真正問題**：`build-promotion.js` `classifyFacebook()`（line 129-146）**只讀** legacy `post.promotion?.facebook?.enabled` 路徑，**未讀** `post.sidecars?.facebook?.data?.enabled` 路徑
+
+結果：we-media-myself2 之 `.md` frontmatter 無 `promotion` block（per Phase 8-a sidecar 設計），`post.promotion` 為 undefined → `classifyFacebook` 直接 return `no-promotion-block` → filter；無機會走 buildManifestEntry 之 sidecar resolution。
+
+`.fb.md` 被當獨立 post 載入並 filter 為 `status:draft` 屬**並行存在之 harmless 副作用**（`**/*.md` glob 命中 `.fb.md`），不阻擋主修復。
+
+#### 6.13 修復摘要
+
+- **`31ae053` fix(promotion): use .fb.md sidecar as facebook source when present**
+  - `src/scripts/build-promotion.js` `classifyFacebook()` 重構為 sidecar-first fallback chain：
+    - 先讀 `post.sidecars?.facebook`；條件：`exists === true` + `data` 為 plain object（非 null / 非 array）→ `sidecarData`
+    - 再讀 legacy `post.promotion?.facebook`；若為 plain object → `legacyFb`
+    - `fb = sidecarData || legacyFb`
+    - 若 `fb` 為 null → `no-promotion-block`；否則沿用既有 `enabled` / `page` / `pages-config` 檢查
+  - 既有 return 格式 `{ include, reason, page, fb }` 保留不變
+  - 既有 page / pages-enabled 過濾邏輯完全未動
+  - 既有無 sidecar 之 post 走 legacyFb fallback（行為完全保留）
+  - 缺欄位防 crash：`typeof / Array.isArray / !fb` 之 short-circuit
+  - diff +18 / -6；commit message scope `(promotion)`
+
+#### 6.14 驗證摘要
+
+| 維度 | 結果 |
+|---|---|
+| **validate baseline** | ✅ `0 error / 22 warning / 17 post(s)`（維持；無 regression） |
+| **we-media-myself2 promotion txt 產出** | ✅ `dist-promotion/facebook/blogger/we-media-myself2.txt`（647 bytes；新產出） |
+| **all-posts-index.txt 含 we-media-myself2** | ✅（3 grep 命中） |
+| **build-manifest.json 含 we-media-myself2** | ✅（9 grep 命中） |
+| **github-pages-blog-planning promotion** | ✅ 仍正常產出（472 bytes；無 regression） |
+| **`total enabled` 數** | ✅ 從 1 → **2**（多 we-media-myself2） |
+| **dist-promotion example.com 殘留** | ✅ **0 命中** |
+| **.fb.md 被當獨立 promotion txt 輸出** | ✅ **無**（仍 filter 為 `status:draft`；不會進入 enabledEntries） |
+| **既有無 sidecar 之 promotion 行為** | ✅ legacyFb fallback chain 保留 |
+
+#### 6.15 修正後狀態
+
+✅ Blocker #3 之根因**完全解除**。
+
+- 修復日期：**2026-05-15**
+- 修復 commit：`31ae053`
+- `.fb.md` sidecar 模式之 FB promotion 流程已生產可用
+- Phase 8-a 之 sidecar bundle 三檔設計於 promotion 流程**完整生效**
+
+---
+
 ## §7 建議後續處理順序
 
 | 順序 | 批次 | 範圍 | 優先級 |
 |---|---|---|---|
 | ~~**1**~~ | ~~**Phase 9-h-fix-canonical-resolver + Phase 9-h-fix-site-config-urls**~~ | ~~修 build-blogger.js canonical 邏輯 + 修 site.config.json placeholder URLs~~ | ✅ **completed**（Phase 9-i-b1 + 9-i-b2；commits `eced408` + `7be40a7`） |
-| **2**（→ 改為 1）| **Phase 9-h-fix-build-promotion-sidecar** | 修 build-promotion.js / load-posts.js 之 .fb.md sidecar attach 邏輯 | 🟠 Medium |
-| **3**（→ 改為 2）| **Phase 9-h-fix-build-github-cross-source** | 修 build-github.js 使其掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 之文章 | 🟠 Medium-High |
-| **4**（→ 改為 3）| **視需要再更新 `docs/phase-1-completion-report.md` / `docs/phase-1-completion-checklist.md`** | 同步 known blockers 之修復狀態 + 視情況升級 completion report 為正式 final | — |
+| ~~**2**~~ | ~~**Phase 9-h-fix-build-promotion-sidecar**~~ | ~~修 build-promotion.js / load-posts.js 之 .fb.md sidecar attach 邏輯~~ | ✅ **completed**（Phase 9-i-d-b；commit `31ae053`；實際根因為 `classifyFacebook()` 未讀 sidecar；無需動 load-posts.js）|
+| **3**（→ 改為 1）| **Phase 9-h-fix-build-github-cross-source** | 修 build-github.js 使其掃描 `content/blogger/posts/` 中 `publishTargets.github.enabled: true` 之文章 | 🟠 Medium-High |
+| **4**（→ 改為 2）| **視需要再更新 `docs/phase-1-completion-report.md` / `docs/phase-1-completion-checklist.md`** | 同步 known blockers 之修復狀態 + 視情況升級 completion report 為正式 final | — |
 
 **保守原則**：每批次獨立 commit；不混合多 blocker 修正於同一 commit。
 
