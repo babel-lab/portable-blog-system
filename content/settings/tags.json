@@ -30,5 +30,29 @@
     "site": [
       "blogger"
     ]
+  },
+  {
+    "id": "book-review",
+    "name": "書評",
+    "slug": "book-review",
+    "site": [
+      "blogger"
+    ]
+  },
+  {
+    "id": "reading-notes",
+    "name": "讀書筆記",
+    "slug": "reading-notes",
+    "site": [
+      "blogger"
+    ]
+  },
+  {
+    "id": "self-growth",
+    "name": "自我成長",
+    "slug": "self-growth",
+    "site": [
+      "blogger"
+    ]
   }
 ]
