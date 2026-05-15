@@ -86,8 +86,21 @@ function buildBloggerToGithubUrl(rawUrl, slug) {
 }
 
 // Phase 3-e-3：canonical URL 解析（含 fallback）
+// Phase 9-i-b2：當 primaryPlatform=blogger + canonical auto/缺 + 有 Blogger publishedUrl 時，
+//   直接使用 Blogger publishedUrl（不 cross-link GitHub；不加 UTM）
+//   per docs/phase-9h-known-blockers.md §4（Blocker #2 根因 2）
 function resolveCanonicalUrl(post, settings) {
   const raw = post.canonical;
+  // sidecar publish data 由 load-posts.js attach 至 post.publish；不從 legacy post.blogger 讀
+  const bloggerPublishedUrl = post.publish?.blogger?.publishedUrl;
+  if (
+    post.primaryPlatform === 'blogger' &&
+    (!raw || raw === 'auto') &&
+    typeof bloggerPublishedUrl === 'string' &&
+    bloggerPublishedUrl !== ''
+  ) {
+    return { url: bloggerPublishedUrl, warning: null };
+  }
   let absolute = null;
   if (raw && raw !== 'auto') {
     absolute = raw;
