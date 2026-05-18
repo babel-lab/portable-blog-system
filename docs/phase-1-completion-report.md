@@ -404,11 +404,15 @@ per `docs/phase-9h-completion-report.md` §1：
 
 ### 8.2 Phase 9-f-g：Book / Periodical structured data
 
-- **狀態**：⏸ deferred / post-Phase-1
-- **範圍**：為 book-review / magazine 文章補 `Book` / `Periodical` JSON-LD
-- **trigger condition**：✅ **已滿足**（we-media-myself2 為 book-review；book metadata 已 landed；per Phase 9-j §4.2）
-- **後續啟動條件**：同 §8.1
-- **來源**：`docs/future-roadmap.md` Phase 9-f 系列補述 / `docs/phase-9j-jsonld-landing-verification.md` §4.2
+- **狀態**：✅ **Book mainEntity landed / closed**（2026-05-18；per `docs/phase-9f-g-completion-report.md`）；Periodical / magazine 延後至 **Phase 9-f-g2**（deferred）
+- **歷史脈絡**：本項原列為 ⏸ deferred / post-Phase-1（per §11 順序 5）；trigger condition 已滿足後，於 2026-05-18 由 Claude Code 落地 Phase 9-f-g 系列第一版（Book mainEntity；5 子批；3 commits）；Periodical / magazine 因當前 0 ready magazine post 仍 deferred 至 Phase 9-f-g2
+- **第一版範圍**：BlogPosting JSON-LD 新增 `mainEntity` of `@type: Book`（條件式：`post.book` object + `book.mediaType` 缺省或 === `"book"` + `book.title` non-empty）；只支援 `mediaType="book"`；兩端 Blogger / GitHub mirror
+- **landed commits**：
+  - Phase 9-f-g-b `10df61c`：docs-only pre-plan
+  - Phase 9-f-g-c `b394e4f`：source 接入 Book mainEntity
+  - Phase 9-f-g-z `283af96`：completion report + docs sync
+- **後續關聯**：Google Rich Results Test 對含 mainEntity Book 之新 schema 仍由作者執行（屬作者 SOP；**非 Claude 已執行**）；Periodical / magazine structured data 延後至 Phase 9-f-g2（trigger：首篇 ready magazine post + Rich Results Test 對應驗證）
+- **來源**：`docs/phase-9f-g-completion-report.md`（10 sections；落地紀錄完整）/ `docs/phase-9f-g-pre-plan.md` / `docs/book-schema.md` §9 / `docs/seo-ga4-adsense.md` §7.4.2 / `docs/future-roadmap.md` Phase 9-f 系列補述 / `docs/phase-9j-jsonld-landing-verification.md` §4.2
 
 ### 8.3 Phase 8-h：legacy 欄位退場
 
@@ -601,10 +605,13 @@ per §8.5：當作者撰寫對應類型 post 並填欄位時，dormant article b
 
 ### 順序 5：Phase 9-f-g Book / Periodical structured data
 
-- **負責**：Claude Code（建議拆 2-3 子批）
-- **範圍**：book-review / magazine 之 `Book` / `Periodical` schema.org
-- **觸發條件**：同順序 4
-- **預期效益**：書評 SEO 強化
+- **狀態**：✅ **Book mainEntity landed / closed**（2026-05-18；per `docs/phase-9f-g-completion-report.md`）；Periodical / magazine 延後至 **Phase 9-f-g2**
+- **歷史脈絡**：本項原列為 post-Phase-1 順序 5 structured data enhancement；觸發條件原為「同順序 4（順序 1 通過 Rich Results Test 驗證後）」；於 2026-05-18 由作者主動選擇略過 Rich Results Test 先啟動 Phase 9-f-g 系列；第一版只完成 Book，Periodical / magazine 因當前 0 ready magazine post 延後
+- **負責**：Claude Code（實際拆 5 子批：a/b/c/d/z；3 commits）
+- **第一版範圍**：BlogPosting JSON-LD 新增 `mainEntity` of `@type: Book`；只支援 `mediaType="book"`；兩端 Blogger / GitHub mirror
+- **landed commits**：`10df61c`（pre-plan）/ `b394e4f`（Book mainEntity source）/ `283af96`（completion report + docs sync）
+- **後續驗證**：Google Rich Results Test 對含 mainEntity Book 之新 schema 仍待作者執行；屬作者 SOP，非 Claude 範疇
+- **後續延伸**：Periodical / magazine structured data 延後至 **Phase 9-f-g2**（trigger：首篇 ready magazine post + Rich Results Test 驗證）
 
 ### 順序 6：Phase 9-h-f 兩端 Related Posts auto block
 
