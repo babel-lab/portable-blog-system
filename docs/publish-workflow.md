@@ -44,6 +44,30 @@ npm run build:promotion      # FB 推廣 .txt
 npm run build:blogger-theme  # Blogger 可貼用 CSS（首次貼主題用）
 ```
 
+### `npm run build:sitemap` 注意事項
+
+`npm run build:sitemap` 為 **manual 步驟**（未接入 prebuild / postbuild chain），會產生：
+
+- `dist/sitemap.xml`（GitHub Pages 站之 sitemap；含 home / post-list / 各 ready post / categories / tags）
+- `dist/robots.txt`（GitHub Pages 站之 robots；含 `Sitemap:` 引用 + `Disallow: /design-system/` + `Disallow: /404.html`）
+
+**執行順序硬性要求**：
+
+- ✅ **必須**在 `npm run build` 之後執行
+- ❌ 如果順序錯（在 `npm run build` 之前先跑 `build:sitemap`），sitemap.xml / robots.txt 會被 vite build 之 `emptyOutDir: true` 清掉
+- 原因：vite build 之 `emptyOutDir` 行為（per `vite.config.js`）會清空 dist/ 後再寫入；本 generator 之輸出時機必須**晚於** vite
+
+**範圍**：
+
+- 只針對 **GitHub Pages** site（per `site.config.json.githubSiteUrl`）
+- **不**產生 Blogger sitemap（Blogger 平台自行管理 sitemap / robots）
+- **不**包含 Blogger publishedUrl（不會與 GitHub canonical 混入）
+
+**dist 與 git 之關係**：
+
+- `dist/sitemap.xml` + `dist/robots.txt` 屬 `.gitignore` 內（per `dist/*` 排除規則）
+- 不入 git；屬部署流程之 build output；GitHub Pages 部署時需含整個 dist/ 內容
+
 ---
 
 ## 4. 發布
