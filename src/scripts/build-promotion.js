@@ -126,11 +126,10 @@ function buildIndexText({ generatedAt, mode, stats, enabledEntries, fbGloballyEn
 // ---- 過濾邏輯 ------------------------------------------------------------
 
 // 回傳 { include: bool, reason: string, page: string|null, fb: object|null }
-// Phase 9-i-d-b：.fb.md sidecar 優先；fallback 至 legacy post.promotion.facebook
-//   per docs/phase-9h-known-blockers.md §5（Blocker #3）
+// Phase 9-i-d-b + 8-h-f：原 sidecar-first + legacy fallback；Phase 8-h-f 移除 legacy 路徑（per docs/phase-8h-c-pre-plan.md §3.2 位置 #13）；現只從 .fb.md sidecar 讀取
 function classifyFacebook(post, fbConfig) {
   const fbSidecar = post.sidecars?.facebook;
-  const sidecarData =
+  const fb =
     fbSidecar &&
     fbSidecar.exists === true &&
     fbSidecar.data &&
@@ -138,11 +137,6 @@ function classifyFacebook(post, fbConfig) {
     !Array.isArray(fbSidecar.data)
       ? fbSidecar.data
       : null;
-  const legacyFb =
-    post.promotion?.facebook && typeof post.promotion.facebook === 'object'
-      ? post.promotion.facebook
-      : null;
-  const fb = sidecarData || legacyFb;
 
   if (!fb) return { include: false, reason: 'no-promotion-block' };
   if (fb.enabled !== true) return { include: false, reason: 'facebook-not-enabled' };
@@ -160,18 +154,12 @@ function classifyFacebook(post, fbConfig) {
 // ---- manifest 條目組裝（4-b 不算 finalUrl/UTM）---------------------------
 
 function buildManifestEntry(post, page, fb, settings) {
-  // Phase 8-d-4-b：4 個欄位（title / target / message / hashtags）改讀 normalized 優先 + legacy fallback。
-  //   - 不動 classifyFacebook 過濾 / buildFacebookUrl 呼叫 / ga4-url-builder URL 邏輯
-  //   - 不動 resolvePlaceholders ctx / EJS template 接收結構 / manifest 欄位順序
-  //   - 不動 fbTitle / note / page / site / slug / sourcePath / id / baseUrl / finalUrl / urlSource / urlReason / resolvedFacebookBody / facebookSidecar
-  //   - 不引入 series / titleEn / hashtag 繼承（屬 Phase 8-e 範圍）
-  //   - normalized 欄位來源依 normalize-post-output.js §6 映射；不臆造 normalized.urls 等不存在 schema
-  //   - hashtags 保留既有 filter(Boolean) 處理，僅換來源；若 normalized.promotion.facebook.hashtags 為陣列（即使空），視為 normalized 已明確提供，採用之
+  // Phase 8-d-4-b + 8-h-f：manifest entry 之 4 個欄位（title / target / message / hashtags）由 normalized.promotion.facebook 提供（normalize-post-output.js 從 .fb.md sidecar 讀取）
+  //   - Phase 8-h-f：移除 legacy fb.* fallback（fb.message / fb.target / fb.hashtags）；per docs/phase-8h-c-pre-plan.md §3.2 位置 #13
+  //   - fbTitle / note 仍從 classifyFacebook 之 fb（now sidecarData-only）讀取；FB txt schema / manifest 欄位順序不變
   const normalizedFb = post.normalized?.promotion?.facebook;
   const normalizedTitle = post.normalized?.display?.title;
-  const hashtagsSource = Array.isArray(normalizedFb?.hashtags)
-    ? normalizedFb.hashtags
-    : fb.hashtags;
+  const hashtagsSource = normalizedFb?.hashtags;
   const hashtags = Array.isArray(hashtagsSource) ? hashtagsSource.filter(Boolean) : [];
 
   // Phase 8-f-6-b：promotion manifest entry additive 欄位（純資料層；不改 FB .txt 輸出）。
@@ -215,8 +203,8 @@ function buildManifestEntry(post, page, fb, settings) {
     title: normalizedTitle || (post.title ?? null),
     page,
     fbTitle: fb.title || null,
-    message: normalizedFb?.message || fb.message || null,
-    target: normalizedFb?.target || (fb.target ?? 'auto'),
+    message: normalizedFb?.message || null,
+    target: normalizedFb?.target || 'auto',
     hashtags,
     hashtagCount: hashtags.length,
     note: fb.note || null,
