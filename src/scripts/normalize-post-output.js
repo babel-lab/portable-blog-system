@@ -176,26 +176,12 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
     if (r.fallbackUsed) recordFallback(meta, 'identity.slug', r.source, 'frontmatter.slug missing');
   }
 
-  // identity.contentKind（含 legacy type fallback）
+  // identity.contentKind
+  // Phase 8-h-d-1：移除 p.type legacy fallback + deprecated-legacy-type-fallback warning（dormant；load-posts.js auto-fallback 已先補 contentKind per docs/phase-8h-c-pre-plan.md §3.2 位置 #2）
   {
     if (hasValue(p.contentKind)) {
       identity.contentKind = p.contentKind;
       recordField(meta, 'identity.contentKind', 'frontmatter.contentKind');
-    } else if (hasValue(p.type)) {
-      identity.contentKind = p.type;
-      recordField(meta, 'identity.contentKind', 'frontmatter.type');
-      recordFallback(
-        meta,
-        'identity.contentKind',
-        'frontmatter.type',
-        'contentKind missing; legacy type used as fallback',
-      );
-      recordWarning(
-        meta,
-        'deprecated-legacy-type-fallback',
-        'identity.contentKind',
-        'frontmatter.type is deprecated; please rename to contentKind',
-      );
     } else {
       identity.contentKind = 'post';
       recordField(meta, 'identity.contentKind', 'fallback');
