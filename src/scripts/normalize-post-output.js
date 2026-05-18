@@ -119,13 +119,7 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
   const fbData =
     fbSidecar && fbSidecar.data && typeof fbSidecar.data === 'object' ? fbSidecar.data : null;
   const fbBody = fbSidecar && typeof fbSidecar.body === 'string' ? fbSidecar.body : null;
-  const legacyFb =
-    p.promotion &&
-    typeof p.promotion === 'object' &&
-    p.promotion.facebook &&
-    typeof p.promotion.facebook === 'object'
-      ? p.promotion.facebook
-      : null;
+  // Phase 8-h-d-2：移除 legacyFb 變數（.md frontmatter promotion.facebook.* legacy 來源；per docs/phase-8h-c-pre-plan.md §3.2 位置 #3-#8）
 
   // validationMeta accumulator
   const meta = {
@@ -692,48 +686,34 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
   const promotion = { facebook: {} };
 
   // promotion.facebook.enabled（明確 false 不可被 fallback 蓋掉）
+  // Phase 8-h-d-2：移除 legacyFb 來源；現只從 .fb.md sidecar 讀取
   {
     let resolved = null;
     let source = null;
     if (fbData && typeof fbData.enabled === 'boolean') {
       resolved = fbData.enabled;
       source = 'fb.md.enabled';
-    } else if (legacyFb && typeof legacyFb.enabled === 'boolean') {
-      resolved = legacyFb.enabled;
-      source = 'frontmatter.promotion.facebook.enabled';
     } else {
       resolved = false;
       source = 'fallback';
     }
     promotion.facebook.enabled = resolved;
     recordField(meta, 'promotion.facebook.enabled', source);
-    if (source === 'frontmatter.promotion.facebook.enabled') {
-      recordFallback(
-        meta,
-        'promotion.facebook.enabled',
-        source,
-        'fb.md.enabled missing; using legacy frontmatter',
-      );
-    } else if (source === 'fallback') {
+    if (source === 'fallback') {
       recordFallback(
         meta,
         'promotion.facebook.enabled',
         'fallback',
-        'enabled missing on both sidecar and frontmatter; defaulted to false',
+        'enabled missing on sidecar; defaulted to false',
       );
     }
   }
 
   // promotion.facebook.target
+  // Phase 8-h-d-2：移除 legacyFb 來源；現只從 .fb.md sidecar 讀取
   {
     const r = getFieldValue(
-      [
-        { value: fbData ? fbData.target : undefined, source: 'fb.md.target' },
-        {
-          value: legacyFb ? legacyFb.target : undefined,
-          source: 'frontmatter.promotion.facebook.target',
-        },
-      ],
+      [{ value: fbData ? fbData.target : undefined, source: 'fb.md.target' }],
       'auto',
     );
     promotion.facebook.target = r.value;
@@ -742,32 +722,19 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
       recordFallback(meta, 'promotion.facebook.target', r.source, 'sidecar target missing');
   }
 
-  // promotion.facebook.message（legacy fallback；保留欄位即使空亦不視為錯誤）
+  // promotion.facebook.message
+  // Phase 8-h-d-2：移除 legacy frontmatter.promotion.facebook.message fallback；此欄位純為 legacy-only，無 sidecar 對應；移除後永遠 null（保留欄位以維持 normalized schema）
   {
-    const r = getFieldValue([
-      {
-        value: legacyFb ? legacyFb.message : undefined,
-        source: 'frontmatter.promotion.facebook.message',
-      },
-    ]);
-    promotion.facebook.message = r.value;
-    recordField(meta, 'promotion.facebook.message', r.source);
+    promotion.facebook.message = null;
+    recordField(meta, 'promotion.facebook.message', 'fallback:null');
   }
 
-  // promotion.facebook.body（sidecar body 優先；legacy message 為 fallback）
+  // promotion.facebook.body
+  // Phase 8-h-d-2：移除 legacy message fallback；body 只來自 .fb.md sidecar body
   {
     if (fbExists && hasValue(fbBody)) {
       promotion.facebook.body = fbBody;
       recordField(meta, 'promotion.facebook.body', 'fb.md.body');
-    } else if (hasValue(promotion.facebook.message)) {
-      promotion.facebook.body = promotion.facebook.message;
-      recordField(meta, 'promotion.facebook.body', 'computed:promotion.facebook.message');
-      recordFallback(
-        meta,
-        'promotion.facebook.body',
-        'computed:promotion.facebook.message',
-        'fb.md body missing; using legacy frontmatter message',
-      );
     } else {
       promotion.facebook.body = null;
       recordField(meta, 'promotion.facebook.body', 'fallback:null');
@@ -775,39 +742,26 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
   }
 
   // promotion.facebook.hashtags（保持陣列）
+  // Phase 8-h-d-2：移除 legacyFb 來源；現只從 .fb.md sidecar 讀取
   {
     let value = null;
     let source = null;
     if (fbData && Array.isArray(fbData.hashtags) && fbData.hashtags.length > 0) {
       value = fbData.hashtags;
       source = 'fb.md.hashtags';
-    } else if (legacyFb && Array.isArray(legacyFb.hashtags) && legacyFb.hashtags.length > 0) {
-      value = legacyFb.hashtags;
-      source = 'frontmatter.promotion.facebook.hashtags';
     } else {
       value = [];
       source = 'fallback';
     }
     promotion.facebook.hashtags = value;
     recordField(meta, 'promotion.facebook.hashtags', source);
-    if (source === 'frontmatter.promotion.facebook.hashtags') {
-      recordFallback(
-        meta,
-        'promotion.facebook.hashtags',
-        source,
-        'sidecar hashtags missing; using legacy frontmatter',
-      );
-    }
   }
 
   // promotion.facebook.finalUrl（依設計 §9.4 順序）
+  // Phase 8-h-d-2：移除 legacyFb.finalUrl 來源；現只從 .fb.md sidecar + computed canonical / blogger / github URLs
   {
     const r = getFieldValue([
       { value: fbData ? fbData.finalUrl : undefined, source: 'fb.md.finalUrl' },
-      {
-        value: legacyFb ? legacyFb.finalUrl : undefined,
-        source: 'frontmatter.promotion.facebook.finalUrl',
-      },
       { value: seo.canonicalUrl, source: 'computed:seo.canonicalUrl' },
       {
         value: publishOut.blogger.publishedUrl,
