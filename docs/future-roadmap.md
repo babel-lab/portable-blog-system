@@ -279,13 +279,17 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 
 - `CLAUDE.md`（專案開發規範與分階段計畫）
 
-### 7.5 Phase 1 / Phase 9-i / 9-j / 9-z / 8-h-a 系列紀錄
+### 7.5 Phase 1 / Phase 9-i / 9-j / 9-z / 8-h / 10-a-b 系列紀錄
 
 - `docs/phase-1-completion-checklist.md`（Phase 9-z-b 逐項對照清單；commit `4c87d1f`；含 §10 ~50 條 author SOP）
 - `docs/phase-1-completion-report.md`（Phase 9-z-c candidate → Phase 9-z-d 升正式 final；當前為正式 Phase 1 final report）
 - `docs/phase-9h-known-blockers.md`（Phase 9-h-full-build-verify-a 之 3 個 known blockers；Phase 9-i 系列 3/3 全清；commits `eced408` + `7be40a7` + `31ae053` + `7986d58`）
 - `docs/phase-9j-jsonld-landing-verification.md`（Phase 9-j JSON-LD landing verification 封存；commit `4d68f50`）
-- `docs/phase-8h-pre-analysis.md`（Phase 8-h-a-doc legacy 退場前盤點分析；commit `a538564`；屬 post-Phase-1 退場批前置）
+- `docs/phase-10-a-b-sitemap-robots-baseline.md`（Phase 10-a-b sitemap / robots dist baseline；commit `7758ce2`）
+- `docs/phase-8h-pre-analysis.md`（Phase 8-h-a-doc legacy 退場前盤點分析；commit `a538564`）
+- `docs/phase-8h-baseline-snapshot.md`（Phase 8-h-b 退場前 baseline run；commit `c9ce52c`）
+- `docs/phase-8h-c-pre-plan.md`（Phase 8-h-c-pre fixture / split plan 分析；commit `130097a`）
+- `docs/phase-8h-completion-report.md`（**Phase 8-h legacy fallback retirement 系列收尾報告；Phase 8-h 實質完成（15/15 in-scope positions 100% retired-or-migrated）**；本文件 Phase 8-h-z 落地）
 
 ---
 
@@ -318,11 +322,29 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 - 結論：JSON-LD 已正式落地；**不是** deferred / half-landed / 未啟動
 - Phase 9-g-g / 9-f-g 進階強化保留為 post-Phase-1 deferred（trigger condition 已滿足，待 Google Rich Results Test 驗證後評估）
 
-### 8.4 Phase 8-h-a-doc（legacy 退場前盤點分析）
+### 8.4 Phase 8-h 系列（legacy fallback retirement；✅ 實質完成）
 
-- commit `a538564`
-- 範圍：純 docs；封存 17 個 source code 位置 + 1 個明確排除位置（parse-markdown H1→H2 屬永久防呆，不在範圍）；建議拆批 8-h-b ~ 8-h-z 共 9-11 commits
-- 狀態：⏸ Phase 8-h-b ~ 8-h-z 退場批仍未啟動；trigger condition「Phase 1 final 封存」於 Phase 9-z-d 達成；屬 post-Phase-1 可啟動
+**Phase 8-h 系列累計 13 commits + 1 skipped sub-batch**（per `docs/phase-8h-completion-report.md`）：
+
+| Sub-batch | 範圍 | commit |
+|---|---|---|
+| Phase 8-h-a-doc | retirement pre-analysis | `a538564` |
+| Phase 8-h-b | retirement baseline run + snapshot | `c9ce52c` |
+| Phase 8-h-c-pre | fixture / split plan analysis | `130097a` |
+| Phase 8-h-c-pre-1 | 5 個 regression fixtures 落地 | `546686d` |
+| Phase 8-h-c | 位置 #1：validate `frontmatter-uses-deprecated-type` warning rule | `bc41b80` |
+| Phase 8-h-d-1 | 位置 #2：normalize contentKind/type fallback | `f05de63` |
+| Phase 8-h-d-2 | 位置 #3-#8：normalize FB sidecar legacy fallback × 6 | `28096e3` |
+| Phase 8-h-d-3 | 位置 #9：normalize canonical legacy fallback | `fa74d02` |
+| Phase 8-h-d-4 | 位置 #14-#17：resolve-placeholders 4 處 URL fallback | `0b47f5b` |
+| Phase 8-h-e-1 | 位置 #11：build-blogger `bloggerTags` fallback | `6ce66f4` |
+| Phase 8-h-e-2-a | 位置 #12 source migration：meta.json `type` → `normalized.identity.contentKind` | `b49e2c3` |
+| **Phase 8-h-e-2-b** | 位置 #12 field removal | ⏸ **skipped / permanent deferred**（per completion report §5）|
+| Phase 8-h-f-content-migration-a | github-pages-blog-planning FB sidecar migration（破例 content migration）| `6f1b3c9` |
+| Phase 8-h-f | 位置 #13：build-promotion classifyFacebook + 4 欄位 legacy fallback | `72db25f` |
+| **Phase 8-h-z（本批）** | completion report + docs sync | 見本批 git log |
+
+**退場結果**：15 of 15 in-scope positions retired-or-migrated（100%）；out-of-scope 1 個位置（#10 parse-markdown H1→H2）per pre-analysis §3.3 永久排除。詳見 `docs/phase-8h-completion-report.md`。
 
 ### 8.5 Post-Phase-1 後續強化路線
 
@@ -331,8 +353,8 @@ per `docs/phase-1-completion-report.md` §11 之保守啟動順序：
 | 順序 | 批次 | 範圍 | 觸發條件 | 風險 |
 |---|---|---|---|---|
 | 1 | Google Rich Results Test 驗證 | 作者對 we-media-myself2 之 BlogPosting JSON-LD 進行驗證 | ✅ 已滿足 | 🟢 低（屬作者 SOP）|
-| 2 | Phase 8-h-b legacy 退場前 baseline run | 跑 build × 5 + validate + 7 reports；產出 baseline snapshot；可順帶補 `dist/sitemap.xml` + `dist/robots.txt` | ✅ 已滿足 | 🟡 中（需執行 build）|
-| 3 | Phase 8-h 退場批（8-h-c → 8-h-d-1~d-4 → 8-h-e-1/e-2 → 8-h-f → 8-h-z）| per `docs/phase-8h-pre-analysis.md` §5；9-11 commits | 順序 2 完成後 | 🟠 中-高（跨 6 source files）|
+| ~~2~~ | ~~Phase 8-h-b legacy 退場前 baseline run~~ | ✅ **landed**（commit `c9ce52c`）| — | — |
+| ~~3~~ | ~~Phase 8-h 退場批（8-h-c → 8-h-d-1~d-4 → 8-h-e-1/e-2 → 8-h-f → 8-h-z）~~ | ✅ **landed**（13 commits + 1 skipped sub-batch；詳見 §8.4 + `docs/phase-8h-completion-report.md`）| — | — |
 | 4 | Phase 9-g-g JSON-LD `mentions` / `isPartOf` | relatedLinks / otherLinks schema.org 補強 | 順序 1 通過後 | 🟡 中（schema.org 嚴格性）|
 | 5 | Phase 9-f-g Book / Periodical structured data | book-review / magazine schema.org | 順序 1 通過後 | 🟡 中（同上）|
 | 6 | Phase 9-h-f 兩端 Related Posts auto block | 跨兩端 auto 推薦邏輯 | 作者 ≥ 5 篇 ready post（當前 3 篇）| 🟡 中 |

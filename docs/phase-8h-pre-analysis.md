@@ -6,6 +6,7 @@
 - `docs/phase-1-completion-checklist.md` §6.2（殘留 8 個 source code 位置摘要）+ §11.3（拆批建議）
 - `docs/phase-1-completion-report.md` §8.3（Phase 8-h pending 描述）+ §11 順序 3（後續批次位置）
 - `docs/future-roadmap.md` Phase 9 mega-row 末段（Phase 8-h legacy 退場仍 pending）
+- `docs/phase-8h-completion-report.md`（**Phase 8-h 系列收尾報告；Phase 8-h 實質完成記錄；本文件之 pre-analysis 已由 8-h-c-pre-plan + 各退場批落地與本 completion report 收尾**）
 
 ---
 

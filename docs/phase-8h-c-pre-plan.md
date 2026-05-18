@@ -6,6 +6,7 @@
 - `docs/phase-8h-pre-analysis.md`（Phase 8-h-a-doc 退場前盤點分析；commit `a538564`）—— 列出 17 個位置與 §5 拆批規劃
 - `docs/phase-8h-baseline-snapshot.md`（Phase 8-h-b 退場前 baseline run；commit `c9ce52c`）—— 提供退場批之 regression 對照基準
 - `docs/phase-1-completion-report.md`（Phase 1 final completion report；commit `7f4958c`）—— §8.3 Phase 8-h pending；§11 順序 3 退場批啟動 trigger condition
+- `docs/phase-8h-completion-report.md`（**Phase 8-h 系列收尾報告；本拆批 plan 中 12-commit roadmap 之實際落地結果**；含 8-h-e-2-b skipped / permanent deferred + 8-h-f-content-migration-a regression handling）
 
 ---
 

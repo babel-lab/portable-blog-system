@@ -7,6 +7,7 @@
 - `docs/phase-1-completion-report.md`（Phase 1 final completion report；commit `7f4958c`）—— §11 順序 3 規範 Phase 8-h 退場 trigger condition「Phase 1 final 已封存後啟動」
 - `docs/phase-10-a-b-sitemap-robots-baseline.md`（Phase 10-a-b sitemap / robots dist baseline；commit `7758ce2`）—— §9.2 明示「本批為 sitemap 專屬 baseline；Phase 8-h-b 為完整 dist regression 對照」
 - `docs/future-roadmap.md` §8.5 順序 2（Phase 8-h-b 退場前 baseline run 排程）
+- `docs/phase-8h-completion-report.md`（**Phase 8-h 系列收尾報告**；本 baseline snapshot 為退場系列之 regression 對照基準；最終驗證結果見 completion report §7）
 
 ---
 

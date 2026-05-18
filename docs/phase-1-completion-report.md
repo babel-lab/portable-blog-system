@@ -407,11 +407,11 @@ per `docs/phase-9h-completion-report.md` §1：
 
 ### 8.3 Phase 8-h：legacy 欄位退場
 
-- **狀態**：⏸ pending / post-Phase-1（pre-analysis 已落地於 commit `a538564`）
+- **狀態**：✅ **landed**（Phase 8-h 系列實質完成；per `docs/phase-8h-completion-report.md`）
 - **範圍**：跨 6 個 source code 檔案、17 個 legacy 位置（per `docs/phase-8h-pre-analysis.md` §3）；含 `validate-content.js` / `normalize-post-output.js` / `build-blogger.js` / `build-promotion.js` / `resolve-placeholders.js`；**不**含 `parse-markdown.js` H1→H2 自動降級（屬永久 SEO 防呆，per §3.3）
-- **建議拆批**（per `docs/phase-8h-pre-analysis.md` §5）：8-h-b baseline run → 8-h-c-pre fixtures（可選）→ 8-h-c → 8-h-d-1 ~ d-4 → 8-h-e-1 / e-2 → 8-h-f → 8-h-z docs sync
-- **trigger condition**：✅ **本文件升 final 即達成**（per `docs/phase-1-completion-report.md` 本批升正式 final 後，Phase 8-h 退場批可啟動）
-- **後續啟動條件**：作者熟悉 Phase 8-a normalized 結構 + 適當時機
+- **退場結果**：**15 of 15 in-scope positions retired-or-migrated（100%）**；含 14 個完全退場 + 1 個 source migration（#12 meta.json type；field 永久保留 schema 相容性）+ 1 個 skipped（#12 field removal；Phase 8-h-e-2-b 永久 deferred）
+- **landed commits**：Phase 8-h-a-doc `a538564` / 8-h-b `c9ce52c` / 8-h-c-pre `130097a` / 8-h-c-pre-1 `546686d` / 8-h-c `bc41b80` / 8-h-d-1 `f05de63` / 8-h-d-2 `28096e3` / 8-h-d-3 `fa74d02` / 8-h-d-4 `0b47f5b` / 8-h-e-1 `6ce66f4` / 8-h-e-2-a `b49e2c3` / 8-h-f-content-migration-a `6f1b3c9` / 8-h-f `72db25f` / 8-h-z（本系列收尾批；docs sync）
+- **規範**（為歷史脈絡保留）：拆批建議 per `docs/phase-8h-pre-analysis.md` §5；fixture 補強 per `docs/phase-8h-c-pre-plan.md` §5.2；regression handling（8-h-f）per `docs/phase-8h-completion-report.md` §4
 
 ### 8.4 Phase 9-h-f：兩端 Related Posts auto block
 
