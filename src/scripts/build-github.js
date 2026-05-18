@@ -216,6 +216,27 @@ function buildSeoForPostDetail({ settings, post }) {
       post.primaryPlatform === 'blogger'
         ? `${settings.site.bloggerSiteUrl}/`
         : `${settings.site.githubSiteUrl}/`;
+    // Phase 9-g-g-d: mentions 接 relatedLinks + otherLinks（per docs/phase-9g-g-pre-plan.md §6）
+    //   - 嚴格 pre-filter：array only + title non-empty + url non-empty
+    //   - item @type 固定 WebPage；只輸出 @type / name / url 三欄位
+    //   - 不映射 platform / kind / description / order / target / rel
+    //   - 不臆造 specific subType（VideoObject / Book / Periodical 等）
+    //   - 與 build-blogger.js buildBloggerJsonLd() 兩端 mirror
+    const mentionsItems = [
+      ...(Array.isArray(post.relatedLinks) ? post.relatedLinks : []),
+      ...(Array.isArray(post.otherLinks) ? post.otherLinks : []),
+    ]
+      .filter(
+        (entry) =>
+          entry &&
+          typeof entry === 'object' &&
+          !Array.isArray(entry) &&
+          typeof entry.title === 'string' &&
+          entry.title.trim() !== '' &&
+          typeof entry.url === 'string' &&
+          entry.url.trim() !== '',
+      )
+      .map((entry) => ({ '@type': 'WebPage', name: entry.title, url: entry.url }));
     seo.jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'BlogPosting',
@@ -235,6 +256,7 @@ function buildSeoForPostDetail({ settings, post }) {
         url: blogSiteUrl,
         inLanguage: settings.site.language,
       },
+      ...(mentionsItems.length > 0 ? { mentions: mentionsItems } : {}),
     };
     if (ogImage) seo.jsonLd.image = ogImage;
   }
