@@ -595,7 +595,9 @@ authors[N].role → "author"
 | `content/settings/books.json` | 跨文章共用之書本實體資料庫；mirror `series.json` 模式 | 同一本書被多篇文章引用，或需要跨文章書籍資料一致性 |
 | 書籍索引頁 | 站內自動生成之書籍列表頁 / 書籍詳細頁 | 開了 `content/settings/books.json` 之後 |
 | 作者索引頁 | 站內自動生成之作者列表頁 / 作者詳細頁 | 需要跨文章作者導覽（例：「該作者之其他書評」）|
-| Structured data（JSON-LD）| 於 GitHub 站輸出 `Book` / `Periodical` / `Person` JSON-LD（SEO）| Phase 5 SEO / JSON-LD 子議題之延伸；屬 customer-facing 輸出，per `docs/future-roadmap.md` §5.2 排除原則之保守路線 |
+| Structured data：**Book mainEntity（JSON-LD）** | 於 BlogPosting JSON-LD 新增 `mainEntity` of `@type: Book`（只支援 `mediaType="book"`）| ⏸ **planned for Phase 9-f-g**（pre-plan landed per `docs/phase-9f-g-pre-plan.md`；trigger 已滿足：作者已完成 Google Rich Results Test）|
+| Structured data：**Periodical（JSON-LD）** | 於 BlogPosting JSON-LD 新增 `mainEntity` of `@type: Periodical`（只支援 `mediaType="magazine"`）| ⏸ **deferred to Phase 9-f-g2**（trigger 未滿足：當前 0 ready magazine post；需首篇 ready magazine 之 Rich Results Test 驗證後再啟動）|
+| Structured data：**Person**（author sameAs / url 等進階）| Person 之 sameAs / url / honorific 等 | ⏸ deferred / nice-to-have（Phase 9-f-g 第一版 Person 只含 @type + name）|
 | `book.author` legacy warning | 升級為 warning-only validate 規則 `book-author-uses-legacy-string` | Phase 8-h+ 相容層退場批次；與其他 legacy fallback 同批評估 |
 | book schema 進階 validation rules | 例：ISBN 格式檢查、ISSN 8 碼檢查、`publishedYear` 區間檢查（皆未落地）；`authors[].role` 列舉值嚴格檢查**已於 Phase 9-e-d-c 落地**（詳見 §11.2 rule 6）| 視作者使用模式與 false-positive 風險評估後決定 |
 | 3 條經評估不落地之 rules（`book-isbn-with-magazine-mediatype` / `book-volume-label-empty-with-volume-number` / `book-author-and-authors-both-present`）| 屬與 docs spec 衝突或誤觸風險高之候選；詳見 §11.5 deferred rules | Phase 9-e-d-a 評估後 9-e-d 系列不落地；未來如政策調整可再評估 |

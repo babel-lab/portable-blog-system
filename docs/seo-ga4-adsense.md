@@ -401,6 +401,25 @@ per `docs/phase-9g-g-pre-plan.md`（Phase 9-g-g-b；commit `f5fb400`）之設計
 
 **完整收尾紀錄**：詳見 `docs/phase-9g-g-completion-report.md`（含 §4 isPartOf 落地摘要 + §5 mentions 落地摘要 + §6 Blogger / GitHub parity 驗證 + §7 驗證摘要 + §9 下一步建議）。
 
+#### 7.4.2 Phase 9-f-g 預計新增欄位（planned；本批 Phase 9-f-g-b docs-only pre-plan landed）
+
+per `docs/phase-9f-g-pre-plan.md`（本批 Phase 9-f-g-b docs-only pre-plan）之設計提案：
+
+| 欄位 | 狀態 | 預期 @type / 結構 | 來源 |
+|---|---|---|---|
+| **`mainEntity`** | ⏸ planned（Phase 9-f-g-c source 批；未啟動）| object `{ @type: "Book", name, author[]: [{@type: Person, name}], publisher: {@type: Organization, name}, datePublished?, isbn?, image?, bookEdition?, alternateName? }`（條件式：只在 `contentKind === "book-review"` 且 `book.mediaType === "book"` 或缺省時才出）| `post.book.{title, authors[], publisher, publishedYear, isbn, coverImage, volumeLabel, titleEn, originalTitle}`（嚴格 pre-filter：empty book.title 不出整個 mainEntity）|
+
+**第一版範圍**：
+- ✅ 只支援 `mediaType="book"`
+- ❌ `mediaType="magazine"` / Periodical 延後至 **Phase 9-f-g2**
+- ❌ DVD / YouTube / Netflix / Movie / TVSeries / VideoObject specific @type 全部延後；維持 mentions[].@type = WebPage
+- ❌ 不接 library sameAs / @graph / author Person.sameAs / publisher Organization.url
+- ❌ 不接 normalize-post-output；不新增 validate rules；不修改 fixtures / samples
+
+**Blogger / GitHub parity 要求**：兩端 BlogPosting JSON-LD 新增 mainEntity 需完全 mirror（per Phase 9-h article block parity + Phase 9-g-g 既有 pattern）。
+
+**設計詳情**：詳見 `docs/phase-9f-g-pre-plan.md` §4-§7（支援範圍 / JSON-LD mapping / we-media-myself2 live target / 與 isPartOf / mentions 關係）。
+
 ### 7.5 canonical 雙保險策略
 
 1. **5-a 解析**（既有）：`resolveCanonicalUrl(post, settings)` 回傳含 UTM 的 absolute URL
