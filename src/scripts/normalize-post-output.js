@@ -651,32 +651,15 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
           'explicit canonical.url empty; computed from canonicalPlatform',
         );
       } else {
-        // 再 fallback：legacy frontmatter canonical（若為 URL 字串非 'auto'）
-        const fmCanonical = p.canonical;
-        if (
-          typeof fmCanonical === 'string' &&
-          fmCanonical !== '' &&
-          fmCanonical !== 'auto' &&
-          /^https?:\/\//.test(fmCanonical)
-        ) {
-          seo.canonicalUrl = fmCanonical;
-          recordField(meta, 'seo.canonicalUrl', 'frontmatter.canonical');
-          recordFallback(
-            meta,
-            'seo.canonicalUrl',
-            'frontmatter.canonical',
-            'no sidecar canonical; using legacy frontmatter',
-          );
-        } else {
-          seo.canonicalUrl = null;
-          recordField(meta, 'seo.canonicalUrl', 'fallback:null');
-          recordWarning(
-            meta,
-            'canonical-url-missing',
-            'seo.canonicalUrl',
-            `canonical URL could not be resolved (canonicalPlatform=${publishOut.canonicalPlatform}; sidecar / computed / frontmatter all empty) — non-blocking`,
-          );
-        }
+        // Phase 8-h-d-3：移除 legacy frontmatter canonical URL string fallback（position #9 per docs/phase-8h-c-pre-plan.md §3.2）
+        seo.canonicalUrl = null;
+        recordField(meta, 'seo.canonicalUrl', 'fallback:null');
+        recordWarning(
+          meta,
+          'canonical-url-missing',
+          'seo.canonicalUrl',
+          `canonical URL could not be resolved (canonicalPlatform=${publishOut.canonicalPlatform}; sidecar / computed all empty) — non-blocking`,
+        );
       }
     }
   }
