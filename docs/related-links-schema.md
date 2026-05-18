@@ -470,7 +470,75 @@ baseline 演進：
 - 無意外 `[13]` 區塊 / 無意外「相關連結 / 其他連結內容檢查」checklist 區塊 / 無意外 `<aside class="lab-related-links">` / `<aside class="lab-other-links">` HTML 區塊
 - validate baseline 維持 **`0/22/17`**
 
-未啟動之 **9-g-g** 屬 JSON-LD 範疇（structured data；與 Phase 9-f-g 同步保守原則 deferred）；與當前 dist 無關。
+未啟動之 **9-g-g** 屬 JSON-LD 範疇（structured data；與 Phase 9-f-g 同步保守原則 deferred）；本節 §9.5 補完 Phase 9-g-g 之 mentions / isPartOf 設計提案（per Phase 9-g-g-b docs-only pre-plan；本批落地）。
+
+### 9.5 Phase 9-g-g JSON-LD mentions / isPartOf 設計提案
+
+per `docs/phase-9g-g-pre-plan.md`（本批 9-g-g-b 落地）之設計：
+
+#### 9.5.1 relatedLinks / otherLinks 作為 JSON-LD mentions source
+
+Phase 9-g-g 計畫將 `post.relatedLinks` + `post.otherLinks` 兩個 array 作為 BlogPosting JSON-LD 之 `mentions[]` 來源。語義對應：
+
+- schema.org 之 `mentions` 定義為「CreativeWork contains a reference to, but is not necessarily about」
+- relatedLinks / otherLinks 屬作者主動策劃之延伸閱讀 / 來源連結；語義精確匹配
+
+#### 9.5.2 第一版 mentions mapping
+
+per Phase 9-g-g-d source 落地（尚未啟動）之預期映射：
+
+| relatedLinks / otherLinks per-item 欄位 | mentions[] item 欄位 |
+|---|---|
+| `title` | `name`（必填）|
+| `url` | `url`（必填）|
+| —（不映射）| `@type`：`'WebPage'`（fixed；schema.org base type 或 `CreativeWork` 替代候選）|
+
+**不映射之欄位**：`kind` / `platform` / `description` / `order` / `target` / `rel`（per §3.1 之 8 per-item 欄位中之 6 個）
+
+#### 9.5.3 Pre-filter rule
+
+每個 entry 必須通過以下條件才進 mentions[]：
+
+1. entry 為 plain object（非 null / 非 array）
+2. `entry.title` 為 string 且 `trim() !== ''`
+3. `entry.url` 為 string 且 `trim() !== ''`
+
+**Empty array 處置**：若 pre-filter 後 mentionsItems 為空，**不輸出** `mentions` 欄位（避免 empty array / null 噪音被 Google 標 invalid）。
+
+#### 9.5.4 明確標註之 scope 限制
+
+| 限制 | 說明 |
+|---|---|
+| ❌ **不使用 `platform` 推導 specific @type** | platform 為 free-form 字串（"Youtube" / "台北市立圖書館" / "出版社官網" 等）；不映射為 schema.org subType；統一用 `WebPage` base |
+| ❌ **不引入 YouTube / Netflix / DVD / magazine specific schema 細分** | VideoObject / MediaObject / Book / Periodical 等 subType 需正確 metadata；本批不臆造 |
+| ❌ **不把 relatedLinks schema 接進 normalize-post-output** | per §9.3 既有設計；第一版直接於 build-blogger.js / build-github.js 讀 `post.relatedLinks` / `post.otherLinks` |
+| ❌ **不映射 affiliate.links 為 mentions** | affiliate 屬 sponsored 性質；schema.org mentions 為「referenced」；混入會誤導 Google 解讀 |
+
+#### 9.5.5 isPartOf 設計（Phase 9-g-g 同系列處理）
+
+per Phase 9-g-g-c source 落地預期：
+
+| isPartOf 子欄位 | 來源 |
+|---|---|
+| `@type` | `'Blog'`（fixed；schema.org 標準）|
+| `@id` | `settings.site.githubSiteUrl` 或 `settings.site.bloggerSiteUrl`（依 post.primaryPlatform）|
+| `name` | `settings.site.siteName` |
+| `url` | 同 `@id` |
+| `inLanguage` | `settings.site.language` |
+
+**第一版只接 site / blog 層級**；不用 book（書評文章不是 PART OF 被評書本；屬語義錯誤）；不用 series（當前 0 ready posts 含 series）；不用 category（WebPageSection 在 schema.org 較少見）。
+
+#### 9.5.6 與 Phase 9-g-g-* 系列子批之關係
+
+| Phase | 範圍 | 狀態 |
+|---|---|---|
+| Phase 9-g-g-a | 純讀取分析（read-only pre-analysis）| ✅ completed（無 commit）|
+| **Phase 9-g-g-b** | **docs-only pre-plan（本批落地；含本節 §9.5）** | ✅ **本批 landed** |
+| Phase 9-g-g-c | source 接入 isPartOf only | ⏸ 未啟動 |
+| Phase 9-g-g-d | source 接入 mentions only | ⏸ 未啟動 |
+| Phase 9-g-g-z | completion report + docs sync | ⏸ 未啟動 |
+
+詳細拆批理由與驗證策略見 `docs/phase-9g-g-pre-plan.md` §8 + §9。
 
 ---
 

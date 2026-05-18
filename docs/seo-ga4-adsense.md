@@ -386,6 +386,19 @@ JSON-LD 用 `<` escape `<`（防 `</script>` 注入），與 5-b `seo/json-ld.ej
 
 `canonicalUrl` 已含 blogger→github UTM（5-a / Phase 3-e-3 解析），與 5-b GitHub canonical 對齊。
 
+#### 7.4.1 Phase 9-g-g 預計新增欄位（planned；尚未實作）
+
+per `docs/phase-9g-g-pre-plan.md`（Phase 9-g-g-b docs-only pre-plan；本批落地）之設計提案：
+
+| 欄位 | 狀態 | 預期 @type / 結構 | 來源 |
+|---|---|---|---|
+| **`isPartOf`** | ⏸ planned（Phase 9-g-g-c source 批；未啟動）| object `{ @type: "Blog", @id, name, url, inLanguage }` | `settings.site.{githubSiteUrl, bloggerSiteUrl, siteName, language}` + `post.primaryPlatform` |
+| **`mentions`** | ⏸ planned（Phase 9-g-g-d source 批；未啟動）| array `[ { @type: "WebPage", name, url } ]`（條件式：non-empty 時才出） | `post.relatedLinks[]` + `post.otherLinks[]`（嚴格 pre-filter：title + url 非空）|
+
+**Blogger / GitHub parity 要求**：兩端 BlogPosting JSON-LD 新增欄位需完全 mirror（per Phase 9-h article block parity 既有 pattern）。`isPartOf` / `mentions` 之 schema 結構 / @type / 欄位順序在兩端應一致；唯一差異為 `isPartOf.@id` / `mentions[].url` 之具體 URL 依 platform 而異。
+
+**設計詳情**：詳見 `docs/phase-9g-g-pre-plan.md` §5（isPartOf 設計）+ §6（mentions 設計）+ `docs/related-links-schema.md` §9.5（mentions / isPartOf 設計提案）。
+
 ### 7.5 canonical 雙保險策略
 
 1. **5-a 解析**（既有）：`resolveCanonicalUrl(post, settings)` 回傳含 UTM 的 absolute URL
