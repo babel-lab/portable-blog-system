@@ -194,6 +194,57 @@ function buildSeoForPostList({ settings }) {
   return commonSeo({ pageType: 'post-list', settings, canonicalUrl });
 }
 
+// Phase 9-f-g-c: BlogPosting.mainEntity = Book（per docs/phase-9f-g-pre-plan.md §4-§5）
+//   - 條件式：post.book object + (mediaType 缺省 OR === "book") + book.title non-empty
+//   - 採 author fallback chain：authors[].displayName → localName → originalName → legacy book.author
+//   - 不接 Periodical / DVD / YouTube / Netflix specific @type / library sameAs / @graph / Person.sameAs
+//   - 與 build-blogger.js buildBloggerJsonLd() 兩端 mirror
+function buildBookMainEntity(post) {
+  const book = post.book;
+  if (!book || typeof book !== 'object' || Array.isArray(book)) return null;
+  if (book.mediaType && book.mediaType !== 'book') return null;
+  if (typeof book.title !== 'string' || book.title.trim() === '') return null;
+  const entity = { '@type': 'Book', name: book.title };
+  // alternateName: non-empty titleEn / originalTitle; 1 → string；2 → array
+  const altNames = [book.titleEn, book.originalTitle].filter(
+    (v) => typeof v === 'string' && v.trim() !== '',
+  );
+  if (altNames.length === 1) entity.alternateName = altNames[0];
+  else if (altNames.length > 1) entity.alternateName = altNames;
+  // author: 優先 authors[] role 缺省或 === "author"；fallback chain name
+  const authorPersons = (Array.isArray(book.authors) ? book.authors : [])
+    .filter((a) => a && typeof a === 'object' && !Array.isArray(a))
+    .filter((a) => !a.role || a.role === 'author')
+    .map((a) => {
+      const name = [a.displayName, a.localName, a.originalName].find(
+        (v) => typeof v === 'string' && v.trim() !== '',
+      );
+      return name ? { '@type': 'Person', name } : null;
+    })
+    .filter(Boolean);
+  if (authorPersons.length > 0) {
+    entity.author = authorPersons;
+  } else if (typeof book.author === 'string' && book.author.trim() !== '') {
+    entity.author = [{ '@type': 'Person', name: book.author }];
+  }
+  // publisher: Organization
+  if (typeof book.publisher === 'string' && book.publisher.trim() !== '') {
+    entity.publisher = { '@type': 'Organization', name: book.publisher };
+  }
+  // datePublished: book.publishedYear → "YYYY"
+  if (typeof book.publishedYear === 'number' && Number.isFinite(book.publishedYear)) {
+    const year = Math.trunc(book.publishedYear);
+    if (year >= 1000 && year <= 9999) entity.datePublished = String(year);
+  }
+  // isbn / image / bookEdition：non-empty 才出
+  if (typeof book.isbn === 'string' && book.isbn.trim() !== '') entity.isbn = book.isbn;
+  if (typeof book.coverImage === 'string' && book.coverImage.trim() !== '')
+    entity.image = book.coverImage;
+  if (typeof book.volumeLabel === 'string' && book.volumeLabel.trim() !== '')
+    entity.bookEdition = book.volumeLabel;
+  return entity;
+}
+
 function buildSeoForPostDetail({ settings, post }) {
   const canonicalUrl = buildCanonicalUrl({ pageType: 'post-detail', settings, post });
   const base = siteBaseUrl(settings);
@@ -237,6 +288,7 @@ function buildSeoForPostDetail({ settings, post }) {
           entry.url.trim() !== '',
       )
       .map((entry) => ({ '@type': 'WebPage', name: entry.title, url: entry.url }));
+    const bookMainEntity = buildBookMainEntity(post);
     seo.jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'BlogPosting',
@@ -257,6 +309,7 @@ function buildSeoForPostDetail({ settings, post }) {
         inLanguage: settings.site.language,
       },
       ...(mentionsItems.length > 0 ? { mentions: mentionsItems } : {}),
+      ...(bookMainEntity ? { mainEntity: bookMainEntity } : {}),
     };
     if (ogImage) seo.jsonLd.image = ogImage;
   }
