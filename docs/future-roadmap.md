@@ -320,7 +320,7 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 - commit `4d68f50`
 - 範圍：純 docs；封存 BlogPosting + WebSite schema 兩端落地狀態；確認 we-media-myself2 之 `@id` / `mainEntityOfPage` 一致；example.com placeholder 全域 0 殘留
 - 結論：JSON-LD 已正式落地；**不是** deferred / half-landed / 未啟動
-- Phase 9-g-g / 9-f-g 進階強化保留為 post-Phase-1 deferred（trigger condition 已滿足，待 Google Rich Results Test 驗證後評估）
+- Phase 9-g-g 進階強化 ✅ **landed / completed**（per §8.5 順序 4；詳見 `docs/phase-9g-g-completion-report.md`）；Phase 9-f-g 仍保留為 post-Phase-1 deferred（trigger condition 已滿足，待 Google Rich Results Test 驗證後評估）
 
 ### 8.4 Phase 8-h 系列（legacy fallback retirement；✅ 實質完成）
 
@@ -355,8 +355,8 @@ per `docs/phase-1-completion-report.md` §11 之保守啟動順序：
 | 1 | Google Rich Results Test 驗證 | 作者對 we-media-myself2 之 BlogPosting JSON-LD 進行驗證 | ✅ 已滿足 | 🟢 低（屬作者 SOP）|
 | ~~2~~ | ~~Phase 8-h-b legacy 退場前 baseline run~~ | ✅ **landed**（commit `c9ce52c`）| — | — |
 | ~~3~~ | ~~Phase 8-h 退場批（8-h-c → 8-h-d-1~d-4 → 8-h-e-1/e-2 → 8-h-f → 8-h-z）~~ | ✅ **landed**（13 commits + 1 skipped sub-batch；詳見 §8.4 + `docs/phase-8h-completion-report.md`）| — | — |
-| 4 | Phase 9-g-g JSON-LD `mentions` / `isPartOf` | relatedLinks / otherLinks schema.org 補強 | 順序 1 通過後 | 🟡 中（schema.org 嚴格性）|
-| 5 | Phase 9-f-g Book / Periodical structured data | book-review / magazine schema.org | 順序 1 通過後 | 🟡 中（同上）|
+| ~~4~~ | ~~Phase 9-g-g JSON-LD `mentions` / `isPartOf`~~ | ✅ **landed / completed**（pre-plan commit `f5fb400` / isPartOf source commit `70fbf22` / mentions source commit `1d56f8a` / 收尾報告 `docs/phase-9g-g-completion-report.md`）| — | — |
+| 5 | Phase 9-f-g Book / Periodical structured data | book-review / magazine schema.org | 順序 1 通過後 | 🟡 中（schema.org 嚴格性）|
 | 6 | Phase 9-h-f 兩端 Related Posts auto block | 跨兩端 auto 推薦邏輯 | 作者 ≥ 5 篇 ready post（當前 3 篇）| 🟡 中 |
 
 ### 8.6 保留之 deferred / nice-to-have 項目

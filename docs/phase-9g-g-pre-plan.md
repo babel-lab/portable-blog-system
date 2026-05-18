@@ -2,11 +2,14 @@
 
 本文件封存 **Phase 9-g-g（JSON-LD `mentions` / `isPartOf` structured data 強化）系列**之 docs-only pre-plan 設計。為**純設計批**；無 source / content / fixtures / dist 變動。
 
+> **後續狀態**（Phase 9-g-g-z 收尾後同步補記）：Phase 9-g-g 系列已實質完成；isPartOf source 已於 Phase 9-g-g-c 落地（commit `70fbf22`）；mentions source 已於 Phase 9-g-g-d 落地（commit `1d56f8a`）；完整收尾紀錄見 `docs/phase-9g-g-completion-report.md`。本文件保留為**設計階段封存版本**；§8 / §9 之 trigger 狀態以 completion report 為準。
+
 對應之上層紀錄：
-- `docs/related-links-schema.md` §9.2（既有 Phase 9-g-g deferred 標註；本批同步補強 mentions 映射設計）
+- `docs/phase-9g-g-completion-report.md`（Phase 9-g-g 系列完整收尾報告；本批之下游紀錄）
+- `docs/related-links-schema.md` §9.2 / §9.5（既有 Phase 9-g-g deferred 標註 + mentions 映射設計）
 - `docs/phase-9j-jsonld-landing-verification.md` §4.1 / §4.2（既有 JSON-LD 落地紀錄 + Phase 9-g-g / 9-f-g deferred 理由）
 - `docs/phase-1-completion-report.md` §8.1（Phase 9-g-g post-Phase-1 deferred）+ §11 順序 4
-- `docs/seo-ga4-adsense.md` §7.4（BlogPosting JSON-LD schema；本批同步補 Phase 9-g-g 預計新增欄位）
+- `docs/seo-ga4-adsense.md` §7.4 / §7.4.1（BlogPosting JSON-LD schema + Phase 9-g-g 新增欄位）
 - `docs/future-roadmap.md` §8.5 順序 4（Phase 9-g-g 排程）
 
 ---
@@ -63,7 +66,7 @@ Phase 9-g-g 為 Phase 1 final + Phase 8-h 退場完成後之 SEO structured data
 | Sub-batch | 狀態 |
 |---|---|
 | Phase 9-g-a ~ 9-g-f-c | ✅ landed（schema / fixtures / Blogger render / GitHub render / copy-helper / publish-checklist 全套；relatedLinks / otherLinks 結構性能力完整）|
-| **Phase 9-g-g**（本系列）| ⏸ pre-plan 階段（本文件）|
+| **Phase 9-g-g**（本系列）| ✅ **已收尾**（per Phase 9-g-g-z；詳見 `docs/phase-9g-g-completion-report.md`）|
 
 ---
 
@@ -337,15 +340,15 @@ per Phase 9-g-g-a 既有分析；本批 pre-plan 再次收斂：
 
 ### 8.1 Phase 9-g-g 系列拆批 roadmap
 
-| 子批次 | 範圍 | 預估 commit 數 | 風險等級 |
+| 子批次 | 範圍 | 狀態 | commit |
 |---|---|---|---|
-| **Phase 9-g-g-a** | 純讀取分析（pre-analysis）| 0（無 commit）| 🟢 極低 |
-| **Phase 9-g-g-b（本批）** | docs-only pre-plan（本文件 + related-links-schema.md §9.2 + seo-ga4-adsense.md §7.4）| 1 | 🟢 極低 |
-| **Phase 9-g-g-c** | source 接入 **isPartOf only**（單一欄位；最保守第一步）| 1 | 🟠 中（首次 BlogPosting schema additive；觸發 vite build dist/.gitkeep）|
-| **Phase 9-g-g-d** | source 接入 **mentions only**（接 relatedLinks / otherLinks；嚴格 pre-filter）| 1 | 🟠 中（mentions[] 構建邏輯較複雜；pre-filter 邊界 case）|
-| **Phase 9-g-g-z** | completion report + docs sync（mirror Phase 8-h-z pattern）| 1 | 🟢 低 |
+| **Phase 9-g-g-a** | 純讀取分析（pre-analysis）| ✅ completed | — |
+| **Phase 9-g-g-b** | docs-only pre-plan（本文件 + related-links-schema.md §9.5 + seo-ga4-adsense.md §7.4.1）| ✅ landed | `f5fb400` |
+| **Phase 9-g-g-c** | source 接入 **isPartOf only**（單一欄位；最保守第一步）| ✅ landed | `70fbf22` |
+| **Phase 9-g-g-d** | source 接入 **mentions only**（接 relatedLinks / otherLinks；嚴格 pre-filter）| ✅ landed | `1d56f8a` |
+| **Phase 9-g-g-z** | completion report + docs sync（mirror Phase 8-h-z pattern；新增 `docs/phase-9g-g-completion-report.md`）| 🔄 進行中（本系列收尾批；docs-only）| 本批 |
 
-**合計**：3 source / docs commits + 1 pre-plan commit + 1 completion report commit = **5 commits**（不含 9-g-g-a 純分析）
+**合計**：1 pre-plan commit（9-g-g-b）+ 2 source commits（9-g-g-c / 9-g-g-d）+ 1 completion report commit（9-g-g-z）= **4 commits**（不含 9-g-g-a 純分析）
 
 ### 8.2 拆批理由
 
@@ -355,11 +358,13 @@ per Phase 9-g-g-a 既有分析；本批 pre-plan 再次收斂：
 
 ### 8.3 各批 trigger conditions
 
-| 批次 | trigger condition |
-|---|---|
-| Phase 9-g-g-c | ✅ 本批（9-g-g-b）docs landed；用戶批准進入 source 批 |
-| Phase 9-g-g-d | ✅ 9-g-g-c 已 landed + 用戶確認 isPartOf 之 Google Rich Results Test 通過（或用戶主動選擇略過 Rich Results Test 直接續做）|
-| Phase 9-g-g-z | ✅ 9-g-g-c + 9-g-g-d 皆 landed |
+（截至 Phase 9-g-g-z 收尾；trigger 條件均已達成）
+
+| 批次 | trigger condition | 實際達成狀態 |
+|---|---|---|
+| Phase 9-g-g-c | 9-g-g-b docs landed；用戶批准進入 source 批 | ✅ 已達成；commit `70fbf22` |
+| Phase 9-g-g-d | 9-g-g-c 已 landed + 用戶確認 isPartOf 之 Google Rich Results Test 通過（或用戶主動選擇略過 Rich Results Test 直接續做）| ✅ 用戶主動選擇略過 Rich Results Test 直接續做；commit `1d56f8a` |
+| Phase 9-g-g-z | 9-g-g-c + 9-g-g-d 皆 landed | ✅ 本批進行中 |
 
 ---
 
@@ -427,10 +432,11 @@ per Phase 9-g-g-a 既有分析；本批 pre-plan 再次收斂：
 
 ### 11.1 既有 docs
 
-- `docs/related-links-schema.md` §3 / §9.2（relatedLinks / otherLinks schema + JSON-LD 後續設計位置）
+- `docs/phase-9g-g-completion-report.md`（**Phase 9-g-g 系列完整收尾報告**；本批之下游紀錄；含 isPartOf / mentions 落地摘要 + Blogger / GitHub parity 驗證 + 下一步建議）
+- `docs/related-links-schema.md` §3 / §9.5（relatedLinks / otherLinks schema + JSON-LD mentions 設計提案；本系列 landed 後 mentions 已正式映射）
 - `docs/phase-9j-jsonld-landing-verification.md` §3 / §4（既有 11 項 JSON-LD landings + Phase 9-g-g deferred 紀錄）
 - `docs/phase-1-completion-report.md` §8.1 / §11 順序 4（Phase 9-g-g post-Phase-1 deferred + 啟動順序）
-- `docs/seo-ga4-adsense.md` §7.4（BlogPosting schema 規範；本批同步補 Phase 9-g-g 預計欄位）
+- `docs/seo-ga4-adsense.md` §7.4 / §7.4.1（BlogPosting schema 規範 + Phase 9-g-g 新增欄位狀態）
 
 ### 11.2 規範來源
 

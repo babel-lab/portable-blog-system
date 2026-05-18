@@ -386,18 +386,20 @@ JSON-LD 用 `<` escape `<`（防 `</script>` 注入），與 5-b `seo/json-ld.ej
 
 `canonicalUrl` 已含 blogger→github UTM（5-a / Phase 3-e-3 解析），與 5-b GitHub canonical 對齊。
 
-#### 7.4.1 Phase 9-g-g 預計新增欄位（planned；尚未實作）
+#### 7.4.1 Phase 9-g-g 新增欄位（landed）
 
-per `docs/phase-9g-g-pre-plan.md`（Phase 9-g-g-b docs-only pre-plan；本批落地）之設計提案：
+per `docs/phase-9g-g-pre-plan.md`（Phase 9-g-g-b；commit `f5fb400`）之設計，以及 Phase 9-g-g-c / 9-g-g-d 之 source landings：
 
-| 欄位 | 狀態 | 預期 @type / 結構 | 來源 |
+| 欄位 | 狀態 | @type / 結構 | 來源 |
 |---|---|---|---|
-| **`isPartOf`** | ⏸ planned（Phase 9-g-g-c source 批；未啟動）| object `{ @type: "Blog", @id, name, url, inLanguage }` | `settings.site.{githubSiteUrl, bloggerSiteUrl, siteName, language}` + `post.primaryPlatform` |
-| **`mentions`** | ⏸ planned（Phase 9-g-g-d source 批；未啟動）| array `[ { @type: "WebPage", name, url } ]`（條件式：non-empty 時才出） | `post.relatedLinks[]` + `post.otherLinks[]`（嚴格 pre-filter：title + url 非空）|
+| **`isPartOf`** | ✅ **landed**（Phase 9-g-g-c；commit `70fbf22`）| object `{ @type: "Blog", @id, name, url, inLanguage }`（永遠輸出）| `settings.site.{githubSiteUrl, bloggerSiteUrl, siteName, language}` + `post.primaryPlatform` |
+| **`mentions`** | ✅ **landed**（Phase 9-g-g-d；commit `1d56f8a`）| array `[ { @type: "WebPage", name, url } ]`（條件式：non-empty 時才出；empty 時整個欄位不出）| `post.relatedLinks[]` + `post.otherLinks[]`（嚴格 pre-filter：title + url 非空）|
 
-**Blogger / GitHub parity 要求**：兩端 BlogPosting JSON-LD 新增欄位需完全 mirror（per Phase 9-h article block parity 既有 pattern）。`isPartOf` / `mentions` 之 schema 結構 / @type / 欄位順序在兩端應一致；唯一差異為 `isPartOf.@id` / `mentions[].url` 之具體 URL 依 platform 而異。
+**Blogger / GitHub parity**：✅ 已完成。兩端 BlogPosting JSON-LD 新增欄位完全 mirror（per Phase 9-h article block parity 既有 pattern）。`isPartOf` / `mentions` 之 schema 結構 / @type / 欄位順序在兩端一致；唯一差異為 `isPartOf.@id` / `mentions[].url` 之具體 URL 依 platform 而異。
 
-**設計詳情**：詳見 `docs/phase-9g-g-pre-plan.md` §5（isPartOf 設計）+ §6（mentions 設計）+ `docs/related-links-schema.md` §9.5（mentions / isPartOf 設計提案）。
+**設計詳情**：詳見 `docs/phase-9g-g-pre-plan.md` §5（isPartOf 設計）+ §6（mentions 設計）+ `docs/related-links-schema.md` §9.5（mentions / isPartOf 落地紀錄）。
+
+**完整收尾紀錄**：詳見 `docs/phase-9g-g-completion-report.md`（含 §4 isPartOf 落地摘要 + §5 mentions 落地摘要 + §6 Blogger / GitHub parity 驗證 + §7 驗證摘要 + §9 下一步建議）。
 
 ### 7.5 canonical 雙保險策略
 

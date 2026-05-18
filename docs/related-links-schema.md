@@ -418,7 +418,7 @@ otherLinks:
 | 9-g-f-a | GitHub render 純讀取分析（確認 SCSS / build pipeline 無需動；推薦插入點 article body 後 / AdSense Bottom 前；包覆 `<div class="lab-container">`） | ✅ completed |
 | 9-g-f-b | GitHub article HTML render：`src/views/pages/post-detail.ejs` 在 article body 後 / AdSense Bottom 前新增 `<aside class="lab-related-links">` / `<aside class="lab-other-links">` 兩個 conditional 區塊；mirror Blogger 9-g-d-b pattern；EJS comment 嚴格無 delimiter 字符 inline 預防（per 9-g-d-c-fix 教訓）；不改 SCSS / build script / Blogger 端 | ✅ completed（commit `1bb807f`） |
 | 9-g-f-c | docs sync：本文件 §9 + `docs/future-roadmap.md` Phase 9-g row + `docs/phase-9g-completion-report.md` §3 / §4.12 / §5.2 / §8 補入 GitHub render 紀錄；可選 `docs/publish-workflow.md` §11 末段補一行；屬 **Phase 9-g-f 系列收尾** | ✅ completed（本批） |
-| 9-g-g（可選 / deferred） | JSON-LD `mentions` / `isPartOf` structured data | ⏸ deferred（與 Phase 9-f-g 同步保守原則：等真實 ready post 可做 Google Rich Results Test 後再評估） |
+| 9-g-g（系列；含 a/b/c/d/z 5 子批） | JSON-LD `mentions` / `isPartOf` structured data；BlogPosting schema additive；Blogger / GitHub 兩端 mirror | ✅ completed（pre-plan commit `f5fb400` / isPartOf source commit `70fbf22` / mentions source commit `1d56f8a` / 收尾報告 `docs/phase-9g-g-completion-report.md`）|
 
 當前 validate baseline：**`0 error / 22 warning on 17 post(s)`**（簡稱 `0/22/17`）
 
@@ -432,11 +432,11 @@ baseline 演進：
 
 ### 9.2 Phase 9-g 後續批次
 
-下列為尚未啟動之後續批次（9-g-d / 9-g-e / 9-g-f 系列已全數 landed，由 §9.1 紀錄；本節僅列尚未啟動者）：
+（截至 Phase 9-g-g-z 收尾；Phase 9-g 系列全數已 landed；本節不再有未啟動批次。Phase 9-g-g 完整收尾紀錄見 `docs/phase-9g-g-completion-report.md`。）
 
-| 子批次 | 範圍 | 起手條件 |
+| 子批次 | 範圍 | 狀態 |
 | --- | --- | --- |
-| Phase 9-g-g（可選 / deferred） | JSON-LD `mentions` / `isPartOf` structured data | 與 Phase 9-f-g 同步保守原則：等真實 ready post 可做 Google Rich Results Test 後再評估 |
+| Phase 9-g-g（系列；含 a/b/c/d/z 5 子批） | JSON-LD `mentions` / `isPartOf` structured data | ✅ completed（per `docs/phase-9g-g-completion-report.md`）|
 
 ### 9.3 不接 normalize-post-output（第一版）
 
@@ -470,22 +470,22 @@ baseline 演進：
 - 無意外 `[13]` 區塊 / 無意外「相關連結 / 其他連結內容檢查」checklist 區塊 / 無意外 `<aside class="lab-related-links">` / `<aside class="lab-other-links">` HTML 區塊
 - validate baseline 維持 **`0/22/17`**
 
-未啟動之 **9-g-g** 屬 JSON-LD 範疇（structured data；與 Phase 9-f-g 同步保守原則 deferred）；本節 §9.5 補完 Phase 9-g-g 之 mentions / isPartOf 設計提案（per Phase 9-g-g-b docs-only pre-plan；本批落地）。
+**Phase 9-g-g** 屬 JSON-LD 範疇（structured data）；本節 §9.5 紀錄 mentions / isPartOf 之最終設計與 landed 狀態（per Phase 9-g-g-b pre-plan + Phase 9-g-g-c / 9-g-g-d source landings + Phase 9-g-g-z 收尾報告）。
 
-### 9.5 Phase 9-g-g JSON-LD mentions / isPartOf 設計提案
+### 9.5 Phase 9-g-g JSON-LD mentions / isPartOf 設計與落地紀錄
 
-per `docs/phase-9g-g-pre-plan.md`（本批 9-g-g-b 落地）之設計：
+per `docs/phase-9g-g-pre-plan.md`（Phase 9-g-g-b；commit `f5fb400`）+ `docs/phase-9g-g-completion-report.md`（Phase 9-g-g-z；本系列收尾報告）：
 
 #### 9.5.1 relatedLinks / otherLinks 作為 JSON-LD mentions source
 
-Phase 9-g-g 計畫將 `post.relatedLinks` + `post.otherLinks` 兩個 array 作為 BlogPosting JSON-LD 之 `mentions[]` 來源。語義對應：
+✅ **已 landed**（Phase 9-g-g-d；commit `1d56f8a`）：`post.relatedLinks` + `post.otherLinks` 兩個 array 已正式作為 BlogPosting JSON-LD 之 `mentions[]` 來源。語義對應：
 
 - schema.org 之 `mentions` 定義為「CreativeWork contains a reference to, but is not necessarily about」
 - relatedLinks / otherLinks 屬作者主動策劃之延伸閱讀 / 來源連結；語義精確匹配
 
 #### 9.5.2 第一版 mentions mapping
 
-per Phase 9-g-g-d source 落地（尚未啟動）之預期映射：
+per Phase 9-g-g-d source 落地（commit `1d56f8a`；兩端 `src/scripts/build-github.js` `buildSeoForPostDetail()` + `src/scripts/build-blogger.js` `buildBloggerJsonLd()` mirror）之實際映射：
 
 | relatedLinks / otherLinks per-item 欄位 | mentions[] item 欄位 |
 |---|---|
@@ -516,7 +516,7 @@ per Phase 9-g-g-d source 落地（尚未啟動）之預期映射：
 
 #### 9.5.5 isPartOf 設計（Phase 9-g-g 同系列處理）
 
-per Phase 9-g-g-c source 落地預期：
+✅ **已 landed**（Phase 9-g-g-c；commit `70fbf22`）：per source 落地：
 
 | isPartOf 子欄位 | 來源 |
 |---|---|
@@ -530,15 +530,15 @@ per Phase 9-g-g-c source 落地預期：
 
 #### 9.5.6 與 Phase 9-g-g-* 系列子批之關係
 
-| Phase | 範圍 | 狀態 |
-|---|---|---|
-| Phase 9-g-g-a | 純讀取分析（read-only pre-analysis）| ✅ completed（無 commit）|
-| **Phase 9-g-g-b** | **docs-only pre-plan（本批落地；含本節 §9.5）** | ✅ **本批 landed** |
-| Phase 9-g-g-c | source 接入 isPartOf only | ⏸ 未啟動 |
-| Phase 9-g-g-d | source 接入 mentions only | ⏸ 未啟動 |
-| Phase 9-g-g-z | completion report + docs sync | ⏸ 未啟動 |
+| Phase | 範圍 | 狀態 | commit |
+|---|---|---|---|
+| Phase 9-g-g-a | 純讀取分析（read-only pre-analysis）| ✅ completed | — |
+| Phase 9-g-g-b | docs-only pre-plan（含本節 §9.5）| ✅ landed | `f5fb400` |
+| Phase 9-g-g-c | source 接入 isPartOf only | ✅ landed | `70fbf22` |
+| Phase 9-g-g-d | source 接入 mentions only | ✅ landed | `1d56f8a` |
+| Phase 9-g-g-z | completion report + docs sync（含本節狀態更新）| 🔄 本批進行中 | 本批 |
 
-詳細拆批理由與驗證策略見 `docs/phase-9g-g-pre-plan.md` §8 + §9。
+詳細拆批理由與驗證策略見 `docs/phase-9g-g-pre-plan.md` §8 + §9；完整收尾紀錄見 `docs/phase-9g-g-completion-report.md`。
 
 ---
 
