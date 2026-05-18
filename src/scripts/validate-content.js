@@ -302,7 +302,8 @@ export function validateContent({ posts, settings }) {
       }
       // Phase 8-b-3：contentKind 相容讀取與舊 type 警告
       //   - post.contentKind 為主（load-posts 在無 contentKind 時自動 fallback 到 data.type）
-      //   - post.type 仍保留作 debug；以下三條規則處理命名落差
+      //   - post.type 仍保留作 debug；以下兩條規則處理命名落差
+      //   - Phase 8-h-c：移除 `frontmatter-uses-deprecated-type` warning rule（dormant；0 active caller per docs/phase-8h-c-pre-plan.md §3.2 位置 #1）
       if (post.contentKind !== undefined && !VALID_CONTENT_KIND.has(post.contentKind)) {
         issues.push({
           severity: 'warning',
@@ -321,14 +322,6 @@ export function validateContent({ posts, settings }) {
           type: 'contentkind-and-type-conflict',
           sourcePath,
           value: `type=${String(post.type)}, contentKind=${String(post.contentKind)}`,
-        });
-      }
-      if (post.type !== undefined && post.contentKind === post.type) {
-        issues.push({
-          severity: 'warning',
-          type: 'frontmatter-uses-deprecated-type',
-          sourcePath,
-          value: String(post.type),
         });
       }
       if (post.primaryPlatform !== undefined && !VALID_PRIMARY_PLATFORM.has(post.primaryPlatform)) {
