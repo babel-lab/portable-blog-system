@@ -128,11 +128,19 @@ function absolutizeBloggerCover(post, settings) {
 }
 
 // Phase 5-f-2：BlogPosting JSON-LD（in-body）；canonicalUrl 缺則 null
+// Phase 9-g-g-c：新增 isPartOf 欄位（per docs/phase-9g-g-pre-plan.md §5）；與 build-github.js buildSeoForPostDetail() 兩端結構 mirror
 function buildBloggerJsonLd(post, canonicalUrl, settings, ogImage) {
   if (!canonicalUrl) return null;
   const cat = (settings.categories || []).find(
     (c) => c.id === post.category || c.slug === post.category,
   );
+  // Phase 9-g-g-c: isPartOf 採最保守 site/blog 層級（@type=Blog；依 post.primaryPlatform 選擇對應平台 blog 首頁）
+  //   - 不使用 book / series / category 當 isPartOf
+  //   - 與 build-github.js 兩端 mirror
+  const blogSiteUrl =
+    post.primaryPlatform === 'blogger'
+      ? `${settings.site.bloggerSiteUrl}/`
+      : `${settings.site.githubSiteUrl}/`;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
@@ -145,6 +153,13 @@ function buildBloggerJsonLd(post, canonicalUrl, settings, ogImage) {
     mainEntityOfPage: canonicalUrl,
     inLanguage: settings.site.language,
     articleSection: cat?.name || post.category,
+    isPartOf: {
+      '@type': 'Blog',
+      '@id': blogSiteUrl,
+      name: settings.site.siteName,
+      url: blogSiteUrl,
+      inLanguage: settings.site.language,
+    },
   };
   if (ogImage) jsonLd.image = ogImage;
   return jsonLd;

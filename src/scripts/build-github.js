@@ -208,6 +208,14 @@ function buildSeoForPostDetail({ settings, post }) {
     keywords: Array.isArray(post.tags) && post.tags.length > 0 ? post.tags : null,
   };
   if (canonicalUrl) {
+    // Phase 9-g-g-c: isPartOf 採最保守 site/blog 層級（per docs/phase-9g-g-pre-plan.md §5）
+    //   - @type=Blog（schema.org 標準）；@id / url 依 post.primaryPlatform 指向對應平台 blog 首頁
+    //   - 不使用 book / series / category 當 isPartOf（語義錯誤或當前無 ready post 觸發）
+    //   - 與 build-blogger.js buildBloggerJsonLd() 兩端結構 mirror
+    const blogSiteUrl =
+      post.primaryPlatform === 'blogger'
+        ? `${settings.site.bloggerSiteUrl}/`
+        : `${settings.site.githubSiteUrl}/`;
     seo.jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'BlogPosting',
@@ -220,6 +228,13 @@ function buildSeoForPostDetail({ settings, post }) {
       mainEntityOfPage: canonicalUrl,
       inLanguage: settings.site.language,
       articleSection: findCategoryName(settings, post.category),
+      isPartOf: {
+        '@type': 'Blog',
+        '@id': blogSiteUrl,
+        name: settings.site.siteName,
+        url: blogSiteUrl,
+        inLanguage: settings.site.language,
+      },
     };
     if (ogImage) seo.jsonLd.image = ogImage;
   }
