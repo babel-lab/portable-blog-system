@@ -595,7 +595,7 @@ authors[N].role → "author"
 | `content/settings/books.json` | 跨文章共用之書本實體資料庫；mirror `series.json` 模式 | 同一本書被多篇文章引用，或需要跨文章書籍資料一致性 |
 | 書籍索引頁 | 站內自動生成之書籍列表頁 / 書籍詳細頁 | 開了 `content/settings/books.json` 之後 |
 | 作者索引頁 | 站內自動生成之作者列表頁 / 作者詳細頁 | 需要跨文章作者導覽（例：「該作者之其他書評」）|
-| Structured data：**Book mainEntity（JSON-LD）** | 於 BlogPosting JSON-LD 新增 `mainEntity` of `@type: Book`（只支援 `mediaType="book"`）| ⏸ **planned for Phase 9-f-g**（pre-plan landed per `docs/phase-9f-g-pre-plan.md`；trigger 已滿足：作者已完成 Google Rich Results Test）|
+| Structured data：**Book mainEntity（JSON-LD）** | 於 BlogPosting JSON-LD 新增 `mainEntity` of `@type: Book`（只支援 `mediaType="book"`）| ✅ **landed at Phase 9-f-g**（pre-plan commit `10df61c` / source commit `b394e4f` / completion report `docs/phase-9f-g-completion-report.md`；兩端 Blogger / GitHub mirror）|
 | Structured data：**Periodical（JSON-LD）** | 於 BlogPosting JSON-LD 新增 `mainEntity` of `@type: Periodical`（只支援 `mediaType="magazine"`）| ⏸ **deferred to Phase 9-f-g2**（trigger 未滿足：當前 0 ready magazine post；需首篇 ready magazine 之 Rich Results Test 驗證後再啟動）|
 | Structured data：**Person**（author sameAs / url 等進階）| Person 之 sameAs / url / honorific 等 | ⏸ deferred / nice-to-have（Phase 9-f-g 第一版 Person 只含 @type + name）|
 | `book.author` legacy warning | 升級為 warning-only validate 規則 `book-author-uses-legacy-string` | Phase 8-h+ 相容層退場批次；與其他 legacy fallback 同批評估 |

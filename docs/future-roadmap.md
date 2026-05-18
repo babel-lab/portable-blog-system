@@ -356,7 +356,7 @@ per `docs/phase-1-completion-report.md` §11 之保守啟動順序：
 | ~~2~~ | ~~Phase 8-h-b legacy 退場前 baseline run~~ | ✅ **landed**（commit `c9ce52c`）| — | — |
 | ~~3~~ | ~~Phase 8-h 退場批（8-h-c → 8-h-d-1~d-4 → 8-h-e-1/e-2 → 8-h-f → 8-h-z）~~ | ✅ **landed**（13 commits + 1 skipped sub-batch；詳見 §8.4 + `docs/phase-8h-completion-report.md`）| — | — |
 | ~~4~~ | ~~Phase 9-g-g JSON-LD `mentions` / `isPartOf`~~ | ✅ **landed / completed**（pre-plan commit `f5fb400` / isPartOf source commit `70fbf22` / mentions source commit `1d56f8a` / 收尾報告 `docs/phase-9g-g-completion-report.md`）| — | — |
-| 5 | Phase 9-f-g Book structured data | book-review schema.org（`mediaType="book"`；Periodical / magazine 延後至 Phase 9-f-g2）| ✅ 順序 1 已通過；🔄 pre-plan landed（Phase 9-f-g-b；本批；per `docs/phase-9f-g-pre-plan.md`）；後續 source 批待批 | 🟡 中（schema.org 嚴格性）|
+| ~~5~~ | ~~Phase 9-f-g Book structured data~~ | ✅ **landed / closed**（pre-plan commit `10df61c` / source commit `b394e4f` / 收尾報告 `docs/phase-9f-g-completion-report.md`；Periodical / magazine 延後至 Phase 9-f-g2）| — | — |
 | 6 | Phase 9-h-f 兩端 Related Posts auto block | 跨兩端 auto 推薦邏輯 | 作者 ≥ 5 篇 ready post（當前 3 篇）| 🟡 中 |
 
 ### 8.6 保留之 deferred / nice-to-have 項目
