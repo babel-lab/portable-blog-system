@@ -74,7 +74,7 @@ Phase 9-g-g 之目標為**擴充 BlogPosting JSON-LD schema**：
 | **Phase 9-g-g-b** | docs-only pre-plan（新增 `docs/phase-9g-g-pre-plan.md` + `docs/related-links-schema.md` §9.5 + `docs/seo-ga4-adsense.md` §7.4.1）| ✅ landed | `f5fb400` |
 | **Phase 9-g-g-c** | source 接入 **isPartOf only**（單一欄位；最保守第一步；2 個 source file mirror）| ✅ landed | `70fbf22` |
 | **Phase 9-g-g-d** | source 接入 **mentions only**（接 `relatedLinks[]` + `otherLinks[]`；嚴格 pre-filter；2 個 source file mirror）| ✅ landed | `1d56f8a` |
-| **Phase 9-g-g-z** | completion report + docs sync（本批；mirror Phase 8-h-z pattern）| 🔄 本批 pending | 本批 |
+| **Phase 9-g-g-z** | completion report + docs sync（mirror Phase 8-h-z pattern）| ✅ landed | `efed101` |
 
 **合計**：3 source / docs commits（9-g-g-b + 9-g-g-c + 9-g-g-d）+ 本 9-g-g-z 收尾批 = **4 commits**（不含 9-g-g-a 純分析）
 

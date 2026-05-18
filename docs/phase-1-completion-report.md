@@ -391,11 +391,16 @@ per `docs/phase-9h-completion-report.md` §1：
 
 ### 8.1 Phase 9-g-g：relatedLinks / otherLinks JSON-LD `mentions` / `isPartOf`
 
-- **狀態**：⏸ deferred / post-Phase-1
-- **範圍**：為 relatedLinks / otherLinks 之 internal links 補 schema.org `mentions` / `relatedLink` / `isPartOf` 屬性
-- **trigger condition**：✅ **已滿足**（we-media-myself2 含 relatedLinks + Blogger URL 已正確指向；per Phase 9-j §4.1）
-- **後續啟動條件**：作者於 Google Rich Results Test 對 we-media-myself2 之**現有** BlogPosting JSON-LD 進行驗證 → 確認基礎 schema 通過 → 再評估啟動
-- **來源**：`docs/phase-9g-completion-report.md` §8.3 / `docs/related-links-schema.md` §9.2 / `docs/phase-9j-jsonld-landing-verification.md` §4.1
+- **狀態**：✅ **landed / closed**（2026-05-18；per `docs/phase-9g-g-completion-report.md`）
+- **歷史脈絡**：本項原列為 ⏸ deferred / post-Phase-1（per §11 順序 4）；trigger condition 已滿足後，於 2026-05-18 由 Claude Code 落地完整 Phase 9-g-g 系列（5 子批；4 commits）
+- **範圍**：為 BlogPosting JSON-LD 補 schema.org `isPartOf`（永遠輸出；@type `Blog`）+ `mentions`（條件式輸出；@type `WebPage`；來源為 `post.relatedLinks` + `post.otherLinks`）；兩端 Blogger / GitHub mirror
+- **landed commits**：
+  - Phase 9-g-g-b `f5fb400`：docs-only pre-plan
+  - Phase 9-g-g-c `70fbf22`：source 接入 isPartOf only
+  - Phase 9-g-g-d `1d56f8a`：source 接入 mentions only
+  - Phase 9-g-g-z `efed101`：completion report + docs sync
+- **後續關聯**：本系列 closed 後，順序 1（Google Rich Results Test 驗證）仍由作者執行；通過後可評估啟動順序 5（Phase 9-f-g Book / Periodical structured data）
+- **來源**：`docs/phase-9g-g-completion-report.md`（10 個 section；落地紀錄完整）/ `docs/phase-9g-completion-report.md` §8.3 / `docs/related-links-schema.md` §9.2 / §9.5 / `docs/phase-9j-jsonld-landing-verification.md` §4.1
 
 ### 8.2 Phase 9-f-g：Book / Periodical structured data
 
@@ -587,10 +592,12 @@ per §8.5：當作者撰寫對應類型 post 並填欄位時，dormant article b
 
 ### 順序 4：Phase 9-g-g JSON-LD `mentions` / `isPartOf`
 
-- **負責**：Claude Code（建議拆 2-3 子批）
-- **範圍**：relatedLinks / otherLinks 之 `mentions` / `isPartOf` schema.org 補強
-- **觸發條件**：順序 1 已通過 Rich Results Test 驗證
-- **預期效益**：SEO 強化；search engine 對 internal link 之語意理解
+- **狀態**：✅ **landed / closed**（2026-05-18；per `docs/phase-9g-g-completion-report.md`）
+- **歷史脈絡**：本項原列為 post-Phase-1 順序 4；觸發條件原為「順序 1 通過 Rich Results Test 驗證後啟動」；於 2026-05-18 由作者主動選擇略過 Rich Results Test 先啟動 Phase 9-g-g 系列，並完整落地
+- **負責**：Claude Code（實際拆 5 子批：a/b/c/d/z；4 commits）
+- **範圍**：BlogPosting JSON-LD 補 `isPartOf`（永遠輸出）+ `mentions`（條件式輸出；來源為 `post.relatedLinks` + `post.otherLinks`）；兩端 Blogger / GitHub mirror
+- **landed commits**：`f5fb400`（pre-plan）/ `70fbf22`（isPartOf source）/ `1d56f8a`（mentions source）/ `efed101`（completion report + docs sync）
+- **後續驗證**：Google Rich Results Test 對含 isPartOf + mentions 之新 schema 仍待作者執行；屬順序 1 之延伸驗證
 
 ### 順序 5：Phase 9-f-g Book / Periodical structured data
 
