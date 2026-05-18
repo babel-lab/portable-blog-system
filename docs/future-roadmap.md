@@ -1,10 +1,12 @@
 # Z-01 future roadmap
 
+> **Phase 1 Final 已封存（Phase 9-z-d）**：BLOG 系統第 1 階段（Phase 0 ~ Phase 9-j）已達 final / completion snapshot 條件。詳見 `docs/phase-1-completion-report.md`（正式 final）+ `docs/phase-1-completion-checklist.md`（逐項對照清單）。Phase 9-i 系列 known blockers 3/3 全清、Phase 9-j JSON-LD landing verification 已封存、首篇真實 ready Blogger post `we-media-myself2` 通過完整 build × 5 pipeline 端對端驗證。**Post-Phase-1 後續強化路線**（Phase 8-h legacy 退場 / 9-g-g 與 9-f-g JSON-LD 進階 / 9-h-f Related Posts auto / sitemap dist 補檔 / Google Rich Results Test 驗證）皆**保留**，詳見 §8。
+
 ## 1. 文件目的
 
 本文件為跨 phase 路線總覽，紀錄各 phase 之推進狀態、最新決策摘要與下一步候選排程。
 
-各 phase 之完整收尾紀錄請見對應 `docs/phase-8X-completion-report.md`；本文件僅承載「跨 phase 視角」與「下一步排程」。
+各 phase 之完整收尾紀錄請見對應 `docs/phase-8X-completion-report.md` / `docs/phase-9X-completion-report.md` / `docs/phase-1-completion-report.md`；本文件僅承載「跨 phase 視角」與「下一步排程」。
 
 ---
 
@@ -276,3 +278,78 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 ### 7.4 專案規範
 
 - `CLAUDE.md`（專案開發規範與分階段計畫）
+
+### 7.5 Phase 1 / Phase 9-i / 9-j / 9-z / 8-h-a 系列紀錄
+
+- `docs/phase-1-completion-checklist.md`（Phase 9-z-b 逐項對照清單；commit `4c87d1f`；含 §10 ~50 條 author SOP）
+- `docs/phase-1-completion-report.md`（Phase 9-z-c candidate → Phase 9-z-d 升正式 final；當前為正式 Phase 1 final report）
+- `docs/phase-9h-known-blockers.md`（Phase 9-h-full-build-verify-a 之 3 個 known blockers；Phase 9-i 系列 3/3 全清；commits `eced408` + `7be40a7` + `31ae053` + `7986d58`）
+- `docs/phase-9j-jsonld-landing-verification.md`（Phase 9-j JSON-LD landing verification 封存；commit `4d68f50`）
+- `docs/phase-8h-pre-analysis.md`（Phase 8-h-a-doc legacy 退場前盤點分析；commit `a538564`；屬 post-Phase-1 退場批前置）
+
+---
+
+## 8. Phase 1 Final 系列補述 + post-Phase-1 路線
+
+> 本節為 Phase 9-z-d（本批；Phase 1 final 升正式）之 docs sync。原 §2 Phase 9 row 涵蓋至 Phase 9-h-r；本節補述 Phase 9-i / 9-j / 9-z / 8-h-a-doc 系列 landings 與 post-Phase-1 後續強化路線排程。
+
+### 8.1 Phase 9-z 系列（Phase 1 收尾文件群）
+
+| 子批 | 範圍 | 狀態 | commit / 紀錄 |
+|---|---|---|---|
+| 9-z-b | Phase 1 完成 checklist（`docs/phase-1-completion-checklist.md`；525 行 / 13 主節 / §10 ~50 條 author SOP）| ✅ landed | commit `4c87d1f` |
+| 9-z-c | Phase 1 completion candidate report（`docs/phase-1-completion-report.md`；初版為 candidate）| ✅ landed → 9-z-d 升 final | commit `4f4349c` |
+| 9-z-d | **Phase 1 final completion report 升正式版**（本批；移除 candidate 標註；同步 we-media-myself2 端對端驗證事實 + Phase 9-i 全清 + Phase 9-j 已封存；同步 `docs/phase-1-completion-checklist.md` §2.3 / §12 / §13 + 本文件 §1 / §7.5 / §8）| ✅ landed（本批）| 見本批 git log |
+
+### 8.2 Phase 9-i 系列（Phase 9-h-full-build-verify-a 之 3 個 known blockers 修復）
+
+| Blocker | 範圍 | 修復 commit |
+|---|---|---|
+| #2 canonical → example.com / GitHub path | site.config.json placeholder + build-blogger.js canonical resolver | `eced408` + `7be40a7`（Phase 9-i-b1 + 9-i-b2）|
+| #3 build:promotion sidecar attach 未生效 | build-promotion.js `classifyFacebook` 改為 sidecar-first fallback chain | `31ae053`（Phase 9-i-d-b）|
+| #1 GitHub cross-source dist 未產出 | 新增 `load-github-posts.js` mirror cross-source + build-github.js canonical 對稱 | `7986d58`（Phase 9-i-f-b）|
+
+**status：3/3 全清**（per `docs/phase-9h-known-blockers.md` §7.1）。
+
+### 8.3 Phase 9-j JSON-LD landing verification（驗收文件批）
+
+- commit `4d68f50`
+- 範圍：純 docs；封存 BlogPosting + WebSite schema 兩端落地狀態；確認 we-media-myself2 之 `@id` / `mainEntityOfPage` 一致；example.com placeholder 全域 0 殘留
+- 結論：JSON-LD 已正式落地；**不是** deferred / half-landed / 未啟動
+- Phase 9-g-g / 9-f-g 進階強化保留為 post-Phase-1 deferred（trigger condition 已滿足，待 Google Rich Results Test 驗證後評估）
+
+### 8.4 Phase 8-h-a-doc（legacy 退場前盤點分析）
+
+- commit `a538564`
+- 範圍：純 docs；封存 17 個 source code 位置 + 1 個明確排除位置（parse-markdown H1→H2 屬永久防呆，不在範圍）；建議拆批 8-h-b ~ 8-h-z 共 9-11 commits
+- 狀態：⏸ Phase 8-h-b ~ 8-h-z 退場批仍未啟動；trigger condition「Phase 1 final 封存」於 Phase 9-z-d 達成；屬 post-Phase-1 可啟動
+
+### 8.5 Post-Phase-1 後續強化路線
+
+per `docs/phase-1-completion-report.md` §11 之保守啟動順序：
+
+| 順序 | 批次 | 範圍 | 觸發條件 | 風險 |
+|---|---|---|---|---|
+| 1 | Google Rich Results Test 驗證 | 作者對 we-media-myself2 之 BlogPosting JSON-LD 進行驗證 | ✅ 已滿足 | 🟢 低（屬作者 SOP）|
+| 2 | Phase 8-h-b legacy 退場前 baseline run | 跑 build × 5 + validate + 7 reports；產出 baseline snapshot；可順帶補 `dist/sitemap.xml` + `dist/robots.txt` | ✅ 已滿足 | 🟡 中（需執行 build）|
+| 3 | Phase 8-h 退場批（8-h-c → 8-h-d-1~d-4 → 8-h-e-1/e-2 → 8-h-f → 8-h-z）| per `docs/phase-8h-pre-analysis.md` §5；9-11 commits | 順序 2 完成後 | 🟠 中-高（跨 6 source files）|
+| 4 | Phase 9-g-g JSON-LD `mentions` / `isPartOf` | relatedLinks / otherLinks schema.org 補強 | 順序 1 通過後 | 🟡 中（schema.org 嚴格性）|
+| 5 | Phase 9-f-g Book / Periodical structured data | book-review / magazine schema.org | 順序 1 通過後 | 🟡 中（同上）|
+| 6 | Phase 9-h-f 兩端 Related Posts auto block | 跨兩端 auto 推薦邏輯 | 作者 ≥ 5 篇 ready post（當前 3 篇）| 🟡 中 |
+
+### 8.6 保留之 deferred / nice-to-have 項目
+
+- **Phase 8-g-1**：fixture / sample end-to-end 驗證（per §4；待作者人工確認部署隔離流程）
+- **Phase 8-g candidate 6**：first article `.fb.md` hashtags fallback（per §3.1 8-g-20-final；nice-to-have / Phase 8-h+）
+- **Dormant article blocks**：Cover / Affiliate Box top/bottom / Download Box / Book Photo 共 4 個區塊；屬作者內容路徑；不需新增 source / build pipeline；每篇新文章可依需要 live activate
+- **`dist/sitemap.xml` + `dist/robots.txt` 補檔**：系統 ready；屬流程未跑而非系統缺漏；可單獨成批或併入 Phase 8-h-b
+- **圖書館可借類型 enum schema 擴充**（一般圖書 / 電子書 / DVD / 雜誌 / Netflix 等正式 type）：屬未來 schema 候選；當前 `platform` free-form 可表達但無正式分類 enum
+
+### 8.7 邊界聲明
+
+- Phase 9-z-d 為**純 docs 升 final 批**；**不**啟動任何 source code / dist / validate / build 變動
+- Phase 9-z-d **不**啟動 Phase 8-h 退場批
+- Phase 9-z-d **不**啟動 `dist/sitemap.xml` / `dist/robots.txt` 補檔
+- Phase 9-z-d **不**啟動 Google Rich Results Test
+- Phase 9-z-d **不**啟動 Phase 9-g-g / 9-f-g / 9-h-f
+- 後續每篇新文章發布應對照 `docs/phase-1-completion-checklist.md` §10 之 author SOP

@@ -52,9 +52,11 @@ CLAUDE.md §1 第 1 條規定：第一版的目標是「可長期維護、可備
 
 ### 2.1 Git 狀態
 
-- **HEAD**：`6950e20 docs(phase-9): add phase-9h completion report`
+- **HEAD**（本 checklist 建立時）：`6950e20 docs(phase-9): add phase-9h completion report`
+- **HEAD**（Phase 9-z-d Phase 1 final 升正式時）：`4d68f50 docs(json-ld): add phase 9j landing verification`
 - **working tree**：clean
 - **本文件建立批次**：Phase 9-z-b（純 docs；單檔新增）
+- **Phase 9-z-d 升 final 備註**：`docs/phase-1-completion-report.md` 已於 Phase 9-z-d 由 candidate 升正式 final（參見該文件 §1.1 / §12 / §13）；本 checklist 之 §2.3 timeline / §12 雙層判定 / §13 下一步建議三節已同步更新
 
 ### 2.2 Baseline 指標
 
@@ -71,11 +73,13 @@ CLAUDE.md §1 第 1 條規定：第一版的目標是「可長期維護、可備
 |---|---|
 | Phase 9-g 收尾（relatedLinks / otherLinks 系列）| ✅ 已收尾 |
 | Phase 9-h 收尾（GitHub article block parity）| ✅ 已收尾（GitHub article block parity completed snapshot；Related Posts auto deferred） |
-| Phase 9-g-g（relatedLinks JSON-LD `mentions` / `isPartOf`）| ⏸ deferred |
-| Phase 9-f-g（Book / Periodical JSON-LD）| ⏸ deferred |
-| Phase 8-h（legacy 欄位退場）| ⏸ pending |
-| 第 1 階段 final completion report | ❌ 缺；候選為 Phase 9-z-c |
-| 真實作者使用流程驗證 | ❌ 未執行；候選為 §10 之 manual checklist |
+| Phase 9-g-g（relatedLinks JSON-LD `mentions` / `isPartOf`）| ⏸ deferred（trigger condition 已滿足；屬 post-Phase-1）|
+| Phase 9-f-g（Book / Periodical JSON-LD）| ⏸ deferred（trigger condition 已滿足；屬 post-Phase-1）|
+| Phase 8-h（legacy 欄位退場）| ⏸ pending（pre-analysis 已落地於 commit `a538564`；trigger 已滿足；屬 post-Phase-1）|
+| Phase 9-i 系列 known blockers 3/3 修復 | ✅ 全清（commits `eced408` + `7be40a7` + `31ae053` + `7986d58`）|
+| Phase 9-j JSON-LD landing verification | ✅ 已封存（commit `4d68f50`）|
+| 第 1 階段 final completion report | ✅ 已升正式（Phase 9-z-d；`docs/phase-1-completion-report.md`）|
+| 真實作者使用流程驗證 | ✅ 已通過首篇 we-media-myself2 端對端驗證（commit `8332d82` + Phase 9-i 修復後）；§10 50 條 checklist 屬持續適用之 author SOP，不視為一次性阻擋 |
 
 ---
 
@@ -472,9 +476,13 @@ Phase 9 為 Phase 8-g pause-state 後之 Direction A + D 起手系列。
 
 ## §12 第 1 階段完成判定
 
+> **Phase 9-z-d 升 final 後狀態更新**：本節原為 Phase 9-z-b 撰寫時之雙層判定（系統能力 ✅ 接近 / 真實使用 ❌ 未達成）。Phase 9-z-d 升 Phase 1 final 後，狀態升級為 **A ✅ / B ✅ / 整體 ✅ final**；本節保留原文作為 Phase 9-z-b 之歷史 snapshot，正式 final 判定詳見 `docs/phase-1-completion-report.md` §4 / §12。
+
 ### 12.1 系統能力完成度
 
-**狀態：✅ 已接近 Phase 1 收尾**
+**狀態（Phase 9-z-b 原判定）：✅ 已接近 Phase 1 收尾**
+
+**狀態（Phase 9-z-d 升 final 後）：✅ 已達 Phase 1 final 條件**（per `docs/phase-1-completion-report.md` §4.1）
 
 - CLAUDE.md §28 17 條 MVP 必做項目**全 ✅**（per §3）
 - CLAUDE.md §29 12 項第一版不做清單**全維持不做**（per §4）
@@ -486,7 +494,11 @@ Phase 9 為 Phase 8-g pause-state 後之 Direction A + D 起手系列。
 
 ### 12.2 完整使用與測試完成度
 
-**狀態：❌ 未達成**
+**狀態（Phase 9-z-b 原判定）：❌ 未達成**
+
+**狀態（Phase 9-z-d 升 final 後）：✅ 已通過首篇 we-media-myself2 端對端驗證**（per `docs/phase-1-completion-report.md` §4.2 / §3.4）
+
+§10 ~50 條 checklist 之新角色：由「Phase 1 收尾阻擋條件」轉為「每篇新文章發布之持續適用 author SOP 手冊」；本批不逐項勾選封存（per `docs/phase-1-completion-report.md` §10）。
 
 - §10 真實作者使用流程 checklist **0 條已勾選**
 - §8 article blocks 之 5 個 dormant render 未經 ready post 啟用驗證
@@ -494,19 +506,27 @@ Phase 9 為 Phase 8-g pause-state 後之 Direction A + D 起手系列。
 - Phase 9-f-c 系列之 book metadata output 系統 ready 但**零個 ready book-review post**
 - `sitemap.xml` / `robots.txt` 缺檔代表 `build:sitemap` 未在當前流程跑過
 
-### 12.3 保守判定
-
-不直接宣告第 1 階段 100% 完成。當前狀態建議用以下保守 wording：
+### 12.3 保守判定（Phase 9-z-b 原文；保留作歷史 snapshot）
 
 > **「BLOG 系統第 1 階段之系統能力已接近 Phase 1 收尾；MVP 必做清單 17 條全數系統落地，CLAUDE.md §29 第一版不做清單 12 項全維持不做。然而第 1 階段定義包含『完整使用與測試完成』，當前真實作者使用流程（§10 共 ~50 條 checklist）尚未啟動，且 5/6 conditional article blocks 屬 dormant render 狀態（infrastructure ready；零個 ready post 啟用）。**
 >
 > **建議：第 1 階段 final completion report（Phase 9-z-c）應待 §10 至少完成一輪 end-to-end 流程後再寫，並以該輪流程之實際輸出作為驗證依據。**」
 
+### 12.4 Phase 9-z-d 升 final 後正式結論
+
+> **「BLOG 系統第 1 階段已達 final / completion snapshot 條件。系統能力 17 條 MVP 必做項目全數系統落地、6/6 conditional article block 兩端 parity 達成、Phase 9-i known blockers 3/3 全清、Phase 9-j JSON-LD landing verification 已封存、首篇真實 ready Blogger post `we-media-myself2` 通過完整 build × 5 pipeline 端對端驗證。**
+>
+> **後續強化路線（Phase 8-h legacy 退場 / 9-g-g 與 9-f-g JSON-LD 進階 / Google Rich Results Test 驗證 / sitemap dist 補檔 / Phase 9-h-f Related Posts auto）皆屬 post-Phase-1 範疇，不阻擋本階段 final 宣告。**
+>
+> **§10 ~50 條 checklist 由 Phase 1 收尾阻擋條件轉為每篇新文章發布之持續適用 author SOP 手冊；後續每篇 ready post 發布應對照執行。**」
+
 ---
 
 ## §13 下一步建議
 
-完成本 checklist（Phase 9-z-b）後之**建議順序**：
+> **Phase 9-z-d 升 final 後狀態更新**：原順序 1（§10 真實作者試寫流程）已透過首篇 we-media-myself2 migration 實質完成；原順序 2（Phase 9-z-c → final report）已於 Phase 9-z-d 升正式 final 達成。順序 3-7 仍為 post-Phase-1 後續候選；正式啟動順序建議詳見 `docs/phase-1-completion-report.md` §11。
+
+完成本 checklist（Phase 9-z-b）後之**建議順序**（原文保留作歷史 snapshot）：
 
 | 順序 | 批次 | 範圍 | 觸發條件 |
 |---|---|---|---|
