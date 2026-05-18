@@ -71,21 +71,23 @@ npm run build:blogger-theme  # Blogger 可貼用 CSS（首次貼主題用）
 
 ---
 
-## 6. Reports（待 Phase 7-b 補完）
+## 6. Reports
 
-未來於 `dist-reports/` 提供：
-- build report：彙總 ready / draft 數量、warning 數、產物 manifest
-- draft posts report：未發布草稿清單
-- missing tags report：用到但未定義於 `tags.json` 的 tag
-- published URL report：Blogger URL 是否回填
+per `npm run report:*`；輸出至 `dist-reports/`：
+- `npm run report:build`：彙總 ready / draft 數量、warning 數、產物 manifest → `build-report.{txt,json}`
+- `npm run report:drafts`：未發布草稿清單 → `draft-posts-report.{txt,json}`
+- `npm run report:missing-tags`：用到但未定義於 `tags.json` 的 tag → `missing-tags-report.{txt,json}`
+- `npm run report:urls`：Blogger URL 是否回填 → `published-urls-report.{txt,json}`
+- `npm run report:series`：series metadata 一致性 → `series-report.{txt,json}`（Phase 9-f-b 補充）
+- `npm run report:book`：book metadata 一致性 → `book-report.{txt,json}`（Phase 9-f-b-1 補充）
 
 ---
 
-## 7. Checks（待 Phase 7-c 補完）
+## 7. Checks
 
-未來於 `dist-reports/` 提供：
-- broken links check：站內死連結
-- image links check：圖片連結 / cover 路徑可達性
+per `npm run check:*`；輸出至 `dist-reports/`：
+- `npm run check:links`：站內死連結檢查 → `check-broken-links-report.{txt,json}`
+- `npm run check:images`：圖片連結 / cover 路徑可達性 → `check-image-links-report.{txt,json}`
 
 ---
 
