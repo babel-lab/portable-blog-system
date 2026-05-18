@@ -241,20 +241,14 @@ async function renderPublishChecklist(post, canonical, meta) {
 
 // Phase 3-e-4：每篇 post 對應 meta.json（uniform schema、缺漏填 null）
 function buildMeta(post, { renderedKind, canonical, builtAt, outputDir }) {
-  // Phase 8-g-18-d：Blogger tags 輸出來源由 normalized.publish.blogger.tags 優先 + legacy post.tags fallback
+  // Phase 8-g-18-d：Blogger tags 輸出來源為 normalized.publish.blogger.tags
   //   - 設計依據：docs/series-schema.md §22 candidate 7 + Phase 8-d normalized-priority pattern
   //   - normalize-post-output.js（Phase 8-g-18-c）已於 normalized.publish.blogger.tags 封裝
   //     fallback chain：post.tags (non-empty) → series.tags (non-empty) → []
   //   - 本欄不直接讀 series.tags / series.hashtags（per §22.5 分離原則）；series.tags 之繼承走 normalize 已封裝
-  //   - 既有無 series.tags 之 posts：normalized.publish.blogger.tags 等同 post.tags → meta.json 輸出 byte-identical
-  //   - 保留 legacy post.tags fallback：防 normalized 缺值（per 本批特別禁止 13：不移除 legacy fallback）
+  //   - Phase 8-h-e-1：移除 legacy post.tags fallback（per docs/phase-8h-c-pre-plan.md §3.2 位置 #11；defensive-only，0 active caller across content/）
   const normalizedBloggerTags = post.normalized?.publish?.blogger?.tags;
-  const bloggerTags =
-    Array.isArray(normalizedBloggerTags) && normalizedBloggerTags.length > 0
-      ? normalizedBloggerTags
-      : Array.isArray(post.tags)
-        ? post.tags
-        : [];
+  const bloggerTags = Array.isArray(normalizedBloggerTags) ? normalizedBloggerTags : [];
 
   return {
     id: post.id ?? null,
