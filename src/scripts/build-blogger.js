@@ -255,7 +255,8 @@ function buildMeta(post, { renderedKind, canonical, builtAt, outputDir }) {
     slug: post.slug,
     title: post.title ?? null,
     titleEn: post.titleEn ?? null,
-    type: post.type ?? null,
+    // Phase 8-h-e-2-a：meta.json type 欄位來源由 post.type 遷移至 post.normalized.identity.contentKind（per docs/phase-8h-c-pre-plan.md §3.2 位置 #12 第一步；type 欄位本身保留以維持 schema 相容性）
+    type: post.normalized?.identity?.contentKind ?? null,
     primaryPlatform: post.primaryPlatform ?? null,
 
     sourceSite: post.sourceSite,
