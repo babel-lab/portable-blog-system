@@ -88,10 +88,7 @@ function getBloggerPublishedUrl(post, publish) {
   if (publish && isNonEmptyString(publish.publishedUrl)) {
     return { value: publish.publishedUrl, source: 'post.publish.publishedUrl' };
   }
-  // (3) post.publishedUrl（legacy frontmatter top-level）
-  if (post && isNonEmptyString(post.publishedUrl)) {
-    return { value: post.publishedUrl, source: 'post.publishedUrl' };
-  }
+  // Phase 8-h-d-4：移除 (3) post.publishedUrl legacy frontmatter top-level fallback（per docs/phase-8h-c-pre-plan.md §3.2 位置 #14）
   return null;
 }
 
@@ -109,14 +106,7 @@ function getGithubPublishedUrl(post, publish) {
   if (publish && publish.github && isNonEmptyString(publish.github.url)) {
     return { value: publish.github.url, source: 'post.publish.github.url' };
   }
-  // (3) post.github.publishedUrl（legacy frontmatter）
-  if (post && post.github && isNonEmptyString(post.github.publishedUrl)) {
-    return { value: post.github.publishedUrl, source: 'post.github.publishedUrl' };
-  }
-  // (4) post.githubUrl（legacy top-level alias）
-  if (post && isNonEmptyString(post.githubUrl)) {
-    return { value: post.githubUrl, source: 'post.githubUrl' };
-  }
+  // Phase 8-h-d-4：移除 (3) post.github.publishedUrl + (4) post.githubUrl legacy frontmatter fallback（per docs/phase-8h-c-pre-plan.md §3.2 位置 #15 + #16）
   return null;
 }
 
@@ -134,11 +124,8 @@ function getCanonicalUrl(post, publish, articleUrlResolver) {
   if (publish && isNonEmptyString(publish.canonicalUrl)) {
     return { value: publish.canonicalUrl, source: 'post.publish.canonicalUrl' };
   }
-  // (3) post.canonicalUrl（frontmatter flat）
-  if (post && isNonEmptyString(post.canonicalUrl)) {
-    return { value: post.canonicalUrl, source: 'post.canonicalUrl' };
-  }
-  // (4) articleUrl 解析結果（若 resolver 提供且非 null）
+  // Phase 8-h-d-4：移除 (3) post.canonicalUrl legacy frontmatter top-level fallback（per docs/phase-8h-c-pre-plan.md §3.2 位置 #17）
+  // (3) articleUrl 解析結果（若 resolver 提供且非 null）
   if (typeof articleUrlResolver === 'function') {
     const r = articleUrlResolver();
     if (r && isNonEmptyString(r.value)) {
