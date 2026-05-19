@@ -8,6 +8,7 @@
     "dev": "vite --host 0.0.0.0",
     "prebuild": "node src/scripts/build-github.js --mode=build",
     "build": "vite build",
+    "postbuild": "npm run build:sitemap",
     "preview": "vite preview",
     "build:data": "node src/scripts/build-github.js",
     "build:github": "node src/scripts/build-github.js",

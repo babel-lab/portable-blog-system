@@ -37,8 +37,8 @@
 
 ```bash
 npm run validate:content     # 0 errors / 0 warnings 才繼續
-npm run build                # GitHub 站 build（含 prebuild）
-npm run build:sitemap        # 必須在 vite build 之後（vite 會清空 dist/）
+npm run build                # GitHub 站 build（含 prebuild data + postbuild sitemap auto-chain）
+# npm run build:sitemap      # 已由 postbuild 自動 chain；獨立 idempotent，可單獨手動執行
 npm run build:blogger        # Blogger HTML
 npm run build:promotion      # FB 推廣 .txt
 npm run build:blogger-theme  # Blogger 可貼用 CSS（首次貼主題用）
@@ -46,16 +46,26 @@ npm run build:blogger-theme  # Blogger 可貼用 CSS（首次貼主題用）
 
 ### `npm run build:sitemap` 注意事項
 
-`npm run build:sitemap` 為 **manual 步驟**（未接入 prebuild / postbuild chain），會產生：
+`npm run build:sitemap` 自 Phase deploy-workflow-defense 起**已接入 npm `postbuild` lifecycle hook**：每次 `npm run build` 完成後 npm 會自動 chain `build:sitemap`，無需人為記憶順序。
+
+仍保留為**獨立 idempotent script**；可手動單獨執行（如僅想重產 sitemap 而不 rebuild 整站）。
+
+產出：
 
 - `dist/sitemap.xml`（GitHub Pages 站之 sitemap；含 home / post-list / 各 ready post / categories / tags）
 - `dist/robots.txt`（GitHub Pages 站之 robots；含 `Sitemap:` 引用 + `Disallow: /design-system/` + `Disallow: /404.html`）
 
-**執行順序硬性要求**：
+**為何採 postbuild chain**：
 
-- ✅ **必須**在 `npm run build` 之後執行
-- ❌ 如果順序錯（在 `npm run build` 之前先跑 `build:sitemap`），sitemap.xml / robots.txt 會被 vite build 之 `emptyOutDir: true` 清掉
-- 原因：vite build 之 `emptyOutDir` 行為（per `vite.config.js`）會清空 dist/ 後再寫入；本 generator 之輸出時機必須**晚於** vite
+vite build 之 `emptyOutDir: true` 行為（per `vite.config.js`）會清空 `dist/` 後再寫入；若 sitemap 在 build 之前產生會被清掉。先前依賴人工記憶之 ordering 多次被遺忘（含 2026-05-19 之 image size deploy 之 sitemap regression，per `docs/phase-10-completion-report.md` 之後續紀錄），改用 npm 標準 lifecycle hook 自動化保證順序。
+
+**對稱 lifecycle hook**：
+
+```
+prebuild  → node src/scripts/build-github.js --mode=build   # build 前產 .cache/pages/ data
+build     → vite build                                       # vite 將 .cache/pages/ 轉至 dist/
+postbuild → npm run build:sitemap                            # build 後產 dist/sitemap.xml + dist/robots.txt
+```
 
 **範圍**：
 
