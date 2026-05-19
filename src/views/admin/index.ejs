@@ -49,6 +49,24 @@
   tr.post-row.is-open .toggle-hint::before { content: "▼ "; }
   .col-narrow { white-space: nowrap; }
   .col-urls { max-width: 22rem; }
+  /* Admin-2-b-1 dry-run viewer */
+  .dry-run-section { border: 2px dashed #f0d264; background: #fffbe6; padding: 0.75rem; border-radius: 4px; margin-top: 0.75rem; }
+  .dry-run-section h3 { color: #856404; border-bottom-color: #f0d264; }
+  .dry-run-warning { background: #fff4cc; border: 1px solid #f0d264; padding: 0.4rem 0.6rem; border-radius: 3px; margin: 0.25rem 0; font-weight: 600; color: #856404; font-size: 0.85em; }
+  .dry-run-toggle { padding: 0.35rem 0.75rem; border: 1px solid #999; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; }
+  .dry-run-toggle:hover { background: #f0f0f0; }
+  .dry-run-form { margin-top: 0.5rem; }
+  .dry-run-form table { font-size: 0.82em; }
+  .dry-run-form th { background: #f5e8b8; }
+  .dry-run-form textarea { width: 100%; box-sizing: border-box; font-family: inherit; font-size: 0.9em; padding: 0.25rem 0.4rem; border: 1px solid #bbb; border-radius: 3px; resize: vertical; }
+  .dry-run-compute { padding: 0.35rem 0.75rem; border: 1px solid #856404; background: #ffeb99; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #856404; margin-top: 0.5rem; }
+  .dry-run-compute:hover { background: #f0d264; }
+  .dry-run-result table { font-size: 0.82em; }
+  .dry-run-result .changed-count { font-weight: 700; color: #856404; }
+  .dry-run-result .status-changed { color: #d63384; font-weight: 600; }
+  .dry-run-result .status-unchanged { color: #155724; }
+  .dry-run-result .status-empty { color: #999; font-style: italic; }
+  .dry-run-old-value, .dry-run-new-value { max-width: 16rem; word-break: break-word; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -319,6 +337,53 @@
           </div>
           <% } %>
 
+          <div class="detail-section dry-run-section" data-post-idx="<%= idx %>">
+            <h3>Dry-run edit (no write)</h3>
+            <p class="dry-run-warning">⚠️ Dry-run only. No file will be written. 此功能僅計算 + 顯示變更差異；任何實際寫入請以 VS Code + git workflow 處理。</p>
+            <p style="font-size: 0.82em; color: #555; margin: 0.25rem 0 0.5rem;">支援欄位（per <code>docs/admin-2-write-pre-analysis.md</code> §4.1 safe editable subset）：description / searchDescription / titleEn / coverAlt</p>
+            <button type="button" class="dry-run-toggle">Start Edit</button>
+            <div class="dry-run-form" hidden>
+              <table>
+                <thead>
+                  <tr><th style="width:9rem">field</th><th style="width:40%">current value</th><th>new value（編輯此欄即可）</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="mono">description</td>
+                    <td class="dry-run-old-value" data-field="description" data-current="<%= p.description %>"><%= p.description || '(empty)' %></td>
+                    <td><textarea data-input="description" rows="2"><%= p.description %></textarea></td>
+                  </tr>
+                  <tr>
+                    <td class="mono">searchDescription</td>
+                    <td class="dry-run-old-value" data-field="searchDescription" data-current="<%= p.searchDescription %>"><%= p.searchDescription || '(empty)' %></td>
+                    <td><textarea data-input="searchDescription" rows="2"><%= p.searchDescription %></textarea></td>
+                  </tr>
+                  <tr>
+                    <td class="mono">titleEn</td>
+                    <td class="dry-run-old-value" data-field="titleEn" data-current="<%= p.titleEn %>"><%= p.titleEn || '(empty)' %></td>
+                    <td><textarea data-input="titleEn" rows="1"><%= p.titleEn %></textarea></td>
+                  </tr>
+                  <tr>
+                    <td class="mono">coverAlt</td>
+                    <td class="dry-run-old-value" data-field="coverAlt" data-current="<%= p.coverAlt %>"><%= p.coverAlt || '(empty)' %></td>
+                    <td><textarea data-input="coverAlt" rows="1"><%= p.coverAlt %></textarea></td>
+                  </tr>
+                </tbody>
+              </table>
+              <button type="button" class="dry-run-compute">Show Dry-run Diff</button>
+              <div class="dry-run-result" hidden>
+                <p style="margin: 0.5rem 0 0.25rem;">變更欄位數：<span class="changed-count">0</span> / 4</p>
+                <table>
+                  <thead>
+                    <tr><th style="width:9rem">field</th><th>old</th><th>new</th><th style="width:9rem">status</th></tr>
+                  </thead>
+                  <tbody class="dry-run-diff-rows"></tbody>
+                </table>
+                <p class="dry-run-warning" style="margin-top: 0.5rem;">⚠️ Dry-run only. No file will be written. 若要實際寫入：VS Code 編輯 source 檔 + <code>git diff</code> + <code>git commit</code>。</p>
+              </div>
+            </div>
+          </div>
+
           <div class="detail-section">
             <h3>Source path</h3>
             <p class="mono" style="margin: 0;"><%= p.sourcePath %></p>
@@ -403,6 +468,60 @@
 
       // Initial apply (no filter)
       applyFilters();
+
+      // Phase Admin-2-b-1: dry-run edit viewer handlers
+      // 純 client-side：不寫任何檔案；不呼叫 fetch / XHR / fs；無 Apply / Save / Write button。
+      // 點 dry-run section 內 button / input 時 stopPropagation 避免冒泡至 row click（toggle detail）。
+      function escapeHtml(s) {
+        var div = document.createElement('div');
+        div.textContent = s == null ? '' : String(s);
+        return div.innerHTML;
+      }
+      var drySections = document.querySelectorAll('.dry-run-section');
+      drySections.forEach(function (section) {
+        section.addEventListener('click', function (e) { e.stopPropagation(); });
+        var toggle = section.querySelector('.dry-run-toggle');
+        var form = section.querySelector('.dry-run-form');
+        var compute = section.querySelector('.dry-run-compute');
+        var result = section.querySelector('.dry-run-result');
+        var diffRows = section.querySelector('.dry-run-diff-rows');
+        var changedCount = section.querySelector('.changed-count');
+        if (!toggle || !form || !compute || !result || !diffRows || !changedCount) return;
+        toggle.addEventListener('click', function () {
+          form.hidden = !form.hidden;
+          toggle.textContent = form.hidden ? 'Start Edit' : 'Cancel';
+          if (form.hidden) result.hidden = true;
+        });
+        compute.addEventListener('click', function () {
+          var fields = ['description', 'searchDescription', 'titleEn', 'coverAlt'];
+          var changed = 0;
+          var html = '';
+          fields.forEach(function (name) {
+            var oldCell = section.querySelector('[data-field="' + name + '"]');
+            var input = section.querySelector('[data-input="' + name + '"]');
+            var oldVal = oldCell ? (oldCell.dataset.current || '') : '';
+            var newVal = input ? (input.value || '') : '';
+            var statusClass, statusText;
+            if (oldVal === newVal) {
+              if (oldVal === '') { statusClass = 'status-empty'; statusText = 'unchanged / empty'; }
+              else { statusClass = 'status-unchanged'; statusText = 'unchanged'; }
+            } else {
+              statusClass = 'status-changed';
+              statusText = 'changed';
+              changed++;
+            }
+            html += '<tr>'
+              + '<td class="mono">' + escapeHtml(name) + '</td>'
+              + '<td class="dry-run-old-value">' + (oldVal === '' ? '<span class="status-empty">(empty)</span>' : escapeHtml(oldVal)) + '</td>'
+              + '<td class="dry-run-new-value">' + (newVal === '' ? '<span class="status-empty">(empty)</span>' : escapeHtml(newVal)) + '</td>'
+              + '<td class="' + statusClass + '">' + statusText + '</td>'
+              + '</tr>';
+          });
+          diffRows.innerHTML = html;
+          changedCount.textContent = changed;
+          result.hidden = false;
+        });
+      });
     })();
   </script>
   <% } %>
