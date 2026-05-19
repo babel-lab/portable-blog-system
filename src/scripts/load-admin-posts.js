@@ -43,39 +43,86 @@ async function loadOnePost(siteName, mdPath) {
 function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   const slug = typeof fm.slug === 'string' ? fm.slug : '';
   const githubBase = (settings?.site?.githubSiteUrl || '').replace(/\/+$/, '');
+  const description = typeof fm.description === 'string' ? fm.description : '';
+  const searchDescription = typeof fm.searchDescription === 'string' ? fm.searchDescription : '';
+  const category = typeof fm.category === 'string' ? fm.category : '';
+  const tags = Array.isArray(fm.tags) ? fm.tags : [];
+  const descriptionExists = description.trim() !== '';
+  const searchDescriptionExists = searchDescription.trim() !== '';
+  const contentKind = typeof fm.contentKind === 'string' ? fm.contentKind : '';
+  const cover = typeof fm.cover === 'string' ? fm.cover : '';
+  const coverAlt = typeof fm.coverAlt === 'string' ? fm.coverAlt : '';
+  const titleEn = typeof fm.titleEn === 'string' ? fm.titleEn : '';
+  const blogger = {
+    enabled: Boolean(fm?.publishTargets?.blogger?.enabled),
+    mode: fm?.publishTargets?.blogger?.mode || '',
+    type: publishJson?.blogger?.type || '',
+    status: publishJson?.blogger?.status || '',
+    permalink: publishJson?.blogger?.permalink || '',
+    publishedUrl: publishJson?.blogger?.publishedUrl || '',
+  };
+  const github = {
+    enabled: Boolean(fm?.publishTargets?.github?.enabled),
+    mode: fm?.publishTargets?.github?.mode || '',
+    path: publishJson?.github?.path || (slug ? `/posts/${slug}/` : ''),
+    previewUrl: githubBase && slug ? `${githubBase}/posts/${slug}/` : '',
+  };
+  const relatedLinksCount = Array.isArray(fm.relatedLinks) ? fm.relatedLinks.length : 0;
+  const otherLinksCount = Array.isArray(fm.otherLinks) ? fm.otherLinks.length : 0;
+
+  // Phase Admin-1-c：metadata completeness checks（lenient；只標 "OK" 或 "missing"，不自動補值）
+  //   - blogger OK：disabled 視為 OK；enabled 且有 publishedUrl 視為 OK；enabled 但無 publishedUrl 視為 missing
+  //   - github OK：disabled 視為 OK；enabled 且 slug 推導出 previewUrl 視為 OK
+  //   - url OK：至少一邊有 published / preview URL
+  //   - categoryTags OK：category 存在 + 至少 1 個 tag
+  const completeness = {
+    seo: descriptionExists && searchDescriptionExists ? 'ok' : 'missing',
+    fb: fb.exists ? 'ok' : 'missing',
+    blogger: !blogger.enabled ? 'ok' : (blogger.publishedUrl ? 'ok' : 'missing'),
+    github: !github.enabled ? 'ok' : (github.previewUrl ? 'ok' : 'missing'),
+    url: (blogger.publishedUrl || github.previewUrl) ? 'ok' : 'missing',
+    categoryTags: (category && tags.length > 0) ? 'ok' : 'missing',
+  };
+
+  const missingFields = [];
+  if (!contentKind) missingFields.push('contentKind');
+  if (!descriptionExists) missingFields.push('description');
+  if (!searchDescriptionExists) missingFields.push('searchDescription');
+  if (!category) missingFields.push('category');
+  if (tags.length === 0) missingFields.push('tags');
+  if (!cover) missingFields.push('cover');
+  if (!coverAlt) missingFields.push('coverAlt');
+  if (!titleEn) missingFields.push('titleEn');
+  if (blogger.enabled && !blogger.publishedUrl) missingFields.push('blogger.publishedUrl');
+  if (!fb.exists) missingFields.push('.fb.md sidecar');
+
   return {
     sourceSite: siteName,
     sourcePath: mdPath,
     id: typeof fm.id === 'string' ? fm.id : '',
     title: typeof fm.title === 'string' ? fm.title : '',
-    titleEn: typeof fm.titleEn === 'string' ? fm.titleEn : '',
+    titleEn,
     slug,
-    contentKind: typeof fm.contentKind === 'string' ? fm.contentKind : '',
+    contentKind,
     primaryPlatform: typeof fm.primaryPlatform === 'string' ? fm.primaryPlatform : '',
     status: typeof fm.status === 'string' ? fm.status : '',
     draft: fm.draft === true,
-    category: typeof fm.category === 'string' ? fm.category : '',
-    tags: Array.isArray(fm.tags) ? fm.tags : [],
-    descriptionExists:
-      typeof fm.description === 'string' && fm.description.trim() !== '',
-    searchDescriptionExists:
-      typeof fm.searchDescription === 'string' && fm.searchDescription.trim() !== '',
+    category,
+    tags,
+    cover,
+    coverAlt,
+    description,
+    searchDescription,
+    descriptionExists,
+    searchDescriptionExists,
     fbExists: fb.exists,
     fbEnabled: fb.enabled,
-    blogger: {
-      enabled: Boolean(fm?.publishTargets?.blogger?.enabled),
-      mode: fm?.publishTargets?.blogger?.mode || '',
-      type: publishJson?.blogger?.type || '',
-      status: publishJson?.blogger?.status || '',
-      permalink: publishJson?.blogger?.permalink || '',
-      publishedUrl: publishJson?.blogger?.publishedUrl || '',
-    },
-    github: {
-      enabled: Boolean(fm?.publishTargets?.github?.enabled),
-      mode: fm?.publishTargets?.github?.mode || '',
-      path: publishJson?.github?.path || (slug ? `/posts/${slug}/` : ''),
-      previewUrl: githubBase && slug ? `${githubBase}/posts/${slug}/` : '',
-    },
+    blogger,
+    github,
+    relatedLinksCount,
+    otherLinksCount,
+    completeness,
+    missingFields,
   };
 }
 

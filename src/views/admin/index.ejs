@@ -8,13 +8,25 @@
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; margin: 0; padding: 1.5rem; line-height: 1.5; color: #222; background: #f5f5f5; }
   h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+  h2 { margin: 1.25rem 0 0.5rem; font-size: 1.05rem; }
   .admin-banner { background: #fff4cc; border: 1px solid #f0d264; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; font-weight: 600; }
   .admin-banner small { font-weight: 400; color: #666; }
   .admin-meta { color: #555; font-size: 0.85em; margin-bottom: 1rem; padding: 0.5rem 0.75rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; font-size: 0.85em; }
+  .stat-card { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem 0.75rem; min-width: 7rem; }
+  .stat-card strong { display: block; font-size: 1.2em; color: #004085; }
+  .controls { background: #fff; border: 1px solid #ddd; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; font-size: 0.9em; }
+  .controls label { display: flex; align-items: center; gap: 0.4rem; }
+  .controls input[type="search"] { padding: 0.35rem 0.6rem; border: 1px solid #bbb; border-radius: 3px; min-width: 18rem; font-size: 0.95em; }
+  .controls select { padding: 0.35rem 0.5rem; border: 1px solid #bbb; border-radius: 3px; font-size: 0.95em; background: #fff; }
+  .controls .visible-count { color: #555; margin-left: auto; }
   table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #ddd; font-size: 0.85em; }
-  th, td { padding: 0.5rem 0.6rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  th, td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
   th { background: #ececec; font-weight: 600; position: sticky; top: 0; z-index: 1; }
-  tr:hover td { background: #fafafa; }
+  tr.post-row { cursor: pointer; }
+  tr.post-row:hover td { background: #fafafa; }
+  tr.post-row.is-open td { background: #e8f4ff; }
+  tr.post-detail td { background: #fafafa; padding: 0.75rem 1rem 1rem; border-bottom: 2px solid #ccc; }
   .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.78em; font-weight: 600; margin: 1px 2px 1px 0; line-height: 1.6; white-space: nowrap; }
   .b-ok { background: #d4edda; color: #155724; }
   .b-missing { background: #f8d7da; color: #721c24; }
@@ -26,9 +38,17 @@
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; word-break: break-all; }
   .text-muted { color: #999; }
   .empty { color: #999; font-style: italic; }
-  td.col-narrow { white-space: nowrap; }
-  td.col-id { min-width: 11rem; }
-  td.col-urls { max-width: 24rem; }
+  .detail-grid { display: grid; grid-template-columns: 12rem 1fr; gap: 0.25rem 1rem; margin-top: 0.5rem; font-size: 0.85em; }
+  .detail-grid dt { font-weight: 600; color: #444; }
+  .detail-grid dd { margin: 0; word-break: break-all; }
+  .detail-section { margin-bottom: 0.75rem; }
+  .detail-section h3 { margin: 0.5rem 0 0.25rem; font-size: 0.95em; color: #004085; border-bottom: 1px solid #ccd; padding-bottom: 2px; }
+  .completeness-summary { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem; }
+  .toggle-hint { color: #999; font-size: 0.78em; margin-left: 0.5rem; }
+  .toggle-hint::before { content: "▶ "; }
+  tr.post-row.is-open .toggle-hint::before { content: "▼ "; }
+  .col-narrow { white-space: nowrap; }
+  .col-urls { max-width: 22rem; }
 </style>
 </head>
 <body>
@@ -42,135 +62,267 @@
   <h1>Posts (read-only)</h1>
 
   <div class="admin-meta">
-    <strong>產生時間：</strong><span class="mono"><%= builtAt %></span><br>
-    <strong>來源：</strong>本機 source content <%= posts.length %> 筆（含 draft / ready / published 等所有狀態）<br>
-    <strong>模式：</strong>dev-mode-only（per Phase Admin-1-b Plan B；prod build 跳過此頁；不進 sitemap；不進 navigation；不進 deploy repo）
+    <strong>產生時間：</strong><span class="mono"><%= builtAt %></span> |
+    <strong>來源：</strong>本機 source content <%= posts.length %> 筆（含 draft / ready / published 等所有狀態）|
+    <strong>模式：</strong>dev-mode-only（Plan B；prod build 跳過）
+  </div>
+
+  <%
+    // 統計摘要
+    const total = posts.length;
+    const byStatus = { ready: 0, draft: 0, published: 0, other: 0 };
+    let bloggerEnabled = 0, githubEnabled = 0, fbExists = 0;
+    let seoOk = 0, urlOk = 0;
+    posts.forEach(function(p) {
+      const s = (p.status === 'ready' || p.status === 'draft' || p.status === 'published') ? p.status : 'other';
+      byStatus[s] = (byStatus[s] || 0) + 1;
+      if (p.blogger.enabled) bloggerEnabled++;
+      if (p.github.enabled) githubEnabled++;
+      if (p.fbExists) fbExists++;
+      if (p.completeness.seo === 'ok') seoOk++;
+      if (p.completeness.url === 'ok') urlOk++;
+    });
+  %>
+
+  <div class="stats">
+    <div class="stat-card"><strong><%= total %></strong>total posts</div>
+    <div class="stat-card"><strong><%= byStatus.ready %></strong>ready</div>
+    <div class="stat-card"><strong><%= byStatus.draft %></strong>draft</div>
+    <div class="stat-card"><strong><%= byStatus.published %></strong>published</div>
+    <div class="stat-card"><strong><%= bloggerEnabled %></strong>blogger enabled</div>
+    <div class="stat-card"><strong><%= githubEnabled %></strong>github enabled</div>
+    <div class="stat-card"><strong><%= fbExists %></strong>has .fb.md</div>
+    <div class="stat-card"><strong><%= seoOk %></strong>SEO ok</div>
+    <div class="stat-card"><strong><%= urlOk %></strong>URL ok</div>
   </div>
 
   <% if (posts.length === 0) { %>
     <p class="empty">無 posts 可顯示（content/{github,blogger}/posts/*.md 為空）</p>
   <% } else { %>
-  <table>
+  <div class="controls">
+    <label>
+      🔎
+      <input type="search" id="admin-search" placeholder="搜尋 title / slug / category / tags" autocomplete="off">
+    </label>
+    <label>
+      篩選：
+      <select id="admin-filter">
+        <option value="all">all</option>
+        <optgroup label="status">
+          <option value="status:ready">status: ready</option>
+          <option value="status:draft">status: draft</option>
+          <option value="status:published">status: published</option>
+        </optgroup>
+        <optgroup label="channel">
+          <option value="blogger:enabled">Blogger enabled</option>
+          <option value="blogger:disabled">Blogger disabled</option>
+          <option value="github:enabled">GitHub enabled</option>
+          <option value="github:disabled">GitHub disabled</option>
+        </optgroup>
+        <optgroup label="completeness">
+          <option value="completeness:seo-missing">SEO missing</option>
+          <option value="completeness:fb-missing">FB missing</option>
+          <option value="completeness:url-missing">publishedUrl missing</option>
+          <option value="completeness:categoryTags-missing">category/tags missing</option>
+        </optgroup>
+        <optgroup label="contentKind">
+          <option value="kind:post">contentKind: post</option>
+          <option value="kind:page">contentKind: page</option>
+          <option value="kind:tech-note">contentKind: tech-note</option>
+          <option value="kind:book-review">contentKind: book-review</option>
+          <option value="kind:download">contentKind: download</option>
+        </optgroup>
+      </select>
+    </label>
+    <span class="visible-count" id="admin-visible-count"><%= total %> / <%= total %> 顯示中</span>
+  </div>
+
+  <table id="admin-table">
     <thead>
       <tr>
-        <th>id / title / slug</th>
-        <th class="col-narrow">contentKind / source</th>
-        <th class="col-narrow">status</th>
+        <th>id / title</th>
+        <th class="col-narrow">kind / status</th>
         <th>category / tags</th>
         <th>Blogger</th>
         <th>GitHub</th>
-        <th class="col-narrow">SEO</th>
-        <th class="col-narrow">FB</th>
+        <th class="col-narrow">Completeness</th>
         <th class="col-urls">URLs</th>
       </tr>
     </thead>
     <tbody>
-      <% posts.forEach(function(p) { %>
-      <tr>
-        <td class="col-id">
+      <% posts.forEach(function(p, idx) {
+        const searchBlob = [p.title, p.titleEn, p.slug, p.category, p.id, ...(p.tags || [])].join(' ').toLowerCase();
+        const statusVal = (p.status === 'ready' || p.status === 'draft' || p.status === 'published') ? p.status : 'other';
+      %>
+      <tr class="post-row"
+          data-idx="<%= idx %>"
+          data-search="<%= searchBlob %>"
+          data-status="<%= statusVal %>"
+          data-blogger="<%= p.blogger.enabled ? 'enabled' : 'disabled' %>"
+          data-github="<%= p.github.enabled ? 'enabled' : 'disabled' %>"
+          data-seo="<%= p.completeness.seo %>"
+          data-fb="<%= p.completeness.fb %>"
+          data-url="<%= p.completeness.url %>"
+          data-cat-tags="<%= p.completeness.categoryTags %>"
+          data-content-kind="<%= p.contentKind || '' %>">
+        <td>
           <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(no title)</span><% } %>
+          <span class="toggle-hint"></span>
           <% if (p.titleEn) { %><br><span class="text-muted"><%= p.titleEn %></span><% } %>
-          <br><span class="mono text-muted">id=<%= p.id || '—' %></span>
-          <br><span class="mono text-muted">slug=<%= p.slug || '—' %></span>
+          <br><span class="mono text-muted"><%= p.id || 'no-id' %></span>
+          <br><span class="mono text-muted">slug: <%= p.slug || '—' %></span>
         </td>
         <td class="col-narrow">
           <% if (p.contentKind) { %>
             <span class="badge b-info"><%= p.contentKind %></span>
           <% } else { %>
-            <span class="badge b-missing">no contentKind</span>
+            <span class="badge b-missing">no kind</span>
           <% } %>
-          <br><span class="text-muted mono">source: <%= p.sourceSite %></span>
-          <% if (p.primaryPlatform) { %>
-            <br><span class="text-muted mono">primary: <%= p.primaryPlatform %></span>
-          <% } %>
-        </td>
-        <td class="col-narrow">
-          <% if (p.status === 'ready') { %>
-            <span class="badge b-ready">ready</span>
-          <% } else if (p.status === 'draft' || p.draft) { %>
-            <span class="badge b-draft">draft</span>
-          <% } else if (p.status === 'published') { %>
-            <span class="badge b-published">published</span>
-          <% } else if (p.status) { %>
-            <span class="badge b-info"><%= p.status %></span>
-          <% } else { %>
-            <span class="badge b-missing">no status</span>
-          <% } %>
+          <br>
+          <% if (p.status === 'ready') { %><span class="badge b-ready">ready</span>
+          <% } else if (p.status === 'draft' || p.draft) { %><span class="badge b-draft">draft</span>
+          <% } else if (p.status === 'published') { %><span class="badge b-published">published</span>
+          <% } else { %><span class="badge b-missing"><%= p.status || 'no status' %></span><% } %>
+          <br><span class="text-muted mono">src: <%= p.sourceSite %></span>
         </td>
         <td>
-          <% if (p.category) { %>
-            <span class="badge b-info"><%= p.category %></span>
-          <% } else { %>
-            <span class="badge b-missing">no category</span>
-          <% } %>
+          <% if (p.category) { %><span class="badge b-info"><%= p.category %></span>
+          <% } else { %><span class="badge b-missing">no category</span><% } %>
           <% if (p.tags.length > 0) { %><br>
             <% p.tags.forEach(function(t) { %><span class="badge b-tag">#<%= t %></span><% }); %>
-          <% } else { %>
-            <br><span class="badge b-missing">no tags</span>
-          <% } %>
+          <% } else { %><br><span class="badge b-missing">no tags</span><% } %>
         </td>
         <td>
           <% if (p.blogger.enabled) { %>
             <span class="badge b-ok">enabled</span>
             <% if (p.blogger.mode) { %><span class="badge b-info"><%= p.blogger.mode %></span><% } %>
-            <br><span class="text-muted mono">type=<%= p.blogger.type || '—' %></span>
-            <br><span class="text-muted mono">status=<%= p.blogger.status || '—' %></span>
             <br>
-            <% if (p.blogger.publishedUrl) { %>
-              <span class="badge b-published">published</span>
-            <% } else { %>
-              <span class="badge b-missing">no publishedUrl</span>
-            <% } %>
-          <% } else { %>
-            <span class="badge b-info">disabled</span>
-          <% } %>
+            <% if (p.blogger.publishedUrl) { %><span class="badge b-published">published</span>
+            <% } else { %><span class="badge b-missing">no URL</span><% } %>
+          <% } else { %><span class="badge b-info">disabled</span><% } %>
         </td>
         <td>
           <% if (p.github.enabled) { %>
             <span class="badge b-ok">enabled</span>
             <% if (p.github.mode) { %><span class="badge b-info"><%= p.github.mode %></span><% } %>
-            <br><span class="text-muted mono">path=<%= p.github.path || '—' %></span>
-          <% } else { %>
-            <span class="badge b-info">disabled</span>
-          <% } %>
+          <% } else { %><span class="badge b-info">disabled</span><% } %>
         </td>
         <td class="col-narrow">
-          <% if (p.descriptionExists) { %>
-            <span class="badge b-ok">desc</span>
-          <% } else { %>
-            <span class="badge b-missing">desc</span>
-          <% } %>
-          <br>
-          <% if (p.searchDescriptionExists) { %>
-            <span class="badge b-ok">searchDesc</span>
-          <% } else { %>
-            <span class="badge b-missing">searchDesc</span>
-          <% } %>
-        </td>
-        <td class="col-narrow">
-          <% if (p.fbExists) { %>
-            <span class="badge b-ok">.fb.md</span>
-            <br>
-            <% if (p.fbEnabled) { %>
-              <span class="badge b-ok">enabled</span>
-            <% } else { %>
-              <span class="badge b-info">disabled</span>
-            <% } %>
-          <% } else { %>
-            <span class="badge b-missing">no .fb.md</span>
-          <% } %>
+          <span class="badge <%= p.completeness.seo === 'ok' ? 'b-ok' : 'b-missing' %>">SEO <%= p.completeness.seo %></span><br>
+          <span class="badge <%= p.completeness.fb === 'ok' ? 'b-ok' : 'b-missing' %>">FB <%= p.completeness.fb %></span><br>
+          <span class="badge <%= p.completeness.blogger === 'ok' ? 'b-ok' : 'b-missing' %>">Blogger <%= p.completeness.blogger %></span><br>
+          <span class="badge <%= p.completeness.github === 'ok' ? 'b-ok' : 'b-missing' %>">GitHub <%= p.completeness.github %></span><br>
+          <span class="badge <%= p.completeness.url === 'ok' ? 'b-ok' : 'b-missing' %>">URL <%= p.completeness.url %></span><br>
+          <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span>
         </td>
         <td class="col-urls">
-          <% if (p.blogger.publishedUrl) { %>
-            <div class="mono">📘 <%= p.blogger.publishedUrl %></div>
+          <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <%= p.blogger.publishedUrl %></div><% } %>
+          <% if (p.github.previewUrl) { %><div class="mono">🐙 <%= p.github.previewUrl %></div><% } %>
+          <% if (!p.blogger.publishedUrl && !p.github.previewUrl) { %><span class="text-muted">—</span><% } %>
+        </td>
+      </tr>
+      <tr class="post-detail" data-idx="<%= idx %>" hidden>
+        <td colspan="7">
+          <div class="detail-section">
+            <h3>Identity</h3>
+            <dl class="detail-grid">
+              <dt>id</dt><dd class="mono"><%= p.id || '(empty)' %></dd>
+              <dt>title</dt><dd><%= p.title || '(empty)' %></dd>
+              <dt>titleEn</dt><dd><%= p.titleEn || '(empty)' %></dd>
+              <dt>slug</dt><dd class="mono"><%= p.slug || '(empty)' %></dd>
+              <dt>contentKind</dt><dd class="mono"><%= p.contentKind || '(empty)' %></dd>
+              <dt>primaryPlatform</dt><dd class="mono"><%= p.primaryPlatform || '(empty)' %></dd>
+              <dt>sourceSite</dt><dd class="mono"><%= p.sourceSite %></dd>
+              <dt>status</dt><dd><%= p.status || '(empty)' %><% if (p.draft) { %> / draft=true<% } %></dd>
+              <dt>category</dt><dd><%= p.category || '(empty)' %></dd>
+              <dt>tags</dt><dd><% if (p.tags.length > 0) { p.tags.forEach(function(t) { %><span class="badge b-tag">#<%= t %></span><% }); } else { %>(empty)<% } %></dd>
+            </dl>
+          </div>
+
+          <div class="detail-section">
+            <h3>SEO</h3>
+            <dl class="detail-grid">
+              <dt>description</dt><dd><%= p.description || '(empty)' %></dd>
+              <dt>searchDescription</dt><dd><%= p.searchDescription || '(empty)' %></dd>
+              <dt>cover</dt><dd class="mono"><%= p.cover || '(empty)' %></dd>
+              <dt>coverAlt</dt><dd><%= p.coverAlt || '(empty)' %></dd>
+            </dl>
+          </div>
+
+          <div class="detail-section">
+            <h3>Blogger channel</h3>
+            <dl class="detail-grid">
+              <dt>publishTargets.enabled</dt><dd><%= p.blogger.enabled %></dd>
+              <dt>publishTargets.mode</dt><dd class="mono"><%= p.blogger.mode || '(empty)' %></dd>
+              <dt>blogger.type</dt><dd class="mono"><%= p.blogger.type || '(empty)' %></dd>
+              <dt>blogger.status</dt><dd class="mono"><%= p.blogger.status || '(empty)' %></dd>
+              <dt>blogger.permalink</dt><dd class="mono"><%= p.blogger.permalink || '(empty)' %></dd>
+              <dt>blogger.publishedUrl</dt><dd class="mono"><%= p.blogger.publishedUrl || '(empty)' %></dd>
+            </dl>
+          </div>
+
+          <div class="detail-section">
+            <h3>GitHub channel</h3>
+            <dl class="detail-grid">
+              <dt>publishTargets.enabled</dt><dd><%= p.github.enabled %></dd>
+              <dt>publishTargets.mode</dt><dd class="mono"><%= p.github.mode || '(empty)' %></dd>
+              <dt>github.path</dt><dd class="mono"><%= p.github.path || '(empty)' %></dd>
+              <dt>github.previewUrl</dt><dd class="mono"><%= p.github.previewUrl || '(empty)' %></dd>
+            </dl>
+          </div>
+
+          <div class="detail-section">
+            <h3>FB promotion (.fb.md sidecar)</h3>
+            <dl class="detail-grid">
+              <dt>sidecar exists</dt><dd><%= p.fbExists %></dd>
+              <dt>enabled flag</dt><dd><%= p.fbEnabled %></dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.85em; margin: 0.25rem 0 0;">
+              注：本批 read-only 僅讀 .fb.md 之 frontmatter <code>enabled</code> 旗標；不解析 hashtags / body / UTM 等內容欄位。
+            </p>
+          </div>
+
+          <div class="detail-section">
+            <h3>Related / other links</h3>
+            <dl class="detail-grid">
+              <dt>relatedLinks 數量</dt><dd><%= p.relatedLinksCount %></dd>
+              <dt>otherLinks 數量</dt><dd><%= p.otherLinksCount %></dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.85em; margin: 0.25rem 0 0;">
+              注：本批僅顯示陣列長度（直接讀 frontmatter）；個別 link 內容 schema 詳見 <code>docs/related-links-schema.md</code>。
+            </p>
+          </div>
+
+          <div class="detail-section">
+            <h3>Completeness summary</h3>
+            <div class="completeness-summary">
+              <span class="badge <%= p.completeness.seo === 'ok' ? 'b-ok' : 'b-missing' %>">SEO <%= p.completeness.seo %></span>
+              <span class="badge <%= p.completeness.fb === 'ok' ? 'b-ok' : 'b-missing' %>">FB <%= p.completeness.fb %></span>
+              <span class="badge <%= p.completeness.blogger === 'ok' ? 'b-ok' : 'b-missing' %>">Blogger <%= p.completeness.blogger %></span>
+              <span class="badge <%= p.completeness.github === 'ok' ? 'b-ok' : 'b-missing' %>">GitHub <%= p.completeness.github %></span>
+              <span class="badge <%= p.completeness.url === 'ok' ? 'b-ok' : 'b-missing' %>">URL <%= p.completeness.url %></span>
+              <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span>
+            </div>
+          </div>
+
+          <% if (p.missingFields && p.missingFields.length > 0) { %>
+          <div class="detail-section">
+            <h3>Missing fields（建議補齊）</h3>
+            <div class="completeness-summary">
+              <% p.missingFields.forEach(function(f) { %><span class="badge b-missing"><%= f %></span><% }); %>
+            </div>
+          </div>
+          <% } else { %>
+          <div class="detail-section">
+            <h3>Missing fields</h3>
+            <p style="margin: 0;"><span class="badge b-ok">所有檢查欄位齊全</span></p>
+          </div>
           <% } %>
-          <% if (p.github.previewUrl) { %>
-            <div class="mono">🐙 <%= p.github.previewUrl %></div>
-          <% } %>
-          <% if (!p.blogger.publishedUrl && !p.github.previewUrl) { %>
-            <span class="text-muted">—</span>
-          <% } %>
-          <div class="mono text-muted">source: <%= p.sourcePath %></div>
+
+          <div class="detail-section">
+            <h3>Source path</h3>
+            <p class="mono" style="margin: 0;"><%= p.sourcePath %></p>
+          </div>
         </td>
       </tr>
       <% }); %>
@@ -179,9 +331,80 @@
   <% } %>
 
   <div class="admin-meta" style="margin-top: 1rem;">
-    <strong>說明：</strong>本頁為 read-only；無 form / 無 button writes；不會寫入任何 source 檔案。<br>
-    <strong>規格：</strong>詳見 <span class="mono">docs/admin-1-readonly-preflight.md</span> + <span class="mono">docs/admin-mvp-pre-analysis.md</span>。<br>
-    <strong>邊界：</strong>per <span class="mono">docs/admin-local-boundary-pre-analysis.md</span>，本頁屬本機 only；不應透過 nav / sitemap / 公開 URL 暴露。
+    <strong>說明：</strong>點任一 row 可展開 detail panel；再點一次收合。<br>
+    <strong>搜尋：</strong>match title / titleEn / slug / category / id / tags（case-insensitive）。<br>
+    <strong>邊界：</strong>本頁屬 read-only；無 form / 無 button writes；不會寫入任何 source 檔案。<br>
+    <strong>規格：</strong>詳見 <code>docs/admin-1-readonly-preflight.md</code> / <code>docs/admin-mvp-pre-analysis.md</code>。
   </div>
+
+  <% if (posts.length > 0) { %>
+  <script>
+    (function () {
+      var search = document.getElementById('admin-search');
+      var filter = document.getElementById('admin-filter');
+      var visibleCount = document.getElementById('admin-visible-count');
+      var rows = Array.prototype.slice.call(document.querySelectorAll('tr.post-row'));
+      var details = Array.prototype.slice.call(document.querySelectorAll('tr.post-detail'));
+
+      function matchesFilter(row, f) {
+        if (f === 'all' || !f) return true;
+        var parts = f.split(':');
+        var key = parts[0];
+        var val = parts[1];
+        switch (key) {
+          case 'status': return row.dataset.status === val;
+          case 'blogger': return row.dataset.blogger === val;
+          case 'github': return row.dataset.github === val;
+          case 'kind': return row.dataset.contentKind === val;
+          case 'completeness':
+            // val 形如 "seo-missing" / "fb-missing" / "url-missing" / "categoryTags-missing"
+            if (val === 'seo-missing') return row.dataset.seo === 'missing';
+            if (val === 'fb-missing') return row.dataset.fb === 'missing';
+            if (val === 'url-missing') return row.dataset.url === 'missing';
+            if (val === 'categoryTags-missing') return row.dataset.catTags === 'missing';
+            return true;
+          default: return true;
+        }
+      }
+
+      function applyFilters() {
+        var q = (search.value || '').toLowerCase().trim();
+        var f = filter.value;
+        var shown = 0;
+        rows.forEach(function (row, i) {
+          var detail = details[i];
+          var show = true;
+          if (q && (row.dataset.search || '').indexOf(q) === -1) show = false;
+          if (show && !matchesFilter(row, f)) show = false;
+          row.hidden = !show;
+          if (!show) {
+            // 收合 detail 並移除 is-open
+            detail.hidden = true;
+            row.classList.remove('is-open');
+          } else {
+            shown++;
+          }
+        });
+        visibleCount.textContent = shown + ' / ' + rows.length + ' 顯示中';
+      }
+
+      search.addEventListener('input', applyFilters);
+      filter.addEventListener('change', applyFilters);
+
+      // 點 row 展開 / 收合 detail
+      rows.forEach(function (row, i) {
+        row.addEventListener('click', function () {
+          var detail = details[i];
+          var nowOpen = detail.hidden;
+          detail.hidden = !nowOpen;
+          row.classList.toggle('is-open', nowOpen);
+        });
+      });
+
+      // Initial apply (no filter)
+      applyFilters();
+    })();
+  </script>
+  <% } %>
 </body>
 </html>
