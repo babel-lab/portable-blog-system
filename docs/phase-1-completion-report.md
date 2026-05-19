@@ -85,7 +85,7 @@
 - **Phase 8-g-1**：fixture / sample end-to-end 驗證（需作者人工確認部署隔離流程）
 - **Phase 8-g candidate 6**：first article `.fb.md` hashtags fallback（nice-to-have）
 - **Google Rich Results Test 驗證**：作者持續執行（屬 post-Phase-1 author SOP）
-- **`dist/sitemap.xml` + `dist/robots.txt` 補檔**：系統 ready；屬流程未跑而非系統缺漏；屬下一批可選 quick win
+- **`dist/sitemap.xml` + `dist/robots.txt` 補檔**：✅ landed（Phase 9-g-g-c；2026-05-19 09:49；`npm run build:sitemap` 成功，wrote 10 url entries）
 - **圖書館可借類型 enum schema 擴充**（一般圖書 / 電子書 / DVD / 雜誌 / Netflix 等正式 type）：屬未來 schema 候選
 
 **Dormant article blocks**（infrastructure ready；屬作者內容路徑，**不視為** Phase 1 阻擋）：
@@ -123,7 +123,7 @@
 | 產物 | 狀態 |
 |---|---|
 | `dist/index.html` + `dist/posts/{slug}/index.html` × 3（含 we-media-myself2 cross-source mirror）+ `dist/categories/` / `dist/tags/` / `dist/design-system/` | ✅ 存在 |
-| `dist/sitemap.xml` / `dist/robots.txt` | ⏸ 缺檔（系統 ready；屬流程未跑；列為 post-Phase-1 下一批可選 quick win）|
+| `dist/sitemap.xml` / `dist/robots.txt` | ✅ 已補（Phase 9-g-g-c；2026-05-19 09:49；`npm run build:sitemap` 成功，wrote 10 url entries；dist 受 `.gitignore` 管理不入 commit）|
 | `dist-blogger/posts/{slug}/{post.html,copy-helper.txt,meta.json,publish-checklist.txt}` × 2（含 we-media-myself2）| ✅ 存在 |
 | `dist-blogger/theme/blogger-{tokens,components,article,full-style}.css` | ✅ 存在 |
 | `dist-blogger/build-manifest.json` | ✅ 存在 |
@@ -172,7 +172,7 @@
 - Phase 8-a ~ 8-g 主軸**全 ✅**（Phase 8-h pending 屬 post-Phase-1 清理工作，非新功能缺漏）
 - Phase 9 主軸**全 ✅**（per §7；含 9-b / 9-c / 9-e / 9-f-c / 9-g / 9-h / 9-i / 9-j）
 - Article block parity 100%（per §7.1）
-- 輸出產物 9 大類**全可產出**（per §3.3；`sitemap.xml` / `robots.txt` 缺檔屬流程未跑，非系統缺漏）
+- 輸出產物 9 大類**全可產出**（per §3.3；`sitemap.xml` / `robots.txt` 已於 Phase 9-g-g-c 補檔完成；2026-05-19 09:49）
 - Phase 9-i 系列 known blockers 3/3 全清（per `docs/phase-9h-known-blockers.md` §7.1）
 - JSON-LD landing verification 已封存（per `docs/phase-9j-jsonld-landing-verification.md` §2.1）
 
@@ -461,10 +461,14 @@ per `docs/phase-9h-completion-report.md` §1：
 
 ### 8.9 `dist/sitemap.xml` + `dist/robots.txt` 補檔
 
-- **狀態**：⏸ post-Phase-1 quick win
-- **範圍**：跑 `npm run build:sitemap` 補檔
-- **性質**：系統 ready；屬流程未跑而非系統缺漏
-- **建議**：列為下一批可選 quick win；可單獨成批或併入 Phase 8-h-b baseline run
+- **狀態**：✅ landed（Phase 9-g-g-c；2026-05-19 09:49）
+- `dist/sitemap.xml`：✅ 已補
+- `dist/robots.txt`：✅ 已補
+- **補檔批次**：Phase 9-g-g-c
+- **補檔時間**：2026-05-19 09:49
+- **指令**：`npm run build:sitemap`
+- **結果**：成功；wrote 10 url entries
+- **說明**：dist 產物受 `.gitignore` 管理，不納入 commit；後續部署前需確認 `build:sitemap` 已執行或納入部署流程
 
 ### 8.10 圖書館可借類型 enum schema 擴充
 
@@ -483,7 +487,7 @@ per `docs/phase-9h-completion-report.md` §1：
 
 CLAUDE.md §28 17 條 MVP 必做清單**全 ✅**（per §3 / `docs/phase-1-completion-checklist.md` §3）：
 
-- 專案資料夾結構 / README / CLAUDE.md / docs / settings JSON / 範例文章 / GitHub 全部頁面 / Blogger full / summary / redirect-card / copy-helper / publish-checklist / Blogger CSS 匯出 / FB promotion / Design System / SCSS / Sticky Header + Mobile Drawer + Back to Top / link processor / GA4 events / sitemap + robots（系統 ready；dist 補檔屬 post-Phase-1）
+- 專案資料夾結構 / README / CLAUDE.md / docs / settings JSON / 範例文章 / GitHub 全部頁面 / Blogger full / summary / redirect-card / copy-helper / publish-checklist / Blogger CSS 匯出 / FB promotion / Design System / SCSS / Sticky Header + Mobile Drawer + Back to Top / link processor / GA4 events / sitemap + robots（系統 ready；dist 補檔已於 Phase 9-g-g-c landed）
 
 第一版不做清單 12 項**全維持不做**。
 
@@ -527,7 +531,7 @@ Phase 5-b GitHub WebSite + BlogPosting + Phase 5-f-2 Blogger BlogPosting（full 
 | Dormant article blocks | 屬作者內容問題；不影響系統結構 | ❌ 不阻擋 |
 | Phase 9-h-f Related Posts auto | 屬未來；CLAUDE.md §17 列為 Optional | ❌ 不阻擋 |
 | Google Rich Results Test | 屬作者持續 SOP；持續適用 | ❌ 不阻擋 |
-| `dist/sitemap.xml` + `dist/robots.txt` 補檔 | 屬流程未跑；非系統缺漏 | ❌ 不阻擋 |
+| `dist/sitemap.xml` + `dist/robots.txt` 補檔 | ✅ 已補（Phase 9-g-g-c；2026-05-19 09:49）| ❌ 不阻擋 |
 
 ### 9.6 結論
 
