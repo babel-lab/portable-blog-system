@@ -454,7 +454,7 @@ Admin-2-b-1 為**安全 stepping stone**：
 | Stop point | 觸發條件 | user 動作 |
 |---|---|---|
 | 1. Admin-2-a 完成（本批）| pre-analysis doc landed | user 批准 Admin-2-b-1 dry-run viewer 方向 |
-| 2. Admin-2-b-1 完成 | dry-run viewer landed；可預覽但不能 apply | user 驗證 UX；確認可進 b-2 實際 write |
+| 2. Admin-2-b-1 完成 ✅ **landed 2026-05-19** | dry-run viewer landed（commit `b676f26`；per `docs/admin-2b1-completion-report.md`）；可預覽但不能 apply | user 驗證 UX；確認可進 b-2 實際 write |
 | 3. Admin-2-b-2 完成 | SEO 2 欄位 write 可用 | user 驗證原子性 + diff preview + post-validate；確認可進 b-3 |
 | 4. Admin-2-b-3 完成 | FB sidecar write 可用 | user 驗證 |
 | 5. Admin-2-b-4 完成 | titleEn / cover / etc. write 可用 | user 驗證 |
