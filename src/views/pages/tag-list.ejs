@@ -7,7 +7,7 @@
     <ul class="lab-taxonomy-list">
       <% entries.forEach(function (entry) { %>
       <li class="lab-taxonomy-list__item">
-        <a class="lab-taxonomy-list__link" href="/tags/<%= entry.slug %>/">
+        <a class="lab-taxonomy-list__link" href="<%= basePath %>/tags/<%= entry.slug %>/">
           <span class="lab-taxonomy-list__name"><%= entry.name %></span>
           <span class="lab-taxonomy-list__count">（<%= entry.count %>）</span>
         </a>

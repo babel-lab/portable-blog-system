@@ -4,7 +4,7 @@
   <% if (navigation && navigation.length > 0) { %>
   <nav class="lab-mobile-drawer__nav" aria-label="行動選單導覽">
     <% navigation.forEach(function (item) { %>
-    <a class="lab-mobile-drawer__link" href="<%= item.href %>"><%= item.label %></a>
+    <a class="lab-mobile-drawer__link" href="<%= basePath %><%= item.href %>"><%= item.label %></a>
     <% }); %>
   </nav>
   <% } %>

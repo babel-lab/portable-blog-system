@@ -81,11 +81,13 @@ async function renderPage({ template, data }) {
 }
 
 function makeBaseData(settings) {
+  const basePath = siteBasePath(settings);
   return (extra) => ({
     site: settings.site,
     navigation: settings.navigation,
     ga4: settings.ga4,
     ads: settings.ads,
+    basePath,
     ...extra,
   });
 }
@@ -94,6 +96,20 @@ function makeBaseData(settings) {
 
 function siteBaseUrl(settings) {
   return (settings.site?.githubSiteUrl || '').replace(/\/+$/, '');
+}
+
+// Phase 10-e-fix-a：derive in-site base path from githubSiteUrl for project-site deploy.
+//   user site (e.g. https://babel-lab.github.io)         → ''
+//   project site (e.g. https://babel-lab.github.io/blog)  → '/blog'
+//   consumed by EJS as <%= basePath %>{root-relative href} for internal navigation
+function siteBasePath(settings) {
+  const url = settings.site?.githubSiteUrl || '';
+  if (!url) return '';
+  try {
+    return new URL(url).pathname.replace(/\/+$/, '');
+  } catch (e) {
+    return '';
+  }
 }
 
 function ogLocaleFromLanguage(language) {

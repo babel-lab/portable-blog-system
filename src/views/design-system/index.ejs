@@ -4,7 +4,7 @@
     <p>本站 Design System 各子頁依 CLAUDE.md §19 G-01 ~ G-07 結構。</p>
     <ul>
       <% subpages.forEach(function (sub) { %>
-      <li><a href="/design-system/<%= sub.slug %>/"><%= sub.code %> <%= sub.name %></a></li>
+      <li><a href="<%= basePath %>/design-system/<%= sub.slug %>/"><%= sub.code %> <%= sub.name %></a></li>
       <% }); %>
     </ul>
   </div>

@@ -31,7 +31,7 @@
           <% } %>
           <p class="lab-post-card__category"><%= post.category %></p>
           <h2 class="lab-post-card__title">
-            <a href="/posts/<%= itemSlug %>/"><%= itemTitle %></a>
+            <a href="<%= basePath %>/posts/<%= itemSlug %>/"><%= itemTitle %></a>
           </h2>
           <% if (post.titleEn) { %>
           <p class="lab-post-card__title-en"><%= post.titleEn %></p>
