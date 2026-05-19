@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin (read-only) — Portable Blog System</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; margin: 0; padding: 1.5rem; line-height: 1.5; color: #222; background: #f5f5f5; }
+  h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+  .admin-banner { background: #fff4cc; border: 1px solid #f0d264; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; font-weight: 600; }
+  .admin-banner small { font-weight: 400; color: #666; }
+  .admin-meta { color: #555; font-size: 0.85em; margin-bottom: 1rem; padding: 0.5rem 0.75rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #ddd; font-size: 0.85em; }
+  th, td { padding: 0.5rem 0.6rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  th { background: #ececec; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  tr:hover td { background: #fafafa; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.78em; font-weight: 600; margin: 1px 2px 1px 0; line-height: 1.6; white-space: nowrap; }
+  .b-ok { background: #d4edda; color: #155724; }
+  .b-missing { background: #f8d7da; color: #721c24; }
+  .b-draft { background: #fff3cd; color: #856404; }
+  .b-ready { background: #cce5ff; color: #004085; }
+  .b-published { background: #c3e6cb; color: #0a3622; }
+  .b-info { background: #e2e3e5; color: #383d41; }
+  .b-tag { background: #e6f0ff; color: #003366; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; word-break: break-all; }
+  .text-muted { color: #999; }
+  .empty { color: #999; font-style: italic; }
+  td.col-narrow { white-space: nowrap; }
+  td.col-id { min-width: 11rem; }
+  td.col-urls { max-width: 24rem; }
+</style>
+</head>
+<body>
+  <div class="admin-banner">
+    🔒 READ-ONLY ADMIN
+    <small>
+      — 本機開發檢視；不公開；不寫入任何資料；不部署到 GitHub Pages；prod build 不產出此頁。
+    </small>
+  </div>
+
+  <h1>Posts (read-only)</h1>
+
+  <div class="admin-meta">
+    <strong>產生時間：</strong><span class="mono"><%= builtAt %></span><br>
+    <strong>來源：</strong>本機 source content <%= posts.length %> 筆（含 draft / ready / published 等所有狀態）<br>
+    <strong>模式：</strong>dev-mode-only（per Phase Admin-1-b Plan B；prod build 跳過此頁；不進 sitemap；不進 navigation；不進 deploy repo）
+  </div>
+
+  <% if (posts.length === 0) { %>
+    <p class="empty">無 posts 可顯示（content/{github,blogger}/posts/*.md 為空）</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>id / title / slug</th>
+        <th class="col-narrow">contentKind / source</th>
+        <th class="col-narrow">status</th>
+        <th>category / tags</th>
+        <th>Blogger</th>
+        <th>GitHub</th>
+        <th class="col-narrow">SEO</th>
+        <th class="col-narrow">FB</th>
+        <th class="col-urls">URLs</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% posts.forEach(function(p) { %>
+      <tr>
+        <td class="col-id">
+          <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(no title)</span><% } %>
+          <% if (p.titleEn) { %><br><span class="text-muted"><%= p.titleEn %></span><% } %>
+          <br><span class="mono text-muted">id=<%= p.id || '—' %></span>
+          <br><span class="mono text-muted">slug=<%= p.slug || '—' %></span>
+        </td>
+        <td class="col-narrow">
+          <% if (p.contentKind) { %>
+            <span class="badge b-info"><%= p.contentKind %></span>
+          <% } else { %>
+            <span class="badge b-missing">no contentKind</span>
+          <% } %>
+          <br><span class="text-muted mono">source: <%= p.sourceSite %></span>
+          <% if (p.primaryPlatform) { %>
+            <br><span class="text-muted mono">primary: <%= p.primaryPlatform %></span>
+          <% } %>
+        </td>
+        <td class="col-narrow">
+          <% if (p.status === 'ready') { %>
+            <span class="badge b-ready">ready</span>
+          <% } else if (p.status === 'draft' || p.draft) { %>
+            <span class="badge b-draft">draft</span>
+          <% } else if (p.status === 'published') { %>
+            <span class="badge b-published">published</span>
+          <% } else if (p.status) { %>
+            <span class="badge b-info"><%= p.status %></span>
+          <% } else { %>
+            <span class="badge b-missing">no status</span>
+          <% } %>
+        </td>
+        <td>
+          <% if (p.category) { %>
+            <span class="badge b-info"><%= p.category %></span>
+          <% } else { %>
+            <span class="badge b-missing">no category</span>
+          <% } %>
+          <% if (p.tags.length > 0) { %><br>
+            <% p.tags.forEach(function(t) { %><span class="badge b-tag">#<%= t %></span><% }); %>
+          <% } else { %>
+            <br><span class="badge b-missing">no tags</span>
+          <% } %>
+        </td>
+        <td>
+          <% if (p.blogger.enabled) { %>
+            <span class="badge b-ok">enabled</span>
+            <% if (p.blogger.mode) { %><span class="badge b-info"><%= p.blogger.mode %></span><% } %>
+            <br><span class="text-muted mono">type=<%= p.blogger.type || '—' %></span>
+            <br><span class="text-muted mono">status=<%= p.blogger.status || '—' %></span>
+            <br>
+            <% if (p.blogger.publishedUrl) { %>
+              <span class="badge b-published">published</span>
+            <% } else { %>
+              <span class="badge b-missing">no publishedUrl</span>
+            <% } %>
+          <% } else { %>
+            <span class="badge b-info">disabled</span>
+          <% } %>
+        </td>
+        <td>
+          <% if (p.github.enabled) { %>
+            <span class="badge b-ok">enabled</span>
+            <% if (p.github.mode) { %><span class="badge b-info"><%= p.github.mode %></span><% } %>
+            <br><span class="text-muted mono">path=<%= p.github.path || '—' %></span>
+          <% } else { %>
+            <span class="badge b-info">disabled</span>
+          <% } %>
+        </td>
+        <td class="col-narrow">
+          <% if (p.descriptionExists) { %>
+            <span class="badge b-ok">desc</span>
+          <% } else { %>
+            <span class="badge b-missing">desc</span>
+          <% } %>
+          <br>
+          <% if (p.searchDescriptionExists) { %>
+            <span class="badge b-ok">searchDesc</span>
+          <% } else { %>
+            <span class="badge b-missing">searchDesc</span>
+          <% } %>
+        </td>
+        <td class="col-narrow">
+          <% if (p.fbExists) { %>
+            <span class="badge b-ok">.fb.md</span>
+            <br>
+            <% if (p.fbEnabled) { %>
+              <span class="badge b-ok">enabled</span>
+            <% } else { %>
+              <span class="badge b-info">disabled</span>
+            <% } %>
+          <% } else { %>
+            <span class="badge b-missing">no .fb.md</span>
+          <% } %>
+        </td>
+        <td class="col-urls">
+          <% if (p.blogger.publishedUrl) { %>
+            <div class="mono">📘 <%= p.blogger.publishedUrl %></div>
+          <% } %>
+          <% if (p.github.previewUrl) { %>
+            <div class="mono">🐙 <%= p.github.previewUrl %></div>
+          <% } %>
+          <% if (!p.blogger.publishedUrl && !p.github.previewUrl) { %>
+            <span class="text-muted">—</span>
+          <% } %>
+          <div class="mono text-muted">source: <%= p.sourcePath %></div>
+        </td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+  <% } %>
+
+  <div class="admin-meta" style="margin-top: 1rem;">
+    <strong>說明：</strong>本頁為 read-only；無 form / 無 button writes；不會寫入任何 source 檔案。<br>
+    <strong>規格：</strong>詳見 <span class="mono">docs/admin-1-readonly-preflight.md</span> + <span class="mono">docs/admin-mvp-pre-analysis.md</span>。<br>
+    <strong>邊界：</strong>per <span class="mono">docs/admin-local-boundary-pre-analysis.md</span>，本頁屬本機 only；不應透過 nav / sitemap / 公開 URL 暴露。
+  </div>
+</body>
+</html>

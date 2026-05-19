@@ -9,6 +9,7 @@ import { loadGithubPosts } from './load-github-posts.js';
 import { renderBody } from './parse-markdown.js';
 import { validateContent, printWarnings } from './validate-content.js';
 import { applyCrossSiteUtm } from './ga4-url-builder.js';
+import { loadAdminPosts } from './load-admin-posts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -387,6 +388,12 @@ async function main() {
   const startedAt = new Date();
   const outputs = [];
 
+  // Phase Admin-1-b：每次 run 都清除 .cache/pages/admin/ 殘留；dev-mode 之後會 re-create
+  //   - 防止 prod build 因 stale .cache 而把 admin/index.html 帶進 dist/
+  //   - 即使 vite emptyOutDir 清 dist，.cache 不被清，故需 build-github.js 主動處理
+  const adminCacheDir = path.join(PAGES_DIR, 'admin');
+  await fs.rm(adminCacheDir, { recursive: true, force: true }).catch(() => {});
+
   const settings = await loadSettings();
   // Phase 8-f-2-b：plumbing — settings 經 loadPosts 轉發至 processMarkdownEntry / normalizePostOutput
   // Phase 9-i-f-b：改用 loadGithubPosts() cross-source aggregator；mirror loadBloggerPosts 既有模式
@@ -592,6 +599,22 @@ async function main() {
       }),
     });
     await writeText(path.join(PAGES_DIR, 'design-system', sub.slug, 'index.html'), html, outputs);
+  }
+
+  // Phase Admin-1-b：dev-mode-only read-only Admin page
+  //   - 僅 mode === 'dev' 時 render；prod build 不產出（per admin-local-boundary §3 + admin-1-readonly-preflight Plan B）
+  //   - 直接 ejs.renderFile 不 wrap base.ejs（admin 為 standalone HTML；無 nav / GA4 / Ads）
+  //   - 寫入 .cache/pages/admin/index.html → vite dev serve 於 /admin/
+  //   - 不進 sitemap（build-sitemap.js 不掃 admin）；不進 deploy（cp dist 時無此目錄；prod build 已早 rm）
+  if (mode === 'dev') {
+    const adminData = await loadAdminPosts({ settings });
+    const adminHtml = await ejs.renderFile(
+      path.join(VIEWS_DIR, 'admin', 'index.ejs'),
+      { posts: adminData.posts, builtAt: startedAt.toISOString() },
+      { async: true },
+    );
+    await writeText(path.join(PAGES_DIR, 'admin', 'index.html'), adminHtml, outputs);
+    console.log(`[build-github] admin (dev-mode) rendered: ${adminData.posts.length} posts`);
   }
 
   const manifest = {
