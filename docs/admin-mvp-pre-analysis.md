@@ -293,14 +293,23 @@ Admin 重 build:promotion → FB 推廣 txt 含正式 URL
 - ✅ `docs/admin-mvp-pre-analysis.md`（本文件；本批）
 - ✅ `docs/system-direction.md`（本批）
 
-### Phase Admin-1：MVP read-only（read + preview only）
+### Phase Admin-1：MVP read-only（read + preview only） ✅ **landed 2026-05-19**
 
-- 列出 source repo 既有文章（讀 `content/` glob）
-- 顯示文章 metadata（read-only form）
-- 顯示對應 dist HTML preview（已 build 過則直接 iframe；未 build 提示先跑 build）
-- 顯示 validate warning per post
-- **不寫入**任何檔案
-- **作為驗證**：確認 read / parse / display 邏輯正確
+實作 sub-batches（per `docs/admin-1-completion-report.md`）：
+
+- Admin-1-a：preflight + Plan B 選定 — commit `f876e9e`
+- Admin-1-b：dev-mode-only Admin page MVP — commit `7f9c6b7`
+- Admin-1-c：enhanced read-only（search / filter / detail / completeness）— commit `11ba32e`
+- Admin-1-wrap：completion report 收尾 — `docs/admin-1-completion-report.md`
+
+原規劃條目達成狀況：
+
+- ✅ 列出 source repo 既有文章（`load-admin-posts.js` direct glob）
+- ✅ 顯示文章 metadata（read-only；含 7 sections detail panel）
+- ✅ dist HTML preview connect（admin URL list 連至 publishedUrl / previewUrl）
+- ⏸ 顯示 validate warning per post（**未在 Admin-1-a/b/c 範圍**；列為 Admin-1-d / post-MVP 候選）
+- ✅ **不寫入**任何檔案
+- ✅ read / parse / display 邏輯驗證完成（本機 `npm run dev` → `http://localhost:5173/admin/`）
 
 ### Phase Admin-2：MVP write（新增 / 編輯）
 
@@ -335,10 +344,10 @@ Admin 重 build:promotion → FB 推廣 txt 含正式 URL
 
 | 順序 | Phase | 觸發條件 |
 |---|---|---|
-| 1 | Admin-0（**本批已完成**）| 規劃文件落地 |
-| 2 | （可選）schema 擴充批：UTM `audience` 等 | 在 Admin-1 之前先補 schema gap（per §9）|
-| 3 | Admin-1 read-only | 規劃確認後 |
-| 4 | Admin-2 write | Admin-1 穩定後 |
+| 1 | Admin-0（**已完成**）| 規劃文件落地 |
+| 2 | （可選）schema 擴充批：UTM `audience` 等 | 在 Admin-2 之前先補 schema gap（per §9）|
+| 3 | Admin-1 read-only（**已完成 2026-05-19**）| per `docs/admin-1-completion-report.md`；3 commits（`f876e9e` + `7f9c6b7` + `11ba32e`）|
+| 4 | Admin-2 write | Admin-1 穩定後；**強烈建議**先做 Admin-2-a write pre-analysis + safety plan |
 | 5 | Admin-3 build 整合 | Admin-2 穩定後 |
 | 6 | Admin-4 發布輔助 | Admin-3 穩定後 |
 | 7 | Admin-5+ 富 metadata | MVP 流程 user 驗證可用後 |
