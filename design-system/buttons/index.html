@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>G-05 Buttons | Design System | Portable Blog System</title>
+
+      <meta name="description" content="Portable Blog System Design System - Buttons" />
+    <meta name="author" content="Dean" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="G-05 Buttons | Design System | Portable Blog System" />
+    <meta property="og:description" content="Portable Blog System Design System - Buttons" />
+    <meta property="og:site_name" content="Portable Blog System" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="G-05 Buttons | Design System | Portable Blog System" />
+    <meta name="twitter:description" content="Portable Blog System Design System - Buttons" />
+    <script type="module" crossorigin src="../../assets/entry-Ccoo5--o.js"></script>
+    <link rel="stylesheet" crossorigin href="../../assets/entry-EqQXlKjx.css">
+  </head>
+  <body class="lab-site lab-site--github">
+    <header class="lab-header" data-sticky-header>
+  <div class="lab-container lab-header__inner">
+    <a class="lab-header__brand" href="/">Portable Blog System</a>
+    <button type="button" class="lab-header__menu-button" data-drawer-open aria-controls="lab-drawer" aria-expanded="false" aria-label="開啟選單" hidden>
+      <span aria-hidden="true">≡</span>
+    </button>
+    
+<nav class="lab-nav" aria-label="主選單">
+  
+  <a class="lab-nav__link" href="/">首頁</a>
+  
+  <a class="lab-nav__link" href="/posts/">文章</a>
+  
+  <a class="lab-nav__link" href="/categories/">分類</a>
+  
+  <a class="lab-nav__link" href="/design-system/">Design System</a>
+  
+</nav>
+
+
+  </div>
+</header>
+
+    <main>
+      <section class="lab-section">
+  <div class="lab-container">
+    <h1>G-05 Buttons</h1>
+    <p>Phase 2-2-a 定義的 <code>.lab-button</code> 元件，含 5 變體 + 2 size + disabled 狀態。所有按鈕完全使用 Phase 2-1 token。</p>
+
+    <h2>Variants（變體 × 5）</h2>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <a href="#" class="lab-button lab-button--primary">Primary</a>
+      <a href="#" class="lab-button lab-button--secondary">Secondary</a>
+      <a href="#" class="lab-button lab-button--outline">Outline</a>
+      <a href="#" class="lab-button lab-button--text">Text</a>
+      <a href="#" class="lab-button lab-button--primary lab-button--disabled" aria-disabled="true">Disabled</a>
+    </div>
+
+    <h2>Sizes（size × 3）</h2>
+    <p>以 primary 為例；可套用於任一變體。</p>
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <a href="#" class="lab-button lab-button--primary lab-button--sm">Small (sm)</a>
+      <a href="#" class="lab-button lab-button--primary">Default</a>
+      <a href="#" class="lab-button lab-button--primary lab-button--lg">Large (lg)</a>
+    </div>
+
+    <h2>Disabled × 變體</h2>
+    <p><code>.lab-button--disabled</code> modifier 可與任一變體疊加；亦支援原生 <code>:disabled</code> / <code>[disabled]</code>。</p>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      <a href="#" class="lab-button lab-button--primary lab-button--disabled" aria-disabled="true">Primary</a>
+      <a href="#" class="lab-button lab-button--secondary lab-button--disabled" aria-disabled="true">Secondary</a>
+      <a href="#" class="lab-button lab-button--outline lab-button--disabled" aria-disabled="true">Outline</a>
+      <a href="#" class="lab-button lab-button--text lab-button--disabled" aria-disabled="true">Text</a>
+      <button type="button" class="lab-button lab-button--primary" disabled>Native &lt;button disabled&gt;</button>
+    </div>
+
+    <h2>互動測試</h2>
+    <ul>
+      <li><strong>Hover</strong>：滑鼠移至按鈕觀察色彩變化（primary / secondary 加深；outline 反白；text 加底線）</li>
+      <li><strong>Focus</strong>：用 Tab 鍵跳到按鈕，應出現 2px primary outline + 2px offset</li>
+      <li><strong>Active</strong>：按住 primary / secondary 按鈕，背景再加深一階</li>
+      <li><strong>Disabled</strong>：<code>opacity: 0.5</code> + <code>cursor: not-allowed</code> + <code>pointer-events: none</code></li>
+    </ul>
+  </div>
+</section>
+
+    </main>
+    <footer class="lab-footer">
+  <div class="lab-container">
+    © 2026 Portable Blog System. Built for GitHub Pages + Blogger export.
+  </div>
+</footer>
+
+    <aside id="lab-drawer" class="lab-mobile-drawer" data-mobile-drawer
+       role="dialog" aria-modal="true" aria-hidden="true" aria-label="行動選單">
+  <button type="button" class="lab-mobile-drawer__close" data-drawer-close aria-label="關閉選單">×</button>
+  
+  <nav class="lab-mobile-drawer__nav" aria-label="行動選單導覽">
+    
+    <a class="lab-mobile-drawer__link" href="/">首頁</a>
+    
+    <a class="lab-mobile-drawer__link" href="/posts/">文章</a>
+    
+    <a class="lab-mobile-drawer__link" href="/categories/">分類</a>
+    
+    <a class="lab-mobile-drawer__link" href="/design-system/">Design System</a>
+    
+  </nav>
+  
+</aside>
+<div class="lab-overlay" data-drawer-overlay hidden></div>
+
+  </body>
+</html>

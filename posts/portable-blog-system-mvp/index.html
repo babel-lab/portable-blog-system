@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portable Blog System MVP 開發筆記 | Portable Blog System</title>
+
+      <meta name="description" content="Portable Blog System Phase 1-A 第一篇 ready 範例文章，紀錄資料管線的最小可驗證範圍。" />
+    <meta name="author" content="Dean" />
+    <meta name="robots" content="index, follow" />
+    <meta name="keywords" content="github, vite, static-site" />
+    <meta property="article:published_time" content="2026-05-04" />
+    <meta property="article:modified_time" content="2026-05-04" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Portable Blog System MVP 開發筆記 | Portable Blog System" />
+    <meta property="og:description" content="Portable Blog System Phase 1-A 第一篇 ready 範例文章，紀錄資料管線的最小可驗證範圍。" />
+    <meta property="og:url" content="https://babel-lab.github.io/portable-blog-system/posts/portable-blog-system-mvp/" />
+    <meta property="og:site_name" content="Portable Blog System" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta property="og:image" content="https://babel-lab.github.io/portable-blog-system/images/placeholders/cover-placeholder.svg" />
+    <meta property="og:image:alt" content="Portable Blog System MVP 開發筆記 cover placeholder" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Portable Blog System MVP 開發筆記 | Portable Blog System" />
+    <meta name="twitter:description" content="Portable Blog System Phase 1-A 第一篇 ready 範例文章，紀錄資料管線的最小可驗證範圍。" />
+    <meta name="twitter:image" content="https://babel-lab.github.io/portable-blog-system/images/placeholders/cover-placeholder.svg" />
+    <link rel="canonical" href="https://babel-lab.github.io/portable-blog-system/posts/portable-blog-system-mvp/" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","@id":"https://babel-lab.github.io/portable-blog-system/posts/portable-blog-system-mvp/","headline":"Portable Blog System MVP 開發筆記","description":"Portable Blog System Phase 1-A 第一篇 ready 範例文章，紀錄資料管線的最小可驗證範圍。","datePublished":"2026-05-04","dateModified":"2026-05-04","author":{"@type":"Person","name":"Dean"},"mainEntityOfPage":"https://babel-lab.github.io/portable-blog-system/posts/portable-blog-system-mvp/","inLanguage":"zh-Hant","articleSection":"技術筆記","isPartOf":{"@type":"Blog","@id":"https://babel-lab.github.io/portable-blog-system/","name":"Portable Blog System","url":"https://babel-lab.github.io/portable-blog-system/","inLanguage":"zh-Hant"},"image":"https://babel-lab.github.io/portable-blog-system/images/placeholders/cover-placeholder.svg"}</script>
+    <script type="module" crossorigin src="../../assets/entry-Ccoo5--o.js"></script>
+    <link rel="stylesheet" crossorigin href="../../assets/entry-EqQXlKjx.css">
+  </head>
+  <body class="lab-site lab-site--github">
+    <header class="lab-header" data-sticky-header>
+  <div class="lab-container lab-header__inner">
+    <a class="lab-header__brand" href="/">Portable Blog System</a>
+    <button type="button" class="lab-header__menu-button" data-drawer-open aria-controls="lab-drawer" aria-expanded="false" aria-label="開啟選單" hidden>
+      <span aria-hidden="true">≡</span>
+    </button>
+    
+<nav class="lab-nav" aria-label="主選單">
+  
+  <a class="lab-nav__link" href="/">首頁</a>
+  
+  <a class="lab-nav__link" href="/posts/">文章</a>
+  
+  <a class="lab-nav__link" href="/categories/">分類</a>
+  
+  <a class="lab-nav__link" href="/design-system/">Design System</a>
+  
+</nav>
+
+
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+<article class="lab-article">
+  <header class="lab-article__header lab-container">
+    <p class="lab-article__category">tech-note</p>
+    <h1 class="lab-article__title">Portable Blog System MVP 開發筆記</h1>
+    
+    <p class="lab-article__title-en">Portable Blog System MVP Development Notes</p>
+    
+    <p class="lab-article__meta">
+      <time datetime="2026-05-04">2026-05-04</time>
+      
+      
+      ·
+      <span>Dean</span>
+      
+    </p>
+  </header>
+
+  
+  <div class="lab-container">
+    <div class="lab-article__cover">
+      <img class="lab-article__cover-img"
+           src="../../images/placeholders/cover-placeholder.svg"
+           alt="Portable Blog System MVP 開發筆記 cover placeholder"
+           decoding="async"
+           width="1200" height="630">
+    </div>
+  </div>
+  
+
+                    
+  
+
+                
+  <div class="lab-article__body lab-container">
+    <p>這是 Phase 1-A 新增的第一篇 ready 範例文章，目的是驗證 Markdown frontmatter 讀取與 draft 過濾流程。</p>
+<h2>本階段重點</h2>
+<ul>
+<li>建立 Markdown frontmatter 讀取流程</li>
+<li>建立文章資料整理邏輯</li>
+<li>保留 draft 過濾邏輯</li>
+<li>暫存輸出至 <code>.cache/data/posts.json</code></li>
+</ul>
+<p>正文內容將在 Phase 1-B 開始 render 為 HTML 詳細頁。</p>
+
+  </div>
+
+                    
+          
+                
+      
+                  
+  <div class="lab-container">
+    <ul class="lab-hashtags">
+      
+      <li><span class="lab-hashtag">#github</span></li>
+      
+      <li><span class="lab-hashtag">#vite</span></li>
+      
+      <li><span class="lab-hashtag">#static-site</span></li>
+      
+    </ul>
+  </div>
+  
+  
+</article>
+
+    </main>
+    <footer class="lab-footer">
+  <div class="lab-container">
+    © 2026 Portable Blog System. Built for GitHub Pages + Blogger export.
+  </div>
+</footer>
+
+    <aside id="lab-drawer" class="lab-mobile-drawer" data-mobile-drawer
+       role="dialog" aria-modal="true" aria-hidden="true" aria-label="行動選單">
+  <button type="button" class="lab-mobile-drawer__close" data-drawer-close aria-label="關閉選單">×</button>
+  
+  <nav class="lab-mobile-drawer__nav" aria-label="行動選單導覽">
+    
+    <a class="lab-mobile-drawer__link" href="/">首頁</a>
+    
+    <a class="lab-mobile-drawer__link" href="/posts/">文章</a>
+    
+    <a class="lab-mobile-drawer__link" href="/categories/">分類</a>
+    
+    <a class="lab-mobile-drawer__link" href="/design-system/">Design System</a>
+    
+  </nav>
+  
+</aside>
+<div class="lab-overlay" data-drawer-overlay hidden></div>
+
+  </body>
+</html>

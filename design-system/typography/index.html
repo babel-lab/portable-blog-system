@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>G-04 Typography | Design System | Portable Blog System</title>
+
+      <meta name="description" content="Portable Blog System Design System - Typography" />
+    <meta name="author" content="Dean" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="G-04 Typography | Design System | Portable Blog System" />
+    <meta property="og:description" content="Portable Blog System Design System - Typography" />
+    <meta property="og:site_name" content="Portable Blog System" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="G-04 Typography | Design System | Portable Blog System" />
+    <meta name="twitter:description" content="Portable Blog System Design System - Typography" />
+    <script type="module" crossorigin src="../../assets/entry-Ccoo5--o.js"></script>
+    <link rel="stylesheet" crossorigin href="../../assets/entry-EqQXlKjx.css">
+  </head>
+  <body class="lab-site lab-site--github">
+    <header class="lab-header" data-sticky-header>
+  <div class="lab-container lab-header__inner">
+    <a class="lab-header__brand" href="/">Portable Blog System</a>
+    <button type="button" class="lab-header__menu-button" data-drawer-open aria-controls="lab-drawer" aria-expanded="false" aria-label="開啟選單" hidden>
+      <span aria-hidden="true">≡</span>
+    </button>
+    
+<nav class="lab-nav" aria-label="主選單">
+  
+  <a class="lab-nav__link" href="/">首頁</a>
+  
+  <a class="lab-nav__link" href="/posts/">文章</a>
+  
+  <a class="lab-nav__link" href="/categories/">分類</a>
+  
+  <a class="lab-nav__link" href="/design-system/">Design System</a>
+  
+</nav>
+
+
+  </div>
+</header>
+
+    <main>
+      <section class="lab-section">
+  <div class="lab-container">
+    <h1>G-04 Typography</h1>
+    <p>Phase 2-1 已定義的 typography 全部 token，共 21 個。涵蓋 font-family / font-size / line-height / font-weight / letter-spacing 五大類。</p>
+
+    <h2>Font Families（字型 × 2）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-font-sans</code>
+        <p style="margin:0; font-family:var(--lab-font-sans); font-size:var(--lab-font-size-lg);">Sans-serif（內文 / 標題） — The quick brown fox jumps over the lazy dog. 1234567890</p>
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-font-mono</code>
+        <p style="margin:0; font-family:var(--lab-font-mono); font-size:var(--lab-font-size-lg);">Monospace（程式碼 / 等寬） — The quick brown fox jumps over the lazy dog. 1234567890</p>
+      </div>
+      
+    </div>
+
+    <h2>Font Sizes（字級 × 8）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-3); margin-top:var(--lab-space-4);">
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-xs</code>
+        <span style="font-size:var(--lab-font-size-xs);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">0.75rem</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-sm</code>
+        <span style="font-size:var(--lab-font-size-sm);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">0.875rem</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-base</code>
+        <span style="font-size:var(--lab-font-size-base);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">1rem</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-lg</code>
+        <span style="font-size:var(--lab-font-size-lg);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">1.125rem</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-xl</code>
+        <span style="font-size:var(--lab-font-size-xl);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">1.25rem</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-2xl</code>
+        <span style="font-size:var(--lab-font-size-2xl);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">1.5rem</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-3xl</code>
+        <span style="font-size:var(--lab-font-size-3xl);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">1.875rem</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-size-4xl</code>
+        <span style="font-size:var(--lab-font-size-4xl);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">2.25rem</span>
+      </div>
+      
+    </div>
+
+    <h2>Line Heights（行高 × 4）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-4); margin-top:var(--lab-space-4);">
+      
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-line-height-tight (1.25)</code>
+        <p style="margin:0; line-height:var(--lab-line-height-tight); max-width:42rem;">這是用來示範行高的多行段落。Lorem ipsum dolor sit amet, consectetur adipiscing elit. 多行文字配合不同行高 token，可以看出段落呼吸感的差異。</p>
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-line-height-base (1.5)</code>
+        <p style="margin:0; line-height:var(--lab-line-height-base); max-width:42rem;">這是用來示範行高的多行段落。Lorem ipsum dolor sit amet, consectetur adipiscing elit. 多行文字配合不同行高 token，可以看出段落呼吸感的差異。</p>
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-line-height-relaxed (1.7)</code>
+        <p style="margin:0; line-height:var(--lab-line-height-relaxed); max-width:42rem;">這是用來示範行高的多行段落。Lorem ipsum dolor sit amet, consectetur adipiscing elit. 多行文字配合不同行高 token，可以看出段落呼吸感的差異。</p>
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:var(--lab-space-1);">
+        <code>--lab-line-height-loose (2)</code>
+        <p style="margin:0; line-height:var(--lab-line-height-loose); max-width:42rem;">這是用來示範行高的多行段落。Lorem ipsum dolor sit amet, consectetur adipiscing elit. 多行文字配合不同行高 token，可以看出段落呼吸感的差異。</p>
+      </div>
+      
+    </div>
+
+    <h2>Font Weights（字重 × 4）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-2); margin-top:var(--lab-space-4);">
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-weight-regular</code>
+        <span style="font-weight:var(--lab-font-weight-regular); font-size:var(--lab-font-size-lg);">範例 Sample 400</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-weight-medium</code>
+        <span style="font-weight:var(--lab-font-weight-medium); font-size:var(--lab-font-size-lg);">範例 Sample 500</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-weight-semibold</code>
+        <span style="font-weight:var(--lab-font-weight-semibold); font-size:var(--lab-font-size-lg);">範例 Sample 600</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-font-weight-bold</code>
+        <span style="font-weight:var(--lab-font-weight-bold); font-size:var(--lab-font-size-lg);">範例 Sample 700</span>
+      </div>
+      
+    </div>
+
+    <h2>Letter Spacing（字距 × 3）</h2>
+    <div style="display:flex; flex-direction:column; gap:var(--lab-space-2); margin-top:var(--lab-space-4);">
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-letter-spacing-tight</code>
+        <span style="letter-spacing:var(--lab-letter-spacing-tight); font-size:var(--lab-font-size-lg);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">-0.01em</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-letter-spacing-normal</code>
+        <span style="letter-spacing:var(--lab-letter-spacing-normal); font-size:var(--lab-font-size-lg);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">0</span>
+      </div>
+      
+      <div style="display:flex; align-items:baseline; gap:var(--lab-space-3);">
+        <code style="width:14rem;">--lab-letter-spacing-wide</code>
+        <span style="letter-spacing:var(--lab-letter-spacing-wide); font-size:var(--lab-font-size-lg);">範例 Sample 1234</span>
+        <span style="color:var(--lab-color-muted); font-size:var(--lab-font-size-sm);">0.08em</span>
+      </div>
+      
+    </div>
+  </div>
+</section>
+
+    </main>
+    <footer class="lab-footer">
+  <div class="lab-container">
+    © 2026 Portable Blog System. Built for GitHub Pages + Blogger export.
+  </div>
+</footer>
+
+    <aside id="lab-drawer" class="lab-mobile-drawer" data-mobile-drawer
+       role="dialog" aria-modal="true" aria-hidden="true" aria-label="行動選單">
+  <button type="button" class="lab-mobile-drawer__close" data-drawer-close aria-label="關閉選單">×</button>
+  
+  <nav class="lab-mobile-drawer__nav" aria-label="行動選單導覽">
+    
+    <a class="lab-mobile-drawer__link" href="/">首頁</a>
+    
+    <a class="lab-mobile-drawer__link" href="/posts/">文章</a>
+    
+    <a class="lab-mobile-drawer__link" href="/categories/">分類</a>
+    
+    <a class="lab-mobile-drawer__link" href="/design-system/">Design System</a>
+    
+  </nav>
+  
+</aside>
+<div class="lab-overlay" data-drawer-overlay hidden></div>
+
+  </body>
+</html>
