@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadSettings } from './load-settings.js';
-import { loadPosts } from './load-posts.js';
+import { loadGithubPosts } from './load-github-posts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -155,7 +155,10 @@ async function main() {
     process.exit(1);
   }
 
-  const github = await loadPosts({ site: 'github' });
+  // Phase 10-sitemap-cross-source-fix-a：改用 loadGithubPosts() 跨來源 aggregator（mirror build-github.js）
+  //   - 含 native github-site posts + Blogger-primary publishTargets.github.enabled cross-source mirror posts
+  //   - draft / publishTargets.github.enabled !== true 仍由 loader 過濾
+  const github = await loadGithubPosts({ settings });
   const categoryMap = collectCategoryMap(settings, github.posts);
   const tagMap = collectTagMap(settings, github.posts);
 
