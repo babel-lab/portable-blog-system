@@ -1208,25 +1208,51 @@ target="_blank" rel="sponsored nofollow noopener noreferrer"
 
 ## 16.4 Blogger ↔ GitHub 互導
 
-Blogger 與 GitHub 互導視為自家跨站導流，可加 UTM。
+Blogger 與 GitHub 互導視為自家跨站導流，會自動加 UTM 與 target / rel 控制。第一版**已實作 GitHub Pages → Blogger 方向之自動處理**（per Phase related-links-ga4-audit）；Blogger → GitHub Pages 反向尚未實作，列為 future phase。
 
-Blogger 導 GitHub：
+### GitHub Pages → Blogger（已實作）
+
+套用範圍：GitHub Pages 文章頁之 `relatedLinks` / `otherLinks` 中之 Blogger cross-link。
+
+判斷依據：URL hostname 等於 `settings.site.bloggerSiteUrl` 之 host → 視為 Blogger cross-link；**不**依賴 frontmatter 之 `kind` 欄位（即使 `kind: internal` 亦同樣套用）。
+
+正式 UTM 規則：
+
+```text
+utm_source=github_pages
+utm_medium=referral
+utm_campaign=portable_blog_system
+utm_content=related_links     ← relatedLinks aside 內之連結
+utm_content=other_links       ← otherLinks aside 內之連結
+```
+
+target / rel 自動處理：
+
+- 強制 `target="_blank"`（開新分頁）
+- 合併 `rel="nofollow noopener noreferrer"`；保留既有 token（如作者 explicit `sponsored`），不重複
+
+策略 A（已含 UTM 之 url 處理）：若原 URL 已含**任一** `utm_source` / `utm_medium` / `utm_campaign` / `utm_content`，視為作者手動指定 → 系統**不覆蓋**、**不重複注入** UTM；但仍套 `target="_blank"` + `rel` 合併。
+
+未受影響範圍：
+
+- ❌ GitHub Pages 同站內部連結 → 不加 UTM
+- ❌ 第三方非 Blogger external links → 不加 GitHub→Blogger UTM；仍按 §16.1 預設 `target="_blank" rel="nofollow noopener noreferrer"` 處理
+- ❌ Blogger templates 與 `dist-blogger/` 輸出 → 完全不變
+
+實作位置：`src/scripts/ga4-url-builder.js`（`isBloggerCrossLink` / `mergeRel` / `applyCrossSiteUtm`）+ `src/scripts/build-github.js`（`deriveRenderedCrossLinks` 於 post-detail render 前套用）+ `src/views/pages/post-detail.ejs`（render 端讀 `relatedLinksRendered` / `otherLinksRendered` 並使用 `item.target` / `item.rel`）。
+
+### Blogger → GitHub Pages（future phase；未實作）
+
+未來若實作 Blogger 端對 GitHub Pages 連結之自動處理，**建議**規則（**尚未生效**）：
 
 ```text
 utm_source=blogger
-utm_medium=internal_referral
-utm_campaign=blogger_to_github
-utm_content={slug}
+utm_medium=referral
+utm_campaign=portable_blog_system
+utm_content=related_links | other_links
 ```
 
-GitHub 導 Blogger：
-
-```text
-utm_source=github
-utm_medium=internal_referral
-utm_campaign=github_to_blogger
-utm_content={slug}
-```
+當前 Blogger 端對 GitHub Pages 連結**不**自動加 UTM / 不自動套 target / rel；作者若需 UTM 可於 frontmatter 之 url 欄位手動加入。
 
 ## 16.5 relatedLinks / otherLinks 連結處理
 

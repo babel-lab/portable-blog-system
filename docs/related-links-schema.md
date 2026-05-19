@@ -198,7 +198,35 @@ Phase 9-g-c-c 已落地 4 條 warning-only 規則（per `src/scripts/validate-co
 
 ### 4.3 與 Blogger / GitHub 互導之關係
 
-CLAUDE.md §16.4 描述 Blogger ↔ GitHub 互導之 UTM 規則（`utm_source=blogger` 等）。本文件 `kind: internal` 連結之 UTM 套用屬未來 build / render 階段之決策，屬本批之外；第一版實作（Phase 9-g-d）建議**不**自動套 UTM，由作者於 `url` 欄位自行決定。
+CLAUDE.md §16.4 描述 Blogger ↔ GitHub 互導之 UTM 與 target / rel 規則。第一版**已實作 GitHub Pages → Blogger 方向之自動處理**（per Phase related-links-ga4-audit；commit `6e44b4e`）。
+
+**GitHub Pages 端 cross-link 自動行為**：
+
+當 `relatedLinks` / `otherLinks` 之 `item.url` hostname 等於 `settings.site.bloggerSiteUrl` 之 host 時，render 階段自動處理：
+
+| 屬性 | 行為 |
+|---|---|
+| 判斷依據 | URL hostname；**不**依賴 `kind` 欄位（`kind: internal` 之 Blogger URL 亦適用）|
+| `target` | 強制 `_blank`（開新分頁）|
+| `rel` | 合併 `nofollow noopener noreferrer`；保留既有 token（如作者 explicit `sponsored`）不重複 |
+| UTM 注入 | `utm_source=github_pages` / `utm_medium=referral` / `utm_campaign=portable_blog_system` / `utm_content=related_links` 或 `other_links`（依 aside 區塊）|
+
+**策略 A**（已含 UTM 之 url 處理）：若 url 已含**任一** `utm_source` / `utm_medium` / `utm_campaign` / `utm_content`，視為作者手動指定 → 系統**不覆蓋**、**不重複**注入 UTM；但仍套 `target="_blank"` + `rel` 合併。
+
+**未受影響範圍**：
+
+- GitHub Pages 同站內部連結（同 host）→ 不加 UTM
+- 第三方非 Blogger external links（如 affiliate.links 之博客來 / 金石堂）→ 不加 GitHub→Blogger UTM；仍按 §4.1 之 external 預設 `target="_blank"` + `rel="nofollow noopener"` 處理
+- Blogger templates / `dist-blogger/` 輸出 → 不變
+- `design-system` / `sitemap.xml` / `robots.txt` → 不變
+
+**Blogger → GitHub Pages 反向 UTM**：未實作；屬 future phase。當前 Blogger 端對 GitHub Pages 連結**不**自動處理；作者若需 UTM 可於 frontmatter 之 url 欄位手動加入。
+
+**實作位置**：
+
+- `src/scripts/ga4-url-builder.js`：`isBloggerCrossLink()` / `mergeRel()` / `applyCrossSiteUtm()` 純函式
+- `src/scripts/build-github.js`：`deriveRenderedCrossLinks()` 於 post-detail render 前對 `post.relatedLinks` / `post.otherLinks` 套用，產出 `relatedLinksRendered` / `otherLinksRendered` 注入 EJS data
+- `src/views/pages/post-detail.ejs`：render 端讀 `relatedLinksRendered` / `otherLinksRendered`；anchor 使用 `item.target` / `item.rel`（fallback 至 §4.1 之 internal / external 預設）
 
 ---
 
