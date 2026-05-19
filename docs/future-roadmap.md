@@ -292,6 +292,7 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 - `docs/phase-8h-completion-report.md`（**Phase 8-h legacy fallback retirement 系列收尾報告；Phase 8-h 實質完成（15/15 in-scope positions 100% retired-or-migrated）**；本文件 Phase 8-h-z 落地）
 - `docs/phase-10-completion-report.md`（**Phase 10 GitHub Pages deployment 系列收尾報告；首次正式對外部署 + 雙 repo 分離架構（source 留本機 / public repo 純 deploy-only）+ 2 個 production-only fixes（internal-link + back-to-top）**；本文件 Phase 10-e-v-close 落地；詳見 §8.8）
 - `docs/admin-1-completion-report.md`（**Admin-1 dev-mode-only read-only Admin 系列收尾報告**；2026-05-19 落地；3 commits `f876e9e` Admin-1-a preflight + `7f9c6b7` Admin-1-b dev-mode-only page + `11ba32e` Admin-1-c enhanced read-only；Admin 嚴格 read-only / dev-mode-only / 不入 dist-sitemap-nav）
+- `docs/admin-2-write-pre-analysis.md`（**Admin-2 write pre-analysis + safety plan**；Phase Admin-2-a；2026-05-19 落地；write surface inventory + 4 級欄位分級 + write strategy 比較（推薦 B+D+E+F 組合）+ 建議 Admin-2-b 拆 5 sub-batches（b-1 dry-run viewer 起手）+ 11 條安全檢查 + 7 個 stop points；**不啟動實作**；保留 Admin-1 既有邊界）
 
 ---
 

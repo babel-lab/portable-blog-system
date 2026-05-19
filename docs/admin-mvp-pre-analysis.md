@@ -347,7 +347,7 @@ Admin 重 build:promotion → FB 推廣 txt 含正式 URL
 | 1 | Admin-0（**已完成**）| 規劃文件落地 |
 | 2 | （可選）schema 擴充批：UTM `audience` 等 | 在 Admin-2 之前先補 schema gap（per §9）|
 | 3 | Admin-1 read-only（**已完成 2026-05-19**）| per `docs/admin-1-completion-report.md`；3 commits（`f876e9e` + `7f9c6b7` + `11ba32e`）|
-| 4 | Admin-2 write | Admin-1 穩定後；**強烈建議**先做 Admin-2-a write pre-analysis + safety plan |
+| 4 | Admin-2 write | Admin-1 穩定後；**Admin-2-a pre-analysis 已 landed**（per `docs/admin-2-write-pre-analysis.md`）；建議下批 Admin-2-b-1 為 dry-run viewer（不實作寫入）|
 | 5 | Admin-3 build 整合 | Admin-2 穩定後 |
 | 6 | Admin-4 發布輔助 | Admin-3 穩定後 |
 | 7 | Admin-5+ 富 metadata | MVP 流程 user 驗證可用後 |
