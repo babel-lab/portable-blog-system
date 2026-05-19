@@ -88,6 +88,69 @@ export function resolvePostBaseUrl({ post, settings }) {
   return { baseUrl: null, urlSource: null, urlReason: `unknown-site:${site}` };
 }
 
+// Phase related-links-ga4-audit：判斷 url 是否為指向 Blogger cross-site host 之連結。
+//   依據 settings.site.bloggerSiteUrl 之 hostname 比對；忽略 kind 欄位。
+//   用於 GitHub Pages 端 relatedLinks / otherLinks 之 attribution 處理。
+export function isBloggerCrossLink(rawUrl, settings) {
+  if (typeof rawUrl !== 'string' || !rawUrl) return false;
+  const bloggerSiteUrl = settings?.site?.bloggerSiteUrl;
+  if (!bloggerSiteUrl) return false;
+  try {
+    const u = new URL(rawUrl);
+    const bloggerHost = new URL(bloggerSiteUrl).hostname;
+    return u.hostname === bloggerHost;
+  } catch {
+    return false;
+  }
+}
+
+// mergeRel：合併 rel token strings；保留原順序 + 不重複 token。
+//   primary 為既有 rel string；additions 為要加入之 token array。
+export function mergeRel(primary, additions) {
+  const existing = typeof primary === 'string' && primary.trim() !== ''
+    ? primary.trim().split(/\s+/).filter(Boolean)
+    : [];
+  const adds = Array.isArray(additions) ? additions : [];
+  const seen = new Set(existing);
+  const result = [...existing];
+  for (const token of adds) {
+    if (typeof token === 'string' && token !== '' && !seen.has(token)) {
+      result.push(token);
+      seen.add(token);
+    }
+  }
+  return result.join(' ');
+}
+
+// applyCrossSiteUtm：對 GitHub Pages → Blogger cross-link 之 UTM 注入 + target/rel 標記。
+//   - 非 Blogger cross-link → 回傳 { url, target: null, rel: null, applied: false }（不改動）
+//   - 已含任一 utm_source / utm_medium / utm_campaign / utm_content → 策略 A：保留 author intent，
+//     不覆寫 UTM；但仍套 target=_blank + rel merge（per Phase related-links-ga4-audit spec 點 10）
+//   - 否則注入 4 個 UTM + 設 target=_blank + 合併 rel ['nofollow', 'noopener', 'noreferrer']
+//   slot：'related_links' | 'other_links'（決定 utm_content）
+export function applyCrossSiteUtm({ url, settings, slot, existingRel = '' }) {
+  if (!isBloggerCrossLink(url, settings)) {
+    return { url, target: null, rel: null, applied: false };
+  }
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return { url, target: null, rel: null, applied: false };
+  }
+  const hasUtm = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content']
+    .some((key) => u.searchParams.has(key));
+  const mergedRel = mergeRel(existingRel, ['nofollow', 'noopener', 'noreferrer']);
+  if (hasUtm) {
+    return { url, target: '_blank', rel: mergedRel, applied: false };
+  }
+  u.searchParams.set('utm_source', 'github_pages');
+  u.searchParams.set('utm_medium', 'referral');
+  u.searchParams.set('utm_campaign', 'portable_blog_system');
+  u.searchParams.set('utm_content', slot);
+  return { url: u.toString(), target: '_blank', rel: mergedRel, applied: true };
+}
+
 // buildFacebookUrl：一站式組合。回傳 { baseUrl, finalUrl, urlSource, urlReason }。
 // utm 設定來自 settings.promotion.facebook.utm；page / slug 用於 pattern 展開。
 export function buildFacebookUrl({ post, fb, page, settings }) {

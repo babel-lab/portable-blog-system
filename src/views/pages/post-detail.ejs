@@ -142,13 +142,14 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   <% } -%>
 
   <%# Phase 9-g-f-b：相關連結（作者手動指定；mirror Blogger 9-g-d-b pattern） -%>
+  <%# Phase related-links-ga4-audit：改讀 relatedLinksRendered / otherLinksRendered（含 Blogger cross-link UTM + target/rel） -%>
   <%# renderable pre-filter：plain object 且 url 非空 且 title 非空 才渲染；其餘 skip -%>
-  <%# kind 為 internal 時不加 target 與 rel；其他採 external default 開新分頁 + nofollow noopener -%>
-  <%# 本批忽略 item.order；不支援 item.target / item.rel author override；不接 normalize-post-output -%>
+  <%# Blogger cross-link（item.target/item.rel 由 build-github 預處理填入）採其值；其餘 kind=internal 不加 target/rel；非 internal 走 external default _blank + nofollow noopener -%>
+  <%# 本批忽略 item.order；author item.target / item.rel override 仍經 mergeRel 合併 -%>
   <%# trim-newline pattern：對無 relatedLinks / otherLinks 之 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
   <%# 本批 EJS comment 內嚴格不出現 EJS delimiter 文字（避免 9-g-d-c / 9-g-e-b 之既有 bug 模式） -%>
   <%
-    const renderableRelated = (Array.isArray(post.relatedLinks) ? post.relatedLinks : []).filter(function(item) {
+    const renderableRelated = (Array.isArray(relatedLinksRendered) ? relatedLinksRendered : []).filter(function(item) {
       return item && typeof item === 'object' && !Array.isArray(item)
         && typeof item.url === 'string' && item.url.trim() !== ''
         && typeof item.title === 'string' && item.title.trim() !== '';
@@ -163,9 +164,11 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
           const isInternal = item.kind === 'internal';
           const platform = (typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '';
           const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
+          const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
+          const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
         %>
         <li class="lab-related-links__item lab-related-links__item--<%= isInternal ? 'internal' : 'external' %>">
-          <a class="lab-related-links__link" href="<%= item.url %>"<% if (!isInternal) { %> target="_blank" rel="nofollow noopener"<% } %>>
+          <a class="lab-related-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %>>
             <% if (platform) { %><span class="lab-related-links__platform">[<%= platform %>]</span> <% } %><span class="lab-related-links__title-text"><%= item.title %></span>
           </a>
           <% if (hasDesc) { %><p class="lab-related-links__description"><%= item.description %></p><% } %>
@@ -177,8 +180,9 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   <% } -%>
 
   <%# Phase 9-g-f-b：其他連結（同 lab-related-links 規則，class prefix 改 lab-other-links） -%>
+  <%# Phase related-links-ga4-audit：讀 otherLinksRendered；utm_content=other_links -%>
   <%
-    const renderableOther = (Array.isArray(post.otherLinks) ? post.otherLinks : []).filter(function(item) {
+    const renderableOther = (Array.isArray(otherLinksRendered) ? otherLinksRendered : []).filter(function(item) {
       return item && typeof item === 'object' && !Array.isArray(item)
         && typeof item.url === 'string' && item.url.trim() !== ''
         && typeof item.title === 'string' && item.title.trim() !== '';
@@ -193,9 +197,11 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
           const isInternal = item.kind === 'internal';
           const platform = (typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '';
           const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
+          const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
+          const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
         %>
         <li class="lab-other-links__item lab-other-links__item--<%= isInternal ? 'internal' : 'external' %>">
-          <a class="lab-other-links__link" href="<%= item.url %>"<% if (!isInternal) { %> target="_blank" rel="nofollow noopener"<% } %>>
+          <a class="lab-other-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %>>
             <% if (platform) { %><span class="lab-other-links__platform">[<%= platform %>]</span> <% } %><span class="lab-other-links__title-text"><%= item.title %></span>
           </a>
           <% if (hasDesc) { %><p class="lab-other-links__description"><%= item.description %></p><% } %>

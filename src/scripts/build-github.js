@@ -8,6 +8,7 @@ import { loadSettings } from './load-settings.js';
 import { loadGithubPosts } from './load-github-posts.js';
 import { renderBody } from './parse-markdown.js';
 import { validateContent, printWarnings } from './validate-content.js';
+import { applyCrossSiteUtm } from './ga4-url-builder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -354,6 +355,26 @@ function buildSeoForTagList({ settings }) {
   return commonSeo({ pageType: 'tag-list', settings, canonicalUrl });
 }
 
+// Phase related-links-ga4-audit：對 relatedLinks / otherLinks 預處理。
+//   - 對 Blogger cross-link 連結注入 UTM + 設 target=_blank + 合併 rel（per ga4-url-builder.applyCrossSiteUtm）
+//   - 非 Blogger 連結維持原樣（item.target / item.rel 為 null；EJS template 走 fallback 既有邏輯）
+//   - 非 object / 非 string url 之 item 維持原樣（EJS render-time filter 會 skip）
+function deriveRenderedCrossLinks(rawLinks, settings, slot) {
+  const arr = Array.isArray(rawLinks) ? rawLinks : [];
+  return arr.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    if (typeof item.url !== 'string' || item.url.trim() === '') return item;
+    const xs = applyCrossSiteUtm({
+      url: item.url,
+      settings,
+      slot,
+      existingRel: typeof item.rel === 'string' ? item.rel : '',
+    });
+    if (xs.target === null) return item; // 非 Blogger cross-link：不動
+    return { ...item, url: xs.url, target: xs.target, rel: xs.rel };
+  });
+}
+
 function buildSeoNoindex({ pageType, settings }) {
   return {
     ...commonSeo({ pageType, settings, canonicalUrl: null }),
@@ -415,6 +436,12 @@ async function main() {
 
   for (const post of githubPosts.posts) {
     const bodyHtml = renderBody(post.body || '');
+    // Phase related-links-ga4-audit：對每篇 post 預處理 relatedLinks / otherLinks
+    //   - 對 Blogger cross-link 注入 GA4 UTM + 強制 target=_blank + 合併 rel
+    //   - 非 Blogger 連結 / 同站連結維持 EJS 預設邏輯（item.target / item.rel 為 null）
+    //   - 既有 utm_* 套用策略 A：跳過 UTM 注入但仍套 target/rel
+    const relatedLinksRendered = deriveRenderedCrossLinks(post.relatedLinks, settings, 'related_links');
+    const otherLinksRendered = deriveRenderedCrossLinks(post.otherLinks, settings, 'other_links');
     const detailHtml = await renderPage({
       template: 'pages/post-detail.ejs',
       data: baseData({
@@ -428,6 +455,8 @@ async function main() {
         title: `${post.title} | ${settings.site.siteName}`,
         description: post.description || settings.site.description,
         seo: buildSeoForPostDetail({ settings, post }),
+        relatedLinksRendered,
+        otherLinksRendered,
       }),
     });
     await writeText(path.join(PAGES_DIR, 'posts', post.slug, 'index.html'), detailHtml, outputs);
