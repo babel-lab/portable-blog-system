@@ -290,6 +290,7 @@ Phase 8-g-5 + Phase 8-g-6 補完 sample / template 來源層之 deprecated `type
 - `docs/phase-8h-baseline-snapshot.md`（Phase 8-h-b 退場前 baseline run；commit `c9ce52c`）
 - `docs/phase-8h-c-pre-plan.md`（Phase 8-h-c-pre fixture / split plan 分析；commit `130097a`）
 - `docs/phase-8h-completion-report.md`（**Phase 8-h legacy fallback retirement 系列收尾報告；Phase 8-h 實質完成（15/15 in-scope positions 100% retired-or-migrated）**；本文件 Phase 8-h-z 落地）
+- `docs/phase-10-completion-report.md`（**Phase 10 GitHub Pages deployment 系列收尾報告；首次正式對外部署 + 雙 repo 分離架構（source 留本機 / public repo 純 deploy-only）+ 2 個 production-only fixes（internal-link + back-to-top）**；本文件 Phase 10-e-v-close 落地；詳見 §8.8）
 
 ---
 
@@ -375,3 +376,36 @@ per `docs/phase-1-completion-report.md` §11 之保守啟動順序：
 - Phase 9-z-d **不**啟動 Google Rich Results Test
 - Phase 9-z-d **不**啟動 Phase 9-g-g / 9-f-g / 9-h-f
 - 後續每篇新文章發布應對照 `docs/phase-1-completion-checklist.md` §10 之 author SOP
+
+### 8.8 Phase 10 GitHub Pages deployment 系列（post-Phase-1；✅ landed 2026-05-19）
+
+Phase 10 為 Phase 1 final 封存後之首次正式對外部署批，包含 12 個 sub-batches + 收尾批。GitHub Pages 線上：`https://babel-lab.github.io/portable-blog-system/`。
+
+| 子批 | 範圍 | 狀態 | commit / 紀錄 |
+|---|---|---|---|
+| 10-a | deploy preflight inventory | ✅ landed | 純對話分析 |
+| 10-b | GitHub Pages deploy runbook docs | ✅ landed | commit `5073661` |
+| 10-b-2 | repo strategy decision note（推薦方案 B project site）| ✅ landed | 純對話分析 |
+| 10-b-3 | switch githubSiteUrl to project site subpath + rebuild | ✅ landed | commit `eb24097` |
+| 10-c | remote setup + first push main（⚠️ 誤推；後策略修正）| — | 無新 commit |
+| 10-c-fix-a | remove local origin remote + clear upstream tracking | ✅ landed | 純 git 操作 |
+| 10-c-fix-b | re-add deploy-only remote without pushing main | ✅ landed | 純 git 操作 |
+| 10-d | deploy-only gh-pages branch deployment（initial）| ✅ landed | deploy commit `720a349` |
+| 10-e-fix-a | fix GitHub project-site internal links（basePath helper + 13 templates）| ✅ landed | source commit `bc4340f` + deploy commit `fbfc691` |
+| 10-e-v | live verification + back-to-top button issue 盤點 | ✅ landed | 純讀取分析 |
+| 10-e-v-fix | add back-to-top button to base layout | ✅ landed | source commit `ab9e305` + deploy commit `02d9d7b` |
+| 10-e-v-close | Phase 10 完成報告 + docs sync（本批）| ✅ landed | 見本批 git log |
+
+**核心架構決策**：
+
+- **source 留本機**：source repo `D:\github\blog-new\portable-blog-system\` 之 main branch **永遠不 push**；無 upstream tracking 作硬性保護
+- **deploy-only public repo**：`https://github.com/babel-lab/portable-blog-system` 僅含 `gh-pages` branch + dist 內容；無 source / docs / config
+- **獨立 deploy 工作目錄**：`D:\github\blog-new\portable-blog-deploy\`（sibling 目錄；orphan gh-pages branch）
+- **subpath 一致性**：`site.config.json.githubSiteUrl` / sitemap.xml absolute URL / canonical / JSON-LD / 內部 nav links 全鏈對齊 `/portable-blog-system/`
+
+**端對端驗收**：
+
+- §6 internal-link 4/4 通過（首頁 nav / 文章卡片 / 手機選單 / 404 回首頁）
+- §7 back-to-top 9/9 通過（出現 / 平滑回頂 / 滾頂消失 / 手機尺寸 / design-system 雙按鈕 / console / print 等）
+
+**完整紀錄**：`docs/phase-10-completion-report.md`（10 主節）+ `docs/checklists/github-deploy-checklist.md` §7 部署完成紀錄（首批 3 行 deploy log）

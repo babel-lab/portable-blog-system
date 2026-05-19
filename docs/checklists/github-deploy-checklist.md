@@ -131,4 +131,6 @@ GitHub Pages 部署操作勾選清單。配套詳細說明見 `docs/github-deplo
 
 | 日期 | HEAD（main）| Pages URL | 備註 |
 |---|---|---|---|
-|  |  |  |  |
+| 2026-05-19 | `eb24097` | https://babel-lab.github.io/portable-blog-system/ | initial deploy（deploy commit `720a349`；含 root-absolute internal links bug；發現 blocker 後 redeploy）|
+| 2026-05-19 | `bc4340f` | 同上 | internal-link fix redeploy（deploy commit `fbfc691`；basePath helper + 13 templates；§6 4/4 驗收通過）|
+| 2026-05-19 | `ab9e305` | 同上 | back-to-top button fix redeploy（deploy commit `02d9d7b`；base.ejs +1 line；§7 9/9 驗收通過）|
