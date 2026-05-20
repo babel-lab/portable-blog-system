@@ -8,7 +8,7 @@
 .lab-header__brand { font-weight: 800; text-decoration: none; }
 // Phase 6-b 修補：menu button 預設 display: none，避免 CSS 載入前 FOUC 在 desktop 閃出漢堡 icon。
 // 僅小版（< md）才顯示，不依賴 md+ media query 才隱藏。
-.lab-header__menu-button { display: none; border: 1px solid var(--lab-color-border); background: #fff; border-radius: .5rem; padding: .4rem .7rem; cursor: pointer; }
+.lab-header__menu-button { display: none; border: 1px solid var(--lab-color-border); background: var(--lab-color-background); border-radius: .5rem; padding: .4rem .7rem; cursor: pointer; }
 .lab-header__menu-button:focus-visible { @include mx.lab-focus-ring; }
 
 @media (max-width: #{bp.$bp-md - 0.01em}) {

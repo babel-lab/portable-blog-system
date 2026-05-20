@@ -1,7 +1,7 @@
 @use '../abstracts/breakpoints' as bp;
 @use '../abstracts/mixins' as mx;
 
-.lab-mobile-drawer { position: fixed; inset: 0 0 0 auto; width: min(80vw, 20rem); z-index: 40; padding: 1rem; background: var(--lab-color-gray-100, #f3f4f6); border-left: 1px solid var(--lab-color-border); transform: translateX(100%); transition: transform .2s ease; display: grid; align-content: start; gap: 1rem; }
+.lab-mobile-drawer { position: fixed; inset: 0 0 0 auto; width: min(80vw, 20rem); z-index: 40; padding: 1rem; background: var(--lab-color-gray-100); border-left: 1px solid var(--lab-color-border); transform: translateX(100%); transition: transform .2s ease; display: grid; align-content: start; gap: 1rem; }
 .lab-mobile-drawer.is-open { transform: translateX(0); box-shadow: -20px 0 40px rgb(15 23 42 / 12%); }
 .lab-mobile-drawer__close { justify-self: end; }
 .lab-mobile-drawer__close:focus-visible { @include mx.lab-focus-ring; }
