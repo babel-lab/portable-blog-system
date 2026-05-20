@@ -367,6 +367,48 @@
             </p>
           </div>
 
+          <%# Phase 20260520-fb-p5-b：FB sidecar dry-run editor（client-side only；無 fs.write / fetch / form submit / Apply button） -%>
+          <%# - 使用 fb- prefix class 避免與既有 SEO dry-run viewer 之 .dry-run-section / .dry-run-toggle 衝突 -%>
+          <%# - 12 個欄位：enabled / status / postUrl / postedAt / postId / campaign / audience / title / titleEn / hashtags / imageUrl / note -%>
+          <%# - hashtags 採 textarea 一行一個；split by \n 後 normalize + JSON.stringify 比對 -%>
+          <%# - inline style 避免動 <style> block；視覺用藍色 tint 與既有黃色 SEO dry-run 區分 -%>
+          <div class="detail-section fb-dry-run-section" data-post-idx="<%= idx %>" style="border: 2px dashed #6c8ebf; background: #f0f4fa; padding: 0.75rem; border-radius: 4px; margin-top: 0.75rem;">
+            <h3 style="color: #2c5282; border-bottom: 1px solid #c5d6e8;">FB Sidecar Dry-run Editor</h3>
+            <p style="background: #d6e4f5; border: 1px solid #6c8ebf; padding: 0.4rem 0.6rem; border-radius: 3px; margin: 0.25rem 0; font-weight: 600; color: #2c5282; font-size: 0.85em;">⚠️ Dry-run only. No file will be written. 這只是 dry-run 預覽，不會寫入任何 .fb.md 檔案。需要的話請手動複製結果。</p>
+            <p style="font-size: 0.82em; color: #555; margin: 0.25rem 0 0.5rem;">支援 12 個欄位（enabled / status / postUrl / postedAt / postId / campaign / audience / title / titleEn / hashtags / imageUrl / note）；read-only preview；無 form submit / 無 fs API / 無 fetch。實際寫入留待 FB-P5-c phase；當前請手動編輯 .fb.md。</p>
+            <button type="button" class="fb-dry-run-toggle" style="padding: 0.35rem 0.75rem; border: 1px solid #999; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600;">Edit FB Metadata</button>
+            <button type="button" class="fb-dry-run-cancel" hidden style="padding: 0.35rem 0.75rem; border: 1px solid #999; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; margin-left: 0.5rem;">Cancel FB Edit</button>
+            <div class="fb-dry-run-form" hidden style="margin-top: 0.5rem;">
+              <table style="font-size: 0.82em; width: 100%;">
+                <thead><tr style="background: #d6e4f5;"><th style="width:9rem">field</th><th style="width:35%">current value</th><th>new value（編輯此欄即可）</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">enabled</td><td class="fb-dry-run-old-value" data-fb-field="enabled" data-current="<%= p.fbEnabled ? 'true' : 'false' %>"><%= p.fbEnabled ? 'true' : 'false' %></td><td><select data-fb-input="enabled" style="width: 100%; padding: 0.25rem; font-family: inherit;"><option value="true"<%= p.fbEnabled ? ' selected' : '' %>>true</option><option value="false"<%= !p.fbEnabled ? ' selected' : '' %>>false</option></select></td></tr>
+                  <tr><td class="mono">status</td><td class="fb-dry-run-old-value" data-fb-field="status" data-current="<%= p.fbStatus %>"><%= p.fbStatus || '(empty)' %></td><td><input type="text" data-fb-input="status" value="<%= p.fbStatus %>" placeholder="draft / ready / posted / archived" style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">postUrl</td><td class="fb-dry-run-old-value" data-fb-field="postUrl" data-current="<%= p.fbPostUrl %>"><%= p.fbPostUrl || '(empty)' %></td><td><input type="text" data-fb-input="postUrl" value="<%= p.fbPostUrl %>" placeholder="https://www.facebook.com/..." style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">postedAt</td><td class="fb-dry-run-old-value" data-fb-field="postedAt" data-current="<%= p.fbPostedAt %>"><%= p.fbPostedAt || '(empty)' %></td><td><input type="text" data-fb-input="postedAt" value="<%= p.fbPostedAt %>" placeholder="ISO 8601 或 YYYY-MM-DD HH:mm" style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">postId</td><td class="fb-dry-run-old-value" data-fb-field="postId" data-current="<%= p.fbPostId %>"><%= p.fbPostId || '(empty)' %></td><td><input type="text" data-fb-input="postId" value="<%= p.fbPostId %>" placeholder="optional (Graph API)" style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">campaign</td><td class="fb-dry-run-old-value" data-fb-field="campaign" data-current="<%= p.fbCampaign %>"><%= p.fbCampaign || '(empty)' %></td><td><input type="text" data-fb-input="campaign" value="<%= p.fbCampaign %>" placeholder="人工分類標記" style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">audience</td><td class="fb-dry-run-old-value" data-fb-field="audience" data-current="<%= p.fbAudience %>"><%= p.fbAudience || '(empty)' %></td><td><input type="text" data-fb-input="audience" value="<%= p.fbAudience %>" placeholder="developers / parents / educators / ..." style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">title</td><td class="fb-dry-run-old-value" data-fb-field="title" data-current="<%= p.fbTitle %>"><%= p.fbTitle || '(empty)' %></td><td><input type="text" data-fb-input="title" value="<%= p.fbTitle %>" style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">titleEn</td><td class="fb-dry-run-old-value" data-fb-field="titleEn" data-current="<%= p.fbTitleEn %>"><%= p.fbTitleEn || '(empty)' %></td><td><input type="text" data-fb-input="titleEn" value="<%= p.fbTitleEn %>" style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">hashtags<br><small style="color: #777; font-size: 0.85em;">(一行一個)</small></td><td class="fb-dry-run-old-value" data-fb-field="hashtags" data-current="<%= Array.isArray(p.fbHashtags) ? p.fbHashtags.join('\n') : '' %>" style="white-space: pre-wrap;"><% if (Array.isArray(p.fbHashtags) && p.fbHashtags.length > 0) { %><%= p.fbHashtags.join('\n') %><% } else { %>(empty)<% } %></td><td><textarea data-fb-input="hashtags" rows="3" placeholder="一行一個 hashtag" style="width: 100%; padding: 0.25rem; font-family: inherit; resize: vertical;"><%= Array.isArray(p.fbHashtags) ? p.fbHashtags.join('\n') : '' %></textarea></td></tr>
+                  <tr><td class="mono">imageUrl</td><td class="fb-dry-run-old-value" data-fb-field="imageUrl" data-current="<%= p.fbImageUrl %>"><%= p.fbImageUrl || '(empty)' %></td><td><input type="text" data-fb-input="imageUrl" value="<%= p.fbImageUrl %>" placeholder="https://... (外連；不直接載入)" style="width: 100%; padding: 0.25rem;"></td></tr>
+                  <tr><td class="mono">note</td><td class="fb-dry-run-old-value" data-fb-field="note" data-current="<%= p.fbNote %>"><%= p.fbNote || '(empty)' %></td><td><textarea data-fb-input="note" rows="2" style="width: 100%; padding: 0.25rem; font-family: inherit; resize: vertical;"><%= p.fbNote %></textarea></td></tr>
+                </tbody>
+              </table>
+              <button type="button" class="fb-dry-run-compute" style="padding: 0.35rem 0.75rem; border: 1px solid #2c5282; background: #cfe2ff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #2c5282; margin-top: 0.5rem;">Show FB Dry-run Diff</button>
+              <div class="fb-dry-run-result" hidden>
+                <p style="margin: 0.5rem 0 0.25rem;">變更欄位數：<span class="fb-dry-run-changed-count" style="font-weight: 700; color: #2c5282;">0</span> / 12</p>
+                <table style="font-size: 0.82em; width: 100%;">
+                  <thead><tr style="background: #d6e4f5;"><th style="width:8rem">field</th><th>before</th><th>after</th><th style="width:8rem">status</th></tr></thead>
+                  <tbody class="fb-dry-run-diff-rows"></tbody>
+                </table>
+                <details style="margin-top: 0.5rem;"><summary style="cursor: pointer; color: #2c5282; font-size: 0.82em;">Show simulated frontmatter (after)</summary><pre class="fb-dry-run-after" style="background: #fff; border: 1px solid #c5d6e8; padding: 0.4rem; margin-top: 0.25rem; font-size: 0.78em; overflow-x: auto; white-space: pre-wrap;"></pre></details>
+                <p style="background: #d6e4f5; border: 1px solid #6c8ebf; padding: 0.4rem 0.6rem; border-radius: 3px; margin-top: 0.5rem; font-weight: 600; color: #2c5282; font-size: 0.85em;">⚠️ Dry-run only. No file will be written. 若需實際寫入：等 FB-P5-c phase 落地；當前請手動編輯 <code>.fb.md</code> 後重 build。</p>
+              </div>
+            </div>
+          </div>
+
           <div class="detail-section">
             <h3>Related / other links</h3>
             <dl class="detail-grid">
@@ -612,6 +654,101 @@
           diffRows.innerHTML = html;
           changedCount.textContent = changed;
           result.hidden = false;
+        });
+      });
+
+      // Phase 20260520-fb-p5-b: FB sidecar dry-run editor handlers
+      // 純 client-side：無 fs.write / 無 fetch / 無 XHR / 無 form submit / 無 Apply button。
+      // 點 fb-dry-run-section 內 button / input 時 stopPropagation 避免冒泡至 row click（toggle detail）。
+      // 與既有 SEO dry-run viewer 使用獨立 .fb-dry-run-* class 不衝突。
+      var fbDrySections = document.querySelectorAll('.fb-dry-run-section');
+      fbDrySections.forEach(function (section) {
+        section.addEventListener('click', function (e) { e.stopPropagation(); });
+        var fbToggle = section.querySelector('.fb-dry-run-toggle');
+        var fbCancel = section.querySelector('.fb-dry-run-cancel');
+        var fbForm = section.querySelector('.fb-dry-run-form');
+        var fbCompute = section.querySelector('.fb-dry-run-compute');
+        var fbResult = section.querySelector('.fb-dry-run-result');
+        var fbDiffRows = section.querySelector('.fb-dry-run-diff-rows');
+        var fbChangedCount = section.querySelector('.fb-dry-run-changed-count');
+        var fbAfterBlock = section.querySelector('.fb-dry-run-after');
+        if (!fbToggle || !fbForm || !fbCompute || !fbResult || !fbDiffRows || !fbChangedCount) return;
+
+        function setFbFormOpen(open) {
+          fbForm.hidden = !open;
+          fbToggle.hidden = open;
+          if (fbCancel) fbCancel.hidden = !open;
+          if (!open) fbResult.hidden = true;
+        }
+        fbToggle.addEventListener('click', function () { setFbFormOpen(true); });
+        if (fbCancel) fbCancel.addEventListener('click', function () { setFbFormOpen(false); });
+
+        fbCompute.addEventListener('click', function () {
+          var fbFields = [
+            { name: 'enabled', type: 'bool' },
+            { name: 'status', type: 'string' },
+            { name: 'postUrl', type: 'string' },
+            { name: 'postedAt', type: 'string' },
+            { name: 'postId', type: 'string' },
+            { name: 'campaign', type: 'string' },
+            { name: 'audience', type: 'string' },
+            { name: 'title', type: 'string' },
+            { name: 'titleEn', type: 'string' },
+            { name: 'hashtags', type: 'array' },
+            { name: 'imageUrl', type: 'string' },
+            { name: 'note', type: 'string' },
+          ];
+          var changedFb = 0;
+          var htmlFb = '';
+          var afterLines = [];
+          fbFields.forEach(function (f) {
+            var oldCell = section.querySelector('[data-fb-field="' + f.name + '"]');
+            var input = section.querySelector('[data-fb-input="' + f.name + '"]');
+            var oldVal = oldCell ? (oldCell.dataset.current || '') : '';
+            var newVal = input ? (input.value || '') : '';
+            var oldDisp = oldVal;
+            var newDisp = newVal;
+            var isEqual;
+            if (f.type === 'array') {
+              var splitNorm = function (s) {
+                return s.split(/\r?\n/).map(function(x){return x.trim();}).filter(function(x){return x !== '';});
+              };
+              var oldArr = oldVal === '' ? [] : splitNorm(oldVal);
+              var newArr = splitNorm(newVal);
+              oldDisp = oldArr.join('\n');
+              newDisp = newArr.join('\n');
+              isEqual = JSON.stringify(oldArr) === JSON.stringify(newArr);
+              afterLines.push(f.name + ':');
+              if (newArr.length === 0) { afterLines.push('  []'); }
+              else { newArr.forEach(function(h){ afterLines.push('  - "' + h.replace(/"/g, '\\"') + '"'); }); }
+            } else if (f.type === 'bool') {
+              isEqual = oldVal === newVal;
+              afterLines.push(f.name + ': ' + (newVal === 'true' ? 'true' : 'false'));
+            } else {
+              isEqual = oldVal === newVal;
+              afterLines.push(f.name + ': "' + newVal.replace(/"/g, '\\"') + '"');
+            }
+            var statusStyle, statusText;
+            if (isEqual) {
+              if (oldDisp === '' && newDisp === '') { statusStyle = 'color: #999; font-style: italic;'; statusText = 'unchanged / empty'; }
+              else { statusStyle = 'color: #155724;'; statusText = 'unchanged'; }
+            } else {
+              statusStyle = 'color: #d63384; font-weight: 600;';
+              statusText = 'changed';
+              changedFb++;
+            }
+            var emptyMark = '<span style="color:#999;font-style:italic;">(empty)</span>';
+            htmlFb += '<tr>'
+              + '<td class="mono">' + escapeHtml(f.name) + '</td>'
+              + '<td style="max-width: 14rem; word-break: break-word; white-space: pre-wrap;">' + (oldDisp === '' ? emptyMark : escapeHtml(oldDisp)) + '</td>'
+              + '<td style="max-width: 14rem; word-break: break-word; white-space: pre-wrap;">' + (newDisp === '' ? emptyMark : escapeHtml(newDisp)) + '</td>'
+              + '<td style="' + statusStyle + '">' + statusText + '</td>'
+              + '</tr>';
+          });
+          fbDiffRows.innerHTML = htmlFb;
+          fbChangedCount.textContent = changedFb;
+          if (fbAfterBlock) fbAfterBlock.textContent = afterLines.join('\n');
+          fbResult.hidden = false;
         });
       });
     })();
