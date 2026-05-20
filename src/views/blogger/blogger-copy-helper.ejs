@@ -245,3 +245,44 @@ canonical URL（已含 blogger→github UTM）：
 - internal 連結之 url 應為已發布後回填之真實 URL
 - external 連結於 HTML render 時會自動加 target="_blank" rel="nofollow noopener"
 <% } -%>
+<%# Phase 20260520-seo-3：SEO indexing guidance（per docs/seo-indexing-rules.md §3 + §6 SEO-3） -%>
+<%# - 顯示 SEO-2 precedence 解析後之 indexing guidance（read-only；非 Blogger 端真實 robots meta） -%>
+<%# - Blogger 平台之 robots meta 通常由 Blogger 主題層 / 後台「搜尋設定 → 自訂 robots 標頭標記」控制 -%>
+<%# - 本系統不能直接 inject Blogger head robots meta；此區塊為 manual check guidance，非「已自動套用」 -%>
+<%# - precedence: 1. post.seo.indexing (explicit) → 2. contentKind=download fallback (SEO-1) → 3. default index,follow -%>
+<%
+  const seoIndexing = post.seo && typeof post.seo.indexing === 'string' ? post.seo.indexing : null;
+  let indexingValue = 'index, follow';
+  let indexingSource = 'default (無 seo.indexing 且非 download)';
+  let indexingNote = '';
+  if (seoIndexing === 'index') {
+    indexingValue = 'index, follow';
+    indexingSource = 'seo.indexing=index (explicit)';
+  } else if (seoIndexing === 'noindex-follow') {
+    indexingValue = 'noindex, follow';
+    indexingSource = 'seo.indexing=noindex-follow (explicit)';
+    indexingNote = '此頁屬導流後段 / 下載頁用途，建議不要被搜尋引擎直接收錄。';
+  } else if (seoIndexing === 'noindex-nofollow') {
+    indexingValue = 'noindex, nofollow';
+    indexingSource = 'seo.indexing=noindex-nofollow (explicit)';
+    indexingNote = '此頁屬 admin / preview / test / private 類用途，建議不被收錄且不追蹤連結。';
+  } else if (post.contentKind === 'download') {
+    indexingValue = 'noindex, follow';
+    indexingSource = 'contentKind=download fallback (SEO-1)';
+    indexingNote = '此頁屬導流後段 / 下載頁用途，建議不要被搜尋引擎直接收錄。';
+  }
+-%>
+
+----------------------------------------
+[14] SEO indexing guidance（manual check；非自動套用）
+----------------------------------------
+SEO indexing: <%= indexingValue %>
+來源（precedence）：<%= indexingSource %>
+<% if (indexingNote) { %>說明：<%= indexingNote %>
+<% } -%>
+提示：
+- Blogger 平台之 robots meta 通常由 Blogger 主題層 / 後台「搜尋設定 → 自訂 robots 標頭標記」控制
+- 本系統**不能**直接 inject Blogger head 之 robots meta；此區塊為 indexing guidance，**非「已自動套用」**
+- 若上述為 noindex 類值，請於 Blogger 後台對應設定（避免該頁被搜尋引擎直接收錄）
+- precedence 規則詳見 docs/seo-indexing-rules.md §3
+- 本批未處理 Blogger sitemap / robots.txt（屬 SEO-4 範圍）

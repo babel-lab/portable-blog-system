@@ -42,7 +42,10 @@ publishTargets:
     enabled: true
     mode: "full"
   blogger:
-    enabled: false
+    # Phase 20260520-seo-3 樣本：enabled true 以驗證 Blogger copy-helper [14] 之 noindex-follow path
+    #   - 既有 seo.indexing=noindex-follow（Phase 20260520-seo-2）+ contentKind=download（Phase 20260520-seo-1）
+    #   - Blogger 端 copy-helper [14] section 預期顯示「SEO indexing: noindex, follow」+ 來源 explicit
+    enabled: true
     mode: "summary"
 
 blocks:
