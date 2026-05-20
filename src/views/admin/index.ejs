@@ -195,6 +195,7 @@
           <% if (p.titleEn) { %><br><span class="text-muted"><%= p.titleEn %></span><% } %>
           <br><span class="mono text-muted"><%= p.id || 'no-id' %></span>
           <br><span class="mono text-muted">slug: <%= p.slug || '—' %></span>
+          <br><span class="mono text-muted" title="<%= p.publishedSource ? 'source: ' + p.publishedSource : 'no publishedAt source' %>">published: <%= p.publishedAt || 'no date' %><% if (p.publishedSource) { %> <span class="text-muted" style="font-size: 0.85em;">(<%= p.publishedSource %>)</span><% } %></span>
         </td>
         <td class="col-narrow">
           <% if (p.contentKind) { %>
@@ -261,6 +262,19 @@
               <dt>category</dt><dd><%= p.category || '(empty)' %></dd>
               <dt>tags</dt><dd><% if (p.tags.length > 0) { p.tags.forEach(function(t) { %><span class="badge b-tag">#<%= t %></span><% }); } else { %>(empty)<% } %></dd>
             </dl>
+          </div>
+
+          <div class="detail-section">
+            <h3>Dates</h3>
+            <dl class="detail-grid">
+              <dt>publishedAt (canonical)</dt><dd class="mono"><%= p.publishedAt || '(empty)' %></dd>
+              <dt>publishedSource</dt><dd class="mono"><%= p.publishedSource || '(empty)' %></dd>
+              <dt>dateIntent (frontmatter.date)</dt><dd class="mono"><%= p.dateIntent || '(empty)' %></dd>
+              <dt>updatedAt (frontmatter.updated)</dt><dd class="mono"><%= p.updatedAt || '(empty)' %></dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.85em; margin: 0.25rem 0 0;">
+              注：publishedAt 為 canonical fallback chain（blogger.publishedAt → github.publishedAt → frontmatter.date）；列表排序以此欄位為主，fallback 至 id desc。
+            </p>
           </div>
 
           <div class="detail-section">

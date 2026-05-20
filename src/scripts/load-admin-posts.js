@@ -70,6 +70,27 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   const relatedLinksCount = Array.isArray(fm.relatedLinks) ? fm.relatedLinks.length : 0;
   const otherLinksCount = Array.isArray(fm.otherLinks) ? fm.otherLinks.length : 0;
 
+  // Phase 20260520-b-2: publishedAt canonical fallback chain
+  //   1. publishJson.blogger.publishedAt
+  //   2. publishJson.github.publishedAt
+  //   3. frontmatter.date（作者意圖日期）
+  //   4. ""（無）
+  // dateIntent 與 updatedAt 為原始欄位，方便 UI 細分顯示。
+  const dateIntent = typeof fm.date === 'string' ? fm.date : '';
+  const updatedAt = typeof fm.updated === 'string' ? fm.updated : '';
+  let publishedAt = '';
+  let publishedSource = '';
+  if (typeof publishJson?.blogger?.publishedAt === 'string' && publishJson.blogger.publishedAt) {
+    publishedAt = publishJson.blogger.publishedAt;
+    publishedSource = 'blogger.publishedAt';
+  } else if (typeof publishJson?.github?.publishedAt === 'string' && publishJson.github.publishedAt) {
+    publishedAt = publishJson.github.publishedAt;
+    publishedSource = 'github.publishedAt';
+  } else if (dateIntent) {
+    publishedAt = dateIntent;
+    publishedSource = 'frontmatter.date';
+  }
+
   // Phase Admin-1-c：metadata completeness checks（lenient；只標 "OK" 或 "missing"，不自動補值）
   //   - blogger OK：disabled 視為 OK；enabled 且有 publishedUrl 視為 OK；enabled 但無 publishedUrl 視為 missing
   //   - github OK：disabled 視為 OK；enabled 且 slug 推導出 previewUrl 視為 OK
@@ -107,6 +128,10 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     primaryPlatform: typeof fm.primaryPlatform === 'string' ? fm.primaryPlatform : '',
     status: typeof fm.status === 'string' ? fm.status : '',
     draft: fm.draft === true,
+    publishedAt,
+    publishedSource,
+    dateIntent,
+    updatedAt,
     category,
     tags,
     cover,
@@ -126,6 +151,13 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   };
 }
 
+// Phase 20260520-b-2: sort helper；不可解析或空值回傳 0；不 throw
+function getSortTime(value) {
+  if (!value) return 0;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? 0 : t;
+}
+
 export async function loadAdminPosts({ settings }) {
   const posts = [];
   for (const site of SITES) {
@@ -136,7 +168,15 @@ export async function loadAdminPosts({ settings }) {
       posts.push(toAdminView(raw, settings));
     }
   }
-  // Sort by id descending（推測為 YYYYMMDD-slug；新文章在前）
-  posts.sort((a, b) => (b.id || '').localeCompare(a.id || ''));
+  // Phase 20260520-b-2: 主排序 publishedAt desc，fallback 至 id desc
+  //   - 有 publishedAt 排前（較新在前；timestamp 大者前）
+  //   - publishedAt 相同或都無 → 以 id desc 穩定 fallback
+  //   - 日期解析失敗視為無日期（getSortTime 回 0；不 throw）
+  posts.sort((a, b) => {
+    const tb = getSortTime(b.publishedAt);
+    const ta = getSortTime(a.publishedAt);
+    if (tb !== ta) return tb - ta;
+    return (b.id || '').localeCompare(a.id || '');
+  });
   return { posts };
 }
