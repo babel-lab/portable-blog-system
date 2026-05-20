@@ -473,4 +473,42 @@ build:blogger-theme 後 → diff dist-blogger/theme/blogger-components.css 與 b
 
 ---
 
+## §14 落地進度紀錄
+
+### 14.1 DS-3-c-a（commit `f530a39` — 2026-05-20 早些時候）
+
+✅ **完整落地**（per §7.1 / §8.2 / §8.3）：
+- `src/styles/layout/_header.scss:11`：`background: #fff` → `background: var(--lab-color-background)`
+- `src/styles/layout/_mobile-drawer.scss:4`：移除 `, #f3f4f6` fallback；變純 `var(--lab-color-gray-100)`
+- 視覺零差；Blogger 端零影響（layout 不在 mirror）；2 個 hex 違規清除。
+
+### 14.2 DS-3-c-b（部分）（commit `Phase 20260520-pm-3` — 2026-05-20 下午）
+
+✅ **GitHub source 部分落地**：
+- `src/styles/components/_button.scss:34/35/38`：3 個 `#000` → `var(--lab-color-overlay-dark)`
+- `src/styles/components/_download-box.scss:7`：1 個 `#000` → `var(--lab-color-overlay-dark)`
+- 視覺零差（token 值 = `#000`；render 結果 byte-equal）
+
+⚠️ **Mirror partial 未同步**（**安全 drift**）：
+- `src/styles/blogger/_blogger-components-rules.scss` line 54 (×2) / 55 / 140 之 4 個 `#000` **保留**
+- 屬「source 不齊但 render 等值」之 drift：GitHub source 用 `var(--lab-color-overlay-dark)`；Blogger mirror source 用 `#000`；二者 resolve 後皆為 `#000`，hover render 結果一致
+- `dist-blogger/theme/*.css` byte-identical → **user 不需重貼 Blogger 後台 CSS**
+- mirror sync 留待後續 batch（user 明示「也要動 Blogger」之時）
+
+### 14.3 DS-3-c-c（hero gradient）
+
+⏳ **未落地**；待 user 表態方案 A / B / C（per §5.2）。本日 Phase 20260520-pm-3 不處理（spec 第 8/9 條「不新增 token / 不改視覺語意」嚴格範圍 → 三個方案皆有違反或需新 token）。
+
+### 14.4 累計 hex 違規清除進度
+
+| 範疇 | hex 違規 | 已修 | 剩餘 | 狀態 |
+|---|---|---|---|---|
+| Layout（`_header.scss` + `_mobile-drawer.scss`）| 2 | 2 | 0 | ✅ DS-3-c-a 完成 |
+| GitHub component overlay（`_button.scss` + `_download-box.scss`）| 4 | 4 | 0 | ✅ DS-3-c-b GitHub side 完成 |
+| Blogger mirror overlay（`_blogger-components-rules.scss`）| 4 | 0 | 4 | ⚠️ Safe drift；mirror sync 待 |
+| Hero gradient（`_base.scss`）| 2 | 0 | 2 | ⏳ DS-3-c-c 待 user 方案 |
+| **合計** | **12** | **6** | **6**（4 mirror + 2 hero）| 50% 完成 |
+
+---
+
 （本文件結束）

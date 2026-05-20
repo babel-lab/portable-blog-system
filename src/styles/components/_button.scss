@@ -31,11 +31,11 @@
   border-color: var(--lab-color-primary);
 }
 .lab-button--primary:hover {
-  background: color-mix(in srgb, var(--lab-color-primary) 88%, #000);
-  border-color: color-mix(in srgb, var(--lab-color-primary) 88%, #000);
+  background: color-mix(in srgb, var(--lab-color-primary) 88%, var(--lab-color-overlay-dark));
+  border-color: color-mix(in srgb, var(--lab-color-primary) 88%, var(--lab-color-overlay-dark));
 }
 .lab-button--primary:active {
-  background: color-mix(in srgb, var(--lab-color-primary) 78%, #000);
+  background: color-mix(in srgb, var(--lab-color-primary) 78%, var(--lab-color-overlay-dark));
 }
 
 .lab-button--secondary {
