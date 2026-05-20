@@ -1,7 +1,7 @@
 ---
 id: "20260504-portable-blog-system-mvp"
 site: "github"
-contentKind: "tech-note"
+contentKind: "download"
 primaryPlatform: "github"
 
 title: "Portable Blog System MVP 開發筆記"

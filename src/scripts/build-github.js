@@ -276,6 +276,13 @@ function buildSeoForPostDetail({ settings, post }) {
     modifiedTime: post.updated || post.date || null,
     keywords: Array.isArray(post.tags) && post.tags.length > 0 ? post.tags : null,
   };
+  // Phase 20260520-seo-1：contentKind=download 視為導流漏斗後段頁
+  //   - 改寫 commonSeo 之預設 'index, follow' 為 'noindex, follow'
+  //   - 保留 follow 以維持外向連結 PageRank flow（per docs/seo-indexing-rules.md §3 / §4）
+  //   - 不涉 robots.txt / 不涉 Blogger 端（屬 SEO-3 範圍）
+  if (post.contentKind === 'download') {
+    seo.robots = 'noindex, follow';
+  }
   if (canonicalUrl) {
     // Phase 9-g-g-c: isPartOf 採最保守 site/blog 層級（per docs/phase-9g-g-pre-plan.md §5）
     //   - @type=Blog（schema.org 標準）；@id / url 依 post.primaryPlatform 指向對應平台 blog 首頁

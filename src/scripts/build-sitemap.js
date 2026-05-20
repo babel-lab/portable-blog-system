@@ -120,7 +120,11 @@ function buildEntries({ base, posts, categoryMap, tagMap, buildIso }) {
   entries.push({ loc: `${base}/posts/`, lastmod: buildIso });
 
   // 3. post-detail（draft 已由 loadPosts 過濾）
+  // Phase 20260520-seo-1：contentKind=download 視為導流漏斗後段頁，排除於 sitemap
+  //   - 屬 noindex,follow 配套（per docs/seo-indexing-rules.md §3）
+  //   - 該頁仍可正常 build / 公開訪問；但不主動提交給搜尋引擎
   for (const post of posts) {
+    if (post.contentKind === 'download') continue;
     const lastmod = post.updated || post.date || null;
     entries.push({ loc: `${base}/posts/${post.slug}/`, lastmod });
   }
