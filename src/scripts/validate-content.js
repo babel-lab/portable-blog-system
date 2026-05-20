@@ -326,6 +326,22 @@ export function validateContent({ posts, settings }) {
           value: `type=${String(post.type)}, contentKind=${String(post.contentKind)}`,
         });
       }
+      // Phase 20260520-seo-2-e：seo block 結構檢查（hardening per SEO-2-d gap candidates）
+      //   - 當 post.seo 存在但非 plain object 時觸發 invalid-seo-block warning
+      //   - 涵蓋 null / string / number / boolean / array 等非 plain object 之 seo 值
+      //   - 與下方 invalid-seo-indexing 互斥：本檢查通過 → seo 為 plain object → 下方檢查才會走 .indexing path
+      //   - 採 warning 對齊既有 invalid-seo-indexing / invalid-content-kind 之 severity 慣例
+      if (
+        post.seo !== undefined &&
+        (post.seo === null || typeof post.seo !== 'object' || Array.isArray(post.seo))
+      ) {
+        issues.push({
+          severity: 'warning',
+          type: 'invalid-seo-block',
+          sourcePath,
+          value: String(post.seo),
+        });
+      }
       // Phase 20260520-seo-2：seo.indexing 顯式欄位之合法列舉值檢查
       //   - 採 warning 對齊既有 invalid-content-kind 之 severity 慣例
       //   - 非 string 或不在 VALID_SEO_INDEXING 中視為 invalid

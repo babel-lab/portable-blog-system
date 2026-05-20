@@ -8,17 +8,20 @@ category: "tech-note"
 tags:
   - "github"
 cover: "/images/placeholders/cover.png"
-description: "Phase 20260520-seo-2-d fixture：seo 為 array 而非 object；確認 validator 是否穩定處理（gap candidate）。"
+description: "Phase 20260520-seo-2-d fixture（SEO-2-e 已 hardening）：seo 為 array 而非 object；觸發 invalid-seo-block warning。"
 seo:
   - indexing: index
 ---
 
-本 fixture 故意將 `seo` frontmatter 設為 array of object `[{ indexing: "index" }]`（而非單一 nested object `{ indexing: "index" }`），以測試 validator 對 array `seo` 之處理。
+本 fixture 故意將 `seo` frontmatter 設為 array of object `[{ indexing: "index" }]`（而非單一 nested object `{ indexing: "index" }`），以驗證 validator 對 array `seo` 之處理。
 
-**預期 validator 行為**（per `validate-content.js` line 332-340）：
-- guard #3: `typeof post.seo === 'object'` → `typeof [{...}] === 'object'` → **true**（array 在 JS typeof 為 'object'，validator 未額外 isArray 攔截）
-- guard #4: `post.seo.indexing !== undefined` → array 無 `indexing` property（除非 numeric index）→ `[{...}].indexing === undefined` → **false** → validator **silent skip**
+**預期 validator 行為**（per `validate-content.js` SEO-2-e hardening rule `invalid-seo-block`）：
+- `post.seo !== undefined` → true
+- `Array.isArray([{...}])` → true → 觸發 `invalid-seo-block` warning ✅
 
-**Gap candidate**：當前 validator 對 `seo: <array>` 之 invalid input 不觸發 warning；屬 silent failure 風險。本 fixture 用以記錄此 gap；validator hardening（如 `Array.isArray()` guard）留待獨立 phase。
+預期 validate 輸出：
+- 1 個 `[WARNING] invalid-seo-block: [object Object]`（`String([{...}])` → `'[object Object]'`）
+
+**Historical note**：本 fixture 於 SEO-2-d（commit `bc35a02`）建立時，因 validator 之 guard #4（`array.indexing === undefined`）而 silent skip（無 warning）；當時被標記為 gap candidate（因 `typeof [] === 'object'` 通過 guard #3 但實際非預期 plain object）。Phase 20260520-seo-2-e 補上 `invalid-seo-block` hardening rule（含 `Array.isArray()` 嚴格 array 攔截）後，本 fixture 由 silent skip 改為觸發 1 個 warning。
 
 本檔位於 `content/validation-fixtures/github/posts/`，僅供 `validate-content` 掃描。
