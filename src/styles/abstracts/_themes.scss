@@ -1,2 +1,73 @@
-.lab-site--github { --lab-color-primary: #2563eb; }
-.lab-site--blogger { --lab-color-primary: #b45309; }
+// =============================================================================
+// Phase DS-3-b：保守 theme override（方案 A）
+//
+// per docs/design-system-ds3b-theme-overrides-proposal.md §4（方案 A）+ §9.2
+//     docs/design-system-ds2-token-naming.md §6（platform override rule）
+//     docs/css-design-system-policy.md §3 / §6.3
+//
+// 性質：方案 A 保守 alias；補 theme override 結構；視覺低變動（GitHub 預期零差異）。
+//
+// 設計原則：
+//   - GitHub override：維持既有藍色 primary（#2563eb；無變化）；secondary / link
+//     explicit alias 補語意；其餘 9 個 semantic token 沿用 _tokens.scss default
+//     （reserved 註解標示，不寫無意義之自我引用如 var(--lab-color-badge-bg)）
+//   - Blogger override：保留 source-level warm primary（#b45309）；同 GitHub 之
+//     secondary / link alias 結構；其餘 reserved
+//   - 採群組 selector  .lab-site--blogger, .lab-blogger-article 為未來
+//     DS-3-b-blogger-entry batch 整合預留（讓 Blogger entry 若 @use 'themes'
+//     時可直接生效）；當前 GitHub Pages 端無 .lab-blogger-article 元素，故零 match
+//
+// ⚠️ Blogger 後台 CSS 本批不變色（per DS-3-b-pre §2.2 之 dead-code 觀察）：
+//   - Blogger 4 個 entry（blogger-tokens / blogger-article / blogger-components /
+//     blogger-full-style）目前都不 @use 'abstracts/themes'
+//   - 故本批之 .lab-site--blogger / .lab-blogger-article override 不會進入
+//     dist-blogger/theme/*.css
+//   - Blogger 後台已貼 CSS 之 --lab-color-primary 仍為 #2563eb（藍；來自
+//     lab-tokens-base mixin 預設值），非 warm #b45309
+//   - 若要讓 Blogger 後台真正吃到 warm primary 與其他 platform override，
+//     需另開 DS-3-b-blogger-entry batch 動 Blogger pipeline 結構（本批不做）
+//
+// ⚠️ Component 邊界（per css-design-system-policy.md §3 / §5）：
+//   - Component 不應直接讀 platform token（如 --blogger-primary / --github-primary；
+//     當前根本不存在此命名，policy 自然 enforce）
+//   - Platform 只覆寫 semantic token；不新增 component-specific token
+//   - Component 改吃 DS-3-a 新增之 semantic token 屬 DS-3-c 範圍；本批不動 component
+//
+// ⚠️ link-hover / link-visited 為何不在本批 override（避免視覺差異）：
+//   - _tokens.scss default：--lab-color-link-hover: #1d4ed8（比 primary #2563eb 深之藍）
+//   - 若採 DS-3-b-pre / spec 之示例 var(--lab-color-primary) 寫法，會把 GitHub
+//     link-hover 從 #1d4ed8 改為 #2563eb → hover 色差消失 → 違反方案 A「視覺低
+//     變動」承諾
+//   - 故本批兩端皆採 reserved 註解；維持 _tokens.scss default 之既有 hover/visited 色
+//   - 若未來 DS-3-c 或 user 明確要 platform 化 link-hover，再另行 override
+//
+// 本批不改：component / _tokens.scss / _blogger-components-rules.scss / EJS /
+//           build scripts / blogger entry。
+// =============================================================================
+
+.lab-site--github {
+  --lab-color-primary: #2563eb;
+  --lab-color-secondary: var(--lab-color-accent);  // alias 至既有 accent default（語意明示；無視覺差）
+  --lab-color-link: var(--lab-color-primary);      // 沿用 primary（同 _tokens default #2563eb；無視覺差）
+  // --lab-color-link-hover: reserved（維持 _tokens default #1d4ed8；避免視覺差，per 上方註解）
+  // --lab-color-link-visited: reserved（維持 default #6d28d9）
+  // --lab-color-badge-bg / --lab-color-badge-text: reserved（維持 default；DS-3-c 接 tag/hashtag 時 platform 化）
+  // --lab-color-bg-soft: reserved（維持 default = surface）
+  // --lab-color-callout-bg / --lab-color-callout-border: reserved（未來 callout component 落地時 platform 化）
+  // --lab-color-on-primary: reserved（維持 default = background）
+}
+
+.lab-site--blogger,
+.lab-blogger-article {
+  --lab-color-primary: #b45309;                    // warm primary（source-level；Blogger 後台本批
+                                                   //   不生效；GitHub Pages 端無對應元素故不 match）
+  --lab-color-secondary: var(--lab-color-accent);
+  --lab-color-link: var(--lab-color-primary);      // 此 selector 內 primary = #b45309；若未來
+                                                   //   DS-3-b-blogger-entry 整合，Blogger 端 link 將變 #b45309
+  // --lab-color-link-hover: reserved（per 上方註解；避免視覺差）
+  // --lab-color-link-visited: reserved
+  // --lab-color-badge-bg / --lab-color-badge-text: reserved
+  // --lab-color-bg-soft: reserved
+  // --lab-color-callout-bg / --lab-color-callout-border: reserved
+  // --lab-color-on-primary: reserved
+}
