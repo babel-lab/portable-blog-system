@@ -106,6 +106,42 @@ SEO 檢查（5-f）
 <% } %>
 [ ] copy-helper [7]-[10] 區段已對照 Blogger 後台 / theme 確認（5-f-3）
 [ ] OG image（cover）已補上或確認本篇不需要
+<%# Phase 20260520-seo-3-b：SEO indexing manual check rows（per docs/seo-indexing-rules.md §6 SEO-3-b） %>
+<%# - 與 copy-helper [14] 同套 SEO-2 precedence；文案更短適合勾選 %>
+<%# - 不誤導：本系統不能直接 inject Blogger head robots meta；需作者於 Blogger 後台 manual 設定 %>
+<%# - noindex 類值才出現「Blogger 後台已對應設定」之強制 checklist row；index / default 路徑不顯示該行 %>
+<%
+  const seoIndexing = post.seo && typeof post.seo.indexing === 'string' ? post.seo.indexing : null;
+  let indexingValue = 'index, follow';
+  let indexingSource = 'default';
+  let isNoindex = false;
+  let noindexNote = '';
+  if (seoIndexing === 'index') {
+    indexingValue = 'index, follow';
+    indexingSource = 'seo.indexing=index';
+  } else if (seoIndexing === 'noindex-follow') {
+    indexingValue = 'noindex, follow';
+    indexingSource = 'seo.indexing=noindex-follow';
+    isNoindex = true;
+    noindexNote = '導流後段 / 下載頁，請於 Blogger 後台不要直接收錄';
+  } else if (seoIndexing === 'noindex-nofollow') {
+    indexingValue = 'noindex, nofollow';
+    indexingSource = 'seo.indexing=noindex-nofollow';
+    isNoindex = true;
+    noindexNote = 'preview / test / private 類，請於 Blogger 後台不要收錄且不追蹤';
+  } else if (post.contentKind === 'download') {
+    indexingValue = 'noindex, follow';
+    indexingSource = 'contentKind=download (SEO-1 fallback)';
+    isNoindex = true;
+    noindexNote = '導流後段 / 下載頁，請於 Blogger 後台不要直接收錄';
+  }
+-%>
+[ ] SEO indexing guidance 已對照（manual check；本系統不能直接 inject Blogger head robots meta）
+    建議值：<%= indexingValue %>（來源：<%= indexingSource %>）
+<% if (isNoindex) { -%>
+[ ] Blogger 後台「搜尋設定 → 自訂 robots 標頭標記」已對應設定（<%= noindexNote %>）
+<% } -%>
+[ ] 詳細 guidance 對照 copy-helper [14] / docs/seo-indexing-rules.md
 
 ----------------------------------------
 發布後
