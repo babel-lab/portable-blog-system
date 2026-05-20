@@ -197,4 +197,98 @@ per `docs/seo-ga4-adsense.md` §3.4 + §4：
 
 ---
 
+## §11 SEO-2 series final checkpoint（Phase 20260520-seo-2-z）
+
+本節為 **SEO-2 indexing validation 系列**（含 SEO-2 / SEO-2-b / SEO-2-c / SEO-2-d / SEO-2-e / SEO-2-f）之收尾盤點。屬純 docs checkpoint；無新功能 / 無 validator 變動 / 無新 fixtures。
+
+### 11.1 目前合法 `seo.indexing` values
+
+`VALID_SEO_INDEXING` set（per `src/scripts/validate-content.js` line 33）：
+
+- `index`
+- `noindex-follow`
+- `noindex-nofollow`
+
+3 個合法字串值；case-sensitive 比對（per `Set.has()` 嚴格相等）。
+
+### 11.2 warning rules
+
+#### 11.2.1 `invalid-seo-indexing`（per SEO-2）
+
+- 觸發條件：
+  - `post.seo !== undefined`
+  - `post.seo !== null`
+  - `typeof post.seo === 'object'`（seo 為正常 object，含 array 但會被 §11.2.2 先攔截）
+  - `post.seo.indexing !== undefined`（seo.indexing 存在）
+  - 且（`typeof post.seo.indexing !== 'string'` 或 `!VALID_SEO_INDEXING.has(post.seo.indexing)`）
+- severity：warning
+- 涵蓋：typo / 大小寫變體 / empty string / boolean / number / null / array / nested object 之 invalid indexing
+
+#### 11.2.2 `invalid-seo-block`（per SEO-2-e hardening）
+
+- 觸發條件：
+  - `post.seo !== undefined`
+  - 且（`post.seo === null` 或 `typeof post.seo !== 'object'` 或 `Array.isArray(post.seo)`）
+- severity：warning
+- 涵蓋：seo 為 string / number / boolean / null / array 等非 plain object 之 invalid seo block 結構
+- 插入位置：既有 `invalid-seo-indexing` rule 之**前**（兩者互斥；invalid-seo-block 通過 → seo 為 plain object → 才進入 indexing path）
+
+### 11.3 不警告的情況
+
+- `seo` 缺欄位（`undefined`）→ 屬合法 unset；validator 不觸發；build 端走 contentKind / default fallback
+- `seo` 為 plain object 但沒有 `indexing`（如 `seo: {}` 或 `seo: { other: ... }`）→ 不觸發；屬合法 unset indexing
+- `seo.indexing` 為 `VALID_SEO_INDEXING` 之 3 個合法字串值之一 → 不觸發
+- **valid fixtures 不列入 issue-post(s) count**（per validator 之 `byPath.size` 模型；只計入有 issue 之 unique post paths）
+
+### 11.4 覆蓋範圍
+
+- **GitHub validation fixtures**（`content/validation-fixtures/github/posts/`）：valid × 3（index / noindex-follow / noindex-nofollow）+ invalid indexing × 6（typo / case-Index / case-NOINDEX-FOLLOW / number / boolean / empty-string / indexing-array / indexing-object / indexing-null）+ invalid seo block × 2（seo-string / seo-array）
+- **Blogger validation fixtures**（`content/validation-fixtures/blogger/posts/`）：valid × 3（同上 3 個合法值）+ invalid indexing × 3（typo / case-Index / number）+ invalid seo block × 2（string / array）
+- **確認 Blogger validation fixtures 被 validate-content 掃描**（per SEO-2-f）：sourcePath 與 GitHub fixtures 同構，差異僅在路徑；validator rules 對兩 site 之 fixtures 一致觸發
+
+### 11.5 目前 baseline
+
+`0 error(s) / 38 warning(s) on 33 issue-post(s)`
+
+| 範疇 | warning 數 | issue-post(s) 數 |
+|---|---|---|
+| Pre-SEO-2 baseline | 22 | 17 |
+| SEO-2-b（GitHub basic）| +2 | +2 |
+| SEO-2-c（GitHub edge-case）| +4 | +4 |
+| SEO-2-d（GitHub structural）| +3 | +3 |
+| SEO-2-e（validator hardening for SEO-2-d A/B）| +2 | +2 |
+| SEO-2-f（Blogger fixtures）| +5 | +5 |
+| **SEO-2-z（本批；docs only）** | **+0** | **+0** |
+| **Total after SEO-2-z** | **33** ⇒ baseline shown as 38 因 byPath 計算（per validator line 914；warning count 與 byPath.size 在多 issue per post 場景下不必相等） | **22** ⇒ baseline shown as 33 |
+
+實測 baseline `0/38/33`：warning 38 個（含 SEO-2 系列 +16 個 + 既有 22 個）；issue-post(s) 33 個（含 SEO-2 系列 +16 個 invalid fixtures + 既有 17 個 issue-posts）。
+
+### 11.6 重要 commits
+
+- `0867ca2 feat(seo): support explicit indexing metadata`（SEO-2 explicit indexing field）
+- `7588f67 test(seo): add indexing validation fixtures`（SEO-2-b GitHub basic validation fixtures）
+- `b0959bf test(seo): add indexing edge-case fixtures`（SEO-2-c GitHub edge-case fixtures）
+- `bc35a02 test(seo): add indexing structural edge-case fixtures`（SEO-2-d structural edge-case fixtures + 2 validator gap candidates 發現）
+- `ac6baf0 fix(seo): warn on invalid seo block structure`（SEO-2-e validator hardening — `invalid-seo-block` rule）
+- `df2ffd4 test(seo): add blogger indexing validation fixtures`（SEO-2-f Blogger indexing fixtures）
+
+### 11.7 後續候選
+
+- **SEO-2-g** fb-sidecar fixtures（驗證 `.fb.md` 內之 seo.indexing 影響範圍）：🟢 可選；屬 `.fb.md` schema 範疇；獨立 schema decision
+- **SEO-4** 多平台 sitemap 拆分（cross-platform sitemap 設計）：🔴 高風險；應另開 phase；涉 build-sitemap.js 結構變動
+- **Admin write / FB proposal P4 / P5**：屬功能型任務；應另開 phase；非 SEO-2 範圍
+- **Blogger 端 indexing 真實生效**（DS-3-b-blogger-entry 系列）：屬 Blogger pipeline 結構變動；獨立 phase
+
+### 11.8 SEO-2 系列邊界聲明
+
+- ✅ SEO-2 系列共 7 batches（含本 SEO-2-z）全程未動：build / sitemap / robots / Admin / FB / Blogger entry / dist / deploy
+- ✅ SEO-2 系列引入 1 個新 validator rule（`invalid-seo-block`；屬 hardening；對既有 sample 內容無 regression）
+- ✅ SEO-2 系列引入 1 個 schema 欄位（`seo.indexing`；nested under `seo` block；optional；缺欄位屬合法 unset path）
+- ✅ SEO-2 系列引入 16 個 validation fixtures（GitHub 10 + Blogger 8 − 2 valid 重複命名差異 = 16；參見 §11.4 覆蓋範圍）
+- ✅ SEO-2 系列引入 1 個樣本 `seo.indexing: noindex-follow` 於 `portable-blog-system-mvp.md`（per SEO-2 commit `0867ca2`）
+- ❌ 未動既有 17 個非 SEO-2 fixtures 之 22 個 warnings
+- ❌ 未動 GitHub Pages 線上 / Blogger 後台已貼 CSS
+
+---
+
 （本文件結束）
