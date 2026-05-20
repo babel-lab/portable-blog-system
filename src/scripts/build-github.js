@@ -276,11 +276,23 @@ function buildSeoForPostDetail({ settings, post }) {
     modifiedTime: post.updated || post.date || null,
     keywords: Array.isArray(post.tags) && post.tags.length > 0 ? post.tags : null,
   };
-  // Phase 20260520-seo-1：contentKind=download 視為導流漏斗後段頁
-  //   - 改寫 commonSeo 之預設 'index, follow' 為 'noindex, follow'
-  //   - 保留 follow 以維持外向連結 PageRank flow（per docs/seo-indexing-rules.md §3 / §4）
-  //   - 不涉 robots.txt / 不涉 Blogger 端（屬 SEO-3 範圍）
-  if (post.contentKind === 'download') {
+  // Phase 20260520-seo-2：robots meta precedence（per docs/seo-indexing-rules.md §3 / §6 SEO-2）
+  //   優先序：
+  //     1. post.seo.indexing (explicit；本批新增)
+  //     2. contentKind === 'download' fallback (SEO-1；既有)
+  //     3. default 'index, follow'（由 commonSeo spread 提供）
+  //   非法 seo.indexing 值由 validate-content.js 之 invalid-seo-indexing 規則 (warning) 偵測；
+  //   build 端對未匹配之值不主動 fallback，沿用 SEO-1 / default 行為
+  const seoIndexing = post.seo && typeof post.seo.indexing === 'string' ? post.seo.indexing : null;
+  if (seoIndexing === 'index') {
+    seo.robots = 'index, follow';
+  } else if (seoIndexing === 'noindex-follow') {
+    seo.robots = 'noindex, follow';
+  } else if (seoIndexing === 'noindex-nofollow') {
+    seo.robots = 'noindex, nofollow';
+  } else if (post.contentKind === 'download') {
+    // Phase 20260520-seo-1 fallback：contentKind=download 視為導流漏斗後段頁
+    //   - 保留 follow 以維持外向連結 PageRank flow（per docs/seo-indexing-rules.md §3 / §4）
     seo.robots = 'noindex, follow';
   }
   if (canonicalUrl) {

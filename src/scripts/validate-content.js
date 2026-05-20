@@ -29,6 +29,8 @@ const DATE_FORMAT_RE = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_SITE = new Set(['github', 'blogger']);
 // Phase 8-b-3：VALID_TYPE 改名為 VALID_CONTENT_KIND，並新增 'page' 列舉值
 const VALID_CONTENT_KIND = new Set(['post', 'tech-note', 'book-review', 'download', 'comic', 'life-note', 'page']);
+// Phase 20260520-seo-2：seo.indexing 顯式欄位之合法列舉值（per docs/seo-indexing-rules.md §3 / §6 SEO-2）
+const VALID_SEO_INDEXING = new Set(['index', 'noindex-follow', 'noindex-nofollow']);
 const VALID_PRIMARY_PLATFORM = new Set(['github', 'blogger']);
 const VALID_PUBLISH_MODE = {
   github: new Set(['full', 'summary']),
@@ -322,6 +324,24 @@ export function validateContent({ posts, settings }) {
           type: 'contentkind-and-type-conflict',
           sourcePath,
           value: `type=${String(post.type)}, contentKind=${String(post.contentKind)}`,
+        });
+      }
+      // Phase 20260520-seo-2：seo.indexing 顯式欄位之合法列舉值檢查
+      //   - 採 warning 對齊既有 invalid-content-kind 之 severity 慣例
+      //   - 非 string 或不在 VALID_SEO_INDEXING 中視為 invalid
+      //   - 缺欄位（undefined）不觸發；屬合法 fallback path（contentKind=download → SEO-1 / 否則 default）
+      if (
+        post.seo !== undefined &&
+        post.seo !== null &&
+        typeof post.seo === 'object' &&
+        post.seo.indexing !== undefined &&
+        (typeof post.seo.indexing !== 'string' || !VALID_SEO_INDEXING.has(post.seo.indexing))
+      ) {
+        issues.push({
+          severity: 'warning',
+          type: 'invalid-seo-indexing',
+          sourcePath,
+          value: String(post.seo.indexing),
         });
       }
       if (post.primaryPlatform !== undefined && !VALID_PRIMARY_PLATFORM.has(post.primaryPlatform)) {

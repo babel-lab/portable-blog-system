@@ -29,6 +29,14 @@ draft: false
 
 canonical: "auto"
 
+# Phase 20260520-seo-2 樣本：seo.indexing 顯式欄位（per docs/seo-indexing-rules.md §3 / §6 SEO-2）
+#   - 此 post 既有 contentKind: download（SEO-1 fallback 路徑），
+#     另顯式設 seo.indexing: noindex-follow（SEO-2 explicit 路徑）；
+#   - 結果同向（皆 noindex,follow + sitemap exclude），但 build / sitemap 端
+#     走 SEO-2 explicit 路徑而非 SEO-1 fallback；驗證 precedence 第一優先
+seo:
+  indexing: "noindex-follow"
+
 publishTargets:
   github:
     enabled: true

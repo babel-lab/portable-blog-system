@@ -124,7 +124,7 @@ per `docs/seo-ga4-adsense.md` §3.4 + §4：
 | Phase 候選 | 範圍 | 風險 |
 |---|---|---|
 | **SEO-1** ✅ **已落地（Phase 20260520-seo-1）** | `contentKind: download` post 透過 `buildSeoForPostDetail` 在 spread `commonSeo` 後覆寫 `seo.robots = 'noindex, follow'`（per `meta-tags.ejs` 既有 `seo.robots` override 機制）；`build-sitemap.js` `buildEntries()` for-loop 內 skip `contentKind === 'download'` 之 post；測試樣本：`content/github/posts/20260504-portable-blog-system-mvp.md` contentKind 由 `tech-note` 改為 `download`；sitemap entries 由 15 減至 14 | 🟢 低（純 additive；不影響既有 indexed 文章） |
-| **SEO-2**（提案）| frontmatter 新增 `seo.indexing` 欄位（值：`index` / `noindex-follow` / `noindex-nofollow`）；EJS 與 build-sitemap 依此欄位決定 meta / sitemap inclusion | 🟡 中（schema 變動；需 validate-content 規則同步）|
+| **SEO-2** ✅ **已落地（Phase 20260520-seo-2）** | frontmatter 新增 nested `seo.indexing` 欄位（合法值：`index` / `noindex-follow` / `noindex-nofollow`）；`buildSeoForPostDetail` 與 `build-sitemap.js` 同採 precedence：(1) `post.seo.indexing` explicit (2) `contentKind === 'download'` fallback (SEO-1) (3) default `index, follow` + sitemap include；`validate-content.js` 新增 `invalid-seo-indexing` warning 規則（對齊 `invalid-content-kind` 之 warning severity 慣例）；測試樣本：`content/github/posts/20260504-portable-blog-system-mvp.md` 加 `seo.indexing: noindex-follow`（與既有 SEO-1 contentKind=download 同向但走 SEO-2 路徑） | 🟡 中（schema additive；validate baseline 0/22/17 不退步 — 無既有 post 含 invalid seo.indexing）|
 | **SEO-3**（提案）| Blogger 平台之 indexing 處理（Blogger 後台自帶 search description；本文件之 noindex 規則對 Blogger 之 mapping）| 🟡 中（Blogger 後台需手動設 search description / robots 標籤）|
 | **SEO-4**（提案）| 多平台 sitemap 拆分 / 跨平台 canonical 一致性（per 規則 7）| 🔴 高（涉 cross-platform 設計）|
 
