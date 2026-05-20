@@ -188,7 +188,7 @@ npm run check:images
 詳見 `docs/phase-2-candidate-roadmap.md`。
 
 摘要：
-- 🟢 安全小修：DS-3-c-a / DS-3-c-b hex 違規 / FB completeness 微調 / GA4 prod-only gating
+- 🟢 安全小修：~~DS-3-c-a hex 違規~~（✅ commit `f530a39`）/ DS-3-c-b hex 違規（GitHub source ✅ commit `67a0ccc`；mirror partial sync 待）/ FB completeness 微調 / GA4 prod-only gating
 - 🟡 需 user 決策：GA4 啟用 measurementId / FB-P5-c write / Admin-2-b-2 SEO write / DS-3-b platform theme tokens
 - 🔴 中-高風險：sitemap 拆分 / mirror partial 整合 / Blogger entry themes 整合 / FB Graph API
 - ❌ 永不：第一版不接 FB API / 不自動社群發文 / 不接 Blogger API / 不引入 React/Vue/Tailwind / 不引入後端資料庫
