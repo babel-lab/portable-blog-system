@@ -330,7 +330,7 @@
               <dt>fbCampaign</dt><dd class="mono"><%= p.fbCampaign || '(empty)' %></dd>
             </dl>
             <p class="text-muted" style="font-size: 0.85em; margin: 0.25rem 0 0;">
-              注：4 欄位屬 <code>docs/fb-post-url-metadata-proposal.md</code> §3.1 proposal；尚未於 <code>docs/fb-sidecar-schema.md</code> §3.1 正式收編。fbPostUrl 為 FB 貼文本身之 URL；與 <code>finalUrl</code>（FB 貼文 body 內導流文章 URL）為兩個不同概念，不可混用。
+              注：4 欄位已於 Phase 20260520-c-2 正式收編至 <code>docs/fb-sidecar-schema.md</code> §3.1 / §3.5。Admin 仍為 read-only display；本畫面不寫入 .fb.md。fbPostUrl 為作者於 FB 發佈後手動回填之 FB 貼文 URL（指回 FB）；與 <code>finalUrl</code>（FB 貼文 body 內之 Blogger / GitHub article 最終 URL；從 FB 出去）為兩個不同概念，不可混用。
             </p>
           </div>
 
