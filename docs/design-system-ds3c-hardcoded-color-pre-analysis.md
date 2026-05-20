@@ -482,18 +482,18 @@ build:blogger-theme 後 → diff dist-blogger/theme/blogger-components.css 與 b
 - `src/styles/layout/_mobile-drawer.scss:4`：移除 `, #f3f4f6` fallback；變純 `var(--lab-color-gray-100)`
 - 視覺零差；Blogger 端零影響（layout 不在 mirror）；2 個 hex 違規清除。
 
-### 14.2 DS-3-c-b（部分）（commit `Phase 20260520-pm-3` — 2026-05-20 下午）
+### 14.2 DS-3-c-b（完整落地）（commits `67a0ccc` GitHub source + `cc2621d` mirror partial sync — 2026-05-20）
 
-✅ **GitHub source 部分落地**：
+✅ **GitHub source 落地**（commit `67a0ccc`，Phase 20260520-pm-3）：
 - `src/styles/components/_button.scss:34/35/38`：3 個 `#000` → `var(--lab-color-overlay-dark)`
 - `src/styles/components/_download-box.scss:7`：1 個 `#000` → `var(--lab-color-overlay-dark)`
 - 視覺零差（token 值 = `#000`；render 結果 byte-equal）
 
-⚠️ **Mirror partial 未同步**（**安全 drift**）：
-- `src/styles/blogger/_blogger-components-rules.scss` line 54 (×2) / 55 / 140 之 4 個 `#000` **保留**
-- 屬「source 不齊但 render 等值」之 drift：GitHub source 用 `var(--lab-color-overlay-dark)`；Blogger mirror source 用 `#000`；二者 resolve 後皆為 `#000`，hover render 結果一致
-- `dist-blogger/theme/*.css` byte-identical → **user 不需重貼 Blogger 後台 CSS**
-- mirror sync 留待後續 batch（user 明示「也要動 Blogger」之時）
+✅ **Mirror partial 同步完成**（commit `cc2621d`，Phase 20260520-am-1）：
+- `src/styles/blogger/_blogger-components-rules.scss` line 54 (×2) / 55 / 140 之 4 個 `#000` 全替換為 `var(--lab-color-overlay-dark)`
+- source-truth 與 GitHub component 完全對齊；先前「source 不齊但 render 等值」之 drift 已消除
+- `dist-blogger/theme/*.css` 已透過 `npm run build:blogger-theme` 重產；CSS 文本變動（hex literal → var reference）但 render 同色（`--lab-color-overlay-dark` token 值 = `#000`）
+- ⚠️ Blogger 後台**建議重貼** `blogger-full-style.css` 以維持 source-truth 一致；render 視覺相同；user 可擇時動作（非強制）
 
 ### 14.3 DS-3-c-c（hero gradient）
 
@@ -505,9 +505,9 @@ build:blogger-theme 後 → diff dist-blogger/theme/blogger-components.css 與 b
 |---|---|---|---|---|
 | Layout（`_header.scss` + `_mobile-drawer.scss`）| 2 | 2 | 0 | ✅ DS-3-c-a 完成 |
 | GitHub component overlay（`_button.scss` + `_download-box.scss`）| 4 | 4 | 0 | ✅ DS-3-c-b GitHub side 完成 |
-| Blogger mirror overlay（`_blogger-components-rules.scss`）| 4 | 0 | 4 | ⚠️ Safe drift；mirror sync 待 |
+| Blogger mirror overlay（`_blogger-components-rules.scss`）| 4 | 4 | 0 | ✅ DS-3-c-b mirror sync 完成（commit `cc2621d`，Phase 20260520-am-1）|
 | Hero gradient（`_base.scss`）| 2 | 0 | 2 | ⏳ DS-3-c-c 待 user 方案 |
-| **合計** | **12** | **6** | **6**（4 mirror + 2 hero）| 50% 完成 |
+| **合計** | **12** | **10** | **2**（hero gradient）| 83% 完成 |
 
 ---
 

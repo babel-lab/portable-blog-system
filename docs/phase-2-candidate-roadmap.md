@@ -15,7 +15,7 @@
 
 | # | 項目 | 對應文件 / 系列 | 預估 LOC | 備註 |
 |---|---|---|---|---|
-| 1.1 | ~~DS-3-c-a：`_header.scss` `#fff` → token / `_mobile-drawer.scss` 移除 fallback~~ | `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §14 | — | ✅ 已於 20260520 commit `f530a39` 完成；DS-3-c-b GitHub source 部分亦已於 commit `67a0ccc` 完成；剩餘 DS-3-c-b mirror partial sync / DS-3-c-c hero gradient 仍待 user 決策（per `design-system-ds3c-hardcoded-color-pre-analysis.md` §14.2 / §5.2）|
+| 1.1 | ~~DS-3-c-a：`_header.scss` `#fff` → token / `_mobile-drawer.scss` 移除 fallback~~ | `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §14 | — | ✅ DS-3-c-a 已於 20260520 commit `f530a39` 完成；✅ DS-3-c-b 已於 commits `67a0ccc` (GitHub source) + `cc2621d` (mirror partial sync) 完成；剩餘 DS-3-c-c hero gradient 仍待 user 決策（per `design-system-ds3c-hardcoded-color-pre-analysis.md` §5.2）|
 | 1.2 | GA4 prod-only gating（dev mode 不送 event）| `docs/ga4-enable-preflight.md` §2.4 Option B | ~10 LOC ga4.ejs | 需 user 決議；對齊 Admin-1-b dev-mode-only pattern |
 | 1.3 | FB completeness 條件式（如 `enabled=true && status=published && !postUrl → missing`）| `docs/fb-post-url-metadata-proposal.md` §5.3 / P3 | ~10 LOC loader | 會影響既有 fixture completeness 數 |
 | 1.4 | Admin disclaimer drift fix（若有新 phase 落地後 disclaimer 過時） | per c-3 pattern | <5 LOC | 例如 P5-c 落地後更新 FB Post section disclaimer |
@@ -73,12 +73,14 @@
 - 預估：~10 LOC + 重產 dist-blogger
 - 風險：🟡 中（user 需重貼 Blogger 後台 CSS；單次成本）
 
-### 2.6 DS-3-c-b：hover overlay tokenize + mirror 同步
+### 2.6 ~~DS-3-c-b：hover overlay tokenize + mirror 同步~~
 
-- 對應：`docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §5.1 / §7
+✅ **已於 20260520 完成**（commits `67a0ccc` GitHub source + `cc2621d` mirror partial sync）；per `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §14.2。
+
+- 對應：`docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §5.1 / §7 / §14.2
 - 範圍：8 個 `color-mix(..., #000)` → `color-mix(..., var(--lab-color-overlay-dark))`；含 `_blogger-components-rules.scss` mirror 同步
-- 預估：~7 行 / 3 檔
-- 風險：🟡 中（mirror 同步成本；Blogger CSS 文本變動建議重貼）
+- 預估：~7 行 / 3 檔（實際落地 1+2 commits / 3 檔）
+- 風險：🟡 中（mirror 同步成本；Blogger CSS 文本變動建議重貼；user 可擇時重貼，render 視覺相同）
 
 ### 2.7 DS-3-c-c：`.lab-hero` gradient 抽 token
 
@@ -184,7 +186,7 @@ Phase 2.3（visual / Blogger 同步；🟡 中；需 visual diff）
   ↓
   - DS-3-b platform theme tokens（per §2.4）
   - DS-3-b-blogger-entry（per §2.5）
-  - DS-3-c-b hover overlay + mirror 同步（per §2.6）
+  - ~~DS-3-c-b hover overlay + mirror 同步~~（✅ 已於 20260520 commits `67a0ccc` + `cc2621d` 完成；per §2.6）
   - DS-3-c-c hero gradient（per §2.7；user 決方案）
 
 Phase 2.4（規模觸發；🔴 高；建議當前不啟動）
