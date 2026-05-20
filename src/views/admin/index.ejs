@@ -93,6 +93,8 @@
     let seoOk = 0, urlOk = 0;
     // sourceSite = 文章來源（content/{site}/posts/）；與 publishTargets enabled 概念不同
     let srcBlogger = 0, srcGithub = 0;
+    // Phase 20260520-c-4: fbPublished completeness（fb.enabled=false 或 fbPostUrl/fbPostedAt 有值 → ok）
+    let fbPublishedOk = 0;
     posts.forEach(function(p) {
       const s = (p.status === 'ready' || p.status === 'draft' || p.status === 'published') ? p.status : 'other';
       byStatus[s] = (byStatus[s] || 0) + 1;
@@ -103,6 +105,7 @@
       if (p.fbExists) fbExists++;
       if (p.completeness.seo === 'ok') seoOk++;
       if (p.completeness.url === 'ok') urlOk++;
+      if (p.completeness.fbPublished === 'ok') fbPublishedOk++;
     });
   %>
 
@@ -118,6 +121,7 @@
     <div class="stat-card"><strong><%= fbExists %></strong>has .fb.md</div>
     <div class="stat-card"><strong><%= seoOk %></strong>SEO ok</div>
     <div class="stat-card"><strong><%= urlOk %></strong>URL ok</div>
+    <div class="stat-card" title="fb.enabled=false 或 fbPostUrl/fbPostedAt 有值之文章數；per docs/fb-sidecar-schema.md §3.5.5 P3"><strong><%= fbPublishedOk %></strong>fb published ok</div>
   </div>
 
   <% if (posts.length === 0) { %>
@@ -148,6 +152,7 @@
           <option value="completeness:fb-missing">FB missing</option>
           <option value="completeness:url-missing">publishedUrl missing</option>
           <option value="completeness:categoryTags-missing">category/tags missing</option>
+          <option value="completeness:fbPublished-missing">FB published missing</option>
         </optgroup>
         <optgroup label="contentKind">
           <option value="kind:post">contentKind: post</option>
@@ -189,6 +194,7 @@
           data-fb="<%= p.completeness.fb %>"
           data-url="<%= p.completeness.url %>"
           data-cat-tags="<%= p.completeness.categoryTags %>"
+          data-fb-published="<%= p.completeness.fbPublished %>"
           data-content-kind="<%= p.contentKind || '' %>">
         <td>
           <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(no title)</span><% } %>
@@ -239,7 +245,8 @@
           <span class="badge <%= p.completeness.blogger === 'ok' ? 'b-ok' : 'b-missing' %>">Blogger <%= p.completeness.blogger %></span><br>
           <span class="badge <%= p.completeness.github === 'ok' ? 'b-ok' : 'b-missing' %>">GitHub <%= p.completeness.github %></span><br>
           <span class="badge <%= p.completeness.url === 'ok' ? 'b-ok' : 'b-missing' %>">URL <%= p.completeness.url %></span><br>
-          <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span>
+          <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span><br>
+          <span class="badge <%= p.completeness.fbPublished === 'ok' ? 'b-ok' : 'b-missing' %>" title="fb.enabled=false 或 fbPostUrl/fbPostedAt 有值 → ok；fb.enabled=true 但兩欄位皆空 → missing">FB pub <%= p.completeness.fbPublished %></span>
         </td>
         <td class="col-urls">
           <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <%= p.blogger.publishedUrl %></div><% } %>
@@ -354,6 +361,7 @@
               <span class="badge <%= p.completeness.github === 'ok' ? 'b-ok' : 'b-missing' %>">GitHub <%= p.completeness.github %></span>
               <span class="badge <%= p.completeness.url === 'ok' ? 'b-ok' : 'b-missing' %>">URL <%= p.completeness.url %></span>
               <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span>
+              <span class="badge <%= p.completeness.fbPublished === 'ok' ? 'b-ok' : 'b-missing' %>">FB pub <%= p.completeness.fbPublished %></span>
             </div>
           </div>
 
@@ -465,6 +473,7 @@
             if (val === 'fb-missing') return row.dataset.fb === 'missing';
             if (val === 'url-missing') return row.dataset.url === 'missing';
             if (val === 'categoryTags-missing') return row.dataset.catTags === 'missing';
+            if (val === 'fbPublished-missing') return row.dataset.fbPublished === 'missing';
             return true;
           default: return true;
         }
