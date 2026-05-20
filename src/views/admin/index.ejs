@@ -158,7 +158,8 @@
         </optgroup>
       </select>
     </label>
-    <span class="visible-count" id="admin-visible-count"><%= total %> / <%= total %> 顯示中</span>
+    <button type="button" id="admin-show-all-toggle" style="padding: 0.35rem 0.7rem; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; font-size: 0.9em;" hidden>Show all</button>
+    <span class="visible-count" id="admin-visible-count">showing <%= total %> of <%= total %> matched (<%= total %> total)</span>
   </div>
 
   <table id="admin-table">
@@ -425,9 +426,13 @@
   <% if (posts.length > 0) { %>
   <script>
     (function () {
+      // Phase 20260520-b-4: show-all toggle config
+      var SHOW_LIMIT = 20;
+      var showAll = false;
       var search = document.getElementById('admin-search');
       var filter = document.getElementById('admin-filter');
       var visibleCount = document.getElementById('admin-visible-count');
+      var showAllToggle = document.getElementById('admin-show-all-toggle');
       var rows = Array.prototype.slice.call(document.querySelectorAll('tr.post-row'));
       var details = Array.prototype.slice.call(document.querySelectorAll('tr.post-detail'));
 
@@ -452,29 +457,48 @@
         }
       }
 
+      // Phase 20260520-b-4：順序 search → filter → limit；toggle 作用於 search/filter 後結果
       function applyFilters() {
         var q = (search.value || '').toLowerCase().trim();
         var f = filter.value;
-        var shown = 0;
+        var matchedCount = 0;
+        var shownCount = 0;
         rows.forEach(function (row, i) {
           var detail = details[i];
-          var show = true;
-          if (q && (row.dataset.search || '').indexOf(q) === -1) show = false;
-          if (show && !matchesFilter(row, f)) show = false;
-          row.hidden = !show;
-          if (!show) {
+          var matches = true;
+          if (q && (row.dataset.search || '').indexOf(q) === -1) matches = false;
+          if (matches && !matchesFilter(row, f)) matches = false;
+          var visible = false;
+          if (matches) {
+            matchedCount++;
+            if (showAll || shownCount < SHOW_LIMIT) {
+              visible = true;
+              shownCount++;
+            }
+          }
+          row.hidden = !visible;
+          if (!visible) {
             // 收合 detail 並移除 is-open
             detail.hidden = true;
             row.classList.remove('is-open');
-          } else {
-            shown++;
           }
         });
-        visibleCount.textContent = shown + ' / ' + rows.length + ' 顯示中';
+        visibleCount.textContent = 'showing ' + shownCount + ' of ' + matchedCount + ' matched (' + rows.length + ' total)';
+        if (showAllToggle) {
+          var needsToggle = matchedCount > SHOW_LIMIT;
+          showAllToggle.hidden = !needsToggle;
+          showAllToggle.textContent = showAll ? 'Show latest ' + SHOW_LIMIT : 'Show all';
+        }
       }
 
       search.addEventListener('input', applyFilters);
       filter.addEventListener('change', applyFilters);
+      if (showAllToggle) {
+        showAllToggle.addEventListener('click', function () {
+          showAll = !showAll;
+          applyFilters();
+        });
+      }
 
       // 點 row 展開 / 收合 detail
       rows.forEach(function (row, i) {
