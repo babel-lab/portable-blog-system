@@ -24,23 +24,56 @@ async function readJsonSafe(jsonPath) {
 async function readFbSidecarMeta(fbPath) {
   // Phase 20260520-c-1：additive 補讀 FB post metadata 4 個欄位
   //   - per docs/fb-post-url-metadata-proposal.md §3.1 之 proposal 欄位
-  //   - 屬 read-only display；本批不做 write；不解析 body / hashtags / finalUrl
+  //   - 屬 read-only display；本批不做 write；不解析 body / finalUrl
   //   - 空值 / 缺檔 / 非 string 一律回 ""；不 throw
   //   - fbPostUrl = FB 貼文本身 URL；與 finalUrl（FB body 內導流文章 URL）為兩個不同概念，不可混用
+  // Phase 20260520-fb-p5-a：additive 再補讀 7 個 read-only display 欄位
+  //   - status / audience / title / titleEn / hashtags / imageUrl / note
+  //   - 不做 aggressive normalization；不寫入；不解析 body
+  //   - hashtags：array 保留；string 包成單元素 array；其他回空 array（loader return 型別一致便於 EJS render）
+  //   - 同時 derive fbBadge（per docs/fb-sidecar-metadata-pre-analysis.md §6.2 + spec 規則）
   const strOrEmpty = (v) => (typeof v === 'string' ? v : '');
+  const normHashtags = (v) => {
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string' && v !== '') return [v];
+    return [];
+  };
+  const deriveFbBadge = (fb) => {
+    if (!fb.exists) return 'none';
+    if (!fb.enabled) return 'disabled';
+    if (fb.status === 'posted' || fb.postUrl) return 'posted';
+    if (fb.status) return fb.status;
+    return 'ready';
+  };
   try {
     const txt = await fs.readFile(fbPath, 'utf-8');
     const { data } = matter(txt);
-    return {
+    const fb = {
       exists: true,
       enabled: Boolean(data?.enabled),
       postUrl: strOrEmpty(data?.fbPostUrl),
       postedAt: strOrEmpty(data?.fbPostedAt),
       postId: strOrEmpty(data?.fbPostId),
       campaign: strOrEmpty(data?.fbCampaign),
+      status: strOrEmpty(data?.status),
+      audience: strOrEmpty(data?.audience),
+      title: strOrEmpty(data?.title),
+      titleEn: strOrEmpty(data?.titleEn),
+      hashtags: normHashtags(data?.hashtags),
+      imageUrl: strOrEmpty(data?.imageUrl),
+      note: strOrEmpty(data?.note),
     };
+    fb.badge = deriveFbBadge(fb);
+    return fb;
   } catch {
-    return { exists: false, enabled: false, postUrl: '', postedAt: '', postId: '', campaign: '' };
+    const fb = {
+      exists: false, enabled: false,
+      postUrl: '', postedAt: '', postId: '', campaign: '',
+      status: '', audience: '', title: '', titleEn: '', hashtags: [],
+      imageUrl: '', note: '',
+    };
+    fb.badge = deriveFbBadge(fb);
+    return fb;
   }
 }
 
@@ -166,6 +199,15 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     fbPostedAt: fb.postedAt,
     fbPostId: fb.postId,
     fbCampaign: fb.campaign,
+    // Phase 20260520-fb-p5-a: 7 個 additive read-only 欄位 + derive badge
+    fbStatus: fb.status,
+    fbAudience: fb.audience,
+    fbTitle: fb.title,
+    fbTitleEn: fb.titleEn,
+    fbHashtags: fb.hashtags,
+    fbImageUrl: fb.imageUrl,
+    fbNote: fb.note,
+    fbBadge: fb.badge,
     blogger,
     github,
     relatedLinksCount,

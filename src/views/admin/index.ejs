@@ -216,6 +216,15 @@
           <% } else if (p.status === 'published') { %><span class="badge b-published">published</span>
           <% } else { %><span class="badge b-missing"><%= p.status || 'no status' %></span><% } %>
           <br><span class="text-muted mono">src: <%= p.sourceSite %></span>
+          <%# Phase 20260520-fb-p5-a：FB sidecar derived status badge（per docs/fb-sidecar-metadata-pre-analysis.md §6.2） -%>
+          <%
+            var fbBadgeClass = 'b-info';
+            if (p.fbBadge === 'posted') { fbBadgeClass = 'b-published'; }
+            else if (p.fbBadge === 'ready') { fbBadgeClass = 'b-ready'; }
+            else if (p.fbBadge === 'none' || p.fbBadge === 'disabled') { fbBadgeClass = 'b-info'; }
+            else { fbBadgeClass = 'b-draft'; }
+          -%>
+          <br><span class="badge <%= fbBadgeClass %>" title="FB sidecar derived status；per Phase 20260520-fb-p5-a；none=檔案不存在 / disabled=enabled=false / posted=已發文 / ready=已啟用待發 / 其他=照 status 顯示">FB: <%= p.fbBadge %></span>
         </td>
         <td>
           <% if (p.category) { %><span class="badge b-info"><%= p.category %></span>
@@ -330,14 +339,31 @@
 
           <div class="detail-section">
             <h3>FB Post (read-only metadata)</h3>
+            <%
+              var fbDetailBadgeClass = 'b-info';
+              if (p.fbBadge === 'posted') { fbDetailBadgeClass = 'b-published'; }
+              else if (p.fbBadge === 'ready') { fbDetailBadgeClass = 'b-ready'; }
+              else if (p.fbBadge === 'none' || p.fbBadge === 'disabled') { fbDetailBadgeClass = 'b-info'; }
+              else { fbDetailBadgeClass = 'b-draft'; }
+            -%>
             <dl class="detail-grid">
-              <dt>fbPostUrl</dt><dd class="mono"><% if (p.fbPostUrl) { %><a href="<%= p.fbPostUrl %>" target="_blank" rel="noopener noreferrer"><%= p.fbPostUrl %></a><% } else { %>(empty)<% } %></dd>
+              <dt>exists</dt><dd><%= p.fbExists %></dd>
+              <dt>enabled</dt><dd><%= p.fbEnabled %></dd>
+              <dt>status</dt><dd class="mono"><%= p.fbStatus || '(empty)' %></dd>
+              <dt>badge (derived)</dt><dd><span class="badge <%= fbDetailBadgeClass %>">FB: <%= p.fbBadge %></span></dd>
+              <dt>fbPostUrl</dt><dd class="mono"><% if (p.fbPostUrl) { %><a href="<%= p.fbPostUrl %>" target="_blank" rel="noopener noreferrer"><%= p.fbPostUrl %> ↗</a><% } else { %>(empty)<% } %></dd>
               <dt>fbPostedAt</dt><dd class="mono"><%= p.fbPostedAt || '(empty)' %></dd>
-              <dt>fbPostId</dt><dd class="mono"><%= p.fbPostId || '(empty)' %></dd>
-              <dt>fbCampaign</dt><dd class="mono"><%= p.fbCampaign || '(empty)' %></dd>
+              <dt>campaign</dt><dd class="mono"><%= p.fbCampaign || '(empty)' %></dd>
+              <dt>audience</dt><dd class="mono"><%= p.fbAudience || '(empty)' %></dd>
+              <dt>title</dt><dd><%= p.fbTitle || '(empty)' %></dd>
+              <dt>titleEn</dt><dd><%= p.fbTitleEn || '(empty)' %></dd>
+              <dt>hashtags</dt><dd><% if (Array.isArray(p.fbHashtags) && p.fbHashtags.length > 0) { p.fbHashtags.forEach(function(h) { %><span class="badge b-tag"><%= h %></span><% }); } else { %>(empty)<% } %></dd>
+              <dt>imageUrl</dt><dd class="mono"><% if (p.fbImageUrl) { %><a href="<%= p.fbImageUrl %>" target="_blank" rel="noopener noreferrer"><%= p.fbImageUrl %> ↗</a><% } else { %>(empty)<% } %></dd>
+              <dt>note</dt><dd><%= p.fbNote || '(empty)' %></dd>
+              <dt>fbPostId <span class="text-muted" style="font-size: 0.85em;">(debug; Graph API 預備)</span></dt><dd class="mono" style="font-size: 0.85em;"><%= p.fbPostId || '(empty)' %></dd>
             </dl>
             <p class="text-muted" style="font-size: 0.85em; margin: 0.25rem 0 0;">
-              注：4 欄位已於 Phase 20260520-c-2 正式收編至 <code>docs/fb-sidecar-schema.md</code> §3.1 / §3.5。Admin 仍為 read-only display；本畫面不寫入 .fb.md。fbPostUrl 為作者於 FB 發佈後手動回填之 FB 貼文 URL（指回 FB）；與 <code>finalUrl</code>（FB 貼文 body 內之 Blogger / GitHub article 最終 URL；從 FB 出去）為兩個不同概念，不可混用。
+              注：Phase 20260520-fb-p5-a 補讀 7 個 read-only 欄位（status / audience / title / titleEn / hashtags / imageUrl / note）+ derived badge（per <code>docs/fb-sidecar-metadata-pre-analysis.md</code> §3 / §6）。Admin 仍嚴格 read-only；無 write / form submit / fs API；postId 為 Graph API 預備 debug 欄位（per §6 顯示建議）。4 個 fb post URL 欄位已於 Phase 20260520-c-2 正式收編至 <code>docs/fb-sidecar-schema.md</code> §3.1 / §3.5；fbPostUrl 為作者於 FB 發佈後手動回填之 FB 貼文 URL（指回 FB），與 <code>finalUrl</code>（FB 貼文 body 內之 Blogger / GitHub article 最終 URL；從 FB 出去）為兩個不同概念，不可混用。imageUrl 採外連連結（不直接載入圖片）以避免畫面雜亂。
             </p>
           </div>
 
