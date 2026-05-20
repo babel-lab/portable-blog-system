@@ -228,6 +228,16 @@ DS-3-c 將實際修改 6 個 SCSS 檔（GitHub component / layout / base + Blogg
 - **若 user 要視覺絕對零差** → 採方案 C（本批豁免；標 future DS-3-c-bis 再評估）
 - **不推薦** 方案 B（破壞 semantic 抽象原則）
 
+**📌 user 決議（2026-05-20，Phase 20260520-pm-6）**：
+
+✅ **採方案 C：豁免；保留 hex**。
+
+- 保留 `src/styles/base/_base.scss:5` 之 `#eff6ff` + `#fff`（2 個 hex）為 **documented exemption**
+- 理由：hero gradient 為視覺表現色（chrome 範圍；不在 article block 必須 token 化清單；不在 policy §4 之 19 個共用 components 列表）；不適合硬套一般 semantic token；不為清零而製造不自然 token
+- 無 source 改動 / 無視覺改動 / 無新 token
+- DS-3-c-c 視為 **resolved by documented exemption**；DS-3-c 整體狀態為「10/12 fixed + 2/12 documented exemption」
+- 未來若品牌色調或 hero 設計改版，可重新評估（屬 future DS-3-c-bis 範圍；非本 phase）
+
 ---
 
 ## §6 高風險 / 本批不建議項
@@ -495,9 +505,14 @@ build:blogger-theme 後 → diff dist-blogger/theme/blogger-components.css 與 b
 - `dist-blogger/theme/*.css` 已透過 `npm run build:blogger-theme` 重產；CSS 文本變動（hex literal → var reference）但 render 同色（`--lab-color-overlay-dark` token 值 = `#000`）
 - ⚠️ Blogger 後台**建議重貼** `blogger-full-style.css` 以維持 source-truth 一致；render 視覺相同；user 可擇時動作（非強制）
 
-### 14.3 DS-3-c-c（hero gradient）
+### 14.3 DS-3-c-c（hero gradient）（Phase 20260520-pm-6 — 2026-05-20）
 
-⏳ **未落地**；待 user 表態方案 A / B / C（per §5.2）。本日 Phase 20260520-pm-3 不處理（spec 第 8/9 條「不新增 token / 不改視覺語意」嚴格範圍 → 三個方案皆有違反或需新 token）。
+✅ **採方案 C：documented exemption**（per §5.2 user 決議區塊）。
+
+- `src/styles/base/_base.scss:5` `.lab-hero` gradient 之 `#eff6ff` + `#fff` 2 個 hex **保留**
+- 理由：hero gradient 為視覺表現色（chrome；不在共用 component 清單）；不適合套 semantic token；不為清零而製造不自然 token
+- 無 source 改動 / 無視覺改動 / 無新 token
+- DS-3-c-c 視為 **resolved by documented exemption**（非「未落地」）
 
 ### 14.4 累計 hex 違規清除進度
 
@@ -506,8 +521,8 @@ build:blogger-theme 後 → diff dist-blogger/theme/blogger-components.css 與 b
 | Layout（`_header.scss` + `_mobile-drawer.scss`）| 2 | 2 | 0 | ✅ DS-3-c-a 完成 |
 | GitHub component overlay（`_button.scss` + `_download-box.scss`）| 4 | 4 | 0 | ✅ DS-3-c-b GitHub side 完成 |
 | Blogger mirror overlay（`_blogger-components-rules.scss`）| 4 | 4 | 0 | ✅ DS-3-c-b mirror sync 完成（commit `cc2621d`，Phase 20260520-am-1）|
-| Hero gradient（`_base.scss`）| 2 | 0 | 2 | ⏳ DS-3-c-c 待 user 方案 |
-| **合計** | **12** | **10** | **2**（hero gradient）| 83% 完成 |
+| Hero gradient（`_base.scss`）| 2 | 0 | 0（2 documented exemption）| ✅ DS-3-c-c 採方案 C 豁免（Phase 20260520-pm-6；per §5.2 / §14.3）|
+| **合計** | **12** | **10 fixed + 2 documented exemption** | **0 unresolved** | ✅ DS-3-c resolved（10 fixes + 2 documented exemptions）|
 
 ---
 
