@@ -22,12 +22,25 @@ async function readJsonSafe(jsonPath) {
 }
 
 async function readFbSidecarMeta(fbPath) {
+  // Phase 20260520-c-1：additive 補讀 FB post metadata 4 個欄位
+  //   - per docs/fb-post-url-metadata-proposal.md §3.1 之 proposal 欄位
+  //   - 屬 read-only display；本批不做 write；不解析 body / hashtags / finalUrl
+  //   - 空值 / 缺檔 / 非 string 一律回 ""；不 throw
+  //   - fbPostUrl = FB 貼文本身 URL；與 finalUrl（FB body 內導流文章 URL）為兩個不同概念，不可混用
+  const strOrEmpty = (v) => (typeof v === 'string' ? v : '');
   try {
     const txt = await fs.readFile(fbPath, 'utf-8');
     const { data } = matter(txt);
-    return { exists: true, enabled: Boolean(data?.enabled) };
+    return {
+      exists: true,
+      enabled: Boolean(data?.enabled),
+      postUrl: strOrEmpty(data?.fbPostUrl),
+      postedAt: strOrEmpty(data?.fbPostedAt),
+      postId: strOrEmpty(data?.fbPostId),
+      campaign: strOrEmpty(data?.fbCampaign),
+    };
   } catch {
-    return { exists: false, enabled: false };
+    return { exists: false, enabled: false, postUrl: '', postedAt: '', postId: '', campaign: '' };
   }
 }
 
@@ -142,6 +155,10 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     searchDescriptionExists,
     fbExists: fb.exists,
     fbEnabled: fb.enabled,
+    fbPostUrl: fb.postUrl,
+    fbPostedAt: fb.postedAt,
+    fbPostId: fb.postId,
+    fbCampaign: fb.campaign,
     blogger,
     github,
     relatedLinksCount,

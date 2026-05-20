@@ -322,6 +322,19 @@
           </div>
 
           <div class="detail-section">
+            <h3>FB Post (read-only metadata)</h3>
+            <dl class="detail-grid">
+              <dt>fbPostUrl</dt><dd class="mono"><% if (p.fbPostUrl) { %><a href="<%= p.fbPostUrl %>" target="_blank" rel="noopener noreferrer"><%= p.fbPostUrl %></a><% } else { %>(empty)<% } %></dd>
+              <dt>fbPostedAt</dt><dd class="mono"><%= p.fbPostedAt || '(empty)' %></dd>
+              <dt>fbPostId</dt><dd class="mono"><%= p.fbPostId || '(empty)' %></dd>
+              <dt>fbCampaign</dt><dd class="mono"><%= p.fbCampaign || '(empty)' %></dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.85em; margin: 0.25rem 0 0;">
+              注：4 欄位屬 <code>docs/fb-post-url-metadata-proposal.md</code> §3.1 proposal；尚未於 <code>docs/fb-sidecar-schema.md</code> §3.1 正式收編。fbPostUrl 為 FB 貼文本身之 URL；與 <code>finalUrl</code>（FB 貼文 body 內導流文章 URL）為兩個不同概念，不可混用。
+            </p>
+          </div>
+
+          <div class="detail-section">
             <h3>Related / other links</h3>
             <dl class="detail-grid">
               <dt>relatedLinks 數量</dt><dd><%= p.relatedLinksCount %></dd>
