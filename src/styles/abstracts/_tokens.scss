@@ -49,4 +49,36 @@
   --lab-focus-ring-width: 2px;
   --lab-focus-ring-offset: 2px;
   --lab-focus-ring-style: solid;
+
+  // ---------------------------------------------------------------------------
+  // Phase DS-3-a：semantic token defaults（per docs/design-system-ds2-token-naming.md §5.4 / §10.1）
+  //
+  // 性質：純 additive；既有 token 完全保留（不 rename / 不刪除）；視覺零差異。
+  // 用途：建立 semantic layer，供 component 後續逐步改讀；platform theme override
+  //       後續會在 _themes.scss 處理（DS-3-b）。
+  // alias 策略：對既有已有 semantic-equivalent 之 4 個 token（accent / muted /
+  //              background / surface），本批採「保守 alias」— 新 token 預設 alias
+  //              至既有值；DS-2 §5.6 之 canonical winner 不在本批裁決。
+  //
+  // 本批不改：component / _themes.scss / blogger mirror partial / EJS / build scripts。
+  // 後續批：DS-3-b 補 _themes.scss platform override；DS-3-c 處理 hard-coded color 違規。
+  // ---------------------------------------------------------------------------
+
+  // Alias 至既有 semantic-equivalent（保守；不裁決 canonical）
+  --lab-color-secondary: var(--lab-color-accent);
+  --lab-color-text-muted: var(--lab-color-muted);
+  --lab-color-bg: var(--lab-color-background);
+  --lab-color-bg-soft: var(--lab-color-surface);
+
+  // 新 semantic defaults（fallback 至既有 token；無新 hex）
+  --lab-color-badge-bg: var(--lab-color-gray-100);
+  --lab-color-badge-text: var(--lab-color-text);
+  --lab-color-callout-bg: var(--lab-color-surface);
+  --lab-color-callout-border: var(--lab-color-border);
+
+  // Hover/active overlay base（用於 color-mix(..., var(--lab-color-overlay-dark))；DS-3-c 改 component）
+  --lab-color-overlay-dark: #000;
+
+  // 放在 --lab-color-primary 背景上之文字色（component 內 hardcode #fff / white 之替代）
+  --lab-color-on-primary: var(--lab-color-background);
 }
