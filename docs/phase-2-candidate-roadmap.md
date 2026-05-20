@@ -15,7 +15,7 @@
 
 | # | 項目 | 對應文件 / 系列 | 預估 LOC | 備註 |
 |---|---|---|---|---|
-| 1.1 | DS-3-c-a：`_header.scss` `#fff` → token / `_mobile-drawer.scss` 移除 fallback | `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §7 | 2 行 / 2 檔 | 🟢 零視覺差；零 Blogger 影響 |
+| 1.1 | ~~DS-3-c-a：`_header.scss` `#fff` → token / `_mobile-drawer.scss` 移除 fallback~~ | `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §14 | — | ✅ 已於 20260520 commit `f530a39` 完成；DS-3-c-b GitHub source 部分亦已於 commit `67a0ccc` 完成；剩餘 DS-3-c-b mirror partial sync / DS-3-c-c hero gradient 仍待 user 決策（per `design-system-ds3c-hardcoded-color-pre-analysis.md` §14.2 / §5.2）|
 | 1.2 | GA4 prod-only gating（dev mode 不送 event）| `docs/ga4-enable-preflight.md` §2.4 Option B | ~10 LOC ga4.ejs | 需 user 決議；對齊 Admin-1-b dev-mode-only pattern |
 | 1.3 | FB completeness 條件式（如 `enabled=true && status=published && !postUrl → missing`）| `docs/fb-post-url-metadata-proposal.md` §5.3 / P3 | ~10 LOC loader | 會影響既有 fixture completeness 數 |
 | 1.4 | Admin disclaimer drift fix（若有新 phase 落地後 disclaimer 過時） | per c-3 pattern | <5 LOC | 例如 P5-c 落地後更新 FB Post section disclaimer |
@@ -170,7 +170,7 @@
 ```
 Phase 2.1（quick wins；🟢 低）
   ↓
-  - DS-3-c-a hex 違規低風險修正（per §1.1）
+  - ~~DS-3-c-a hex 違規低風險修正~~（✅ 已於 20260520 commit `f530a39` 完成；per §1.1）
   - GA4 prod-only gating（per §1.2；user 決後）
   - FB completeness P3 條件式（per §1.3）
 
