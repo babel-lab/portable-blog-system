@@ -1,5 +1,7 @@
 # FB Post URL Metadata Proposal
 
+> **Status：** 4 個 proposal 欄位（`fbPostUrl` / `fbPostedAt` / `fbPostId` / `fbCampaign`）已於 **Phase 20260520-c-2** 正式收編至 `docs/fb-sidecar-schema.md` §3.1 與 §3.5；同時關閉 `finalUrl` 之 schema drift（§3.5.2）。本 proposal 文件保留為設計脈絡 / roadmap 紀錄；後續實作（P3 completeness / P4 write / P5 article 顯示 / P6 Graph API）仍適用本文件之分析。
+
 本文件為 **`.fb.md` sidecar 新增 FB 貼文 URL metadata 欄位**之 proposal。屬規格提案 / 討論性質；**本批不修改既有 schema、不啟動 write、不接 FB API**。
 
 對應上層文件：
