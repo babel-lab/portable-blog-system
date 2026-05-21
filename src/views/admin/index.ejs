@@ -281,6 +281,49 @@
             </dl>
           </div>
 
+          <%# Phase 20260521-pm-59: Admin Platform Routing read-only section -%>
+          <%# - 使用 pm-57 loader 新增之 canonicalTarget / platformUrl / gaHostname / githubStatus -%>
+          <%# - 沿用既有 blogger / github 物件 + primaryPlatform；reuse 既有 badge class -%>
+          <%# - 不含 utmPreviewUrl（pm-60 候選）/ platformMigrationNote（schema 未引入）-%>
+          <div class="detail-section">
+            <h3>Platform Routing</h3>
+            <dl class="detail-grid">
+              <dt>primaryPlatform</dt>
+              <dd>
+                <% if (p.primaryPlatform === 'blogger') { %><span class="badge b-info">📘 blogger</span>
+                <% } else if (p.primaryPlatform === 'github') { %><span class="badge b-ok">🐙 github</span>
+                <% } else { %><span class="badge b-missing">(empty)</span><% } %>
+              </dd>
+              <dt>publishTargets</dt>
+              <dd>
+                <% if (p.blogger.enabled) { %><span class="badge b-info">📘 blogger / <%= p.blogger.mode || '(no mode)' %></span><% } %>
+                <% if (p.github.enabled) { %><span class="badge b-ok">🐙 github / <%= p.github.mode || '(no mode)' %></span><% } %>
+                <% if (!p.blogger.enabled && !p.github.enabled) { %><span class="badge b-missing">(none enabled)</span><% } %>
+              </dd>
+              <dt>canonicalTarget</dt>
+              <dd class="mono"><% if (p.canonicalTarget) { %><a href="<%= p.canonicalTarget %>" target="_blank" rel="noopener noreferrer"><%= p.canonicalTarget %></a><% } else { %><span class="text-muted">—</span><% } %></dd>
+              <dt>platformUrl</dt>
+              <dd class="mono"><% if (p.platformUrl) { %><a href="<%= p.platformUrl %>" target="_blank" rel="noopener noreferrer"><%= p.platformUrl %></a><% } else { %><span class="text-muted">—</span><% } %></dd>
+              <dt>gaHostname</dt>
+              <dd class="mono" style="font-size: 0.85em;"><%= p.gaHostname || '—' %></dd>
+              <dt>bloggerStatus</dt>
+              <dd>
+                <% if (p.blogger.status === 'published') { %><span class="badge b-published"><%= p.blogger.status %></span>
+                <% } else if (p.blogger.status) { %><span class="badge b-info"><%= p.blogger.status %></span>
+                <% } else { %><span class="text-muted">(empty)</span><% } %>
+              </dd>
+              <dt>githubStatus</dt>
+              <dd>
+                <% if (p.githubStatus === 'rendered') { %><span class="badge b-ok">rendered</span>
+                <% } else if (p.githubStatus === 'pending') { %><span class="badge b-draft">pending</span>
+                <% } else { %><span class="badge b-info">disabled</span><% } %>
+              </dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.82em; margin: 0.25rem 0 0;">
+              注：本 section 為 Admin read-only derived 顯示；不代表 sitemap / build / deploy 之實際審核結果。per <code>docs/admin-platform-routing-extension-plan.md</code>；不含 utmPreviewUrl（屬 pm-60 候選）/ platformMigrationNote（schema 未引入）。
+            </p>
+          </div>
+
           <div class="detail-section">
             <h3>Dates</h3>
             <dl class="detail-grid">
