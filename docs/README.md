@@ -197,17 +197,24 @@ npm run check:images
 
 ## §7 今日穩定 baseline
 
-（更新時點：2026-05-20）
+（更新時點：2026-05-21）
 
-- HEAD: `8b16b01 docs(ds): document ds-3-c-c hero gradient exemption` （pm-6 後更新；DS-3-c-b mirror sync + DS-3-c-c documented exemption 收尾）
+- HEAD: `1be2a38 docs(build): record production basePath sanity check` （pm-1 後更新；mid-5 production sanity check 收尾）
 - branch: `main` / 無 upstream / 未 push
 - working tree: clean
 - deploy repo HEAD: `4ecd92d`（未動）
 - validate baseline: `0 error(s) / 38 warning(s) on 33 issue-post(s)`
-- dist/sitemap.xml: 14 url entries
-- 今日 commits 總計 40（pm-4 收尾報告 + pm-5 docs sync + pm-6 DS-3-c-b mirror sync + DS-3-c-c 豁免文件）
+- dist/sitemap.xml: 14 url entries（mid-5 production build 確認；per `docs/20260521-dev-route-fix-verification.md` §10.4）
+- dist/.gitkeep: tracked & clean（mid-5-b 已 restore；vite emptyOutDir side effect 已處理）
+- 今日 commits 總計 11（上午 Admin overview polish 6 + 中午 C-3 Admin-only fbPublished P3 rule 2 + mid-4 dev route 404 fix 2 + mid-5 production sanity check 1）
 - 今日 commits 純線性堆疊；無 amend / rebase / force / push
-- 本日完整收尾報告：`docs/20260520-end-of-day-report.md`
+- 今日重點摘要：
+  - Admin overview polish（C-1 README baseline / C-4 audit / S-1 empty states / S-4 tooltips / S-2 linkify / S-5 docs sync）
+  - C-3 Admin-only fbPublished P3 rule 套用（loader + EJS tooltip + 4 docs sync；validate-level rule 仍 deferred）
+  - dev route 404 fix（basePath dev/prod 分流；user 手測 dev links 通過）
+  - production sanity check（build 成功；internal links 仍含 `/portable-blog-system/`；canonical / og:url / JSON-LD / sitemap 14 entries 不變）
+- 仍未啟動（pending；需 user 決策）：C-2 GA4 prod-only gating / S-3 fixture 補 FB metadata / Option B validate-level fbPublished rule / .gitkeep emptyOutDir 長期策略 / push / deploy
+- 昨日完整收尾報告：`docs/20260520-end-of-day-report.md`
 
 ---
 
