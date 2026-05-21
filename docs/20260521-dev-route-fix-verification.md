@@ -214,4 +214,91 @@ function siteBasePath(settings) {
 
 ---
 
+## §10 Production Sanity Check（Phase 20260521-mid-5 / mid-5-b）
+
+本章節記錄 mid-4-b 修正落地後之 production build sanity check 結果。屬保險驗證；確認 dev / build mode 分流之 build mode 端**未壞**任何 production 行為。
+
+### 10.1 npm run build 結果
+
+| 階段 | 結果 |
+|---|---|
+| `predev` / 不適用本批 | n/a（本批跑 `npm run build` 而非 dev）|
+| `prebuild`（`build-github.js --mode=build`） | ✅ done in 208ms；產出 `.cache/pages/` 全部 HTML（含 posts / categories / tags / design-system / 404）|
+| `vite build` | ✅ built in 1.01s；35 modules transformed；無 error |
+| `postbuild`（`build-sitemap.js`） | ✅ done in 49ms；產出 `dist/sitemap.xml`（14 url entries）+ `dist/robots.txt` |
+| 整體 | ✅ 成功；無 error / warning |
+| 產出 dist 檔 | 25 個（HTML pages + entry CSS / JS + sitemap.xml + robots.txt）|
+
+### 10.2 Production internal links 檢查
+
+| 位置 | 連結 prefix 預期 | 實際 |
+|---|---|---|
+| `dist/index.html` header brand | `/portable-blog-system/` | ✅ `<a class="lab-header__brand" href="/portable-blog-system/">` |
+| `dist/index.html` nav 連結（首頁 / 文章 / 分類） | `/portable-blog-system/{path}/` | ✅ 三項皆正確 |
+| `dist/index.html` post card 連結（3 篇）| `/portable-blog-system/posts/{slug}/` | ✅ `we-media-myself2` / `github-pages-blog-planning` / `portable-blog-system-mvp` 三篇皆正確 |
+| `dist/index.html` mobile drawer 連結 | `/portable-blog-system/{path}/` | ✅ 三項皆正確 |
+| `dist/posts/github-pages-blog-planning/index.html` header / nav / mobile drawer | 同首頁規則 | ✅ 全對 |
+| 不該出現之 root path 連結（`href="/posts/"` / `href="/categories/"` / `href="/tags/"` 等無 prefix）| 應 **0 個** | ✅ grep 兩個 dist HTML 皆 0 match |
+
+→ build mode basePath = `/portable-blog-system` 完整保留；mid-4-b 修正未污染 production output。
+
+### 10.3 SEO 絕對 URL 檢查
+
+| 位置 | 欄位 | 值 |
+|---|---|---|
+| `dist/index.html` | canonical | `https://babel-lab.github.io/portable-blog-system/` ✓ |
+| `dist/index.html` | og:url | `https://babel-lab.github.io/portable-blog-system/` ✓ |
+| `dist/index.html` | JSON-LD `url` + `@id` | `https://babel-lab.github.io/portable-blog-system/` ✓ |
+| `dist/posts/github-pages-blog-planning/index.html` | canonical | `https://babel-lab.github.io/portable-blog-system/posts/github-pages-blog-planning/` ✓ |
+| `dist/posts/github-pages-blog-planning/index.html` | og:url | 同上 ✓ |
+
+→ canonical / og:url / JSON-LD 皆基於 absolute `siteBaseUrl`（不經 `basePath` 變數）；mid-4-b 之 basePath mode 分流對此鏈無影響。
+
+### 10.4 Sitemap 檢查
+
+| 項目 | 值 |
+|---|---|
+| `dist/sitemap.xml` `<loc>` 數量 | **14**（與既有 baseline `0/38/33` 對齊之 sitemap 14 entries 一致）|
+| 全部 `<loc>` 以 `https://babel-lab.github.io/portable-blog-system/` 開頭 | ✅ 14 / 14 |
+| 是否含 localhost 污染 | ❌ 0 個 match |
+| 首條 `<loc>` | `https://babel-lab.github.io/portable-blog-system/` |
+| 次條 `<loc>` | `https://babel-lab.github.io/portable-blog-system/posts/` |
+
+→ sitemap 完整保留 production 絕對 URL；mid-4-b 修正未影響 build-sitemap pipeline。
+
+### 10.5 dist `.gitkeep` 處理紀錄
+
+- **現象**：`npm run build` 啟動時 vite `emptyOutDir: true` 清空 `dist/` 全部內容；其中 git 追蹤之 placeholder `dist/.gitkeep` 一併被刪除
+- **影響**：build 後 `git status --short` 顯示 ` D dist/.gitkeep`；其他 dist 產出檔皆 `.gitignored` 不入 diff
+- **決議**：Option A — `git restore dist/.gitkeep`（保留 placeholder 之原始設計；不 commit deletion；不 commit dist 內容）
+- **執行**：mid-5-b 啟動時 `git restore dist/.gitkeep` → working tree 立即 clean
+- **未來**：每次 `npm run build` 仍會觸發此 side effect；建議 user 自行決定長期策略（如改 `.gitignore` 排除 `.gitkeep` 之 emptyOutDir 行為 / 接受 commit deletion / 持續手動 restore）；本批不擅自啟動長期策略
+
+### 10.6 對齊 mid-4-b 修正之確認矩陣
+
+| 確認項 | 結果 |
+|---|---|
+| dev mode 已修正為 root path | ✅ mid-4-c user 手測通過 |
+| build mode 仍保留 `/portable-blog-system` prefix | ✅ §10.2 確認 |
+| dist 中 internal links 未壞 | ✅ §10.2 |
+| canonical / og:url / JSON-LD 未壞 | ✅ §10.3 |
+| sitemap 未壞 | ✅ §10.4（14 url entries baseline 維持）|
+| 本批未動 source / content / docs（除本 doc）/ package.json / vite.config.js / EJS templates / fixtures | ✅ |
+| 本批未跑 validate:content | ✅ |
+| 本批未 push / 未 deploy | ✅ |
+| dist 目前狀態 | ✅ restored；working tree clean |
+
+### 10.7 進入 idle freeze 之 baseline
+
+| 項目 | 值 |
+|---|---|
+| HEAD（本批 commit 後將更新）| `3f97890`（commit 前）→ 本 docs commit 後新增 1 個 hash |
+| working tree（本批 commit 後）| clean |
+| dist | clean（`.gitkeep` 已 restore；其餘 .gitignored）|
+| deploy repo | `4ecd92d`（未動）|
+| validate baseline | `0/38/33`（未跑驗證；mid-4-b / mid-5 邏輯改動不在 validate 範圍）|
+| sitemap | 14 url entries（不變）|
+
+---
+
 （本文件結束）
