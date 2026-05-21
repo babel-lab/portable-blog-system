@@ -486,4 +486,86 @@ f3c7ee8 fix(admin): normalize overview empty states                         ← 
 
 ---
 
+## 13. Remaining deferred items review（Phase 20260521-pm-24）
+
+本章節記錄今日傍晚之 deferred items 整理 read-only review；屬純 read-only 評估；未修改任何檔案；無 commit。產出明日建議工作順序與第一批 phase 指令草案。
+
+### 13.1 pm-24 性質
+
+- **Read-only review**；無 commit / 無 push / 無 deploy / 無 build / 無 validate
+- 純 `git status` / `git log` / read docs / grep；source repo + deploy repo 皆 clean
+- 產出：4 個 deferred items 評估表 + 明日 Path A / Path B 工作順序 + 明天第一批 phase 指令草案
+
+### 13.2 今日已完成 deferred items（2 項解除）
+
+| # | 項目 | 完成方式 | commit hash |
+|---|---|---|---|
+| 1 | **C-2 GA4 prod-only gating** | gating 機制就位（user-defined Option A = build-mode gating；4-AND condition）；**GA4 啟用仍 deferred** | `92f4f07`（pm-11 implementation）；pm-12 已 push；pm-13 確認不需 deploy |
+| 2 | **`.gitkeep` emptyOutDir 長期策略**（Option A.1）| 移除 `dist/.gitkeep` + `.gitignore` 對應 exception line；build 後 drift 從根源消除 | `3917526`（pm-20 implementation）；pm-21 已 push；不 deploy |
+
+### 13.3 剩餘 deferred items 評估表（4 項）
+
+| # | 項目 | 性質 | 阻擋條件 | 風險 | 適合明天優先 | 推薦順序 |
+|---|---|---|---|---|---|---|
+| 1 | **GA4 真實啟用**（`measurementId` + `enabled=true`）| source（`ga4.config.json`）+ deploy | user 須取得 `G-XXXXXXXXXX` measurementId（GA4 後台 property + data stream）| 🟡 中（首次正式 production 分析；線上 user 行為將被追蹤）| ✅ 高（一旦 user 取得 ID，流程已就位；機制已驗證）| **1**（若 user 已取得 ID）|
+| 2 | **S-3 fixture 補 FB metadata 真實樣本** | source（動 `content/**/*.fb.md` 或 `validation-fixtures/`）| user 須決定 placeholder vs 真實 URL / 日期策略 / 動何處 / 數量 | 🟡 中（動 content；可能影響 build-promotion / validate）| 🟡 中度 | **2** |
+| 3 | **Option B validate-level fbPublished rule** | source（`validate-content.js`）+ fixture | user 須決定 severity（warning vs error）+ fixture 設計；38 warnings baseline 將變動 | 🟡 中（首次動 validate baseline）| 🟡 中度（建議於 S-3 之後啟動以複用 fixture）| **3** |
+| 4 | **hostname allowlist / GA4 runtime gating 細化**（user Option B/C）| source（`ga4.ejs`）| 前置依賴 #1（GA4 真實啟用）+ user 須觀察 1-2 週是否真有 preview mode event 污染 | 🟡 中（runtime gating；inline JS 維護成本）| 🔴 不適合（依賴 #1 啟用 + 觀察期）| **4（最後；未來；不在明日範圍）**|
+
+**額外候選**（非 deferred；屬遞迴）：**README §7 baseline drift cleanup**（docs-only；最自然第一批；零風險）→ 明日推薦作為 `am-1`。
+
+### 13.4 明日建議工作順序
+
+依 user 是否已取得 GA4 measurementId 而有兩條 Path：
+
+#### Path A（user **已**取得 GA4 ID）
+
+| 順序 | Phase 名 | 推薦理由 | 是否需 user 提供資料 | build / validate / deploy |
+|---|---|---|---|---|
+| 1 | **am-1 README §7 baseline drift cleanup** | 最自然恢復節奏；對齊 pm-23 final state；零風險；5-10 行修改 | ❌ 否 | ❌ 都不需 |
+| 2 | **am-2 GA4 enable preflight read-only** | 在啟用前 review 設定流程 / dev 驗證 / build 預期 / deploy 步驟 | ✅ measurementId 字面值 `G-XXX` | ❌ 純 read-only |
+| 3 | **am-3 GA4-enable-1 configure & local verify** | 動 `ga4.config.json`；本機 `npm run build` 驗證 dist 含 gtag script；commit | ✅ 依賴 am-2 確認 | ✅ build；不 validate；不 deploy（留 am-4）|
+
+#### Path B（user **未**取得 GA4 ID）
+
+| 順序 | Phase 名 | 推薦理由 | 是否需 user 提供資料 | build / validate / deploy |
+|---|---|---|---|---|
+| 1 | **am-1 README §7 baseline drift cleanup** | 同 Path A | ❌ 否 | ❌ 都不需 |
+| 2 | **am-2 S-3 fixture metadata strategy pre-analysis** | 評估 placeholder vs 真實 URL / 日期 / 動 content 或 fixtures；產出實作建議 | 🟡 user 須提供策略偏好 | ❌ 純 read-only |
+| 3 | **am-3 S-3 fixture implementation**（若 am-2 已對齊策略）| 動 1-2 個 sidecar；觀察 Admin overview populated state；可能跑 build / validate | ❌ 若 am-2 已對齊 | 🟡 可能跑 validate / build |
+
+### 13.5 明天第一批 phase 指令草案參考
+
+詳見 pm-24 §4 之完整草案；摘要：
+
+```text
+Phase 20260522-am-1：README §7 baseline drift cleanup
+- 只允許修改 docs/README.md（§7 baseline section）
+- HEAD ref 更新為：ce2097e
+- 補記 19 source + 1 deploy + 2 已解除 deferred + 4 剩餘 deferred
+- commit message 建議：docs(project): sync README baseline to pm-23 final state
+```
+
+⚠️ user 可調整時點命名 / 限制 / 補記內容後再下達；assistant 不自行啟動。
+
+### 13.6 不啟動實作之原因
+
+| 項目 | 原因 |
+|---|---|
+| 不啟動 GA4 真實啟用 | 等待 user 取得 measurementId；無 ID 無法 commit |
+| 不啟動 S-3 fixture | 等待 user 表態 placeholder / 真實 URL / 日期策略 |
+| 不啟動 Option B validate-level | 等待 user 表態 severity（warning vs error）|
+| 不啟動 hostname allowlist | 等待 GA4 啟用 + 觀察期完成 |
+| 不啟動 README §7 baseline cleanup | 屬可選；本日節奏已封閉；建議留明日作為 am-1 |
+
+### 13.7 今日 commits 統計（pm-25 補記時點）
+
+- **source commits**：19（pm-22 時點 18 + pm-23 push（無新 commit；僅 push）+ pm-24 read-only review（無 commit）+ pm-25 本批 commit 為第 20 個）
+- **deploy commits**：1（pm-6 `06e26ae`；今日所有後續 phase 皆確認無需再 deploy）
+- **push 狀態**：source main 已 push origin/main 至 `ce2097e`；pm-25 本批 commit 將為新 [ahead 1]
+- **deploy 凍結**：`06e26ae`
+- **deferred items 數**：4（S-3 / Option B validate-level / GA4 真實啟用 / hostname allowlist）；今日累計解除 2 項
+
+---
+
 （本文件結束）
