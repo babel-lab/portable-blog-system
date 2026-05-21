@@ -362,6 +362,52 @@ Admin-1 系列全程**未影響** stable snapshot：
 | FB schema | 未動 | 未動 |
 | loader | 未動 | 未動 |
 
+### 13.6 2026-05-21 中午 C-3-a fbPublished P3 條件式落地
+
+接續上午之 admin overview 小修系列；本批為當日**第 7 個 commit**（並非 admin overview 顯示文案調整，而是 completeness 邏輯 P3 canonical 規則套用）。
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260521-mid-2 / C-3-a` |
+| commit | `edbf6d0 fix(admin): apply fbPublished P3 conditional rule` |
+| 修改範圍 | `src/scripts/load-admin-posts.js`（loader 計算邏輯）+ `src/views/admin/index.ejs`（2 處 tooltip 同步）|
+| 修改規模 | `2 files changed, +12 / -9` |
+| 新規則（per `docs/fb-sidecar-schema.md` §3.5.5 P3 canonical）| `isPostPublished = fm.status === 'published'`；`hasFbPostUrl = fb.postUrl !== ''`；`fbPublishedMissing = fb.enabled === true && isPostPublished === true && hasFbPostUrl === false`；其餘皆 OK |
+| missingFields chip | `'fbPostUrl / fbPostedAt'` → `'fbPostUrl'`（縮為單欄位；不再要求 `fbPostedAt`）|
+| pre-analysis | `Phase 20260521-mid-1`（read-only；無 commit；確認 38 warnings 不受影響 + Option A 推薦）|
+
+#### 安全性說明
+
+| 項目 | 結果 |
+|---|---|
+| 修改 `src/scripts/validate-content.js` | ❌ 未動 |
+| 新增 write path | ❌ 無 |
+| 新增 `<form>` / `submit` / `fetch` / `XHR` / `localStorage` / `fs` write | ❌ 無 |
+| 新增 JS event handler | ❌ 無 |
+| 修改 deriveFbBadge / fb sidecar 讀取邏輯 | ❌ 未動 |
+| 修改其他 completeness 維度（seo / fb / blogger / github / url / categoryTags）| ❌ 未動 |
+| 修改 data structure / exported fields / sort / filter / search | ❌ 未動 |
+| 修改 content / dist / docs（本批 mid-2）/ deploy / package.json / FB sidecar schema / validation fixtures | ❌ 未動 |
+| 跑 build / build:* / validate:content | ❌ 未跑 |
+| Admin read-only / dry-run safe 邊界 | ✅ 維持（banner / robots noindex / dev-mode-only / 無寫入路徑皆未動）|
+
+#### 預期影響
+
+| 影響面 | 結果 |
+|---|---|
+| Admin stat-card `fb published ok` 計數 | 推估 `2` → `3-4`（取決 fixture 中 enabled=true 之 .fb.md 對應 article 之 status；多數 fixture 為非 published）|
+| `validate:content` 38 warnings baseline | **不變**（fbPublished 不在 validate 範圍）|
+| Admin 列表 / detail panel 之 FB pub badge 顯示 | 部分 `missing` → `ok`（regex 觸發較嚴）|
+| Missing fields chip | 顯示 `fbPostUrl`（singular）而非 `fbPostUrl / fbPostedAt` |
+| dist / deploy / GitHub Pages 線上 | 無影響（Admin 為 dev-mode-only）|
+
+#### 後續仍 deferred
+
+| 項目 | 狀態 |
+|---|---|
+| **Option B**：validate-level rule（加 `validate-content.js` 新規則 + fixture）| 🟡 deferred；屬另開 phase；需 user 表態 severity（warning vs error）|
+| **S-3**：fixture 補 FB post URL metadata 真實樣本 | 🟡 deferred；需 user 決定 placeholder / 真實 URL / 日期策略 |
+
 ---
 
 （本文件結束）

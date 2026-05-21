@@ -408,7 +408,7 @@ per `docs/fb-sidecar-metadata-pre-analysis.md` §6.2 + loader `deriveFbBadge`：
 |---|---|---|---|---|
 | M-1 | **filter 增 sourceSite / fbBadge 兩個 optgroup**（client-side filter 增 2 群組；不動 loader）| `src/views/admin/index.ejs` filter `<select>` + JS `matchesFilter` | ~25 行 | 🟡 改 EJS template + JS；無 write；需 build 驗證 |
 | M-2 | **GitHub URL 第三層 badge**（在 GitHub 欄補 `previewUrl ok / no preview` badge；對齊 Blogger 視覺；明示「預測 URL」）| `src/views/admin/index.ejs` GitHub td + tooltip | ~10 行 | 🟡 視覺改動；可能 user 誤解；需文案解釋 |
-| M-3 | **FB completeness P3 條件式**（per roadmap §1.3：`enabled=true && status=published && !postUrl → missing`）| `src/scripts/load-admin-posts.js` ~10 LOC | ~10 行 | 🟡 改 loader；會動既有 fixture `fbPublished` 計數 |
+| ~~M-3~~ | ~~**FB completeness P3 條件式**~~ ✅ **Admin-only 已於 Phase 20260521-mid-2 / C-3-a（commit `edbf6d0`）落地**；validate-level rule（Option B）仍 deferred；S-3 fixture metadata sample 仍等待 user 決定 placeholder / 真實 URL / 日期策略 | `src/scripts/load-admin-posts.js` + `src/views/admin/index.ejs` | +12 / -9 行 | 🟢 Admin-only 已完成；零 validate / 零 dist / 零 deploy 影響 |
 | M-4 | **fixture 補完整 FB post URL metadata 真實樣本**（在正式 content sidecar 加 placeholder 值；非 validation-fixtures）| `content/**/*.fb.md` × 1-2 個 | ~10 行 | 🟡 動正式 content；可能影響 build-promotion 輸出 |
 
 ### 8.3 🔴 不建議今天做（涉及 write / Graph API / schema 大改 / deploy）

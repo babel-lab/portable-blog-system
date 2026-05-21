@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | 1.1 | ~~DS-3-c-a：`_header.scss` `#fff` → token / `_mobile-drawer.scss` 移除 fallback~~ | `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §14 | — | ✅ DS-3-c-a 已於 20260520 commit `f530a39` 完成；✅ DS-3-c-b 已於 commits `67a0ccc` (GitHub source) + `cc2621d` (mirror partial sync) 完成；✅ DS-3-c-c 已於 Phase 20260520-pm-6 採方案 C 豁免（documented exemption；無 source 改動；per `design-system-ds3c-hardcoded-color-pre-analysis.md` §5.2 / §14.3）；**DS-3-c 整體 resolved**（10 fixes + 2 documented exemptions）|
 | 1.2 | GA4 prod-only gating（dev mode 不送 event）| `docs/ga4-enable-preflight.md` §2.4 Option B | ~10 LOC ga4.ejs | 需 user 決議；對齊 Admin-1-b dev-mode-only pattern |
-| 1.3 | FB completeness 條件式（如 `enabled=true && status=published && !postUrl → missing`）| `docs/fb-post-url-metadata-proposal.md` §5.3 / P3 | ~10 LOC loader | 會影響既有 fixture completeness 數 |
+| 1.3 | ~~FB completeness 條件式（如 `enabled=true && status=published && !postUrl → missing`）~~ | `docs/fb-post-url-metadata-proposal.md` §5.3 / P3 | — | ✅ Admin-only 已於 Phase 20260521-mid-2 / C-3-a（commit `edbf6d0`）完成；validate-level rule deferred；fixture metadata sample deferred |
 | 1.4 | Admin disclaimer drift fix（若有新 phase 落地後 disclaimer 過時） | per c-3 pattern | <5 LOC | 例如 P5-c 落地後更新 FB Post section disclaimer |
 | 1.5 | docs index 更新（如新增 phase docs 後 README cross-link 補齊）| 本批已建 `docs/README.md` | docs only | 隨 docs 變動逐次同步 |
 
@@ -177,7 +177,7 @@ Phase 2.1（quick wins；🟢 低）
   ↓
   - ~~DS-3-c-a hex 違規低風險修正~~（✅ 已於 20260520 commit `f530a39` 完成；per §1.1）
   - GA4 prod-only gating（per §1.2；user 決後）
-  - FB completeness P3 條件式（per §1.3）
+  - ~~FB completeness P3 條件式~~（✅ Admin-only 已於 20260521 commit `edbf6d0` 完成；validate-level rule deferred；per §1.3）
 
 Phase 2.2（user-decided；🟡 中；依需求展開）
   ↓
@@ -216,7 +216,7 @@ Phase Z（永禁 / 二階段）
 - [ ] sitemap 拆分是否做（per §3.1；當前不建議）
 - [ ] mirror partial 整合啟動時機（per §3.2；user 主動評估）
 - [ ] GA4 prod-only gating 是否做（per §1.2）
-- [ ] FB completeness P3 條件式是否做（per §1.3）
+- [x] FB completeness P3 條件式是否做（per §1.3）（✅ Admin-only 已於 commit `edbf6d0` 完成；validate-level rule + fixture metadata sample 仍 deferred）
 - [ ] vite host 設定 0.0.0.0 vs localhost（per `docs/fb-sidecar-write-preflight-decision.md` §3.2；影響 FB write API 設計）
 
 ---

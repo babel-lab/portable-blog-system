@@ -208,7 +208,7 @@ Phase 20260520-c-1（commit `aa08e66`）起，Admin overview detail panel 已 re
 | --- | --- | --- |
 | **P1** | schema 正式收編 | ✅ 本 Phase 20260520-c-2 落地 |
 | **P2** | Admin overview detail panel read-only 顯示 | ✅ Phase 20260520-c-1（commit `aa08e66`）已落地 |
-| **P3** | Admin completeness 加 FB published 維度（條件：`.fb.md` `enabled === true` && article `status === 'published'` && `fbPostUrl` 為空 → `completeness.fbPosted = 'missing'`） | 🟡 低-中風險；屬未來批 |
+| **P3** | Admin completeness 加 FB published 維度（條件：`.fb.md` `enabled === true` && article `status === 'published'` && `fbPostUrl` 為空 → `completeness.fbPosted = 'missing'`） | ✅ Admin-only 已於 Phase 20260521-mid-2 / C-3-a（commit `edbf6d0`）落地；規則：fb.enabled=false / article status !== 'published' / fbPostUrl 有值 → ok；fb.enabled=true && status==='published' && fbPostUrl 空 → missing；不再要求 fbPostedAt。`validate:content` 尚未加入此規則，未納入 validation baseline；validate-level rule 與 fixture metadata sample 仍 deferred（屬 Option B 另開 phase）|
 | **P4** | Admin dry-run edit / 真實 write（先 dry-run viewer → user 確認 → 實際 write） | 🟡 中風險；需 write strategy 對齊 |
 | **P5** | Blogger / GitHub article 內顯示「也看 FB 貼文」outbound link（若 `fbPostUrl` 非空） | 🟡 中風險；可選；屬非必要功能 |
 | **P6** | FB Graph API 自動抓 `fbPostUrl` | 🔴 遠期；違反 `CLAUDE.md` §29「不接 FB API / 不自動社群發文」之預設邊界；屬 Z 類第二階段暫緩；需 user 明確啟動 |
