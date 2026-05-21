@@ -411,4 +411,79 @@ f3c7ee8 fix(admin): normalize overview empty states                         ← 
 
 ---
 
+## 12. Evening dist .gitkeep resolution series（Phase 20260521-pm-19 → pm-21）
+
+本章節記錄今日傍晚解決 `dist/.gitkeep` 反覆 drift 問題之 3 個 phases（1 read-only review + 1 implementation + 1 push）。屬 §10.6 / §11.6 之「`.gitkeep` emptyOutDir 長期策略」之**解除**；其餘 deferred items 仍維持。
+
+### 12.1 pm-19 / .gitkeep emptyOutDir long-term strategy read-only review
+
+- **性質**：read-only；無 commit
+- **問題盤點**：
+  - `dist/.gitkeep` 為 git tracked placeholder（0 bytes；首次引入於 initial commit `0bf59cc`）
+  - `vite.config.js` line 45 `emptyOutDir: true` 造成每次 `npm run build` 清空 dist/ 含 .gitkeep
+  - 今日 mid-5 / pm-11 兩次跑 build 皆觸發 ` D dist/.gitkeep` drift；user 即時 `git restore` 解決
+  - 屬 friction：每次 build 後須記得 restore；對 CI/CD 不友善
+- **Option 比較**：
+  - **A.1** 移除 `dist/.gitkeep`（只動 dist；保留其他 3 個 dist-* placeholder）
+  - **A.2** 移除全部 4 個 .gitkeep（dist / dist-blogger / dist-promotion / dist-reports）
+  - **B** 改 `vite.config.js emptyOutDir=false`（stale asset 累積風險）
+  - **C** 維持現況（手動 restore）
+- **推薦**：採 **Option A.1**（最小改動；最低風險；對齊「gitignored 資料夾不需 placeholder」業界慣例；不擴展至其他 dist-*）
+
+### 12.2 pm-20 / dist .gitkeep Option A.1 implementation
+
+- **commit**：`3917526 chore(build): remove dist gitkeep placeholder`
+- **修改範圍**（2 個變動；`2 files changed, 1 deletion(-)`）：
+  - `dist/.gitkeep` deleted（`git rm`；`delete mode 100644`）
+  - `.gitignore` 移除 `!dist/.gitkeep` 一行（避免 stale reference；其他 3 行 `!dist-*/.gitkeep` exception 保留）
+- **未動**：
+  - 其他 dist-* placeholder（`dist-blogger/.gitkeep` / `dist-promotion/.gitkeep` / `dist-reports/.gitkeep`）
+  - `vite.config.js`（`emptyOutDir: true` 保留）
+  - build scripts（`src/scripts/build-*.js`）
+  - `src/**` / `content/**` / `deploy repo`
+- **build 驗證**：
+  - `npm run build` 成功（prebuild + vite build + postbuild 完整 pipeline）
+  - dist/ 正常產出（index.html / sitemap.xml / posts / categories / tags / design-system 等）
+  - sitemap.xml 仍 14 url entries
+  - **不再出現** ` D dist/.gitkeep` drift（drift 從根源消除；vite emptyOutDir 對未追蹤檔無影響）
+  - 其他 dist 產物皆 gitignored（`dist/*`）；未混入 commit
+
+### 12.3 pm-21 / push pm-20 commit 至 origin/main
+
+- **動作**：`git push origin main`
+- **結果**：fast-forward `ef915b8..3917526  main -> main`
+- **post-push**：source main 與 origin/main **同步**（無 ahead/behind）
+- **deploy repo 維持 `06e26ae`**（per pm-19 評估：`.gitkeep` 為 source repo placeholder；不在 deploy 路徑；pm-6 deploy 之 `find + cp` 本就跳過 dotfile；gh-pages 服務內容完全不變）
+- **未動**：deploy repo / gh-pages
+
+### 12.4 不 deploy 決策
+
+| 維度 | 結果 |
+|---|---|
+| commit `3917526` 對線上 GitHub Pages | ❌ 無影響（`.gitkeep` 為 source-only placeholder；非 deploy artifact）|
+| dist 產出之 production 內容（HTML / CSS / JS / sitemap）| ❌ 不變 |
+| 是否需要 deploy phase | ❌ **不需** |
+| deploy repo 凍結 | `06e26ae`（pm-6 deploy；未動）|
+
+### 12.5 deferred items 狀態更新（pm-21 後）
+
+| # | 候選 | 狀態 |
+|---|---|---|
+| 1 | ~~C-2 GA4 prod-only gating~~ | ✅ gating 完成（per §11.6；GA4 啟用仍 deferred）|
+| 2 | S-3 fixture 補 FB metadata | deferred |
+| 3 | Option B validate-level fbPublished rule | deferred |
+| 4 | ~~`.gitkeep` emptyOutDir 長期策略~~ | ✅ **已解決**（pm-20 commit `3917526` Option A.1；pm-21 已 push）|
+| 5 | GA4 真實啟用（measurementId + enabled=true）| deferred；需 user 取得 GA4 ID |
+| 6 | hostname allowlist（user-Option B/C）| 可選；若未來啟用 GA4 後發現 preview mode event 污染再啟動 |
+
+### 12.6 今日 commits 統計（pm-22 補記時點）
+
+- **source commits**：18（pm-14 時點 16 + pm-17 README baseline `ef915b8` + pm-20 dist gitkeep `3917526`；pm-22 本批 commit 為第 19 個）
+- **deploy commits**：1（pm-6 `06e26ae`；pm-13 / pm-19 / pm-21 皆確認本日無需再 deploy）
+- **push 狀態**：source main 全部已 push origin/main（含 pm-15 / pm-18 / pm-21）；deploy gh-pages 已 push origin/gh-pages
+- **deploy 凍結**：`06e26ae`（含昨日 SEO noindex + DS-3 CSS + admin overview polish）
+- **剩餘 deferred items 數**：4（S-3 / Option B validate-level / GA4 真實啟用 / hostname allowlist）；今日 2 個原 deferred items 已解除（C-2 gating + `.gitkeep` 長期策略）
+
+---
+
 （本文件結束）
