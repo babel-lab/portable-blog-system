@@ -82,8 +82,8 @@ async function renderPage({ template, data }) {
   return wrapped.replace('</head>', `    ${headPartials.replace(/\n/g, '\n    ')}\n  </head>`);
 }
 
-function makeBaseData(settings) {
-  const basePath = siteBasePath(settings);
+function makeBaseData(settings, mode) {
+  const basePath = siteBasePath(settings, mode);
   return (extra) => ({
     site: settings.site,
     navigation: settings.navigation,
@@ -104,7 +104,12 @@ function siteBaseUrl(settings) {
 //   user site (e.g. https://babel-lab.github.io)         → ''
 //   project site (e.g. https://babel-lab.github.io/blog)  → '/blog'
 //   consumed by EJS as <%= basePath %>{root-relative href} for internal navigation
-function siteBasePath(settings) {
+// Phase 20260521-mid-4-b：scope basePath to production mode.
+//   - dev mode：return '' so vite dev server (base='/' per vite.config.js) serves links from root namespace
+//   - non-dev mode (build / undefined / 其他)：保留原 production 推導邏輯
+//   對齊 vite.config.js line 11 `base = command === 'serve' ? '/' : './'` 之 mode-aware 既有原則。
+function siteBasePath(settings, mode) {
+  if (mode === 'dev') return '';
   const url = settings.site?.githubSiteUrl || '';
   if (!url) return '';
   try {
@@ -418,7 +423,7 @@ async function main() {
   // Phase 9-i-f-b：改用 loadGithubPosts() cross-source aggregator；mirror loadBloggerPosts 既有模式
   //   含 github 原生 source + content/blogger/posts 中 publishTargets.github.enabled === true 之 cross-source
   const githubPosts = await loadGithubPosts({ settings });
-  const baseData = makeBaseData(settings);
+  const baseData = makeBaseData(settings, mode);
 
   const { warnings } = validateContent({ posts: githubPosts.posts, settings });
 
