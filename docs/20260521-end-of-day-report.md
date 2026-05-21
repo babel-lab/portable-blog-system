@@ -866,4 +866,112 @@ assistant 無法登入 GA4 後台；以下 7 步驟由 user 親自完成：
 
 ---
 
+## 17. Admin Platform Routing extension series（Phase 20260521-pm-54 → pm-62）
+
+本章節記錄今日傍晚 Admin overview 之 Platform Routing read-only display 擴充全鏈（pm-54 pre-analysis → pm-55 plan → pm-57 loader → pm-58 push → pm-59 EJS section → pm-60 push → pm-61 verification guide → pm-62 user 驗收 + docs note）。屬 pm-49 `docs/content-platform-routing.md` §3 之 12 候選欄位之**首批 read-only 落地**（10 欄位中 7 個就位；utmPreviewUrl + list badge + platformMigrationNote 延後）。
+
+### 17.1 pm-54 / Admin platform routing read-only pre-analysis
+- 性質：read-only；無 commit
+- 盤點：1 個 Admin EJS 檔（759 行；含 inline style + EJS + JS）+ 1 loader（251 行）
+- 12 個 read-only 候選欄位可行性 matrix；4 個已 loader 含 / 5 個可純 derive / 1 個需 schema（platformMigrationNote 延後）
+- 推薦 Option A → Option B 拆批
+
+### 17.2 pm-55 / docs-only Admin platform routing read-only extension plan
+- commit：`21cfa06 docs(admin): plan platform routing read-only display extension`
+- 新增 `docs/admin-platform-routing-extension-plan.md`（291 行；9 章節）
+- 拆批：pm-56 loader cheap derived → pm-57 EJS section → pm-58 utmPreviewUrl → pm-59 list badge（可選）
+- 後續實際執行順序為 pm-57 (loader) → pm-58 (push) → pm-59 (EJS) → pm-60 (push)（plan 中之 pm-58 utmPreviewUrl 已暫緩）
+
+### 17.3 pm-56 / push pm-55 docs commit
+- 動作：`git push origin main`；fast-forward `ebfe254..21cfa06`
+
+### 17.4 pm-57 / Admin loader cheap derived fields read-only implementation
+- commit：`a34e909 feat(admin): add cheap derived platform routing fields to loader`
+- 修改 `src/scripts/load-admin-posts.js`（+48 / -1）
+- 新增 module-level `deriveHostname()` helper
+- toAdminView 內新增 `primaryPlatform` local const + 4 derived fields：
+  - `canonicalTarget`：per primaryPlatform → blogger.publishedUrl / github.previewUrl
+  - `platformUrl`：同 canonicalTarget；其他情況 fallback
+  - `gaHostname`：per primaryPlatform → URL hostname / settings host
+  - `githubStatus`：disabled / rendered / pending
+- sanity：`node --check` + `build-github.js --mode=dev` 皆 pass
+
+### 17.5 pm-58 / push pm-57 source commit
+- 動作：`git push origin main`；fast-forward `21cfa06..a34e909`
+
+### 17.6 pm-59 / Admin detail Platform Routing section read-only UI
+- commit：`a285183 feat(admin): add Platform Routing read-only detail section`
+- 修改 `src/views/admin/index.ejs`（+43 / -0；append-only）
+- 放置：Identity section 之後 / Dates section 之前
+- 7 欄位顯示：primaryPlatform / publishTargets / canonicalTarget / platformUrl / gaHostname / bloggerStatus / githubStatus
+- reuse 既有 badge class（b-info / b-ok / b-missing / b-published / b-draft / text-muted / mono）；無新 CSS
+- 嚴格 read-only（無 form / 無 fetch / 無 fs write / 無 Apply button）
+- sanity：`build-github.js --mode=dev` 後 `.cache/pages/admin/index.html` 增至 117636 bytes；grep `Platform Routing|primaryPlatform|canonicalTarget` 命中 16 次
+
+### 17.7 pm-60 / push pm-59 source commit
+- 動作：`git push origin main`；fast-forward `a34e909..a285183`
+
+### 17.8 pm-61 / Admin Platform Routing manual verification guide
+- 性質：read-only；無 commit；無檔案改動
+- 純口頭提供 user 驗收步驟（9 章節）：dev server 啟動 / Admin URL / row click / 7 欄位預期值 / 4 篇 real posts 對照表 / 排查 8 步驟 / 截圖建議
+
+### 17.9 pm-62 / user 手動驗收結果（本批）
+
+| 維度 | 結果 |
+|---|---|
+| `npm run dev` 啟動 | ✅ 通過 |
+| `http://localhost:5173/admin/` 開啟 | ✅ 通過 |
+| 文章 row click 展開 detail panel | ✅ 通過 |
+| Platform Routing section 位置（Identity 後 / Dates 前）| ✅ 通過 |
+| 7 欄位皆出現 | ✅ 通過 |
+
+#### 第一篇 blogger 文章（user 截圖確認）
+
+| 欄位 | 顯示值 |
+|---|---|
+| primaryPlatform | `blogger` |
+| publishTargets | `blogger / full` + `github / full` |
+| canonicalTarget | Blogger URL |
+| platformUrl | Blogger URL |
+| gaHostname | `babel-lab.blogspot.com` |
+| bloggerStatus | `published` |
+| githubStatus | `rendered` |
+
+→ 7 欄位之 derived 邏輯（per pm-57）+ EJS render（per pm-59）皆按設計正確運作。
+
+### 17.10 utmPreviewUrl 暫緩決策
+
+| 維度 | 內容 |
+|---|---|
+| 原始 plan | per pm-55 §3.2 + §4.1 之 `<details>` 收合 UI；屬 B2 子 phase |
+| 暫緩理由 | **Admin detail panel 資訊已偏長**（含 Identity / Platform Routing / Dates / SEO / Blogger channel / GitHub channel / FB promotion / FB Post / FB Sidecar Dry-run Editor / Related links / Completeness summary / Missing fields / SEO Dry-run viewer / Source path 等 14 sections）→ 再加 utmPreviewUrl 會讓畫面更雜 |
+| 後續可能性 | 🟡 延後；若 user 仍需 → 可獨立 phase 啟動（如 future pm-XX）；或考慮整合至 FB promotion section 內（共用既有 FB metadata 區塊；節省垂直空間）|
+| list platform indicator badge（pm-55 §4.2 B4）| 同樣暫緩；屬 nice-to-have UI polish |
+| platformMigrationNote schema | 仍暫緩；schema 未定 |
+
+### 17.11 Admin Platform Routing extension 完成度
+
+| 項目 | 狀態 |
+|---|---|
+| B1 loader cheap derived（4 欄位）| ✅ 完成（pm-57 `a34e909`）|
+| B2 EJS Platform Routing section（7 欄位）| ✅ 完成（pm-59 `a285183`）|
+| B3 utmPreviewUrl loader + UI | 🟡 **暫緩**（per §17.10）|
+| B4 list platform indicator badge | 🟡 **暫緩**（per §17.10）|
+| platformMigrationNote schema | 🔴 不在 scope（schema 未引入）|
+
+✅ **read-only 主功能完成**；user 已驗收通過。
+
+### 17.12 今日 commits 統計（pm-62 補記時點）
+
+- **source commits**：32（pm-46 時點 27 + pm-48 `d1e5858` + pm-49 `023227e` + pm-52 `ebfe254` + pm-55 `21cfa06` + pm-57 `a34e909` + pm-59 `a285183`；pm-62 本批 commit 將為第 33 個）
+- **deploy commits**：2（pm-6 + pm-45；皆已 push）
+- **push 狀態**：source main 已 push origin/main 至 `a285183`（pm-60）；pm-62 本批 commit 將為新 `[ahead 1]`
+- **deploy 凍結**：`f32f7d3`（pm-45 GA4 enable deploy）
+- **解除 deferred items**：**6**（C-2 gating / `.gitkeep` / S-3 fixture / Option B rule / GA4 真實啟用 / UTM naming reconciliation）
+- **新增功能就位 + 暫緩**：Admin Platform Routing extension（B1 + B2 完成；B3 + B4 暫緩）
+- **剩餘 deferred items**：1（hostname allowlist；觀察期）
+- **GA4 status**：✅ production live（measurementId `G-C77SMPF8VD`）
+
+---
+
 （本文件結束）
