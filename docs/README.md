@@ -199,13 +199,13 @@ npm run check:images
 
 （更新時點：2026-05-20）
 
-- HEAD: `b2c20c3 docs(project): add 20260520 end-of-day report` （pm-4 後更新；pm-5 同批僅 docs sync）
+- HEAD: `8b16b01 docs(ds): document ds-3-c-c hero gradient exemption` （pm-6 後更新；DS-3-c-b mirror sync + DS-3-c-c documented exemption 收尾）
 - branch: `main` / 無 upstream / 未 push
 - working tree: clean
 - deploy repo HEAD: `4ecd92d`（未動）
 - validate baseline: `0 error(s) / 38 warning(s) on 33 issue-post(s)`
 - dist/sitemap.xml: 14 url entries
-- 今日 commits 總計 36（pm-4 已產出收尾報告；本批 pm-5 為 docs drift cleanup）
+- 今日 commits 總計 40（pm-4 收尾報告 + pm-5 docs sync + pm-6 DS-3-c-b mirror sync + DS-3-c-c 豁免文件）
 - 今日 commits 純線性堆疊；無 amend / rebase / force / push
 - 本日完整收尾報告：`docs/20260520-end-of-day-report.md`
 
