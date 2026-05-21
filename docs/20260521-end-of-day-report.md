@@ -974,4 +974,83 @@ assistant 無法登入 GA4 後台；以下 7 步驟由 user 親自完成：
 
 ---
 
+## 18. Final stable state / next-day handoff（Phase 20260521-pm-66）
+
+本章節為今日（2026-05-21）最終穩定狀態封存；明日工作起點參考。
+
+### 18.1 最終狀態
+
+| 維度 | 值 |
+|---|---|
+| **source HEAD** | `42c7359 docs(project): sync README baseline to pm-64 final state` |
+| **deploy HEAD** | `f32f7d3 deploy: 09b9a67 snapshot (GA4 enabled)` |
+| **source main / origin/main** | sync（無 ahead/behind）|
+| **deploy gh-pages / origin/gh-pages** | sync（無 ahead/behind）|
+| **兩 repo working tree** | clean |
+| **線上 GitHub Pages** | ✅ 服務於 `f32f7d3`（含 GA4 production）|
+| **GA4 production** | ✅ live；measurementId `G-C77SMPF8VD`；Realtime 驗收通過 |
+| **validate baseline** | `0 error(s) / 39 warning(s) on 34 post(s)` |
+| **dist/sitemap.xml** | 14 url entries |
+
+### 18.2 今日完成 5 大成果
+
+1. ✅ **GA4 production enabled + Realtime 驗收通過**
+   - source commit `09b9a67`（pm-43；configure `enabled=true` + `measurementId=G-C77SMPF8VD`）
+   - deploy commit `f32f7d3`（pm-45；gh-pages 上線）
+   - user 於 pm-46 手動驗收 Realtime 報表：active user 1 / 30 分鐘內 4 pageviews / `/portable-blog-system/` 路徑
+
+2. ✅ **UTM registry 對齊 production snake_case convention**
+   - pm-48 新增 `docs/ga4-parameter-naming-registry.md`（299 行 → pm-52 對齊既有後 ~340 行）
+   - pm-52 commit `ebfe254`：採 user 決議「改 registry 對齊既有 implementation」；採 `github_pages` / `portable_blog_system` / `related_links` / `other_links` snake_case；保留 fbCampaign 個別命名空間之 kebab-case；0 remaining drift
+
+3. ✅ **content platform routing spec 完成**
+   - pm-49 新增 `docs/content-platform-routing.md`（280 行）
+   - 涵蓋 platform routing 概念 / category & tag taxonomy / Admin read-only 12 候選欄位 / 未來 Admin write / GA setting impact / pm-48 registry 之分工
+
+4. ✅ **Admin Platform Routing read-only loader + UI 完成並手動驗收**
+   - pm-55 plan：`docs/admin-platform-routing-extension-plan.md`（291 行）
+   - pm-57 loader：commit `a34e909`；4 個 cheap derived fields（canonicalTarget / platformUrl / gaHostname / githubStatus）+ `deriveHostname()` helper
+   - pm-59 EJS：commit `a285183`；Admin detail panel 新增 Platform Routing section（7 欄位；放置 Identity 後 / Dates 前）
+   - pm-62 user 手動驗收通過（第一篇 blogger 文章 7 欄位皆按設計顯示）
+
+5. ✅ **README baseline sync 完成**
+   - pm-1 / pm-17 / pm-28 / pm-64 共 4 次同步；最新 pm-64 commit `42c7359` 已對齊 fc02a56 之 final state
+
+### 18.3 今日暫緩項
+
+| 項目 | 暫緩理由 |
+|---|---|
+| **utmPreviewUrl** | per pm-62 §17.10：Admin detail panel 資訊已偏長（14 sections）；再加會更雜 |
+| **list platform indicator badge** | 同上 |
+| **platformMigrationNote schema** | schema 未定；屬未來獨立 phase |
+| **hostname allowlist** | 等 GA4 啟用後觀察 1-2 週；當前 isProdBuild gating 已涵蓋 dev/build 主要 split |
+| **custom domain migration** | 預計 5 月底 / 6 月初啟動；屬獨立 phase 系列 |
+| **AdSense / `ads.txt` / 廣告碼** | 依賴 custom domain + HTTPS Enforce 完成 |
+
+### 18.4 明日候選工作（**只列；不執行**）
+
+| 候選 | 性質 | 阻擋 |
+|---|---|---|
+| Admin utmPreviewUrl preflight | read-only preflight | user 須表態（pm-62 暫緩可恢復評估）|
+| Admin list badge UI polish | source（EJS）| user 表態 |
+| platformMigrationNote schema design | docs + schema | user 表態 |
+| custom domain migration plan / preflight | read-only preflight | 等 user 取得 domain |
+| AdSense readiness preflight | read-only | 等 custom domain + HTTPS |
+| hostname allowlist 觀察 review | read-only | 等 GA4 累積 1-2 週資料 |
+| GA4 hostname observation review | read-only | 同上 |
+| README baseline sync × N（自然遞迴）| docs-only | 隨後續 commits 累積 |
+
+### 18.5 今日工作邊界封存
+
+🛑 **今日不再建議 source 改動**。維持以下狀態：
+- source / deploy 兩 repo working tree clean
+- 兩 repo 與 remote 完全同步（無 ahead / 無 behind / 無 dirty）
+- 不再啟動任何 source 改動 / build / validate / deploy / push
+- 不啟動 §18.3 之任何暫緩項
+- 線上 GitHub Pages 維持 `f32f7d3` 之 GA4 production live state
+
+明日工作起點：source HEAD `42c7359`；deploy HEAD `f32f7d3`；皆 sync remote。
+
+---
+
 （本文件結束）
