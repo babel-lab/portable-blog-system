@@ -749,4 +749,121 @@ user 須先於 GA4 後台完成：
 
 ---
 
+## 16. GA4 enable execution series（Phase 20260521-pm-43 → pm-46）
+
+本章節記錄今日下午 15:00 ~ 15:07 之 GA4 真實啟用 4-phase 執行（pm-43 configure / pm-44 push / pm-45 deploy / pm-46 smoke test；本批為 pm-46）。屬 §13.6 / §15 之「GA4 真實啟用」deferred 之**解除**；剩餘 deferred 縮為 1 項（hostname allowlist）。
+
+### 16.1 pm-43 / GA4-enable-1 configure & local verify
+
+- commit：`09b9a67 feat(analytics): enable GA4 with production measurement id`
+- 修改：`content/settings/ga4.config.json`（`enabled: false → true`；`measurementId: "" → "G-C77SMPF8VD"`）；events 列表保留
+- 驗證：
+  - `node src/scripts/build-github.js --mode=dev` → `.cache/pages/` 0 gtag match（isProdBuild=false 正確阻擋）
+  - `npm run build` → dist 所有 HTML 含 `<script async src="https://www.googletagmanager.com/gtag/js?id=G-C77SMPF8VD">`
+  - `git status` 僅 `M content/settings/ga4.config.json`（dist gitignored；pm-20 `.gitkeep` 移除後無 build drift）
+
+### 16.2 pm-44 / GA4-enable-2 push source
+
+- 動作：`git push origin main`
+- 結果：fast-forward `8a915b6..09b9a67`
+- post-push sync；deploy 維持 `06e26ae`（線上仍未啟用）
+
+### 16.3 pm-45 / GA4-enable-3 deploy gh-pages
+
+- deploy commit：`f32f7d3 deploy: 09b9a67 snapshot (GA4 enabled)`
+- 流程（mirror pm-6 deploy phase B）：find 清空 deploy repo（保留 `.git` + `.nojekyll`）→ `cp -r dist/*` → commit + push gh-pages
+- diff：23 HTML 各 +7 行（gtag script block）；161 insertions / 0 deletions
+- `assets/` / `sitemap.xml` / `robots.txt` 未動（byte-equivalent）
+- push 結果：fast-forward `06e26ae..f32f7d3  gh-pages -> gh-pages`
+
+### 16.4 pm-46 / GA4-enable-4 realtime smoke test（本批）
+
+- 性質：純 read-only smoke test + docs note；本 phase 含 docs-only commit；未 push（per spec 限制）
+- **線上原始 HTML 驗證**（`curl -s`；非 WebFetch 之 markdown 轉換）：
+  - `https://babel-lab.github.io/portable-blog-system/` ✅ HTTP 200；Content-Length 6024；含 `<script async src="...?id=G-C77SMPF8VD">` + `gtag('config', 'G-C77SMPF8VD')`
+  - `https://babel-lab.github.io/portable-blog-system/posts/github-pages-blog-planning/` ✅ 同上
+  - Last-Modified `Thu, 21 May 2026 07:11:54 GMT` ← 對齊本批 deploy 時間
+  - Strict-Transport-Security ✅ HSTS（GitHub Pages 原生 HTTPS）
+- **gtag.js endpoint 驗證**：
+  - `https://www.googletagmanager.com/gtag/js?id=G-C77SMPF8VD` ✅ 返回有效 minified JavaScript（Google Tag Manager 程式碼）
+  - 確認 measurementId `G-C77SMPF8VD` 被 Google 端**識別**（GA4 property 存在 + ID 格式正確）
+
+### 16.5 GA4 ID 共用註記（重要）
+
+| 項目 | 內容 |
+|---|---|
+| **目前 GA4 measurementId** | `G-C77SMPF8VD` |
+| **Blogger（`babel-lab.blogspot.com`）** | ✅ 既有；使用同一 measurementId（user 確認）|
+| **GitHub Pages（`babel-lab.github.io/portable-blog-system/`）** | ✅ 本批 pm-45 啟用；同一 measurementId |
+| **未來 custom domain** | ✅ **沿用同一 measurementId**（per user 規劃；GA4 property 不綁 hostname；Data Stream 之 Website URL 為 metadata 識別用，可後續更新）|
+| **資料分離方式** | 後續可於 GA4 後台用 hostname filter / segment 分析 Blogger vs GitHub vs custom domain 之來源 |
+
+### 16.6 Future migration checklist（不在本 phase scope）
+
+⚠️ 以下項目**不**在 GA4-enable 系列之 scope；列為 future migration 之 reminder：
+
+| 項目 | 狀態 | 觸發時機 |
+|---|---|---|
+| **Custom domain** for GitHub Pages | deferred；預計 5 月底 / 6 月初啟動 | user 申請 domain 後 |
+| **GitHub Pages DNS check** + TLS certificate provisioning | deferred | custom domain 設定後 |
+| **GitHub Pages Enforce HTTPS** | deferred | TLS provisioning 完成後 |
+| **`content/settings/site.config.json` `githubSiteUrl`** | 當前 `https://babel-lab.github.io/portable-blog-system` | custom domain 上線後更新 |
+| **siteUrl 推導鏈**（canonical / og:url / JSON-LD url / sitemap `<loc>`）| 自動沿用 `githubSiteUrl`；改 1 處 settings 即可 | 同上 |
+| **`dist/sitemap.xml`** 新 domain | rebuild 後自動帶 | 同上 |
+| **`dist/robots.txt`** Sitemap reference | 同上 | 同上 |
+| **GA4 Data Stream Website URL** | 當前 `https://babel-lab.github.io/portable-blog-system/`；measurementId 不變 | custom domain 上線後於 GA4 後台更新 |
+| **Google Search Console** | 需新增 custom domain property + verify ownership + submit 新 sitemap | custom domain 上線後 |
+| **Google AdSense** | deferred；user 目標於 custom domain 後送審 + 放廣告 | custom domain + HTTPS Enforce 完成後 |
+| **`ads.txt`** | deferred；AdSense 啟用後需於網站根放此檔 | AdSense 審核通過後 |
+| **`hostname allowlist / GA4 hostname 觀察`** | deferred；現有 `isProdBuild` gating 已涵蓋 dev/build；preview mode 邊界當前可接受 | 觀察 1-2 週 GA4 資料；若有 hostname 污染再啟動 |
+| **Blogger 與 GitHub Pages 流量分離分析設定**（GA4 後台 filter / segment）| deferred；可選 | user 想分析時 |
+
+### 16.7 user 端 GA4 Realtime 驗收 checklist（**user 須親自執行**）
+
+assistant 無法登入 GA4 後台；以下 7 步驟由 user 親自完成：
+
+| # | 動作 | 預期結果 |
+|---|---|---|
+| 1 | 登入 [Google Analytics](https://analytics.google.com/) 並選 `G-C77SMPF8VD` 對應 property | 進入 GA4 後台 |
+| 2 | 至 **Reports → Realtime（即時）** 報表 | 進入即時報表頁 |
+| 3 | 開新分頁訪問 `https://babel-lab.github.io/portable-blog-system/`（hard refresh Ctrl+F5）| 載入首頁 |
+| 4 | 等待 30 秒 ~ 2 分鐘 + 切回 GA4 Realtime | Active users（前 30 分鐘）顯示 `>= 1` |
+| 5 | 確認「Event count by Event name」含 `page_view` | page_view event 進入 |
+| 6 | 訪問另一 URL（如 `/posts/github-pages-blog-planning/`）→ 等 30 秒 | Realtime 顯示 2+ pageviews / 2+ unique pages |
+| 7 | （可選）DevTools → Network → 篩 `gtag.js` | HTTP 200 + URL `https://www.googletagmanager.com/gtag/js?id=G-C77SMPF8VD` |
+
+**若 step 4 無資料**：
+- 等 5-10 分鐘（GA4 後台 propagation 可能略慢）
+- 檢查 GA4 後台 property + Data Stream 是否啟用（status: Active）
+- 檢查 measurementId 是否拼字正確（`G-C77SMPF8VD`；10 位英數）
+- 若 GA4 端 Data Stream 之 Enhanced Measurement 未開 → 仍應有 page_view event；但其他 event（scroll / outbound clicks）不發
+
+### 16.8 commit / push 狀態
+
+- 本批 commit：docs-only（本 §16 append）；commit message 預定 `docs(analytics): record ga4 realtime smoke test result`
+- **本批不 push**（per spec 限制：先回報修改內容；user 明示後另開 push phase）
+
+### 16.9 deferred items 狀態更新（pm-46 後）
+
+| # | 候選 | 狀態 |
+|---|---|---|
+| 1 | ~~C-2 GA4 prod-only gating~~ | ✅ 完成（per §11.6）|
+| 2 | ~~`.gitkeep` emptyOutDir 長期策略~~ | ✅ 完成（per §12.5）|
+| 3 | ~~S-3 fixture 補 FB metadata~~ | ✅ 完成（per §14.8）|
+| 4 | ~~Option B validate-level fbPublished rule~~ | ✅ 完成（per §14.8）|
+| 5 | ~~GA4 真實啟用~~ | ✅ **完成**（pm-43 ~ pm-46；commits `09b9a67` + deploy `f32f7d3`）|
+| 6 | hostname allowlist | deferred；等 GA4 啟用後觀察 1-2 週再評估 |
+
+**剩餘 deferred items 數**：**1**（hostname allowlist；觀察期）
+
+### 16.10 今日 commits 統計（pm-46 補記時點）
+
+- **source commits**：26（pm-40 時點 25 + pm-43 GA4 enable `09b9a67` + pm-46 本批 commit 為第 27 個）
+- **deploy commits**：2（pm-6 `06e26ae` + pm-45 `f32f7d3`）
+- **push 狀態**：source main 已 push origin/main 至 `09b9a67`（pm-44）；deploy gh-pages 已 push origin/gh-pages 至 `f32f7d3`（pm-45）；pm-46 本批 commit 將為新 `[ahead 1]`
+- **validate baseline**：`0 error / 39 warning / 34 posts`（pm-34 起）
+- **GA4 status**：✅ **production live**（measurementId `G-C77SMPF8VD`；Blogger + GitHub Pages 共用；user 待自跑 Realtime 驗收）
+
+---
+
 （本文件結束）
