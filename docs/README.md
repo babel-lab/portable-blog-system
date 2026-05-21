@@ -197,40 +197,53 @@ npm run check:images
 
 ## §7 今日穩定 baseline
 
-（更新時點：2026-05-21；pm-28 後快照）
+（更新時點：2026-05-21；pm-64 後快照）
 
-- HEAD: `4b7120f docs(project): record remaining deferred review` （pm-26 後 push origin/main；pm-28 為本批 baseline cleanup commit；本 §7 自身落後 1 commit 為既知遞迴）
+- HEAD: `fc02a56 docs(admin): record platform routing extension manual verification` （pm-63 後 push origin/main；pm-64 為本批 baseline sync commit；本 §7 自身落後 1 commit 為既知遞迴）
 - branch: `main` / tracking `origin/main` / 與 remote 同步
 - working tree: clean
-- deploy repo HEAD: `06e26ae deploy: 68cfddb snapshot (SEO noindex + DS-3 CSS + admin overview polish)`（pm-6 已 push `origin/gh-pages`；pm-13 / pm-19 / pm-21 / pm-23 / pm-26 皆確認本日後續 commits 不需 deploy；deploy repo 自 pm-6 起未動）
-- validate baseline: `0 error(s) / 38 warning(s) on 33 issue-post(s)`
-- dist/sitemap.xml: 14 url entries（mid-5 / pm-11 / pm-20 build 確認；pm-6 deploy 已上線）
+- deploy repo HEAD: `f32f7d3 deploy: 09b9a67 snapshot (GA4 enabled)`（**今日 2 個 deploy**：pm-6 `06e26ae`（SEO noindex + DS-3 CSS + admin overview polish）+ **pm-45 `f32f7d3`**（**GA4 enabled with measurementId G-C77SMPF8VD**）；皆已 push `origin/gh-pages`；deploy repo 自 pm-45 起未動；後續 commits 皆確認不需 deploy）
+- validate baseline: `0 error(s) / 39 warning(s) on 34 post(s)`（pm-34 加 `fb-post-url-missing` rule + negative fixture；+1 warning 變動合理）
+- dist/sitemap.xml: 14 url entries（mid-5 / pm-11 / pm-20 / pm-43 build 確認；pm-6 + pm-45 deploy 已上線）
 - dist/.gitkeep: **已從 source repo 移除**（pm-20 commit `3917526` Option A.1；`.gitignore` 對應 `!dist/.gitkeep` 一行同步移除；build 後 drift 從根源消除；其他 3 個 `dist-*/.gitkeep` 保留）
-- 今日 commits 總計 **20 source + 1 deploy**（pm-28 commit 後將為 21 source）
+- **GA4 status**：✅ **production live**（measurementId `G-C77SMPF8VD`；Blogger + GitHub Pages 共用；future custom domain 沿用；user 於 pm-46 手動驗收 Realtime 通過）
+- 今日 commits 總計 **37 source + 2 deploy**（pm-64 commit 後將為 38 source）
 - 今日 commits 純線性堆疊；無 amend / rebase / force；source main 已 sync `origin/main`；deploy gh-pages 已 sync `origin/gh-pages`
 - 今日重點摘要：
   - Admin overview polish（am-2 ~ am-7：C-1 README baseline / C-4 audit / S-1 empty states / S-4 tooltips / S-2 linkify / S-5 docs sync）
-  - C-3 Admin-only fbPublished P3 rule（mid-1 pre-analysis / mid-2 C-3-a loader + EJS / mid-3 C-3-c docs sync 4 docs；validate-level rule 仍 deferred）
-  - Dev route 404 fix（mid-4-a diagnosis / mid-4-b basePath dev/build 分流 / mid-4-c user 手測通過 + verification doc）
-  - Production sanity check（mid-5 build 成功 + mid-5-b dist/.gitkeep restore + docs §10）
-  - README baseline sync × 3（pm-1 / pm-17 / 本批 pm-28）
-  - End-of-day report（pm-2 docs 落地；pm-7 線上 smoke test；pm-8 EOD §10；pm-14 EOD §11 GA4 series；pm-22 EOD §12 .gitkeep；pm-25 EOD §13 remaining deferred）
-  - Source push × 8（pm-4 首次 push 13 commits + upstream / pm-9 / pm-12 / pm-15 / pm-18 / pm-21 / pm-23 / pm-26）
-  - Deploy phase B（pm-6：dist → deploy repo → push gh-pages → 線上 smoke test 通過 / pm-13 / pm-19 / pm-21 / pm-23 / pm-26 皆確認後續 commits 不需 deploy）
-  - C-2 GA4 prod-only gating 機制就位（pm-10 preflight → pm-11 Option A implementation commit `92f4f07` → pm-12 push → pm-13 deploy decision；**GA4 仍未啟用**）
-  - `.gitkeep` emptyOutDir 長期策略 Option A.1（pm-19 review / pm-20 commit `3917526` 移除 + pm-21 push / pm-22 EOD §12 commit `ce2097e` + pm-23 push；drift 從根源消除）
-  - Deferred items read-only review × 2（pm-16 / pm-24）
-  - Today full phase rhythm read-only review（pm-27；無 commit）
-- 後段重要 commits 追蹤：`ef915b8`（pm-17 README baseline）/ `3917526`（pm-20 dist gitkeep 移除）/ `ce2097e`（pm-22 EOD §12）/ `4b7120f`（pm-25 EOD §13）
-- 已解除 deferred items（**2 項**）：
-  - **C-2 GA4 prod-only gating**（機制就位；commit `92f4f07`；GA4 啟用仍 deferred）
-  - **`.gitkeep` emptyOutDir 長期策略**（Option A.1；commit `3917526`）
-- 仍未啟動 deferred items（**4 項**；需 user 決策）：
-  - **GA4 真實啟用**（measurementId + enabled=true；需 user 取得 `G-XXXXXXXXXX`）
-  - **S-3 fixture 補 FB metadata 真實樣本**（需 user 決定 placeholder / 真實 URL / 日期策略）
-  - **Option B validate-level fbPublished rule**（需 user 決定 severity；warning vs error）
-  - **hostname allowlist / GA4 runtime gating 細化**（user Option B/C；GA4 啟用後再評估）
-- 今日完整收尾報告：`docs/20260521-end-of-day-report.md`（§1-§13；含 GA4 gating series / .gitkeep cleanup / remaining deferred review）
+  - C-3 Admin-only fbPublished P3 rule（mid-1 ~ mid-3；commits `edbf6d0` + `022d8bd`）
+  - Dev route 404 fix（mid-4-a/b/c；commit `7c9f7ea` + verification doc）
+  - Production sanity check + first deploy（mid-5 / pm-6；deploy `06e26ae` 上線通過 smoke test）
+  - End-of-day report（§1-§17；自 pm-2 漸進建構至 pm-62 §17）
+  - **C-2 GA4 prod-only gating 機制就位**（pm-11 commit `92f4f07`；4-AND gating Option A）
+  - **`.gitkeep` emptyOutDir 長期策略 Option A.1**（pm-20 commit `3917526` 根源消除 drift）
+  - **S-3 fixture + Option B validate-level rule**（pm-31 + pm-34；commits `0d4d821` + `13e38ba`；rule `fb-post-url-missing` warning-only）
+  - **🎉 GA4 真實啟用全鏈完成**（pm-43 configure `09b9a67` → pm-44 push → pm-45 deploy `f32f7d3` → pm-46 user Realtime 驗收通過）
+  - **UTM naming registry + content platform routing docs**（pm-48 / pm-49 / pm-52 / pm-55；registry 對齊 production snake_case convention）
+  - **Admin Platform Routing read-only extension**（pm-57 loader cheap derived 4 fields `a34e909` + pm-59 EJS detail section `a285183`；user pm-62 手動驗收通過；utmPreviewUrl + list badge 暫緩）
+  - 多次 README baseline sync（pm-1 / pm-17 / pm-28 / 本批 pm-64）+ source push 16+ 次
+- 後段重要 commits 追蹤：`92f4f07`（C-2 GA4 gating）/ `3917526`（`.gitkeep` 移除）/ `09b9a67`（**GA4 production enable**）/ deploy `f32f7d3`（**GA4 上線**）/ `13e38ba`（Option B rule + negative fixture）/ `d1e5858`（GA4 / UTM registry）/ `023227e`（content platform routing）/ `ebfe254`（UTM registry 對齊既有）/ `21cfa06`（Admin platform routing plan）/ `a34e909`（Admin loader cheap derived）/ `a285183`（Admin EJS Platform Routing section）/ `fc02a56`（Admin manual verification docs）
+- **已解除 deferred items（共 6 項）**：
+  - C-2 GA4 prod-only gating（機制就位；commit `92f4f07`）
+  - `.gitkeep` emptyOutDir 長期策略（Option A.1；commit `3917526`）
+  - S-3 fixture 補 FB metadata（populated + missing case；commits `0d4d821` + `13e38ba`）
+  - Option B validate-level `fb-post-url-missing` rule（commit `13e38ba`）
+  - **GA4 真實啟用**（source `09b9a67` + deploy `f32f7d3`；user Realtime 驗收通過）
+  - **UTM naming reconciliation**（pm-52 registry 對齊既有 snake_case；commit `ebfe254`）
+- **仍未啟動 deferred items（1 項；需 user 決策）**：
+  - **hostname allowlist / GA4 runtime gating 細化**（user Option B/C；等 GA4 啟用後觀察 1-2 週）
+- 今日新增 / 更新之重要 docs：
+  - `docs/ga4-parameter-naming-registry.md`（pm-48 新增 + pm-52 對齊既有 snake_case）
+  - `docs/content-platform-routing.md`（pm-49 新增）
+  - `docs/admin-platform-routing-extension-plan.md`（pm-55 新增）
+  - `docs/20260521-end-of-day-report.md`（pm-2 新增；§10/§11/§12/§13/§14/§15/§16/§17 漸進補記）
+  - `docs/20260521-dev-route-fix-verification.md`（mid-4-c 新增 + mid-5-b §10）
+  - `docs/20260521-admin-overview-display-audit.md`（C-4 新增）
+  - `docs/admin-1-completion-report.md` §13（多批 append）
+  - `docs/fb-sidecar-schema.md` §3.5.5 / `docs/phase-2-candidate-roadmap.md` §1.2 / §1.3（多批 docs sync）
+- **暫緩（user 已表態）**：utmPreviewUrl Admin display / list platform indicator badge（Admin detail panel 資訊已偏長）
+- **不在 scope（schema 未定 / 阻擋條件多）**：platformMigrationNote schema / custom domain migration / AdSense / `ads.txt` / hostname allowlist 實作
+- 今日完整收尾報告：`docs/20260521-end-of-day-report.md`（§1-§17；含 GA4 gating series / .gitkeep cleanup / S-3 fixture / Option B rule / GA4 真實啟用 / UTM registry alignment / Admin Platform Routing extension）
 - 昨日完整收尾報告：`docs/20260520-end-of-day-report.md`
 
 ---
