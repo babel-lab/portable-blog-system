@@ -5,7 +5,7 @@
 對應上層：
 - `docs/ga4-enable-preflight.md`（GA4 啟用流程 + 既有設定盤點）
 - `docs/seo-ga4-adsense.md`（GA4 event spec；既有 9 個 events）
-- `CLAUDE.md` §16.4（既有 Blogger / GitHub cross-link UTM 規則；本 registry 有 drift；見 §9）
+- `CLAUDE.md` §16.4（既有 Blogger / GitHub cross-link UTM 規則；pm-52 後 registry 已對齊；見 §9）
 - `content/settings/promotion.config.json`（既有 FB UTM；本 registry 有部分 drift；見 §9）
 
 ⚠️ **本文件不修改 source code / settings / build / dist / deploy**；屬規格參考；後續實作對齊由獨立 phase 啟動。
@@ -51,11 +51,13 @@
 
 | 欄位 | 命名規則 | 範例 |
 |---|---|---|
-| `utm_source` | **小寫**；單一 token；無底線 / 連字符 | `facebook` / `blogger` / `github` |
+| `utm_source` | **小寫**；允許 `_` 連字（per cross-link UTM 既有實作）| `facebook` / `blogger` / `github_pages` |
 | `utm_medium` | **小寫**；單一 token | `social` / `referral` / `email` / `internal` |
-| `utm_campaign` | **小寫 kebab-case**（`-` 連字）| `book-review-2026q2` / `fan1-post` / `cross-link` |
-| `utm_content` | **小寫 kebab-case**；用於 post slug / series no / CTA variant | `we-media-myself2` / `series-3-c-c` / `cta-bottom` |
+| `utm_campaign` | **小寫**；cross-link / FB promotion UTM 採 **snake_case**（對齊既有 production）；個別主題 campaign 名（如 `fbCampaign` / Admin 顯示之手填 campaign）可用 **kebab-case** | cross-link: `portable_blog_system`；FB pattern: `{page}_post`；fbCampaign 範例: `book-review-2026q2` / `life-comic-parenting` |
+| `utm_content` | **小寫**；cross-link UTM 採 **snake_case** slot（`related_links` / `other_links`）；個別 slug / variant 可用 **kebab-case** | cross-link slot: `related_links` / `other_links`；slug 範例: `we-media-myself2`；variant: `cta-bottom` |
 | `utm_term` | **小寫**；通常用於 keyword 追蹤；本系統不主動使用 | n/a（保留）|
+
+**雙 case 策略說明**：cross-link 與 FB promotion 之 UTM slot 為**自動生成**之系統 token（per `src/scripts/ga4-url-builder.js` + `content/settings/promotion.config.json`）；採 snake_case 對齊現有 production output（per pm-9 章節既有實作）。個別「主題 campaign」名（如 `fbCampaign` 由作者手填）為使用者命名空間；可採 kebab-case；屬可分流之 naming convention。
 
 ### 3.1 禁止之 case drift
 
@@ -63,9 +65,9 @@
 |---|---|
 | `FB` / `Facebook` / `fb` | **`facebook`** |
 | `Blogger` / `BLOG` | **`blogger`** |
-| `GitHub` / `GH` / `github_pages` | **`github`**（per pm-48；⚠️ 與 CLAUDE.md §16.4 既有 `github_pages` drift；見 §9）|
+| `GitHub` / `GH` / `github` | **`github_pages`**（cross-link UTM 採此既有 snake_case 雙 token；per `CLAUDE.md` §16.4 + `src/scripts/ga4-url-builder.js`；對齊 production）|
 | `FAN1` / `Fan1` | **`fan1`** |
-| `Book_Review` / `BookReview` | **`book-review`** |
+| `Book_Review` / `BookReview` | **`book-review`**（kebab；屬個別 fbCampaign 命名空間）|
 | `2026Q2` | **`2026q2`** |
 
 ### 3.2 不加 UTM 之情境
@@ -88,26 +90,30 @@
 |---|---|
 | `utm_source` | `facebook` |
 | `utm_medium` | `social` |
-| `utm_campaign` | `{page}-post`（pm-48 規則；kebab-case；⚠️ 現有 `promotion.config.json` 用 `{page}_post` snake；見 §9）|
-| `utm_content` | `{slug}`（即 post slug）|
+| `utm_campaign` | `{page}_post`（per `content/settings/promotion.config.json` 之 `campaignPattern` 既有設定；snake_case；對齊 production）|
+| `utm_content` | `{slug}`（即 post slug；per `contentPattern`）|
 
-### 4.2 Blogger → GitHub Pages cross-link
+### 4.2 Blogger → GitHub Pages cross-link（**future phase；尚未實作**）
+
+per `CLAUDE.md` §16.4：當 Blogger 端 cross-link 自動化實作時，**對齊 GitHub→Blogger 既有命名 convention 之 mirror**：
 
 | 欄位 | 值 |
 |---|---|
 | `utm_source` | `blogger` |
 | `utm_medium` | `referral` |
-| `utm_campaign` | `cross-link`（pm-48 建議；可細分為 `cross-link-from-blogger`）|
-| `utm_content` | `related-links` / `other-links` / `inline-link`（依連結位置）|
+| `utm_campaign` | `portable_blog_system`（snake_case；mirror §4.3）|
+| `utm_content` | `related_links` / `other_links`（snake_case；mirror §4.3）|
 
-### 4.3 GitHub Pages → Blogger cross-link
+### 4.3 GitHub Pages → Blogger cross-link（**已實作；production live**）
+
+per `CLAUDE.md` §16.4 + `src/scripts/ga4-url-builder.js`：自 pm-6 / pm-45 deploy 起 production live；對齊既有 snake_case convention：
 
 | 欄位 | 值 |
 |---|---|
-| `utm_source` | `github`（pm-48 建議；⚠️ 與 CLAUDE.md §16.4 既有 `github_pages` drift；見 §9）|
+| `utm_source` | `github_pages`（snake_case；雙 token；對齊既有實作）|
 | `utm_medium` | `referral` |
-| `utm_campaign` | `cross-link`（或 `portable-blog-system`；kebab-case；⚠️ 與 CLAUDE.md §16.4 既有 `portable_blog_system` snake drift；見 §9）|
-| `utm_content` | `related-links` / `other-links` |
+| `utm_campaign` | `portable_blog_system`（snake_case；對齊既有實作）|
+| `utm_content` | `related_links` / `other_links`（snake_case slot；對齊既有實作）|
 
 ### 4.4 Internal cross-link（同站）
 
@@ -130,7 +136,7 @@
 | 既有 | 對齊建議 |
 |---|---|
 | `promotion.config.json` `pages.fan1.name` | ✅ 保留 lowercase `fan1`（已對齊）|
-| `utm_campaign={page}_post` → `fan1_post` | ⚠️ snake_case；pm-48 建議 kebab → `fan1-post`；屬 §9 drift |
+| `utm_campaign={page}_post` → `fan1_post` | ✅ snake_case；對齊 production；per pm-52 決策維持既有 |
 | `fb.md` 之 `page: "fan1"` | ✅ lowercase（已對齊）|
 
 ### 5.2 系列文章 campaign 命名
@@ -143,7 +149,7 @@
 | 教具下載 | `download-{material}`；如 `download-flashcards` |
 | GitHub 技術筆記 | `tech-note-{topic}`；如 `tech-note-vite-build` |
 | 講座 / 活動 | `event-{name}-{YYYYMM}`；如 `event-figma-workshop-202607` |
-| 跨站 cross-link 通用 | `cross-link` 或更細 `cross-link-{from-host}` |
+| 跨站 cross-link 通用（自動生成 UTM slot）| `portable_blog_system`（per §4.2 / §4.3 既有實作）；個別 cross-link campaign 標記則用作者命名空間 |
 
 ### 5.3 audience 命名（per `.fb.md` 之 `audience` 欄位）
 
@@ -249,27 +255,59 @@
 
 ---
 
-## §9 已知 drift（**本批不修正**；列為 future reconciliation）
+## §9 已決策：registry 對齊既有 implementation（pm-52 後）
 
-本 registry 為新建之 single source of truth；既有實作有以下 drift 待 reconciliation phase 對齊：
+pm-51 preflight 識別 5 個 drift；pm-52（本 batch）user 決議**改 registry 對齊既有 implementation**，**不改 source / production output**。
 
-| # | 既有實作 | 本 registry 規範 | drift 維度 |
+### 9.1 決策摘要
+
+| # | 維度 | 既有實作（保留） | pm-52 後 registry |
 |---|---|---|---|
-| 1 | `CLAUDE.md` §16.4 `utm_source=github_pages` | §4.3 之 `utm_source=github` | source 命名（單 token vs 雙 token）|
-| 2 | `CLAUDE.md` §16.4 `utm_campaign=portable_blog_system` | §4.3 之 `cross-link`（kebab-case）| case style（snake vs kebab）|
-| 3 | `CLAUDE.md` §16.4 `utm_content=related_links` / `other_links` | §3 + §4.3 之 `related-links` / `other-links`（kebab-case）| case style（snake vs kebab）|
-| 4 | `content/settings/promotion.config.json` `campaignPattern: "{page}_post"` | §4.1 之 `{page}-post`（kebab-case）| case style |
-| 5 | `src/scripts/ga4-url-builder.js` 之既有 UTM 構建 + `build-github.js` 之 deriveRenderedCrossLinks（per CLAUDE.md §16.4 已實作）| 本 registry 之 §3 + §4 規範 | 實作端對齊 future reconciliation |
+| 1 | cross-link `utm_source` | `github_pages`（snake；雙 token；per `src/scripts/ga4-url-builder.js:147`）| ✅ 對齊既有 `github_pages` |
+| 2 | cross-link `utm_campaign` | `portable_blog_system`（snake；per `ga4-url-builder.js:149`）| ✅ 對齊既有 `portable_blog_system` |
+| 3 | cross-link `utm_content` | `related_links` / `other_links`（snake slot；per `ga4-url-builder.js:130, 150` + `build-github.js:480-481`）| ✅ 對齊既有 snake_case slot |
+| 4 | FB `campaignPattern` | `{page}_post`（snake；per `promotion.config.json:14`）| ✅ 對齊既有 `{page}_post` |
+| 5 | FB `fbCampaign` 等個別 campaign 名（作者命名空間）| 範例：`book-review-fixture-2026q2`（kebab；user 命名）| ✅ 保留 **kebab-case**（屬作者個別 campaign，不等同 cross-link UTM slot；雙 case 策略合理）|
 
-### Reconciliation 路徑（屬未來 phase；非本批）
+### 9.2 決策理由
 
-| 方向 A | 方向 B |
-|---|---|
-| **改本 registry 對齊既有實作**（採 snake_case；少改 source）| **改既有實作對齊本 registry**（採 kebab-case；多改 source / CLAUDE.md）|
-| ✅ 對線上既已上線之 UTM 連結不破壞（昨日 deploy `4ecd92d` 含 `utm_source=github_pages` 已上 Google 索引）| ⚠️ 線上既有 UTM 連結之改動會影響 GA4 報表連續性；snake → kebab 之 source 改動屬 breaking change |
-| ⚠️ 但 pm-48 spec 明示之 kebab-case 偏好被推翻 | ✅ 對齊 user pm-48 spec |
+- ✅ 線上 cross-link UTM 已 deploy（pm-6 / pm-45）；Google 已索引
+- ✅ GA4 Realtime 已 user 手測驗收通過（pm-46）；不破壞 dimension 連續性
+- ✅ Blogger 既有 share URL 已散佈外部；無法統一改
+- ✅ 內部一致性比命名漂亮更重要
+- ✅ pm-48 registry 為新建文件；尚可修正為對齊既有
 
-→ 建議 **後續 phase 由 user 決議方向**；本 registry 暫採 pm-48 spec 之 kebab + 單 token source；既有實作之 snake_case + `github_pages` 屬 legacy reconciliation 範圍。
+### 9.3 雙 case 策略對齊
+
+| 場景 | case style | 來源 |
+|---|---|---|
+| cross-link UTM（自動生成；系統 token）| **snake_case** | `ga4-url-builder.js` + `build-github.js` 既有實作 |
+| FB promotion 之 `campaignPattern: "{page}_post"`（自動生成）| **snake_case** | `promotion.config.json` 既有設定 |
+| `fbCampaign` 等個別 campaign 名（作者手填）| **kebab-case**（可選；屬 user namespace）| `.fb.md` `fbCampaign` 欄位；如 `book-review-fixture-2026q2` |
+| FB promotion `{slug}` 帶入 `utm_content` | 沿 slug 本身格式（通常 kebab；如 `we-media-myself2`）| `.md` frontmatter `slug` |
+
+→ 此雙 case 策略對齊**現實邊界**：系統自動生成之 token 維持 snake_case（一致性 + 對齊既有 production）；作者命名空間允許 kebab-case（語意豐富）。
+
+### 9.4 ⚠️ 未來若要改 kebab-case 之警告
+
+若 user 未來決定全 cross-link UTM 改 kebab-case，**必須另開 breaking-change migration phase**，並包含：
+
+- 改 `src/scripts/ga4-url-builder.js`（3 處硬編碼字串）
+- 改 `src/scripts/build-github.js`（2 處 slot 字串）
+- 改 `content/settings/promotion.config.json` `campaignPattern`
+- 改 `CLAUDE.md` §16.4 規範
+- 改 `docs/related-links-schema.md:212` 規格
+- 改 `src/views/pages/post-detail.ejs:183` 註解
+- **GA4 後台**設定 segment / filter 處理過渡期之新舊 source/campaign/content dimension 並存
+- 重 build + deploy → 線上 cross-link URL 變
+- 監控 GA4 報表之 source/campaign continuity 1-2 週
+- 評估 Google SEO 之 utm query 變動影響
+
+⚠️ 屬 **breaking change**；不在本 registry scope；需 user 明示啟動。
+
+### 9.5 remaining drift
+
+🟢 **0 個 remaining drift**（pm-52 後 registry 完整對齊既有實作）。
 
 ---
 
