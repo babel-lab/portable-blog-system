@@ -828,6 +828,25 @@ export function validateContent({ posts, settings }) {
           value: `typeof=${typeof fbData.titleEn}`,
         });
       }
+
+      // Phase 20260521-pm-34：fb-post-url-missing rule（warning-only）
+      //   對齊 Admin completeness.fbPublished P3 規則（per pm-11 / docs/fb-sidecar-schema.md §3.5.5）
+      //   觸發：.fb.md enabled=true && .md status='published' && fbPostUrl 為空
+      //   不觸發：.fb.md 不存在 / enabled=false / status 非 published / fbPostUrl 非空
+      //   fbPostedAt / fbPostId / fbCampaign 為補充欄位；不單獨檢查（per Admin loader 同步）
+      if (
+        fbData &&
+        fbData.enabled === true &&
+        status === 'published' &&
+        (typeof fbData.fbPostUrl !== 'string' || fbData.fbPostUrl === '')
+      ) {
+        issues.push({
+          severity: 'warning',
+          type: 'fb-post-url-missing',
+          sourcePath,
+          value: `.fb.md enabled=true && .md status='published' but fbPostUrl is empty (status=${status})`,
+        });
+      }
     }
   }
 
