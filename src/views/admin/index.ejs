@@ -258,8 +258,8 @@
           <span class="badge <%= p.completeness.fbPublished === 'ok' ? 'b-ok' : 'b-missing' %>" title="fb.enabled=false 或 fbPostUrl/fbPostedAt 有值 → ok；fb.enabled=true 但兩欄位皆空 → missing">FB pub <%= p.completeness.fbPublished %></span>
         </td>
         <td class="col-urls">
-          <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <%= p.blogger.publishedUrl %></div><% } %>
-          <% if (p.github.previewUrl) { %><div class="mono">🐙 <%= p.github.previewUrl %></div><% } %>
+          <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a></div><% } %>
+          <% if (p.github.previewUrl) { %><div class="mono">🐙 <a href="<%= p.github.previewUrl %>" target="_blank" rel="noopener noreferrer"><%= p.github.previewUrl %></a></div><% } %>
           <% if (!p.blogger.publishedUrl && !p.github.previewUrl) { %><span class="text-muted">(empty)</span><% } %>
         </td>
       </tr>
@@ -312,7 +312,7 @@
               <dt>blogger.type</dt><dd class="mono"><%= p.blogger.type || '(empty)' %></dd>
               <dt>blogger.status</dt><dd class="mono"><%= p.blogger.status || '(empty)' %></dd>
               <dt>blogger.permalink</dt><dd class="mono"><%= p.blogger.permalink || '(empty)' %></dd>
-              <dt>blogger.publishedUrl</dt><dd class="mono"><%= p.blogger.publishedUrl || '(empty)' %></dd>
+              <dt>blogger.publishedUrl</dt><dd class="mono"><% if (p.blogger.publishedUrl) { %><a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a><% } else { %>(empty)<% } %></dd>
             </dl>
           </div>
 
@@ -322,7 +322,7 @@
               <dt>publishTargets.enabled</dt><dd><%= p.github.enabled %></dd>
               <dt>publishTargets.mode</dt><dd class="mono"><%= p.github.mode || '(empty)' %></dd>
               <dt>github.path</dt><dd class="mono"><%= p.github.path || '(empty)' %></dd>
-              <dt>github.previewUrl</dt><dd class="mono"><%= p.github.previewUrl || '(empty)' %></dd>
+              <dt>github.previewUrl</dt><dd class="mono"><% if (p.github.previewUrl) { %><a href="<%= p.github.previewUrl %>" target="_blank" rel="noopener noreferrer"><%= p.github.previewUrl %></a><% } else { %>(empty)<% } %></dd>
             </dl>
           </div>
 
