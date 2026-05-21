@@ -197,30 +197,40 @@ npm run check:images
 
 ## §7 今日穩定 baseline
 
-（更新時點：2026-05-21；pm-17 後快照）
+（更新時點：2026-05-21；pm-28 後快照）
 
-- HEAD: `ffb1b37 docs(project): record ga4 gating completion and deploy decision` （pm-15 後 push origin/main；pm-17 為本批 baseline cleanup commit；本 §7 自身落後 1 commit 為既知遞迴）
+- HEAD: `4b7120f docs(project): record remaining deferred review` （pm-26 後 push origin/main；pm-28 為本批 baseline cleanup commit；本 §7 自身落後 1 commit 為既知遞迴）
 - branch: `main` / tracking `origin/main` / 與 remote 同步
 - working tree: clean
-- deploy repo HEAD: `06e26ae deploy: 68cfddb snapshot (SEO noindex + DS-3 CSS + admin overview polish)`（pm-6 已 push `origin/gh-pages`；pm-13 確認 pm-11 之 ga4 gating 不需 deploy；deploy repo 自 pm-6 起未動）
+- deploy repo HEAD: `06e26ae deploy: 68cfddb snapshot (SEO noindex + DS-3 CSS + admin overview polish)`（pm-6 已 push `origin/gh-pages`；pm-13 / pm-19 / pm-21 / pm-23 / pm-26 皆確認本日後續 commits 不需 deploy；deploy repo 自 pm-6 起未動）
 - validate baseline: `0 error(s) / 38 warning(s) on 33 issue-post(s)`
-- dist/sitemap.xml: 14 url entries（mid-5 / pm-11 build 確認；pm-6 deploy 已上線）
-- dist/.gitkeep: tracked & clean（mid-5-b / pm-11 經驗：每次 build 後手動 restore；長期策略 deferred）
-- 今日 commits 總計 **16 source + 1 deploy**（pm-17 commit 後將為 17 source）
+- dist/sitemap.xml: 14 url entries（mid-5 / pm-11 / pm-20 build 確認；pm-6 deploy 已上線）
+- dist/.gitkeep: **已從 source repo 移除**（pm-20 commit `3917526` Option A.1；`.gitignore` 對應 `!dist/.gitkeep` 一行同步移除；build 後 drift 從根源消除；其他 3 個 `dist-*/.gitkeep` 保留）
+- 今日 commits 總計 **20 source + 1 deploy**（pm-28 commit 後將為 21 source）
 - 今日 commits 純線性堆疊；無 amend / rebase / force；source main 已 sync `origin/main`；deploy gh-pages 已 sync `origin/gh-pages`
 - 今日重點摘要：
   - Admin overview polish（am-2 ~ am-7：C-1 README baseline / C-4 audit / S-1 empty states / S-4 tooltips / S-2 linkify / S-5 docs sync）
   - C-3 Admin-only fbPublished P3 rule（mid-1 pre-analysis / mid-2 C-3-a loader + EJS / mid-3 C-3-c docs sync 4 docs；validate-level rule 仍 deferred）
   - Dev route 404 fix（mid-4-a diagnosis / mid-4-b basePath dev/build 分流 / mid-4-c user 手測通過 + verification doc）
   - Production sanity check（mid-5 build 成功 + mid-5-b dist/.gitkeep restore + docs §10）
-  - README baseline sync × 2（pm-1 + 本批 pm-17）
-  - End-of-day report（pm-2 docs 落地；pm-7 線上 smoke test；pm-8 EOD §10；pm-14 EOD §11 GA4 gating series）
-  - Source push × 3（pm-4 首次 push 13 commits + upstream / pm-9 pm-8 docs / pm-12 pm-11 GA4 gating / pm-15 pm-14 docs）
-  - Deploy phase B（pm-6：dist → deploy repo → push gh-pages → 線上 smoke test 通過 / pm-13 GA4 gating commit 不需 deploy）
+  - README baseline sync × 3（pm-1 / pm-17 / 本批 pm-28）
+  - End-of-day report（pm-2 docs 落地；pm-7 線上 smoke test；pm-8 EOD §10；pm-14 EOD §11 GA4 series；pm-22 EOD §12 .gitkeep；pm-25 EOD §13 remaining deferred）
+  - Source push × 8（pm-4 首次 push 13 commits + upstream / pm-9 / pm-12 / pm-15 / pm-18 / pm-21 / pm-23 / pm-26）
+  - Deploy phase B（pm-6：dist → deploy repo → push gh-pages → 線上 smoke test 通過 / pm-13 / pm-19 / pm-21 / pm-23 / pm-26 皆確認後續 commits 不需 deploy）
   - C-2 GA4 prod-only gating 機制就位（pm-10 preflight → pm-11 Option A implementation commit `92f4f07` → pm-12 push → pm-13 deploy decision；**GA4 仍未啟用**）
-  - Deferred items read-only review（pm-16）
-- 仍未啟動（pending；需 user 決策）：S-3 fixture 補 FB metadata / Option B validate-level fbPublished rule / `.gitkeep` emptyOutDir 長期策略 / **GA4 真實啟用**（measurementId + enabled=true）/ **hostname allowlist**（user Option B/C；GA4 啟用後再評估）
-- 今日完整收尾報告：`docs/20260521-end-of-day-report.md`（§1-§11；含 GA4 gating series）
+  - `.gitkeep` emptyOutDir 長期策略 Option A.1（pm-19 review / pm-20 commit `3917526` 移除 + pm-21 push / pm-22 EOD §12 commit `ce2097e` + pm-23 push；drift 從根源消除）
+  - Deferred items read-only review × 2（pm-16 / pm-24）
+  - Today full phase rhythm read-only review（pm-27；無 commit）
+- 後段重要 commits 追蹤：`ef915b8`（pm-17 README baseline）/ `3917526`（pm-20 dist gitkeep 移除）/ `ce2097e`（pm-22 EOD §12）/ `4b7120f`（pm-25 EOD §13）
+- 已解除 deferred items（**2 項**）：
+  - **C-2 GA4 prod-only gating**（機制就位；commit `92f4f07`；GA4 啟用仍 deferred）
+  - **`.gitkeep` emptyOutDir 長期策略**（Option A.1；commit `3917526`）
+- 仍未啟動 deferred items（**4 項**；需 user 決策）：
+  - **GA4 真實啟用**（measurementId + enabled=true；需 user 取得 `G-XXXXXXXXXX`）
+  - **S-3 fixture 補 FB metadata 真實樣本**（需 user 決定 placeholder / 真實 URL / 日期策略）
+  - **Option B validate-level fbPublished rule**（需 user 決定 severity；warning vs error）
+  - **hostname allowlist / GA4 runtime gating 細化**（user Option B/C；GA4 啟用後再評估）
+- 今日完整收尾報告：`docs/20260521-end-of-day-report.md`（§1-§13；含 GA4 gating series / .gitkeep cleanup / remaining deferred review）
 - 昨日完整收尾報告：`docs/20260520-end-of-day-report.md`
 
 ---
