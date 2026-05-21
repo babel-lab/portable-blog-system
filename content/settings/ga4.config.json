@@ -1,6 +1,6 @@
 {
-  "enabled": false,
-  "measurementId": "",
+  "enabled": true,
+  "measurementId": "G-C77SMPF8VD",
   "events": [
     "page_view",
     "internal_link_click",
