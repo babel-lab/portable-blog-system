@@ -568,4 +568,89 @@ Phase 20260522-am-1：README §7 baseline drift cleanup
 
 ---
 
+## 14. Evening S-3 fixture + Option B validate-level rule series（Phase 20260521-pm-30 → pm-35）
+
+本章節記錄今日晚段 S-3 fixture metadata 樣本 + Option B validate-level rule 之 6 個 phases（pm-30 pre-analysis / pm-31 populated fixture / pm-32 push / pm-33 rule pre-analysis / pm-34 rule implementation + negative fixture / pm-35 push）。屬 §11.6 / §13.6 之 S-3 + Option B 兩個 deferred items 之**解除**；其餘 GA4 真實啟用 + hostname allowlist 仍維持。
+
+### 14.1 pm-30 / S-3 fixture metadata strategy pre-analysis
+- 性質：read-only；無 commit
+- 4 個既有 sidecar 盤點（全 0 個有 fbPost* 欄位）
+- 4 個 Option（A 動正式 content placeholder / B 真實 URL / C validation-fixtures placeholder / D 只動 docs）
+- 推薦 **Option C**（不污染正式 content；專供 Admin / validate / unit test）
+
+### 14.2 pm-31 / S-3 populated fixture implementation
+- commit：`0d4d821 test(content): add fb post url metadata fixture`
+- 新增 2 個 fixture：
+  - `content/validation-fixtures/github/posts/_test-fb-post-url-populated.md`（minimal post；status=published）
+  - `content/validation-fixtures/github/posts/_test-fb-post-url-populated.fb.md`（enabled=true；fbPostUrl + fbPostedAt + fbPostId + fbCampaign 皆 schema-valid placeholder）
+- validate 結果：`0/38/33` 維持（縮短 description 後對齊 baseline）
+- 不動正式 content / src / docs / deploy
+
+### 14.3 pm-32 / push populated fixture
+- 動作：`git push origin main`
+- 結果：fast-forward `52ed1da..0d4d821`
+- post-push sync；deploy 維持 `06e26ae`
+
+### 14.4 pm-33 / Option B validate-level fbPublished rule pre-analysis
+- 性質：read-only；無 commit
+- 4 個 Option（A 只檢查 fbPostUrl / B 加 fbPostedAt / C 4 欄位完整 / D 不做）
+- 推薦 **Option A**（對齊 Admin loader P3 規則 DRY；最小 spec；零 false-positive）
+- severity 推薦 **warning**（保留升級空間）
+- rule name 推薦 **`fb-post-url-missing`**（mirror `fb-md-content-missing` 命名）
+- baseline 預估：`0/38/33` → `0/39/34`（+1 from negative fixture）
+
+### 14.5 pm-34 / fb-post-url-missing rule implementation + negative fixture
+- commit：`13e38ba feat(validate): add fb-post-url-missing rule for published posts`
+- 修改範圍（3 個檔案；+49 行）：
+  - `src/scripts/validate-content.js`（+19 行；新增 rule + comment block）
+  - `content/validation-fixtures/github/posts/_test-fb-post-url-missing.md`（新；status=published）
+  - `content/validation-fixtures/github/posts/_test-fb-post-url-missing.fb.md`（新；enabled=true；故意省略 fbPostUrl）
+- rule 觸發條件（4 條 AND）：
+  - `.fb.md` 存在 + `enabled === true`
+  - 對應 `.md` `status === 'published'`
+  - `fbPostUrl` 為空字串或非 string 型別
+- rule 不觸發條件：
+  - `.fb.md` 不存在 / `enabled === false` / `status !== 'published'` / `fbPostUrl` 非空
+- severity：**`warning`**（per pm-33 推薦）
+- validate 結果：**`0/39/34`** ✅（對齊 pm-33 §5 預期）
+  - 唯一新 warning 來自 `_test-fb-post-url-missing.md`
+  - 4 個 real `.fb.md` 對應之 `.md` `status` 皆為 `ready`；未觸發
+  - pm-31 populated fixture 未觸發（hasFbPostUrl=true）
+
+### 14.6 pm-35 / push pm-34 rule + fixture commit
+- 動作：`git push origin main`
+- 結果：fast-forward `0d4d821..13e38ba`
+- post-push sync；deploy 維持 `06e26ae`
+
+### 14.7 不 deploy 決策
+
+| 維度 | 結果 |
+|---|---|
+| commit `0d4d821` / `13e38ba` 對線上 GitHub Pages | ❌ 無影響（validation-fixtures 不出 dist；validate rule 為 source-level 規則）|
+| dist 之 production 內容 | ❌ 不變 |
+| 是否需要 deploy | ❌ **不需** |
+| deploy repo 凍結 | `06e26ae`（pm-6 deploy；未動）|
+
+### 14.8 deferred items 狀態更新（pm-35 後）
+
+| # | 候選 | 狀態 |
+|---|---|---|
+| 1 | ~~C-2 GA4 prod-only gating~~ | ✅ gating 完成（per §11.6；GA4 啟用仍 deferred）|
+| 2 | ~~`.gitkeep` emptyOutDir 長期策略~~ | ✅ Option A.1 完成（per §12.5）|
+| 3 | ~~S-3 fixture 補 FB metadata 真實樣本~~ | ✅ **populated + missing case 皆完成**（pm-31 + pm-34 fixtures；commits `0d4d821` + `13e38ba`）|
+| 4 | ~~Option B validate-level fbPublished rule~~ | ✅ **完成**（rule `fb-post-url-missing`；severity=warning；commit `13e38ba`）|
+| 5 | GA4 真實啟用（measurementId + enabled=true）| deferred；需 user 取得 `G-XXXXXXXXXX` |
+| 6 | hostname allowlist / GA4 runtime gating 細化 | deferred；依賴 #5 + 觀察期 |
+
+### 14.9 今日 commits 統計（pm-36 補記時點）
+
+- **source commits**：23（pm-25 時點 19 + pm-28 README baseline `52ed1da` + pm-31 fixture `0d4d821` + pm-34 rule `13e38ba` + pm-36 本批 commit 為第 24 個）
+- **deploy commits**：1（pm-6 `06e26ae`；pm-13 / pm-19 / pm-21 / pm-23 / pm-26 / pm-29 / pm-32 / pm-35 皆確認本日後續 commits 不需 deploy）
+- **push 狀態**：source main 全部已 push origin/main 至 `13e38ba`（含 pm-29 / pm-32 / pm-35）；pm-36 本批 commit 將為新 [ahead 1]
+- **deploy 凍結**：`06e26ae`
+- **deferred items 數**：2（GA4 真實啟用 + hostname allowlist）；今日累計解除 **4 項**（C-2 gating / `.gitkeep` / S-3 fixture / Option B rule）
+- **validate baseline**：`0 error / 39 warning / 34 posts`（pm-34 起；+1 warning from negative fixture；變動合理）
+
+---
+
 （本文件結束）
