@@ -21,6 +21,19 @@ async function readJsonSafe(jsonPath) {
   }
 }
 
+// Phase 20260521-pm-57：純函式 URL hostname helper
+//   - 用於 Admin platform routing derived 欄位（gaHostname）
+//   - 非 string 或無法 parse → null（不 throw）
+//   - 不寫入任何檔案；不影響 build / dist / deploy
+function deriveHostname(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 async function readFbSidecarMeta(fbPath) {
   // Phase 20260520-c-1：additive 補讀 FB post metadata 4 個欄位
   //   - per docs/fb-post-url-metadata-proposal.md §3.1 之 proposal 欄位
@@ -99,6 +112,7 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   const cover = typeof fm.cover === 'string' ? fm.cover : '';
   const coverAlt = typeof fm.coverAlt === 'string' ? fm.coverAlt : '';
   const titleEn = typeof fm.titleEn === 'string' ? fm.titleEn : '';
+  const primaryPlatform = typeof fm.primaryPlatform === 'string' ? fm.primaryPlatform : '';
   const blogger = {
     enabled: Boolean(fm?.publishTargets?.blogger?.enabled),
     mode: fm?.publishTargets?.blogger?.mode || '',
@@ -173,6 +187,34 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   if (!fb.exists) missingFields.push('.fb.md sidecar');
   if (fbPublishedMissing) missingFields.push('fbPostUrl');
 
+  // Phase 20260521-pm-57: Admin platform routing read-only derived 欄位
+  //   per docs/admin-platform-routing-extension-plan.md §3.1 之 B1 cheap derived
+  //   - canonicalTarget / platformUrl / gaHostname / githubStatus
+  //   - 純 derived；不新增 frontmatter schema；不影響 build / dist / deploy / validate baseline
+  //   - 不含 utmPreviewUrl（屬 pm-58 B2；需 import ga4-url-builder helper + 讀 promotion.config）
+  //   - 不含 platformMigrationNote（schema 未定；屬未來 phase）
+  const canonicalTarget =
+    primaryPlatform === 'blogger' ? (blogger.publishedUrl || '')
+    : primaryPlatform === 'github' ? (github.previewUrl || '')
+    : '';
+  const platformUrl =
+    primaryPlatform === 'blogger' ? (blogger.publishedUrl || '')
+    : primaryPlatform === 'github' ? (github.previewUrl || '')
+    : (blogger.publishedUrl || github.previewUrl || '');
+  const gaHostname =
+    primaryPlatform === 'blogger'
+      ? (deriveHostname(blogger.publishedUrl) || deriveHostname(settings?.site?.bloggerSiteUrl) || null)
+      : primaryPlatform === 'github'
+        ? (deriveHostname(github.previewUrl) || deriveHostname(settings?.site?.githubSiteUrl) || null)
+        : null;
+  // githubStatus: Admin read-only derived；不代表 sitemap / build / deploy 之實際審核結果
+  //   - github.enabled === false → 'disabled'
+  //   - github.enabled === true && previewUrl 非空 → 'rendered'
+  //   - github.enabled === true && previewUrl 空 → 'pending'
+  const githubStatus = !github.enabled
+    ? 'disabled'
+    : (github.previewUrl ? 'rendered' : 'pending');
+
   return {
     sourceSite: siteName,
     sourcePath: mdPath,
@@ -181,7 +223,7 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     titleEn,
     slug,
     contentKind,
-    primaryPlatform: typeof fm.primaryPlatform === 'string' ? fm.primaryPlatform : '',
+    primaryPlatform,
     status: typeof fm.status === 'string' ? fm.status : '',
     draft: fm.draft === true,
     publishedAt,
@@ -213,6 +255,11 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     fbBadge: fb.badge,
     blogger,
     github,
+    // Phase 20260521-pm-57: Admin platform routing read-only derived 欄位
+    canonicalTarget,
+    platformUrl,
+    gaHostname,
+    githubStatus,
     relatedLinksCount,
     otherLinksCount,
     completeness,
