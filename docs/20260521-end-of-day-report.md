@@ -313,7 +313,7 @@ f3c7ee8 fix(admin): normalize overview empty states                         ← 
 - source main 凍結於 `68cfddb`（tracking `origin/main`）
 - deploy gh-pages 凍結於 `06e26ae`（tracking `origin/gh-pages`）
 
-### 10.6 尚未啟動項目（confirmed deferred）
+### 10.6 尚未啟動項目（confirmed deferred；pm-8 snapshot；C-2 已於 §11 解除）
 
 | # | 候選 | 阻擋條件 |
 |---|---|---|
@@ -321,6 +321,93 @@ f3c7ee8 fix(admin): normalize overview empty states                         ← 
 | 2 | **S-3** fixture 補 FB metadata | 等待 user 決定 placeholder / 真實 URL / 日期策略 |
 | 3 | **Option B** validate-level fbPublished rule | deferred；需 user 決定 severity（warning vs error）|
 | 4 | **`.gitkeep` emptyOutDir 長期策略** | 可選；需 user 決定方向 |
+
+---
+
+## 11. Afternoon GA4 gating series（Phase 20260521-pm-10 → pm-13）
+
+本章節記錄今日午後 GA4 prod-only gating 之 4 個 phases（1 read-only preflight + 1 implementation + 1 push + 1 deploy decision preflight）。屬 §10.6 之「C-2 GA4 prod-only gating」之**解除**；其餘 3 個 deferred items 仍維持。
+
+### 11.1 pm-10 / C-2 GA4 prod-only gating read-only preflight
+
+- **性質**：read-only；無 commit
+- **盤點**：6 個 GA4 相關檔案（`ga4.config.json` / `ga4.ejs` / `ga4-events-helper.ejs` / `ga4-events.js` / `ga4-url-builder.js` / `build-github.js` HEAD_PARTIALS injection point）
+- **現況確認**：
+  - GA4 機制已存在但未啟用（`ga4.enabled=false` / `measurementId=""`）
+  - Blogger pipeline 不接 GA4（`build-blogger.js` grep 0 match）
+  - Admin pipeline 不接 GA4（Admin EJS 無 ga4 partial）
+  - UTM 純函式生成（`ga4-url-builder.js`）；獨立於 GA4 enabled / measurementId / gating
+- **Option 評估**：採 **user-defined Option A**（build-mode gating；對齊 vite + build-github 既有 mode-aware 架構；風險最低）
+- **命名差異**：user-defined Option A/B/C ≠ `docs/ga4-enable-preflight.md` §2.4 既有 Option A/B/C；user Option A = doc Option B_docs（build-mode gating）
+
+### 11.2 pm-11 / C-2 GA4 prod-only gating Option A implementation
+
+- **commit**：`92f4f07 fix(analytics): scope ga4 script to production build mode`
+- **修改範圍**（4 個檔；+28 / -14）：
+  - `src/scripts/build-github.js`：`makeBaseData` 新增 `isProdBuild = mode === 'build'` flag（+6）
+  - `src/views/tracking/ga4.ejs`：EJS 條件擴為 4 條 AND（+2 / -1）
+  - `docs/ga4-enable-preflight.md`：§2.4 更新含 Option 命名差異 + §2.6 行為表加 `isProdBuild` 欄位（+18 / -12）
+  - `docs/phase-2-candidate-roadmap.md` §1.2：標 ✅ gating 完成；GA4 啟用 deferred（+1 / -1）
+- **最終 GA4 script 輸出條件**：
+  ```
+  ga4 存在 && ga4.enabled === true && ga4.measurementId 非空 && isProdBuild === true
+  ```
+- **各環境行為**：
+  - `npm run dev`（mode=dev / isProdBuild=false）：❌ 永遠不輸出 gtag
+  - `npm run build`（mode=build / isProdBuild=true）：仍由既有雙條件（enabled + measurementId）決定
+- **GA4 啟用狀態**：**未啟用**；本批僅機制就位；**未填 measurementId** / **未改 enabled=true**
+- **preview mode 邊界**：仍可能輸出（vite preview 通常被視為 build mode）；屬 Option A 既知 trade-off；當前 enabled=false 故無實際影響
+
+### 11.3 pm-12 / push pm-11 commit 至 origin/main
+
+- **動作**：`git push origin main`
+- **結果**：fast-forward `15cea56..92f4f07  main -> main`
+- **post-push**：source main 與 origin/main **同步**（無 ahead/behind）
+- **未動**：deploy repo / gh-pages（per spec 禁止）
+
+### 11.4 pm-13 / GA4 gating commit deploy decision preflight
+
+- **性質**：read-only；無 commit
+- **方法**：`diff -rq dist/ deploy-repo/`（read-only）
+- **發現**：除 `.git` / `.gitkeep` / `.nojekyll` 之結構檔，dist 與 deploy repo 之 production 內容（HTML / CSS / JS / sitemap / robots / assets）**byte-equivalent**
+- **結論**：✅ **不 deploy** commit `92f4f07`
+- **理由**：
+  - GA4 當前未啟用；gating 改動為 future-proof
+  - 舊 gating（3-AND）與新 gating（4-AND）在 `enabled=false` 下皆產生相同 HTML 輸出
+  - production-visible output 不變
+- **後續**：未來啟用 GA4 時必須 deploy（屆時 `enabled=true` 才真改變 HTML）；自然帶上 `92f4f07` 之 gating；無需獨立 deploy phase
+- **deploy repo 維持** `06e26ae`
+
+### 11.5 GA4 啟用 deferred（不在本批 scope）
+
+未來啟用 GA4 之預估流程（屬獨立 phase 系列）：
+
+| 步驟 | 動作 |
+|---|---|
+| 1 | user 至 GA4 後台取得 `G-XXXXXXXXXX` |
+| 2 | 更新 `content/settings/ga4.config.json`（`measurementId` + `enabled: true`）|
+| 3 | source commit + push origin/main |
+| 4 | `npm run build` 確認 dist HTML 含 gtag.js script tag（dev mode 仍不輸出，per `isProdBuild` gating）|
+| 5 | deploy phase B 標準 deploy |
+| 6 | 線上 smoke test（GA4 Real-time 報表確認 event 進入）|
+
+### 11.6 deferred items 狀態更新（pm-13 後）
+
+| # | 候選 | 狀態 |
+|---|---|---|
+| 1 | ~~C-2 GA4 prod-only gating~~ | ✅ **gating 完成**（pm-11 commit `92f4f07`；pm-12 已 push origin/main；pm-13 確認不需立即 deploy）|
+| 2 | S-3 fixture 補 FB metadata | deferred |
+| 3 | Option B validate-level fbPublished rule | deferred |
+| 4 | `.gitkeep` emptyOutDir 長期策略 | deferred |
+| 5（新）| **GA4 真實啟用**（measurementId + enabled=true）| deferred；需 user 取得 GA4 ID + 走 §11.5 流程 |
+| 6（新）| **hostname allowlist**（user-Option B/C）| 可選；若未來啟用 GA4 後發現 preview mode event 污染再啟動 |
+
+### 11.7 今日 commits 統計（pm-14 補記時點）
+
+- **source commits**：15（原 §3 列之 13 + pm-8 docs `15cea56` + pm-11 source `92f4f07`；pm-14 本批 commit 為第 16 個）
+- **deploy commits**：1（pm-6 `06e26ae`；pm-13 確認 `92f4f07` 不 deploy）
+- **push 狀態**：source main 全部已 push origin/main；deploy gh-pages 已 push origin/gh-pages
+- **deploy 凍結**：`06e26ae`（含昨日 SEO noindex + DS-3 CSS + admin overview polish）
 
 ---
 
