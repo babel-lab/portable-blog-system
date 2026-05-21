@@ -197,12 +197,12 @@
           data-fb-published="<%= p.completeness.fbPublished %>"
           data-content-kind="<%= p.contentKind || '' %>">
         <td>
-          <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(no title)</span><% } %>
+          <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(empty)</span><% } %>
           <span class="toggle-hint"></span>
           <% if (p.titleEn) { %><br><span class="text-muted"><%= p.titleEn %></span><% } %>
-          <br><span class="mono text-muted"><%= p.id || 'no-id' %></span>
-          <br><span class="mono text-muted">slug: <%= p.slug || '—' %></span>
-          <br><span class="mono text-muted" title="<%= p.publishedSource ? 'source: ' + p.publishedSource : 'no publishedAt source' %>">published: <%= p.publishedAt || 'no date' %><% if (p.publishedSource) { %> <span class="text-muted" style="font-size: 0.85em;">(<%= p.publishedSource %>)</span><% } %></span>
+          <br><span class="mono text-muted"><%= p.id || '(empty)' %></span>
+          <br><span class="mono text-muted">slug: <%= p.slug || '(empty)' %></span>
+          <br><span class="mono text-muted" title="<%= p.publishedSource ? 'source: ' + p.publishedSource : 'no publishedAt source' %>">published: <%= p.publishedAt || '(empty)' %><% if (p.publishedSource) { %> <span class="text-muted" style="font-size: 0.85em;">(<%= p.publishedSource %>)</span><% } %></span>
         </td>
         <td class="col-narrow">
           <% if (p.contentKind) { %>
@@ -260,7 +260,7 @@
         <td class="col-urls">
           <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <%= p.blogger.publishedUrl %></div><% } %>
           <% if (p.github.previewUrl) { %><div class="mono">🐙 <%= p.github.previewUrl %></div><% } %>
-          <% if (!p.blogger.publishedUrl && !p.github.previewUrl) { %><span class="text-muted">—</span><% } %>
+          <% if (!p.blogger.publishedUrl && !p.github.previewUrl) { %><span class="text-muted">(empty)</span><% } %>
         </td>
       </tr>
       <tr class="post-detail" data-idx="<%= idx %>" hidden>
