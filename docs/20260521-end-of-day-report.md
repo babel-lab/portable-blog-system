@@ -269,4 +269,59 @@ f3c7ee8 fix(admin): normalize overview empty states                         ← 
 
 ---
 
+## 10. Online Smoke Test Result（Phase 20260521-pm-8）
+
+本章節記錄 pm-6 deploy 完成後之線上 GitHub Pages smoke test 結果；今日工作流之最終閉環。
+
+### 10.1 Deploy 狀態
+
+| 項目 | 值 |
+|---|---|
+| source HEAD | `68cfddb`（pm-4 已 push `origin/main`）|
+| deploy HEAD | `06e26ae deploy: 68cfddb snapshot (SEO noindex + DS-3 CSS + admin overview polish)`（pm-6 已 push `origin/gh-pages`）|
+| 線上 GitHub Pages | ✅ 已 serve 至此 deploy hash |
+
+### 10.2 User 手動 smoke test 通過項目
+
+| # | URL | 結果 |
+|---|---|---|
+| 1 | https://babel-lab.github.io/portable-blog-system/ | ✅ homepage 通過 |
+| 2 | https://babel-lab.github.io/portable-blog-system/posts/ | ✅ posts list 通過 |
+| 3 | https://babel-lab.github.io/portable-blog-system/categories/ | ✅ categories list 通過 |
+| 4 | https://babel-lab.github.io/portable-blog-system/posts/github-pages-blog-planning/ | ✅ post detail 通過 |
+| 5 | https://babel-lab.github.io/portable-blog-system/sitemap.xml | ✅ sitemap.xml 可讀 |
+
+### 10.3 線上狀態確認
+
+| 項目 | 狀態 |
+|---|---|
+| GitHub Pages 已正常 serve | ✅ |
+| sitemap 可讀（14 url entries；prod absolute URL；不含 noindex 之 `portable-blog-system-mvp`）| ✅ |
+| production links 正常（含 `/portable-blog-system/` prefix；對齊 mid-5 build sanity 預期）| ✅ |
+| canonical / og:url / JSON-LD | ✅（雙重確認：mid-5 build sanity + 線上 smoke test）|
+| `/portable-blog-system/` base path 在 prod 端正確生效 | ✅（mid-4-b basePath dev/build 分流；build mode 端保留 production 推導）|
+
+### 10.4 今日完整工作流總結
+
+今日節奏**完整封閉**：13 source commits（本機 main 線性堆疊）→ source push 至 `origin/main` → deploy phase B 標準 deploy 推進 gh-pages 至 `06e26ae` → 線上 GitHub Pages serve → user 手動 smoke test 通過。
+
+### 10.5 邊界
+
+- 本 phase 不再 push / 不再 deploy / 不再操作 gh-pages
+- 兩個 repo 維持 clean
+- 不啟動 C-2 / S-3 / Option B / .gitkeep 長期策略
+- source main 凍結於 `68cfddb`（tracking `origin/main`）
+- deploy gh-pages 凍結於 `06e26ae`（tracking `origin/gh-pages`）
+
+### 10.6 尚未啟動項目（confirmed deferred）
+
+| # | 候選 | 阻擋條件 |
+|---|---|---|
+| 1 | **C-2** GA4 prod-only gating | 等待 user 決定 Option A/B/C |
+| 2 | **S-3** fixture 補 FB metadata | 等待 user 決定 placeholder / 真實 URL / 日期策略 |
+| 3 | **Option B** validate-level fbPublished rule | deferred；需 user 決定 severity（warning vs error）|
+| 4 | **`.gitkeep` emptyOutDir 長期策略** | 可選；需 user 決定方向 |
+
+---
+
 （本文件結束）
