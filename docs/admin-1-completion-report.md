@@ -297,4 +297,71 @@ Admin-1 系列全程**未影響** stable snapshot：
 
 ---
 
+## §13 後續小修紀錄（Admin Overview 顯示一致性系列）
+
+本章節為 **Admin-1 系列正式 completion 後**之 incremental polish 紀錄。屬「同檔同 surface（`src/views/admin/index.ejs`）小幅文案 / 顯示調整」性質；**不**重新啟動 Admin-1 phase，也**不**進入 Admin-2 write 範疇。§11 邊界聲明仍適用於 Admin-1 系列本身；本章節僅作為 post-completion 累積式 changelog。
+
+### 13.1 2026-05-21 上午 Admin overview 小修系列
+
+當日總計 4 個 phase（1 audit + 3 source 小修）；全部 `src/views/admin/index.ejs` 範圍內；**未動** loader / data 邏輯 / class name / HTML 結構 / dist / deploy / 既有 schema。
+
+| Phase | 性質 | commit | 範圍 | 修改規模 |
+|---|---|---|---|---|
+| **C-4** | audit | `2d5d879 docs(admin): audit overview display consistency` | 新增 `docs/20260521-admin-overview-display-audit.md`（541 行）；盤點 stat-cards 12 張 / 列表 7 欄 / detail panel 10 sections；識別 7 個 drift（D-1 ~ D-7）；分類 🟢/🟡/🔴 後續候選 | 新增 1 docs 檔；零 source |
+| **S-1** | fix | `f3c7ee8 fix(admin): normalize overview empty states` | 統一列表 5 處 plain-text fallback（`(no title)` / `'no-id'` / `'—'` / `'no date'` / URLs 欄 `—`）→ `(empty)`；保留 badge 內狀態文字（`no kind` / `no status` / `no category` / `no tags` / `no URL`；皆 b-missing badge）| +5 / -5 行 |
+| **S-4** | fix | `bd0d6e8 fix(admin): clarify stat card tooltips` | 4 張 stat-card tooltip 改寫為非工程師友善文案（blogger source / github source / blogger enabled / github enabled）；fb published ok 之既有 tooltip 與其他 7 張無 tooltip 之 stat-card 皆未動 | +4 / -4 行 |
+| **S-2** | fix | `da00f53 fix(admin): linkify overview URLs` | 4 處絕對 URL 加 `<a target="_blank" rel="noopener noreferrer">` 包覆（列表 URLs 欄 `📘 Blogger publishedUrl` + `🐙 GitHub previewUrl`；detail panel `blogger.publishedUrl` + `github.previewUrl`）；`blogger.permalink` 與 `github.path` 保守 skip（可能為相對路徑）；FB 既有 linkified 兩處（`fbPostUrl` / `fbImageUrl`）未動 | +4 / -4 行 |
+
+### 13.2 安全性說明
+
+| 項目 | 結果 |
+|---|---|
+| 新增 write path | ❌ 無 |
+| 新增 `<form>` / `submit` button | ❌ 無 |
+| 新增 `fetch` / `XMLHttpRequest` | ❌ 無 |
+| 新增 `localStorage` / `sessionStorage` | ❌ 無 |
+| 新增 `fs` write | ❌ 無（瀏覽器端不可能；本批 source 端也無）|
+| 新增 `onclick` / `javascript:` URL | ❌ 無 |
+| 新增 client-side JS | ❌ 無（4 個 phase 全為 EJS 字串 / 屬性 / 標籤級調整）|
+| 修改 loader (`src/scripts/load-admin-posts.js`) | ❌ 無 |
+| 修改 stats 計算 / posts sort / filter 邏輯 | ❌ 無 |
+| 修改 URL 推導邏輯 | ❌ 無 |
+| 修改 data 欄位名稱 / class name / HTML 結構 | ❌ 無 |
+| 修改 dist / deploy / content / package.json / 既有 schema | ❌ 無 |
+| 新增外連 `<a>` 之 `target` + `rel` 安全屬性 | ✅ 全部 `target="_blank"` + `rel="noopener noreferrer"`（4/4）|
+| Admin read-only / dry-run safe 邊界 | ✅ 維持原狀（banner / robots noindex / dev-mode-only 設計皆未動）|
+
+### 13.3 後續未做項目
+
+| # | 候選 phase | 阻擋條件 |
+|---|---|---|
+| 1 | **S-3** fixture 補 FB post URL metadata 範例 | 等待 user 決定值策略：fbPostUrl 應使用真實 FB URL 還是 dummy？fbPostedAt 應使用何種日期格式？是否在正式 content 或 validation-fixtures？|
+| 2 | **C-2** GA4 prod-only gating | 等待 user 表態 Option A/B/C（per `docs/ga4-enable-preflight.md` §2.4 / `docs/phase-2-candidate-roadmap.md` §1.2）|
+| 3 | **C-3** FB completeness 條件式 | 需評估「會動既有 38 warnings 中之 `fbPublished` 計數」是否可接受；屬 🟡 中風險（會改 `src/scripts/load-admin-posts.js`）|
+| 4 | M-1 filter 增 sourceSite / fbBadge optgroup | per audit §8.2；🟡 中風險；改 EJS template + JS `matchesFilter`；需 user 表態 |
+| 5 | M-2 GitHub URL 第三層 badge（對齊 Blogger）| per audit §8.2；🟡 中風險；需文案解釋「預測 URL」之差異 |
+
+### 13.4 建議下一步
+
+| 路徑 | 條件 |
+|---|---|
+| **今日上午收尾進 idle freeze** | 推薦；4 個 commit 已涵蓋 audit doc 之 🟢 安全小修 3 項；working tree clean |
+| 下午進 C-2 GA4 prod-only gating | 需 user 先表態 Option A/B/C |
+| 下午進 C-3 FB completeness 條件式 | 需 user 確認可接受 warning 計數變動 |
+| 下午進 S-3 fixture 補欄位 | 需 user 先決定 placeholder 策略 |
+
+### 13.5 累計 baseline 推進
+
+| 項目 | C-4 後 | S-2 後 |
+|---|---|---|
+| HEAD（admin overview 系列）| `2d5d879` | `da00f53` |
+| `src/views/admin/index.ejs` 累計修改 | +0 / -0 | +13 / -13（3 個小修疊加；S-1 5 + S-4 4 + S-2 4）|
+| dist | 未動 | 未動 |
+| deploy repo | 未動（`4ecd92d`） | 未動（`4ecd92d`） |
+| validate baseline | `0/38/33`（未跑驗證但邏輯未動）| 同上 |
+| FB schema | 未動 | 未動 |
+| loader | 未動 | 未動 |
+
+---
+
 （本文件結束）
