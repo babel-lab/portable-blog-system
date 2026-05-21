@@ -142,11 +142,14 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   //   - github OK：disabled 視為 OK；enabled 且 slug 推導出 previewUrl 視為 OK
   //   - url OK：至少一邊有 published / preview URL
   //   - categoryTags OK：category 存在 + 至少 1 個 tag
-  // Phase 20260520-c-4：新增 fbPublished 維度（per docs/fb-sidecar-schema.md §3.5.5 P3）
-  //   - fbPosted true：fbPostUrl 或 fbPostedAt 至少一個非空字串（fbPostId / fbCampaign 為補充欄位，不單獨代表 published）
-  //   - fbPublished OK：fb.enabled=false 視為 OK（disabled 不要求 FB 發布）；
-  //                    fb.enabled=true 且 fbPosted=true 視為 OK；其餘 missing
-  const fbPosted = Boolean(fb.postUrl || fb.postedAt);
+  // Phase 20260520-c-4 / 20260521-mid-2 C-3-a：fbPublished 維度套用 P3 canonical（per docs/fb-sidecar-schema.md §3.5.5）
+  //   - isPostPublished：article frontmatter.status === 'published'
+  //   - hasFbPostUrl：fb.postUrl 非空字串（fbPostedAt / fbPostId / fbCampaign 不單獨代表 published）
+  //   - fbPublishedMissing：fb.enabled === true && isPostPublished === true && hasFbPostUrl === false
+  //   - 其餘情形（disabled / 尚未 published / 已 published 且 hasFbPostUrl）皆視為 OK
+  const isPostPublished = typeof fm.status === 'string' && fm.status === 'published';
+  const hasFbPostUrl = typeof fb.postUrl === 'string' && fb.postUrl !== '';
+  const fbPublishedMissing = fb.enabled === true && isPostPublished === true && hasFbPostUrl === false;
   const completeness = {
     seo: descriptionExists && searchDescriptionExists ? 'ok' : 'missing',
     fb: fb.exists ? 'ok' : 'missing',
@@ -154,7 +157,7 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     github: !github.enabled ? 'ok' : (github.previewUrl ? 'ok' : 'missing'),
     url: (blogger.publishedUrl || github.previewUrl) ? 'ok' : 'missing',
     categoryTags: (category && tags.length > 0) ? 'ok' : 'missing',
-    fbPublished: !fb.enabled ? 'ok' : (fbPosted ? 'ok' : 'missing'),
+    fbPublished: fbPublishedMissing ? 'missing' : 'ok',
   };
 
   const missingFields = [];
@@ -168,7 +171,7 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   if (!titleEn) missingFields.push('titleEn');
   if (blogger.enabled && !blogger.publishedUrl) missingFields.push('blogger.publishedUrl');
   if (!fb.exists) missingFields.push('.fb.md sidecar');
-  if (fb.enabled && !fbPosted) missingFields.push('fbPostUrl / fbPostedAt');
+  if (fbPublishedMissing) missingFields.push('fbPostUrl');
 
   return {
     sourceSite: siteName,

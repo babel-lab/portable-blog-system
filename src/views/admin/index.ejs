@@ -121,7 +121,7 @@
     <div class="stat-card"><strong><%= fbExists %></strong>has .fb.md</div>
     <div class="stat-card"><strong><%= seoOk %></strong>SEO ok</div>
     <div class="stat-card"><strong><%= urlOk %></strong>URL ok</div>
-    <div class="stat-card" title="fb.enabled=false 或 fbPostUrl/fbPostedAt 有值之文章數；per docs/fb-sidecar-schema.md §3.5.5 P3"><strong><%= fbPublishedOk %></strong>fb published ok</div>
+    <div class="stat-card" title="FB disabled 或文章尚未 published 時視為 OK；文章已 published 且 FB enabled=true 時需填 fbPostUrl。per docs/fb-sidecar-schema.md §3.5.5 P3"><strong><%= fbPublishedOk %></strong>fb published ok</div>
   </div>
 
   <% if (posts.length === 0) { %>
@@ -255,7 +255,7 @@
           <span class="badge <%= p.completeness.github === 'ok' ? 'b-ok' : 'b-missing' %>">GitHub <%= p.completeness.github %></span><br>
           <span class="badge <%= p.completeness.url === 'ok' ? 'b-ok' : 'b-missing' %>">URL <%= p.completeness.url %></span><br>
           <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span><br>
-          <span class="badge <%= p.completeness.fbPublished === 'ok' ? 'b-ok' : 'b-missing' %>" title="fb.enabled=false 或 fbPostUrl/fbPostedAt 有值 → ok；fb.enabled=true 但兩欄位皆空 → missing">FB pub <%= p.completeness.fbPublished %></span>
+          <span class="badge <%= p.completeness.fbPublished === 'ok' ? 'b-ok' : 'b-missing' %>" title="FB disabled 或文章尚未 published → ok；文章已 published 且 FB enabled=true 且 fbPostUrl 空 → missing">FB pub <%= p.completeness.fbPublished %></span>
         </td>
         <td class="col-urls">
           <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a></div><% } %>
