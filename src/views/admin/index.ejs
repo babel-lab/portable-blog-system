@@ -114,10 +114,10 @@
     <div class="stat-card"><strong><%= byStatus.ready %></strong>ready</div>
     <div class="stat-card"><strong><%= byStatus.draft %></strong>draft</div>
     <div class="stat-card"><strong><%= byStatus.published %></strong>published</div>
-    <div class="stat-card" title="sourceSite=blogger（文章原始位於 content/blogger/posts/）；與 publishTargets enabled 不同"><strong><%= srcBlogger %></strong>blogger source</div>
-    <div class="stat-card" title="sourceSite=github（文章原始位於 content/github/posts/）；與 publishTargets enabled 不同"><strong><%= srcGithub %></strong>github source</div>
-    <div class="stat-card" title="publishTargets.blogger.enabled=true 之文章數；與 sourceSite 不同"><strong><%= bloggerEnabled %></strong>blogger enabled</div>
-    <div class="stat-card" title="publishTargets.github.enabled=true 之文章數；與 sourceSite 不同"><strong><%= githubEnabled %></strong>github enabled</div>
+    <div class="stat-card" title="原始資料來源標記為 Blogger 的文章數；不等於已輸出或已發布。"><strong><%= srcBlogger %></strong>blogger source</div>
+    <div class="stat-card" title="原始資料來源標記為 GitHub 的文章數；不等於已輸出或已部署。"><strong><%= srcGithub %></strong>github source</div>
+    <div class="stat-card" title="設定為會輸出到 Blogger 的文章數；不等於 Blogger 已發布成功。"><strong><%= bloggerEnabled %></strong>blogger enabled</div>
+    <div class="stat-card" title="設定為會輸出到 GitHub Pages 的文章數；不等於線上頁面已部署完成。"><strong><%= githubEnabled %></strong>github enabled</div>
     <div class="stat-card"><strong><%= fbExists %></strong>has .fb.md</div>
     <div class="stat-card"><strong><%= seoOk %></strong>SEO ok</div>
     <div class="stat-card"><strong><%= urlOk %></strong>URL ok</div>
