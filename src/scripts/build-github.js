@@ -84,12 +84,18 @@ async function renderPage({ template, data }) {
 
 function makeBaseData(settings, mode) {
   const basePath = siteBasePath(settings, mode);
+  // Phase 20260521-pm-11 / C-2 Option A：build-time GA4 gating flag
+  //   - dev mode → false → ga4.ejs 跳過 gtag script 輸出（即使 enabled=true + measurementId 非空也不輸出）
+  //   - build mode → true → 仍由既有雙條件（enabled + measurementId）決定是否輸出
+  //   - 對齊 vite.config.js line 11 與 siteBasePath() 之 mode-aware 既有原則
+  const isProdBuild = mode === 'build';
   return (extra) => ({
     site: settings.site,
     navigation: settings.navigation,
     ga4: settings.ga4,
     ads: settings.ads,
     basePath,
+    isProdBuild,
     ...extra,
   });
 }

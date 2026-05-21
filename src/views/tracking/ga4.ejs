@@ -1,4 +1,5 @@
-<% if (typeof ga4 !== 'undefined' && ga4 && ga4.enabled === true && ga4.measurementId) { -%>
+<% /* Phase 20260521-pm-11 / C-2 Option A：build-time gating；條件 a/b/c/d 同時滿足才輸出 gtag */ -%>
+<% if (typeof ga4 !== 'undefined' && ga4 && ga4.enabled === true && ga4.measurementId && typeof isProdBuild !== 'undefined' && isProdBuild === true) { -%>
 <script async src="https://www.googletagmanager.com/gtag/js?id=<%= ga4.measurementId %>"></script>
 <script>
   window.dataLayer = window.dataLayer || [];

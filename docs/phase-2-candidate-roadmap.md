@@ -16,7 +16,7 @@
 | # | 項目 | 對應文件 / 系列 | 預估 LOC | 備註 |
 |---|---|---|---|---|
 | 1.1 | ~~DS-3-c-a：`_header.scss` `#fff` → token / `_mobile-drawer.scss` 移除 fallback~~ | `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §14 | — | ✅ DS-3-c-a 已於 20260520 commit `f530a39` 完成；✅ DS-3-c-b 已於 commits `67a0ccc` (GitHub source) + `cc2621d` (mirror partial sync) 完成；✅ DS-3-c-c 已於 Phase 20260520-pm-6 採方案 C 豁免（documented exemption；無 source 改動；per `design-system-ds3c-hardcoded-color-pre-analysis.md` §5.2 / §14.3）；**DS-3-c 整體 resolved**（10 fixes + 2 documented exemptions）|
-| 1.2 | GA4 prod-only gating（dev mode 不送 event）| `docs/ga4-enable-preflight.md` §2.4 Option B | ~10 LOC ga4.ejs | 需 user 決議；對齊 Admin-1-b dev-mode-only pattern |
+| 1.2 | ~~GA4 prod-only gating（dev mode 不送 event）~~ | `docs/ga4-enable-preflight.md` §2.4（已採 B_docs；對應 pm-11 user Option A）/ §2.6 | — | ✅ **gating 完成** — Phase 20260521-pm-11 / C-2 Option A 已落地（`isProdBuild` flag at `makeBaseData` + 4-AND condition at `ga4.ejs`）；**GA4 啟用 deferred**（`enabled` 仍 false、`measurementId` 仍空；屬獨立 phase）|
 | 1.3 | ~~FB completeness 條件式（如 `enabled=true && status=published && !postUrl → missing`）~~ | `docs/fb-post-url-metadata-proposal.md` §5.3 / P3 | — | ✅ Admin-only 已於 Phase 20260521-mid-2 / C-3-a（commit `edbf6d0`）完成；validate-level rule deferred；fixture metadata sample deferred |
 | 1.4 | Admin disclaimer drift fix（若有新 phase 落地後 disclaimer 過時） | per c-3 pattern | <5 LOC | 例如 P5-c 落地後更新 FB Post section disclaimer |
 | 1.5 | docs index 更新（如新增 phase docs 後 README cross-link 補齊）| 本批已建 `docs/README.md` | docs only | 隨 docs 變動逐次同步 |

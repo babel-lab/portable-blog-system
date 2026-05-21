@@ -83,12 +83,16 @@
 
 **問題**：dev mode 之 user 本機 browse 會觸發 GA4 event；可能污染正式分析數據。
 
-**選項**（屬 user 待決；非本批落地）：
-- **A.** 接受 dev 也送 event（最簡；無 source 改動）；GA4 數據需加 filter（如排除 localhost referrer / IP）
-- **B.** 在 ga4.ejs 加 production-only gating（如 build-github mode === 'build' 時才輸出）；屬 source 改動；需另開 phase
-- **C.** 在 measurementId 端用「dev_id」 / 「prod_id」雙 ID + build mode 切換；schema 與 build 改動較大
+**選項（本 doc 既有命名；屬 dev event 污染應對之 3 個方向）**：
+- **A_docs.** 接受 dev 也送 event（最簡；無 source 改動）；GA4 數據需加 filter（如排除 localhost referrer / IP）
+- **B_docs.** 在 ga4.ejs 加 production-only gating（如 build-github mode === 'build' 時才輸出）；屬 source 改動
+- **C_docs.** 在 measurementId 端用「dev_id」 / 「prod_id」雙 ID + build mode 切換；schema 與 build 改動較大
 
-**Claude 推薦**：**A 接受 dev 也送**（最最低風險；GA4 數據端 filter 簡單）；若 user 發現 dev event 污染嚴重再啟動 B / C。
+✅ **已採 B_docs（build-mode gating）並落地 — Phase 20260521-pm-11 / C-2 Option A implementation**：
+- 對應 commit：`fix(analytics): scope ga4 script to production build mode`
+- 實作位置：`src/scripts/build-github.js` 之 `makeBaseData` 新增 `isProdBuild` flag（`mode === 'build'`） + `src/views/tracking/ga4.ejs` 條件擴為 4 條 AND（ga4 / ga4.enabled === true / ga4.measurementId 非空 / isProdBuild === true）
+- 目前 `ga4.enabled` 仍 `false`、`measurementId` 仍 `""`；本批**僅做 gating 機制**；**未啟用** GA4；屬 prod-only gating 與 GA4 啟用兩階段拆批
+- 命名差異說明：Phase 20260521-pm-10 / pm-11 之 user-defined Option A/B/C 與本 doc 既有 Option A/B/C **不同**：pm-10/pm-11 之 user Option A = build-mode gating（即本 doc 之 B_docs）；pm-10/pm-11 之 user Option B = hostname runtime gating；pm-10/pm-11 之 user Option C = env var + hostname 混合
 
 ### 2.5 空值時行為
 
@@ -96,15 +100,18 @@
 - `ga4.enabled === true && measurementId === ""` → **靜默不輸出**（既有；雙條件 gating）；非 console.warn / 非 throw；避免 build noise
 - ✅ 既有實作已符合 spec 之「若 measurementId 空值，是否不輸出 script」
 
-### 2.6 production / dev 行為
+### 2.6 production / dev 行為（Phase 20260521-pm-11 後）
 
-| Mode | enabled | measurementId | 輸出 |
-|---|---|---|---|
-| dev / prod | false | (any) | ❌ 不輸出 |
-| dev / prod | true | "" | ❌ 不輸出（雙條件 gating 之 measurementId 非空 fail） |
-| dev / prod | true | "G-XXXXXXXXXX" | ✅ 輸出 |
+| Mode | enabled | measurementId | isProdBuild | 輸出 |
+|---|---|---|---|---|
+| dev | false | (any) | false | ❌ 不輸出 |
+| dev | true | (any) | false | ❌ **不輸出**（本批 pm-11 新增之 prod-only gating；即使 enabled=true + measurementId 非空也不輸出）|
+| build | false | (any) | true | ❌ 不輸出（enabled 未開）|
+| build | true | "" | true | ❌ 不輸出（measurementId 空）|
+| build | true | "G-XXXXXXXXXX" | true | ✅ **輸出**（4 條 AND 全滿足）|
 
-**待決**：是否新增 prod-only gating（§2.4 之 Option A/B/C）— 本批不裁決。
+**機制就位**：✅ prod-only gating 已落地（Phase 20260521-pm-11；commit `fix(analytics): scope ga4 script to production build mode`）。  
+**待決**：實際填 measurementId 與切 `enabled=true`（屬 GA4 啟用 phase；本批未做）。
 
 ---
 
