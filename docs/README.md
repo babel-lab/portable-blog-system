@@ -197,23 +197,30 @@ npm run check:images
 
 ## §7 今日穩定 baseline
 
-（更新時點：2026-05-21）
+（更新時點：2026-05-21；pm-17 後快照）
 
-- HEAD: `1be2a38 docs(build): record production basePath sanity check` （pm-1 後更新；mid-5 production sanity check 收尾）
-- branch: `main` / 無 upstream / 未 push
+- HEAD: `ffb1b37 docs(project): record ga4 gating completion and deploy decision` （pm-15 後 push origin/main；pm-17 為本批 baseline cleanup commit；本 §7 自身落後 1 commit 為既知遞迴）
+- branch: `main` / tracking `origin/main` / 與 remote 同步
 - working tree: clean
-- deploy repo HEAD: `4ecd92d`（未動）
+- deploy repo HEAD: `06e26ae deploy: 68cfddb snapshot (SEO noindex + DS-3 CSS + admin overview polish)`（pm-6 已 push `origin/gh-pages`；pm-13 確認 pm-11 之 ga4 gating 不需 deploy；deploy repo 自 pm-6 起未動）
 - validate baseline: `0 error(s) / 38 warning(s) on 33 issue-post(s)`
-- dist/sitemap.xml: 14 url entries（mid-5 production build 確認；per `docs/20260521-dev-route-fix-verification.md` §10.4）
-- dist/.gitkeep: tracked & clean（mid-5-b 已 restore；vite emptyOutDir side effect 已處理）
-- 今日 commits 總計 11（上午 Admin overview polish 6 + 中午 C-3 Admin-only fbPublished P3 rule 2 + mid-4 dev route 404 fix 2 + mid-5 production sanity check 1）
-- 今日 commits 純線性堆疊；無 amend / rebase / force / push
+- dist/sitemap.xml: 14 url entries（mid-5 / pm-11 build 確認；pm-6 deploy 已上線）
+- dist/.gitkeep: tracked & clean（mid-5-b / pm-11 經驗：每次 build 後手動 restore；長期策略 deferred）
+- 今日 commits 總計 **16 source + 1 deploy**（pm-17 commit 後將為 17 source）
+- 今日 commits 純線性堆疊；無 amend / rebase / force；source main 已 sync `origin/main`；deploy gh-pages 已 sync `origin/gh-pages`
 - 今日重點摘要：
-  - Admin overview polish（C-1 README baseline / C-4 audit / S-1 empty states / S-4 tooltips / S-2 linkify / S-5 docs sync）
-  - C-3 Admin-only fbPublished P3 rule 套用（loader + EJS tooltip + 4 docs sync；validate-level rule 仍 deferred）
-  - dev route 404 fix（basePath dev/prod 分流；user 手測 dev links 通過）
-  - production sanity check（build 成功；internal links 仍含 `/portable-blog-system/`；canonical / og:url / JSON-LD / sitemap 14 entries 不變）
-- 仍未啟動（pending；需 user 決策）：C-2 GA4 prod-only gating / S-3 fixture 補 FB metadata / Option B validate-level fbPublished rule / .gitkeep emptyOutDir 長期策略 / push / deploy
+  - Admin overview polish（am-2 ~ am-7：C-1 README baseline / C-4 audit / S-1 empty states / S-4 tooltips / S-2 linkify / S-5 docs sync）
+  - C-3 Admin-only fbPublished P3 rule（mid-1 pre-analysis / mid-2 C-3-a loader + EJS / mid-3 C-3-c docs sync 4 docs；validate-level rule 仍 deferred）
+  - Dev route 404 fix（mid-4-a diagnosis / mid-4-b basePath dev/build 分流 / mid-4-c user 手測通過 + verification doc）
+  - Production sanity check（mid-5 build 成功 + mid-5-b dist/.gitkeep restore + docs §10）
+  - README baseline sync × 2（pm-1 + 本批 pm-17）
+  - End-of-day report（pm-2 docs 落地；pm-7 線上 smoke test；pm-8 EOD §10；pm-14 EOD §11 GA4 gating series）
+  - Source push × 3（pm-4 首次 push 13 commits + upstream / pm-9 pm-8 docs / pm-12 pm-11 GA4 gating / pm-15 pm-14 docs）
+  - Deploy phase B（pm-6：dist → deploy repo → push gh-pages → 線上 smoke test 通過 / pm-13 GA4 gating commit 不需 deploy）
+  - C-2 GA4 prod-only gating 機制就位（pm-10 preflight → pm-11 Option A implementation commit `92f4f07` → pm-12 push → pm-13 deploy decision；**GA4 仍未啟用**）
+  - Deferred items read-only review（pm-16）
+- 仍未啟動（pending；需 user 決策）：S-3 fixture 補 FB metadata / Option B validate-level fbPublished rule / `.gitkeep` emptyOutDir 長期策略 / **GA4 真實啟用**（measurementId + enabled=true）/ **hostname allowlist**（user Option B/C；GA4 啟用後再評估）
+- 今日完整收尾報告：`docs/20260521-end-of-day-report.md`（§1-§11；含 GA4 gating series）
 - 昨日完整收尾報告：`docs/20260520-end-of-day-report.md`
 
 ---
