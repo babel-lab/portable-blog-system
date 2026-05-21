@@ -653,4 +653,100 @@ Phase 20260522-am-1：README §7 baseline drift cleanup
 
 ---
 
+## 15. GA4 enable preflight read-only（Phase 20260521-pm-39）
+
+本章節記錄今日傍晚之 GA4 enable preflight read-only review；屬純 read-only 評估；未修改任何檔案；無 commit。產出未來 GA4 真實啟用之完整 phase plan + user checklist + hostname allowlist 延後決策。
+
+### 15.1 pm-39 性質
+
+- **Read-only review**；無 commit / 無 push / 無 deploy / 無 build / 無 validate
+- 純 `git status` / `git log` / read settings + source + docs / WebFetch line health check（接續 pm-38）
+- 產出：GA4 機制盤點 + user checklist + 5 個 GA4-enable phases 拆批 + hostname allowlist 判斷
+
+### 15.2 GA4 目前狀態
+
+| 項目 | 值 |
+|---|---|
+| `content/settings/ga4.config.json` `enabled` | `false` |
+| `content/settings/ga4.config.json` `measurementId` | `""` |
+| `content/settings/ga4.config.json` `events` | 9 個預定義 event（`page_view` / `internal_link_click` / `tag_click` / `category_click` / `affiliate_click` / `download_click` / `social_click` / `blogger_to_github_click` / `github_to_blogger_click`）|
+| 線上 GitHub Pages 是否輸出 gtag.js | ❌ 否（4-AND gating 全部 fail）|
+
+### 15.3 GA4 gating 現況（4-AND condition；per pm-11）
+
+`src/views/tracking/ga4.ejs` 內 EJS 條件：
+
+```
+ga4 存在 && ga4.enabled === true && ga4.measurementId 非空 && isProdBuild === true
+```
+
+| Pipeline | 是否接 GA4 partial | 是否實際輸出 gtag（即使 user 啟用）|
+|---|---|---|
+| GitHub Pages build（dist）| ✅ 接（HEAD_PARTIALS 含 ga4）| 通過 4-AND 後輸出 |
+| `build-blogger.js`（dist-blogger）| ❌ 不接 | 永遠不輸出 |
+| `build-promotion.js`（dist-promotion）| ❌ 不接 | 永遠不輸出 |
+| Admin（dev-mode-only）| ❌ Admin EJS 無 ga4 partial | 永遠不輸出 |
+| `npm run dev`（mode=dev / isProdBuild=false）| ✅ 接 | ❌ **永遠不輸出**（4-AND 之 isProdBuild=false fail）|
+
+### 15.4 GA4 啟用前 user checklist
+
+user 須先於 GA4 後台完成：
+
+| # | 動作 | 取得 / 決定 |
+|---|---|---|
+| 1 | 登入 Google Analytics 4 | n/a |
+| 2 | 建立 GA4 **property**（推薦命名：`Portable Blog System` 或類似）| property ID（內部）|
+| 3 | 建立 **Data Stream**（類型：Web；URL：`https://babel-lab.github.io/portable-blog-system/`）| stream ID（內部）|
+| 4 | 從 Data Stream 詳細頁取得 **measurementId** | **`G-XXXXXXXXXX`**（10 位英數；以 `G-` 開頭；UA- 舊版不可用）|
+| 5 | 決定 **Data Retention** 期 | 預設 14 個月；個人 blog 建議 2 月即可 |
+| 6 | 決定 **Enhanced measurement** 是否全啟用 | 建議全啟用（自動追蹤 scrolls / outbound clicks 等；無需 source 改動）|
+| 7 | 評估 **cookie banner / consent banner** 是否需要 | 本系統當前無內建 consent；視 user 訪客來源決定（EU / 加州 → 建議加；純 TW → 可暫不加）|
+
+### 15.5 未來 GA4 enable 5-phase plan
+
+| Phase | 內容 | commit 性質 | 風險 | rollback |
+|---|---|---|---|---|
+| **GA4-enable-1** configure & local verify | 改 `ga4.config.json`（`enabled: true` + `measurementId: "G-XXX"`）+ `npm run build` 驗證 dist 含 gtag script + `npm run dev` 驗證 dev 不輸出 + commit | source（`feat(analytics): enable GA4 with production measurement id`）| 🟡 中 | `git revert` 或 `git restore` |
+| **GA4-enable-2** push source | `git push origin main` | push only | 🟢 低 | `git revert + push` |
+| **GA4-enable-3** deploy gh-pages | 同 pm-6 deploy phase B：dist → deploy repo → push gh-pages | deploy | 🟡 中 | `git reset --hard 06e26ae && git push --force origin gh-pages`（謹慎）或 disable + re-deploy |
+| **GA4-enable-4** online realtime smoke test | 訪問線上 + GA4 後台 Realtime 報表確認 event 進入；DevTools 確認 gtag.js 載入 | n/a（純驗證）| 🟢 低 | 若 Realtime 無資料 → 檢查 measurementId 拼字 → 必要時 GA4-enable-1 修正 |
+| **GA4-enable-5** docs sync | 更新 `docs/ga4-enable-preflight.md` 之 user checklist 標 ✅ / `docs/phase-2-candidate-roadmap.md` / `docs/README.md` §7 / EOD report | docs | 🟢 極低 | `git revert` |
+
+**預估總時間**：~75-100 分（含等待 GA4 Realtime 顯示資料）
+
+### 15.6 hostname allowlist 延後原因
+
+| 維度 | 評估 |
+|---|---|
+| **目前是否需要** | ❌ **不需要**（pm-11 之 `isProdBuild` gating 已涵蓋 dev / build / preview 主要 split；當前 enabled=false 無實際污染）|
+| **不做之風險** | 🟡 `npm run preview`（vite preview）mode 通常被視為 build → 仍輸出 gtag；若 user 啟用 GA4 後跑 preview 訪問本機 4173 port，GA4 會收到本機 hostname event |
+| **線上實際影響** | 🟢 低（preview port 4173 通常少跑；GA4 後台可用 hostname filter 排除）|
+| **建議何時做** | ✅ **GA4 啟用後觀察 1-2 週**；若發現 preview hostname event 污染嚴重 → 再啟動 hostname allowlist 實作 |
+| **若觀察期內無污染** | ✅ 可永久延後；當前 pm-11 之 Option A gating 已足夠 |
+
+### 15.7 user 決策點
+
+1. user 是否已準備建立 GA4 property + 取得 measurementId？
+2. Data Retention 偏好（14 個月預設 vs 2 個月精簡）
+3. Enhanced measurement 是否全啟用
+4. Cookie banner / consent 機制是否需要先建
+5. 若已決定要啟用 → 是否啟動 GA4-enable-1 phase（assistant 等 user 提供 measurementId）
+
+### 15.8 今日 commits 統計（pm-40 補記時點）
+
+- **source commits**：24（pm-36 時點 23 + pm-40 本批 commit 為第 25 個）
+- **deploy commits**：1（pm-6 `06e26ae`）
+- **push 狀態**：source main 全部已 push origin/main 至 `f7c8cce`；pm-40 本批 commit 將為新 `[ahead 1]`
+- **deploy 凍結**：`06e26ae`
+- **deferred items 數**：2（GA4 真實啟用 + hostname allowlist）；今日累計解除 4 項
+
+### 15.9 pm-39 不啟動實作之原因
+
+| 項目 | 原因 |
+|---|---|
+| 不啟動 GA4-enable-1 | 等 user 取得 `G-XXXXXXXXXX` measurementId + 表態 4 個決策點 |
+| 不啟動 hostname allowlist 實作 | 依賴 GA4 啟用 + 1-2 週觀察期；屬未來 |
+
+---
+
 （本文件結束）
