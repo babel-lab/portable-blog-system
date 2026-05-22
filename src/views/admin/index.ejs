@@ -194,6 +194,15 @@
         <% } %>
       </select>
     </label>
+    <%# Phase 20260522-night-3-d: basic sort dropdown；3 選項；default publishedAt desc 對齊 loader 初始排序 -%>
+    <label>
+      排序：
+      <select id="admin-sort">
+        <option value="publishedAt-desc">publishedAt desc</option>
+        <option value="updatedAt-desc">updatedAt desc</option>
+        <option value="title-asc">title asc</option>
+      </select>
+    </label>
     <button type="button" id="admin-show-all-toggle" style="padding: 0.35rem 0.7rem; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; font-size: 0.9em;" hidden>Show all</button>
     <span class="visible-count" id="admin-visible-count">showing <%= total %> of <%= total %> matched (<%= total %> total)</span>
   </div>
@@ -228,7 +237,10 @@
           data-fb-published="<%= p.completeness.fbPublished %>"
           data-content-kind="<%= p.contentKind || '' %>"
           data-category="<%= p.category || '' %>"
-          data-series="<%= (p.series && (p.series.id || p.series.slug)) || '' %>">
+          data-series="<%= (p.series && (p.series.id || p.series.slug)) || '' %>"
+          data-published-at="<%= p.publishedAt || '' %>"
+          data-updated-at="<%= p.updatedAt || p.publishedAt || '' %>"
+          data-title="<%= p.title || '' %>">
         <td>
           <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(empty)</span><% } %>
           <span class="toggle-hint"></span>
@@ -599,6 +611,7 @@
       var filter = document.getElementById('admin-filter');
       var visibleCount = document.getElementById('admin-visible-count');
       var showAllToggle = document.getElementById('admin-show-all-toggle');
+      var sort = document.getElementById('admin-sort');
       var rows = Array.prototype.slice.call(document.querySelectorAll('tr.post-row'));
       var details = Array.prototype.slice.call(document.querySelectorAll('tr.post-detail'));
 
@@ -664,6 +677,42 @@
         }
       }
 
+      // Phase 20260522-night-3-d: client-side sort
+      //   - reorder DOM 之 row + detail pairs（per pair appendChild）
+      //   - reassign rows / details 陣列至新順序（讓 applyFilters 之 SHOW_LIMIT cap 對齊新 sort 順序）
+      //   - 觸發 applyFilters() 重套 search / filter / limit
+      //   - 不破壞 search / filter / detail panel
+      function applySort() {
+        if (!sort) return;
+        var sortBy = sort.value || 'publishedAt-desc';
+        var pairs = rows.map(function (row, i) {
+          return [row, details[i]];
+        });
+        pairs.sort(function (a, b) {
+          var ra = a[0], rb = b[0];
+          if (sortBy === 'publishedAt-desc') {
+            return (rb.dataset.publishedAt || '').localeCompare(ra.dataset.publishedAt || '');
+          }
+          if (sortBy === 'updatedAt-desc') {
+            return (rb.dataset.updatedAt || '').localeCompare(ra.dataset.updatedAt || '');
+          }
+          if (sortBy === 'title-asc') {
+            return (ra.dataset.title || '').localeCompare(rb.dataset.title || '');
+          }
+          return 0;
+        });
+        var tbody = document.querySelector('#admin-table tbody');
+        if (tbody) {
+          pairs.forEach(function (pair) {
+            tbody.appendChild(pair[0]);
+            if (pair[1]) tbody.appendChild(pair[1]);
+          });
+        }
+        rows = pairs.map(function (p) { return p[0]; });
+        details = pairs.map(function (p) { return p[1]; });
+        applyFilters();
+      }
+
       search.addEventListener('input', applyFilters);
       filter.addEventListener('change', applyFilters);
       if (showAllToggle) {
@@ -672,13 +721,18 @@
           applyFilters();
         });
       }
+      // Phase 20260522-night-3-d: sort dropdown listener
+      if (sort) {
+        sort.addEventListener('change', applySort);
+      }
 
       // 點 row 展開 / 收合 detail
+      // Phase 20260522-night-3-d: 捕捉 detail by reference（rowDetail closure）；避免 sort 重排後 closured index 失效
       rows.forEach(function (row, i) {
+        var rowDetail = details[i];
         row.addEventListener('click', function () {
-          var detail = details[i];
-          var nowOpen = detail.hidden;
-          detail.hidden = !nowOpen;
+          var nowOpen = rowDetail.hidden;
+          rowDetail.hidden = !nowOpen;
           row.classList.toggle('is-open', nowOpen);
         });
       });
