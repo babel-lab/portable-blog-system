@@ -107,6 +107,19 @@
       if (p.completeness.url === 'ok') urlOk++;
       if (p.completeness.fbPublished === 'ok') fbPublishedOk++;
     });
+
+    // Phase 20260522-night-3-c: derive unique categories / series from posts（不改 loader 資料結構）
+    //   - category：來源 p.category（string；既有於 loader）
+    //   - series：來源 p.series.id 或 p.series.slug（loader 當前未處理；當無資料時 optgroup 自動不渲染）
+    const uniqueCategories = Array.from(new Set(
+      posts.map(function(p) { return p.category; }).filter(function(c) { return c && typeof c === 'string'; })
+    )).sort();
+    const uniqueSeries = Array.from(new Set(
+      posts.map(function(p) {
+        if (!p.series || typeof p.series !== 'object') return null;
+        return p.series.id || p.series.slug || null;
+      }).filter(function(s) { return s && typeof s === 'string'; })
+    )).sort();
   %>
 
   <div class="stats">
@@ -163,6 +176,22 @@
           <option value="kind:book-review">contentKind: book-review</option>
           <option value="kind:download">contentKind: download</option>
         </optgroup>
+        <%# Phase 20260522-night-3-c: category optgroup（來源 posts 中實際出現之 p.category；無資料時不渲染） -%>
+        <% if (uniqueCategories.length > 0) { %>
+        <optgroup label="Category">
+          <% uniqueCategories.forEach(function(c) { %>
+          <option value="category:<%= c %>">category: <%= c %></option>
+          <% }); %>
+        </optgroup>
+        <% } %>
+        <%# Phase 20260522-night-3-c: series optgroup（來源 posts 中實際 p.series.id|slug；當前 loader 未處理 series；無資料時不渲染） -%>
+        <% if (uniqueSeries.length > 0) { %>
+        <optgroup label="Series">
+          <% uniqueSeries.forEach(function(s) { %>
+          <option value="series:<%= s %>">series: <%= s %></option>
+          <% }); %>
+        </optgroup>
+        <% } %>
       </select>
     </label>
     <button type="button" id="admin-show-all-toggle" style="padding: 0.35rem 0.7rem; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; font-size: 0.9em;" hidden>Show all</button>
@@ -197,7 +226,9 @@
           data-url="<%= p.completeness.url %>"
           data-cat-tags="<%= p.completeness.categoryTags %>"
           data-fb-published="<%= p.completeness.fbPublished %>"
-          data-content-kind="<%= p.contentKind || '' %>">
+          data-content-kind="<%= p.contentKind || '' %>"
+          data-category="<%= p.category || '' %>"
+          data-series="<%= (p.series && (p.series.id || p.series.slug)) || '' %>">
         <td>
           <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(empty)</span><% } %>
           <span class="toggle-hint"></span>
@@ -581,6 +612,9 @@
           case 'blogger': return row.dataset.blogger === val;
           case 'github': return row.dataset.github === val;
           case 'kind': return row.dataset.contentKind === val;
+          // Phase 20260522-night-3-c: category / series filter；對齊 row data-category / data-series；isFilterActive 自動觸發（per night-3-b 既有邏輯）
+          case 'category': return row.dataset.category === val;
+          case 'series': return row.dataset.series === val;
           case 'completeness':
             // val 形如 "seo-missing" / "fb-missing" / "url-missing" / "categoryTags-missing"
             if (val === 'seo-missing') return row.dataset.seo === 'missing';
