@@ -86,6 +86,7 @@
 - `docs/ga4-enable-preflight.md` — GA4 measurementId 接入 preflight + user checklist
 - `docs/hashtag-slug-decision.md` — hashtag slug 派生策略（tags.json lookup 推薦；GA4 click_hashtag + span→a 前置 spec）
 - `docs/blogger-listener-strategy.md` — Blogger 端 GA4 click tracking 策略（短期 reverse UTM；listener deferred）
+- `docs/blogger-to-github-reverse-utm-plan.md` — Blogger → GitHub 反向 UTM 注入計畫（mirror 既有 github_pages→blogger；listener-free 跨站 attribution）
 
 ### 3.5 Design System
 
