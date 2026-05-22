@@ -144,7 +144,17 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
       <% } %>
       <ul class="lab-affiliate-box__links">
         <% post.affiliate.links.forEach(function(link) { %>
-        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+        <%# Phase 20260523-ga4-affiliate-bottom-attr-b: GA4 click tracking attrs on bottom CTA；href/rel/target 不動；affiliate URL 不污染；mirror top；唯一 diff: placement -%>
+        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank" <%- include('../tracking/ga4-events-helper', {
+          event: 'click_affiliate_cta',
+          params: {
+            provider: link.network || '',
+            placement: 'article_bottom',
+            post_slug: post.slug,
+            link_label: link.label,
+            outbound: 'true'
+          }
+        }) %>><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
         <% }); %>
       </ul>
     </aside>
