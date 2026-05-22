@@ -197,9 +197,9 @@ npm run check:images
 
 ## §7 今日穩定 baseline
 
-（更新時點：2026-05-21；pm-64 後快照）
+（更新時點：2026-05-22；day-1 docs-cleanup-a 後快照；本批屬 5/22 起點之 docs-only drift cleanup）
 
-- HEAD: `fc02a56 docs(admin): record platform routing extension manual verification` （pm-63 後 push origin/main；pm-64 為本批 baseline sync commit；本 §7 自身落後 1 commit 為既知遞迴）
+- HEAD: `6593e4c docs(project): add custom domain root files safety strategy` （5/21 夜 custom-domain-root-files-safety-a 已落地；其後 pm-66 EOD §18 commit `f202e51` 已先在 5/21 末段落地；5/22 day-1 docs-cleanup-a 為本批；本 §7 自身落後 1 commit 為既知遞迴）
 - branch: `main` / tracking `origin/main` / 與 remote 同步
 - working tree: clean
 - deploy repo HEAD: `f32f7d3 deploy: 09b9a67 snapshot (GA4 enabled)`（**今日 2 個 deploy**：pm-6 `06e26ae`（SEO noindex + DS-3 CSS + admin overview polish）+ **pm-45 `f32f7d3`**（**GA4 enabled with measurementId G-C77SMPF8VD**）；皆已 push `origin/gh-pages`；deploy repo 自 pm-45 起未動；後續 commits 皆確認不需 deploy）
@@ -207,7 +207,7 @@ npm run check:images
 - dist/sitemap.xml: 14 url entries（mid-5 / pm-11 / pm-20 / pm-43 build 確認；pm-6 + pm-45 deploy 已上線）
 - dist/.gitkeep: **已從 source repo 移除**（pm-20 commit `3917526` Option A.1；`.gitignore` 對應 `!dist/.gitkeep` 一行同步移除；build 後 drift 從根源消除；其他 3 個 `dist-*/.gitkeep` 保留）
 - **GA4 status**：✅ **production live**（measurementId `G-C77SMPF8VD`；Blogger + GitHub Pages 共用；future custom domain 沿用；user 於 pm-46 手動驗收 Realtime 通過）
-- 今日 commits 總計 **37 source + 2 deploy**（pm-64 commit 後將為 38 source）
+- 5/21 commits 總計 **39 source + 2 deploy**（含 pm-66 EOD §18 commit `f202e51` + 5/21 夜 custom-domain-root-files-safety-a commit `6593e4c`；5/22 day-1-docs-cleanup-a 為新一日之起點）
 - 今日 commits 純線性堆疊；無 amend / rebase / force；source main 已 sync `origin/main`；deploy gh-pages 已 sync `origin/gh-pages`
 - 今日重點摘要：
   - Admin overview polish（am-2 ~ am-7：C-1 README baseline / C-4 audit / S-1 empty states / S-4 tooltips / S-2 linkify / S-5 docs sync）
@@ -221,7 +221,8 @@ npm run check:images
   - **🎉 GA4 真實啟用全鏈完成**（pm-43 configure `09b9a67` → pm-44 push → pm-45 deploy `f32f7d3` → pm-46 user Realtime 驗收通過）
   - **UTM naming registry + content platform routing docs**（pm-48 / pm-49 / pm-52 / pm-55；registry 對齊 production snake_case convention）
   - **Admin Platform Routing read-only extension**（pm-57 loader cheap derived 4 fields `a34e909` + pm-59 EJS detail section `a285183`；user pm-62 手動驗收通過；utmPreviewUrl + list badge 暫緩）
-  - 多次 README baseline sync（pm-1 / pm-17 / pm-28 / 本批 pm-64）+ source push 16+ 次
+  - **Custom domain root files safety strategy docs**（5/21 夜 commit `6593e4c`；docs-only；定義 robots / sitemap / ads.txt / CNAME / .nojekyll / favicon 等根目錄檔案策略；**custom domain 尚未啟用**；屬未來 migration 之前置 docs）
+  - 多次 README baseline sync（pm-1 / pm-17 / pm-28 / pm-64 / 5/22 day-1-docs-cleanup-a）+ source push 16+ 次
 - 後段重要 commits 追蹤：`92f4f07`（C-2 GA4 gating）/ `3917526`（`.gitkeep` 移除）/ `09b9a67`（**GA4 production enable**）/ deploy `f32f7d3`（**GA4 上線**）/ `13e38ba`（Option B rule + negative fixture）/ `d1e5858`（GA4 / UTM registry）/ `023227e`（content platform routing）/ `ebfe254`（UTM registry 對齊既有）/ `21cfa06`（Admin platform routing plan）/ `a34e909`（Admin loader cheap derived）/ `a285183`（Admin EJS Platform Routing section）/ `fc02a56`（Admin manual verification docs）
 - **已解除 deferred items（共 6 項）**：
   - C-2 GA4 prod-only gating（機制就位；commit `92f4f07`）

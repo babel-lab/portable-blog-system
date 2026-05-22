@@ -1051,6 +1051,68 @@ assistant 無法登入 GA4 後台；以下 7 步驟由 user 親自完成：
 
 明日工作起點：source HEAD `42c7359`；deploy HEAD `f32f7d3`；皆 sync remote。
 
+⚠️ 上述「明日工作起點」於 §18 撰寫時 snapshot；§19 之 custom-domain-root-files-safety-a + 5/22 day-1-docs-cleanup-a 已於其後更新（per §19）。
+
+---
+
+## 19. Custom domain root files safety strategy docs（Phase 20260521-custom-domain-root-files-safety-a）
+
+本章節為 §18 final stable state 後新增之 5/21 夜 docs-only phase 紀錄；commit `6593e4c` 落地後，5/21 完整 commits 總計從 §18 之 38 source 推進至 **39 source**。本節由 5/22 day-1-docs-cleanup-a 同批落地補記，屬 cross-day baseline drift cleanup。
+
+### 19.1 phase 性質
+
+- **Read-only docs phase**；無 source / build / validate / deploy 改動
+- 純新增 1 個文件：`docs/custom-domain-root-files-strategy.md`
+- 不改 source repo 設定 / deploy repo / DNS / GitHub Pages settings
+- 不啟動任何 custom domain migration phase
+
+### 19.2 範圍
+
+新增之 docs `docs/custom-domain-root-files-strategy.md`（242 行；7 主節）：
+
+| 節 | 主題 |
+|---|---|
+| §1 | Purpose：custom domain 導入前根目錄檔案安全策略 |
+| §2 | Current state：盤點 `public/` 與 `dist/` 與 deploy repo 既有狀態 |
+| §3 | Strategy：robots.txt / ads.txt / CNAME / sitemap.xml / .nojekyll / favicon 共 6 個檔案之策略 |
+| §4 | Future custom domain migration checklist：domain 申請 / source repo 準備 / deploy repo 準備 / GA4+SEO 後台同步 / AdSense 申請 / hostname allowlist |
+| §5 | Boundaries：本批 phase 鎖定項 |
+| §6 | 新網域正式啟用前還缺哪些值 |
+| §7 | Cross-links |
+
+### 19.3 重要結論
+
+- ❌ **custom domain 尚未實作 / 尚未啟用**；本 phase 僅落 docs 策略，**不**啟動任何 migration
+- ❌ **不**建立 placeholder `public/CNAME`（會誤導 DNS check）
+- ❌ **不**建立 placeholder `public/ads.txt`（無 AdSense pub id；fake 會違反政策）
+- ❌ **不**在 public/ 重複放 robots.txt / sitemap.xml（會被 postbuild script 覆蓋）
+- ✅ `.nojekyll` 為 deploy repo 唯一保留 dotfile（per pm-6 deploy phase B 邏輯）
+- ✅ favicon / icons / images / downloads 既有；不受 custom domain 影響
+
+### 19.4 commit
+
+| commit | message | 範圍 |
+|---|---|---|
+| `6593e4c` | `docs(project): add custom domain root files safety strategy` | 新增 1 docs；docs-only；無 src / content / dist / deploy 變動 |
+
+### 19.5 5/21 commits 統計更新
+
+| 時點 | source commits | 說明 |
+|---|---|---|
+| §18.6 撰寫時 | 38 | 含 pm-66 EOD §18 commit `f202e51` |
+| §19 更新後 | **39** | 含 5/21 夜 commit `6593e4c` |
+
+- 推送狀態：source main 已 sync `origin/main` 至 `6593e4c`；deploy gh-pages 維持 `f32f7d3`（未動）
+
+### 19.6 5/22 day-1 實際起點
+
+| repo | HEAD（5/22 day-1 開始時）| tracking |
+|---|---|---|
+| source | `6593e4c` | `origin/main`（sync）|
+| deploy | `f32f7d3` | `origin/gh-pages`（sync）|
+
+5/22 day-1 之 read-only audit 已於 day-1-readonly-a 完成；對應落地報告：`docs/20260522-day-1-readonly-a-report.md`（5/22 day-1-docs-cleanup-a 同批落地）。
+
 ---
 
 （本文件結束）
