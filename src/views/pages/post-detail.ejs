@@ -174,7 +174,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
         %>
         <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on relatedLinks anchor；移除 helper include 避開 async EJS issue；href/target/rel/class 不動 -%>
         <li class="lab-related-links__item lab-related-links__item--<%= isInternal ? 'internal' : 'external' %>">
-          <a class="lab-related-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> data-ga4-event="click_related_link" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= item.title %>" data-ga4-param-link_type="<%= linkType %>" data-ga4-param-link_url="<%= item.url %>" data-ga4-param-outbound="<%= outbound %>">
+          <a class="lab-related-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> data-ga4-event="click_related_link" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= item.title %>" data-ga4-param-link_type="<%= linkType %>" data-ga4-param-link_url="<%= item.url %>" data-ga4-param-outbound="<%= outbound %>" data-ga4-param-placement="related_links">
             <% if (platform) { %><span class="lab-related-links__platform">[<%= platform %>]</span> <% } %><span class="lab-related-links__title-text"><%= item.title %></span>
           </a>
           <% if (hasDesc) { %><p class="lab-related-links__description"><%= item.description %></p><% } %>
@@ -211,7 +211,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
         %>
         <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on otherLinks anchor；mirror relatedLinks；唯一 diff: event 為 click_other_link；移除 helper include 避開 async EJS issue -%>
         <li class="lab-other-links__item lab-other-links__item--<%= isInternal ? 'internal' : 'external' %>">
-          <a class="lab-other-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> data-ga4-event="click_other_link" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= item.title %>" data-ga4-param-link_type="<%= linkType %>" data-ga4-param-link_url="<%= item.url %>" data-ga4-param-outbound="<%= outbound %>">
+          <a class="lab-other-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> data-ga4-event="click_other_link" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= item.title %>" data-ga4-param-link_type="<%= linkType %>" data-ga4-param-link_url="<%= item.url %>" data-ga4-param-outbound="<%= outbound %>" data-ga4-param-placement="other_links">
             <% if (platform) { %><span class="lab-other-links__platform">[<%= platform %>]</span> <% } %><span class="lab-other-links__title-text"><%= item.title %></span>
           </a>
           <% if (hasDesc) { %><p class="lab-other-links__description"><%= item.description %></p><% } %>
