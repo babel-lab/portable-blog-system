@@ -310,6 +310,27 @@
       </tr>
       <tr class="post-detail" data-idx="<%= idx %>" hidden>
         <td colspan="7">
+          <%# Phase 20260522-night-3-e: missing metadata warning banner；重用既有 p.completeness.*；無 missing 時不渲染避免畫面太吵 -%>
+          <%
+            var missingList = [];
+            if (p && p.completeness && typeof p.completeness === 'object') {
+              if (p.completeness.seo === 'missing') missingList.push('SEO');
+              if (p.completeness.fb === 'missing') missingList.push('FB metadata');
+              if (p.completeness.blogger === 'missing') missingList.push('Blogger config');
+              if (p.completeness.github === 'missing') missingList.push('GitHub config');
+              if (p.completeness.url === 'missing') missingList.push('Output URL');
+              if (p.completeness.categoryTags === 'missing') missingList.push('Category / Tags');
+              if (p.completeness.fbPublished === 'missing') missingList.push('FB Published URL');
+            }
+          %>
+          <% if (missingList.length > 0) { %>
+          <div style="background: #fff4cc; border: 1px solid #f0d264; padding: 0.5rem 0.75rem; border-radius: 3px; margin: 0 0 0.75rem; font-size: 0.85em; color: #856404;">
+            <strong>⚠️ Missing metadata：</strong>
+            <ul style="margin: 0.25rem 0 0; padding-left: 1.25rem;">
+              <% missingList.forEach(function(item) { %><li><%= item %></li><% }); %>
+            </ul>
+          </div>
+          <% } %>
           <div class="detail-section">
             <h3>Identity</h3>
             <dl class="detail-grid">
