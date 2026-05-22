@@ -52,6 +52,22 @@
 | hashtag 點擊治理 | 🟡 partial | hashtag 區塊兩端 render 已完成；但 click event 治理尚未集中 |
 | relatedLinks / otherLinks click event 治理 | 🟡 partial | render 已完成；UTM 已實作（GitHub→Blogger 方向）；但 internal link / cross-site / external 三類 click event 區分尚未集中 |
 
+### 2.1 Phase 5-d 既有 click tracking 基礎設施（既有；template 未對接）
+
+⚠️ **重要補記**（per `20260522-pm-click-tracking-governance-reconcile-a`）：本治理 doc 首版（commit `aabc082`）落地時**未充分盤點既有基礎設施**；本批 reconcile 補上以下事實 + 對齊既有 attr 命名 convention（**不**動既有 src code）：
+
+| 元件 | 路徑 | 狀態 |
+|---|---|---|
+| **trackEvent helper** | `src/js/modules/ga4-events.js` | ✅ 已存在；wrap `gtag('event', name, params)`；無 `gtag` 時 silent no-op |
+| **Delegated click listener** | `src/js/modules/link-tracker.js` | ✅ 已存在；document-level `click` listener；掃 `[data-ga4-event]` + 讀 `data-ga4-param-<key>` attr → dispatch via `trackEvent` |
+| **EJS attr helper partial** | `src/views/tracking/ga4-events-helper.ejs` | ✅ 已存在；輸出 `data-ga4-event="..."` + `data-ga4-param-<key>="..."` |
+| **main.js 已 wire** | `src/js/main.js` line 14 `initLinkTracker()` | ✅ 已 wire；每頁載入即生效 |
+| **實際 EJS click point template include helper** | — | ❌ **無**；helper 自述「本階段未在頁面模板實際 include；留給後續整合階段」|
+
+🔑 **影響**：
+- Phase 2 click tracking 框架**4 / 4 已就位**；缺的只是**在 click point EJS 加 1 行 `<%- include('../tracking/ga4-events-helper', {...}) %>`**
+- 本治理 doc 之 §6 Data Attribute Convention 首版採扁平 `data-ga4-<key>` 命名；**與既有 listener / helper 採用之 `data-ga4-param-<key>` 不一致**；本批已 reconcile（per §6 attr 表已更新）
+
 ---
 
 ## 3. Tracking Layers
@@ -220,26 +236,28 @@
 
 ---
 
-## 6. Data Attribute Convention（未來實作 reference；本批不實作）
+## 6. Data Attribute Convention（對齊既有 helper / listener；未來 template 對接時直接採用）
 
-未來 EJS template 與 JS listener 之 contract（**僅 proposal**）：
+EJS template 與 JS listener 之 contract，**對齊既有 `link-tracker.js` + `ga4-events-helper.ejs`（per §2.1）之命名**：
 
 | Attribute | 用途 |
 |---|---|
-| `data-ga4-event` | event name（如 `click_affiliate_cta`）|
-| `data-ga4-platform` | 當前平台 |
-| `data-ga4-source-platform` | cross-site source |
-| `data-ga4-target-platform` | cross-site target |
-| `data-ga4-post-slug` | post slug |
-| `data-ga4-post-title` | post title |
-| `data-ga4-link-type` | `internal` / `cross_site` / `external` / `affiliate` |
-| `data-ga4-link-label` | 顯示文字 |
-| `data-ga4-link-url` | URL（與 `href` 可能含 UTM 之版本一致）|
-| `data-ga4-placement` | `top` / `bottom` / `inline` / `sidebar` |
-| `data-ga4-provider` | affiliate / ad provider |
-| `data-ga4-campaign` | campaign |
-| `data-ga4-content-group` | content group |
-| `data-ga4-outbound` | `true` / `false` |
+| `data-ga4-event` | event name（如 `click_affiliate_cta`）；**listener 識別 anchor**；不含 `param-` 前綴 |
+| `data-ga4-param-platform` | 當前平台（`blogger` / `github_pages`）|
+| `data-ga4-param-source_platform` | cross-site source（snake_case；非 kebab）|
+| `data-ga4-param-target_platform` | cross-site target |
+| `data-ga4-param-post_slug` | post slug |
+| `data-ga4-param-post_title` | post title |
+| `data-ga4-param-link_type` | `internal` / `cross_site` / `external` / `affiliate` |
+| `data-ga4-param-link_label` | 顯示文字 |
+| `data-ga4-param-link_url` | URL（與 `href` 可能含 UTM 之版本一致）|
+| `data-ga4-param-placement` | `top` / `bottom` / `inline` / `sidebar` |
+| `data-ga4-param-provider` | affiliate / ad provider |
+| `data-ga4-param-campaign` | campaign |
+| `data-ga4-param-content_group` | content group |
+| `data-ga4-param-outbound` | `true` / `false`（字串形式；helper 不轉型）|
+
+⚠️ **命名變更紀錄**：本治理 doc 首版（commit `aabc082`）採扁平 `data-ga4-<key>`（如 `data-ga4-platform` / `data-ga4-source-platform`）；本批 reconcile 對齊既有 helper / listener 採用之 `data-ga4-param-<key>` 前綴 + snake_case key（如 `data-ga4-param-platform` / `data-ga4-param-source_platform`）。**`data-ga4-event` 不變**（仍為扁平；listener anchor）。
 
 ### 6.1 設計原則
 
@@ -254,7 +272,59 @@
 - ❌ 本批不新增任何 JS listener
 - ❌ 本批不改 GA4 config
 
-Phase 2 rollout 時，第一個落地 phase 應為「listener 框架就位 + 至少 1 個 click source 對接」。
+Phase 2 rollout 時，第一個落地 phase 應為**將既有 `ga4-events-helper.ejs` partial include 至首個 click point**（per §2.1：listener / helper / wiring 4/4 已就位；無需重建框架）。
+
+### 6.3 命名規則（per `link-tracker.js` + `ga4-events-helper.ejs`）
+
+- **`data-ga4-event`**：放**事件名稱**（如 `click_affiliate_cta`）；listener 用此 attr 識別 click target
+- **`data-ga4-param-<key>`**：放**事件參數**；listener 將 `<key>` 之 attr 值轉為 GA4 event params
+- **param key 建議使用 `snake_case`**（如 `source_platform` / `post_slug` / `link_type`）；對齊 `docs/ga4-parameter-naming-registry.md` snake_case convention + GA4 recommended param naming
+- **既有 helper 之 key 驗證**（per `src/views/tracking/ga4-events-helper.ejs:6`）：
+  ```js
+  /^[a-zA-Z0-9_-]+$/.test(k)
+  ```
+  → 含 `.` / `:` / 空白等之 key 會被 helper **silent drop**；不會輸出 attr
+- **不要使用 dot notation**：如 `tracking.ga4Event` **不應**直接變成 `data-ga4-param-tracking.ga4Event`（含 `.` 會被 helper 過濾）；應拆為 `event=tracking_ga4_event` 或重新對齊 key naming
+
+### 6.4 EJS include 範例（首注入時參考）
+
+於 click point 之 `<a>` 開始 tag 內 include helper partial：
+
+```ejs
+<a class="lab-affiliate-box__link"
+   href="<%= link.url %>"
+   rel="sponsored nofollow noopener noreferrer"
+   target="_blank"
+   <%- include('../tracking/ga4-events-helper', {
+     event: 'click_affiliate_cta',
+     params: {
+       provider,
+       placement: 'article_top',
+       post_slug: post.slug,
+       link_label: link.label,
+       outbound: 'true'
+     }
+   }) %>>
+  <%= link.label %>
+</a>
+```
+
+⚠️ 注意：
+- include path 為相對路徑；`src/views/blogger/blogger-post-full.ejs` 與 `src/views/pages/post-detail.ejs` 兩端皆採 `'../tracking/ga4-events-helper'`
+- `params` 物件之 key 須 snake_case 且符合 §6.3 之 regex
+- value 為 string 即可；listener `trackEvent` 直接傳給 `gtag('event', ...)`
+- `outbound` 採 string `'true'`（非 boolean `true`）；對齊既有 helper 之字串輸出 convention
+
+### 6.5 Helper key validation 一致性
+
+由於 `ga4-events-helper.ejs` 之 regex 為 `/^[a-zA-Z0-9_-]+$/`：
+- ✅ `post_slug` / `link_type` / `source_platform` 合法
+- ✅ `placement` / `provider` / `campaign` 合法
+- ❌ `tracking.ga4Event`（含 `.`）非法 → silent drop
+- ❌ `params:key`（含 `:`）非法 → silent drop
+- ❌ `param key`（含空白）非法 → silent drop
+
+設計範例 params 時，請事先確認 key 通過此 regex；否則 listener 無法接收。
 
 ---
 
@@ -411,6 +481,16 @@ github_to_blogger_click
 - (b) 維持 CLAUDE.md §5 既有命名 → 本治理之 `click_*` 為 alias / 不採用
 
 本文件**不**強制 (a) 或 (b)；屬未來 governance decision。
+
+### 9.3 Phase 2 Rollout 考量：GitHub vs Blogger listener 不對稱
+
+本批 reconcile 補記：
+
+- ✅ **本批只修 governance doc**；對齊 §2.1 之既有 helper / listener attr 命名 convention
+- ❌ **不**代表已在 affiliate CTA / relatedLinks / otherLinks / hashtag 之 EJS template 實作 click tracking attr
+- ✅ **GitHub 端**：因 `src/js/main.js` 已 `import` 並呼叫 `initLinkTracker()`（per §2.1）；未來只要於 GitHub 端 EJS template（如 `src/views/pages/post-detail.ejs`）掛上 `data-ga4-event` + `data-ga4-param-*` attr → **listener 立即生效**；不需新增 src code
+- ❌ **Blogger 端**：因 Blogger 後台貼上之 post HTML（`dist-blogger/posts/{slug}/post.html`）**不含 Vite `main.js` bundle**；attr 即使輸出，listener 也不會載入 → **無法 fire GA4 event**
+- ⚠️ **Blogger 端 listener 策略 deferred**：需獨立 phase 評估解法（candidate options：A 將 listener inline 至 blogger-post-full.ejs `<script>` / B 由 user 於 Blogger 主題級別貼一次性 listener 程式 / C Blogger 端不做 click event，只靠 UTM + 自動 page_view 歸因）；屬 Phase 2 之 future decision
 
 ---
 
