@@ -82,17 +82,8 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
       <% } %>
       <ul class="lab-affiliate-box__links">
         <% post.affiliate.links.forEach(function(link) { %>
-        <%# Phase 20260523-ga4-affiliate-top-attr-a: GA4 click tracking attrs on top CTA；href/rel/target 不動；affiliate URL 不污染 -%>
-        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank" <%- include('../tracking/ga4-events-helper', {
-          event: 'click_affiliate_cta',
-          params: {
-            provider: link.network || '',
-            placement: 'article_top',
-            post_slug: post.slug,
-            link_label: link.label,
-            outbound: 'true'
-          }
-        }) %>><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+        <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on top CTA；移除 helper include 避開 async EJS issue；href/rel/target/class 不動 -%>
+        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank" data-ga4-event="click_affiliate_cta" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= link.label %>" data-ga4-param-link_type="affiliate" data-ga4-param-link_url="<%= link.url %>" data-ga4-param-outbound="true" data-ga4-param-provider="<%= link.network || '' %>" data-ga4-param-placement="article_top"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
         <% }); %>
       </ul>
     </aside>
@@ -144,17 +135,8 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
       <% } %>
       <ul class="lab-affiliate-box__links">
         <% post.affiliate.links.forEach(function(link) { %>
-        <%# Phase 20260523-ga4-affiliate-bottom-attr-b: GA4 click tracking attrs on bottom CTA；href/rel/target 不動；affiliate URL 不污染；mirror top；唯一 diff: placement -%>
-        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank" <%- include('../tracking/ga4-events-helper', {
-          event: 'click_affiliate_cta',
-          params: {
-            provider: link.network || '',
-            placement: 'article_bottom',
-            post_slug: post.slug,
-            link_label: link.label,
-            outbound: 'true'
-          }
-        }) %>><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+        <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on bottom CTA；mirror top；唯一 diff: placement；移除 helper include 避開 async EJS issue -%>
+        <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank" data-ga4-event="click_affiliate_cta" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= link.label %>" data-ga4-param-link_type="affiliate" data-ga4-param-link_url="<%= link.url %>" data-ga4-param-outbound="true" data-ga4-param-provider="<%= link.network || '' %>" data-ga4-param-placement="article_bottom"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
         <% }); %>
       </ul>
     </aside>
@@ -190,18 +172,9 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
           const linkType = isInternal ? 'internal' : (isCrossSite ? 'cross_site' : 'external');
           const outbound = (isInternal || isCrossSite) ? 'false' : 'true';
         %>
-        <%# Phase 20260522-ga4-helper-comment-fix-and-related-other-links-a: GA4 click tracking attrs on relatedLinks anchor；href/target/rel/class 不動；attr append-only -%>
+        <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on relatedLinks anchor；移除 helper include 避開 async EJS issue；href/target/rel/class 不動 -%>
         <li class="lab-related-links__item lab-related-links__item--<%= isInternal ? 'internal' : 'external' %>">
-          <a class="lab-related-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> <%- include('../tracking/ga4-events-helper', {
-            event: 'click_related_link',
-            params: {
-              post_slug: post.slug,
-              link_label: item.title,
-              link_type: linkType,
-              link_url: item.url,
-              outbound: outbound
-            }
-          }) %>>
+          <a class="lab-related-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> data-ga4-event="click_related_link" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= item.title %>" data-ga4-param-link_type="<%= linkType %>" data-ga4-param-link_url="<%= item.url %>" data-ga4-param-outbound="<%= outbound %>">
             <% if (platform) { %><span class="lab-related-links__platform">[<%= platform %>]</span> <% } %><span class="lab-related-links__title-text"><%= item.title %></span>
           </a>
           <% if (hasDesc) { %><p class="lab-related-links__description"><%= item.description %></p><% } %>
@@ -236,18 +209,9 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
           const linkType = isInternal ? 'internal' : (isCrossSite ? 'cross_site' : 'external');
           const outbound = (isInternal || isCrossSite) ? 'false' : 'true';
         %>
-        <%# Phase 20260522-ga4-helper-comment-fix-and-related-other-links-a: GA4 click tracking attrs on otherLinks anchor；mirror relatedLinks；唯一 diff: event 為 click_other_link；href/target/rel/class 不動；attr append-only -%>
+        <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on otherLinks anchor；mirror relatedLinks；唯一 diff: event 為 click_other_link；移除 helper include 避開 async EJS issue -%>
         <li class="lab-other-links__item lab-other-links__item--<%= isInternal ? 'internal' : 'external' %>">
-          <a class="lab-other-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> <%- include('../tracking/ga4-events-helper', {
-            event: 'click_other_link',
-            params: {
-              post_slug: post.slug,
-              link_label: item.title,
-              link_type: linkType,
-              link_url: item.url,
-              outbound: outbound
-            }
-          }) %>>
+          <a class="lab-other-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %> data-ga4-event="click_other_link" data-ga4-param-post_slug="<%= post.slug %>" data-ga4-param-link_label="<%= item.title %>" data-ga4-param-link_type="<%= linkType %>" data-ga4-param-link_url="<%= item.url %>" data-ga4-param-outbound="<%= outbound %>">
             <% if (platform) { %><span class="lab-other-links__platform">[<%= platform %>]</span> <% } %><span class="lab-other-links__title-text"><%= item.title %></span>
           </a>
           <% if (hasDesc) { %><p class="lab-other-links__description"><%= item.description %></p><% } %>
