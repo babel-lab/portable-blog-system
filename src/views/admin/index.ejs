@@ -122,6 +122,8 @@
     <div class="stat-card"><strong><%= seoOk %></strong>SEO ok</div>
     <div class="stat-card"><strong><%= urlOk %></strong>URL ok</div>
     <div class="stat-card" title="FB disabled 或文章尚未 published 時視為 OK；文章已 published 且 FB enabled=true 時需填 fbPostUrl。per docs/fb-sidecar-schema.md §3.5.5 P3"><strong><%= fbPublishedOk %></strong>fb published ok</div>
+    <div class="stat-card" title="總文章數扣除 fb published ok 之計算結果（total - fb published ok）；幫助直接定位需補 FB 貼文 URL 之文章；不等於 FB enabled 數。per Phase 20260522-night-3-a"><strong><%= total - fbPublishedOk %></strong>Missing FB URL</div>
+    <div class="stat-card" title="總文章數扣除 URL ok 之計算結果（total - URL ok）；幫助直接定位需補 publishedUrl 之文章；不等於 Blogger/GitHub enabled 數。per Phase 20260522-night-3-a"><strong><%= total - urlOk %></strong>Missing Output URL</div>
   </div>
 
   <% if (posts.length === 0) { %>
