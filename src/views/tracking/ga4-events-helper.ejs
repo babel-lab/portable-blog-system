@@ -1,6 +1,9 @@
-<%# 用法：<a <%- include('../tracking/ga4-events-helper', { event: 'tag_click', params: { tag: 'github' } }) %>>...</a>
-       輸出：data-ga4-event="tag_click" data-ga4-param-tag="github"
-       本 partial 5-d 提供，但本階段未在頁面模板實際 include；留給後續整合階段。 %>
+<%# 用法：於 a 標籤內 include 此 partial，傳入 event (string) 與 params (object)。
+    範例 event 名: tag_click
+    範例 params: { tag: 'github' }
+    輸出: data-ga4-event="tag_click" data-ga4-param-tag="github"
+    本 partial 由 Phase 5-d 提供；既有 affiliate CTA top/bottom + relatedLinks / otherLinks 已接入。
+    注意: 本 comment 嚴格不出現 EJS opening delimiter（含 scriptlet/expression/raw 三種變體）；避免 EJS parser 非 nesting-aware 之 latent bug；歷史 latent bug 修正紀錄: phase 20260522-ga4-helper-comment-fix-and-related-other-links-a。 %>
 <% const _evt = (typeof event !== 'undefined' && event) ? String(event) : null; -%>
 <% const _params = (typeof params === 'object' && params) ? params : {}; -%>
 <% if (_evt) { -%>data-ga4-event="<%= _evt %>"<% for (const [k, v] of Object.entries(_params)) { if (v != null && /^[a-zA-Z0-9_-]+$/.test(k)) { %> data-ga4-param-<%= k %>="<%= v %>"<% } } -%><% } -%>
