@@ -84,6 +84,7 @@
 - `docs/seo-indexing-rules.md` — indexing policy（含 SEO-0 ~ SEO-2-z 7 batches checkpoint）
 - `docs/seo-sitemap-split-pre-analysis.md` — SEO-4 多平台 sitemap 拆分 pre-analysis（結論：當前不建議實作）
 - `docs/ga4-enable-preflight.md` — GA4 measurementId 接入 preflight + user checklist
+- `docs/hashtag-slug-decision.md` — hashtag slug 派生策略（tags.json lookup 推薦；GA4 click_hashtag + span→a 前置 spec）
 
 ### 3.5 Design System
 
