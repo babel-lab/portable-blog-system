@@ -86,6 +86,37 @@
   </div>
 
   <%
+    // Phase 20260523-night-admin-b6: Relative time 並排顯示 helper（最小可行範圍）
+    //   - 純 display 層；不修改 loader；不引入第三方 lib（dayjs / date-fns / moment）
+    //   - threshold（per user D4）：
+    //       0 天 → 今天
+    //       1 天 → 昨天
+    //       2-90 天 → N 天前
+    //       91-365 天 → N 個月前（採 Math.floor(diffDays / 30)）
+    //       > 365 天 → 空字串（caller 端不印 separator）
+    //   - 空值 / 非字串 / 無法 parse / 未來日期 一律回空字串；不 throw
+    //   - 採 local-midnight 計算 calendar day diff，避免 YYYY-MM-DD 之 UTC 解析造成跨時區邊界誤差
+    //   - 本批僅套用於 row 主欄底部 published 顯示（line ~284）
+    //     detail Dates / FB Post / dry-run editor / sort label / dataset attr 皆不變（per user D2 最小可行範圍）
+    function formatRelativeDate(dateValue) {
+      if (!dateValue || typeof dateValue !== 'string') return '';
+      const t = Date.parse(dateValue);
+      if (Number.isNaN(t)) return '';
+      const pub = new Date(t);
+      const now = new Date();
+      const pubMidnight = new Date(pub.getFullYear(), pub.getMonth(), pub.getDate());
+      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.floor((nowMidnight.getTime() - pubMidnight.getTime()) / 86400000);
+      if (diffDays < 0) return '';
+      if (diffDays === 0) return '今天';
+      if (diffDays === 1) return '昨天';
+      if (diffDays <= 90) return diffDays + ' 天前';
+      if (diffDays <= 365) return Math.floor(diffDays / 30) + ' 個月前';
+      return '';
+    }
+  %>
+
+  <%
     // 統計摘要
     const total = posts.length;
     const byStatus = { ready: 0, draft: 0, published: 0, other: 0 };
@@ -281,7 +312,8 @@
           <% if (p.titleEn) { %><br><span class="text-muted"><%= p.titleEn %></span><% } %>
           <br><span class="mono text-muted"><%= p.id || '(empty)' %></span>
           <br><span class="mono text-muted">slug: <%= p.slug || '(empty)' %></span>
-          <br><span class="mono text-muted" title="<%= p.publishedSource ? 'source: ' + p.publishedSource : 'no publishedAt source' %>">published: <%= p.publishedAt || '(empty)' %><% if (p.publishedSource) { %> <span class="text-muted" style="font-size: 0.85em;">(<%= p.publishedSource %>)</span><% } %></span>
+          <% var pRel = formatRelativeDate(p.publishedAt); %>
+          <br><span class="mono text-muted" title="<%= p.publishedSource ? 'source: ' + p.publishedSource : 'no publishedAt source' %>">published: <%= p.publishedAt || '(empty)' %><% if (pRel) { %> · <%= pRel %><% } %><% if (p.publishedSource) { %> <span class="text-muted" style="font-size: 0.85em;">(<%= p.publishedSource %>)</span><% } %></span>
         </td>
         <td class="col-narrow">
           <% if (p.contentKind) { %>
