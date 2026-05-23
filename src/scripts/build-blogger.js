@@ -17,6 +17,11 @@ import { renderBody } from './parse-markdown.js';
 //   - 僅用於 copy-helper 之「系列組合標題」輔助區塊預計算
 //   - 不取代 post.title / fbTitle / Blogger 主標題；不修改其他 EJS 或 dist 路徑
 import { resolveTitleTemplate } from './resolve-series-title.js';
+// Phase 20260523-pm-24b-reverse-utm-step2-build-blogger-preprocess-a：
+//   Blogger→GitHub cross-site UTM helper（24a 落地；commit 7e1d356）。
+//   本批僅用於預處理 relatedLinks / otherLinks 之 GitHub cross-link → reverse UTM；
+//   不動 buildBloggerToGithubUrl / canonicalUrl / JSON-LD / summary CTA / redirect CTA / index CTA。
+import { applyCrossSiteUtm } from './ga4-url-builder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,16 +61,52 @@ function placeholderHtml(post) {
 `;
 }
 
-async function renderFullPost(post, canonicalUrl, jsonLd) {
+// Phase 20260523-pm-24b-reverse-utm-step2-build-blogger-preprocess-a：
+//   mirror build-github.js deriveRenderedCrossLinks pattern；唯一 diff 為 direction: 'to_github'。
+//   - 對 GitHub Pages cross-link 注入 reverse UTM + 設 target=_blank + 合併 rel
+//   - 非 GitHub cross-link / 同站連結 / 非 object item / 缺 url 之 item 維持原樣
+//   - 既有 utm_* 套用策略 A：跳過 UTM 注入但仍套 target=_blank + rel merge（per applyCrossSiteUtm）
+//   - 本批暫不串接 blogger-post-full.ejs；template 仍讀 post.relatedLinks / post.otherLinks raw（24c 接線）
+function deriveRenderedCrossLinks(rawLinks, settings, slot) {
+  const arr = Array.isArray(rawLinks) ? rawLinks : [];
+  return arr.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    if (typeof item.url !== 'string' || item.url.trim() === '') return item;
+    const xs = applyCrossSiteUtm({
+      url: item.url,
+      settings,
+      slot,
+      existingRel: typeof item.rel === 'string' ? item.rel : '',
+      direction: 'to_github',
+    });
+    if (xs.target === null) return item; // 非 GitHub cross-link：不動
+    return { ...item, url: xs.url, target: xs.target, rel: xs.rel };
+  });
+}
+
+async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
   const bodyHtml = renderBody(post.body || '');
   // Phase 8-d-3b：additive alias for EJS ergonomics；指向 8-d-2 掛載之 post.normalized。
   //   - 不重新呼叫 normalizePostOutput；不啟用 deriveGithubUrl；不預測 Blogger URL
   //   - EJS template 本批不改讀 normalized；屬 8-d-3c 之後範圍
   //   - 既有 EJS 仍讀 post.X；本欄位 additive，不影響輸出
   //   - 同樣 pattern 套用於 renderSummaryPost / renderRedirectCardPost / renderCopyHelper / renderPublishChecklist
+  // Phase 20260523-pm-24b：additive context relatedLinksRendered / otherLinksRendered；
+  //   - blogger-post-full.ejs 本批仍讀 post.relatedLinks / post.otherLinks raw（不串接）
+  //   - 屬資料 prep 階段；24c 將切換 template 端讀法 + 加 target/rel fallback
+  //   - 對無 GitHub cross-link 之 ready post：rendered 與 raw 結構等價（item 同物件 reference）→ EJS 仍讀 raw → post.html byte-identical
+  const relatedLinksRendered = deriveRenderedCrossLinks(post.relatedLinks, settings, 'related_links');
+  const otherLinksRendered = deriveRenderedCrossLinks(post.otherLinks, settings, 'other_links');
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-full.ejs'),
-    { post: { ...post, bodyHtml }, normalized: post.normalized, canonicalUrl, jsonLd },
+    {
+      post: { ...post, bodyHtml },
+      normalized: post.normalized,
+      canonicalUrl,
+      jsonLd,
+      relatedLinksRendered,
+      otherLinksRendered,
+    },
     { async: true },
   );
 }
@@ -446,7 +487,9 @@ async function main() {
     let html;
     let renderedKind;
     if (post.bloggerMode === 'full') {
-      html = await renderFullPost(post, canonical.url, jsonLd);
+      // Phase 20260523-pm-24b：renderFullPost 新增 settings 參數，用於預處理 relatedLinks / otherLinks reverse UTM。
+      //   summary / redirect-card caller 不受影響（其 render function 不需 settings；本批不動）。
+      html = await renderFullPost(post, canonical.url, jsonLd, settings);
       renderedKind = 'full';
     } else if (post.bloggerMode === 'summary') {
       html = await renderSummaryPost(post, canonical.url, jsonLd);
