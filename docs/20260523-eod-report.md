@@ -569,6 +569,71 @@ per 本批 pm-18 addendum 之邊界：
 - ✅ 不碰 Blogger 後台 / 不重產 Blogger theme CSS
 - ✅ 不碰 `.claude/`
 
+### 13.12 後續批次補記（pm-19 / pm-20 / pm-21）
+
+本子節為 pm-18 addendum 落地（commit `e874acc`；push 後 origin/main = `e874acc`）之後新增；屬 pm-21 batch（本批）；補記 pm-19 / pm-20 之 B5 sort indicator 處理。
+
+#### 13.12.1 pm-19：read-only Admin B5 sort indicator 偵察
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-19-admin-b5-sort-indicator-readonly-a` |
+| 性質 | read-only audit；無 commit |
+| 偵察結論 | B5 sort indicator polish **不建議目前做 source change** |
+| 主要依據 | 既有 4 個 sort label 已含明文 `desc` / `asc`（publishedAt desc / updatedAt desc / title asc / fbPostedAt desc）；替換為 ↑↓ 可能 downgrade accessibility；追加 ↑↓ 造成資訊冗餘與視覺噪音；ROI 邊際價值低 |
+| 提出之 3 候選 | A 執行 source polish（不推薦）/ B 標記為 no-op / low priority 之 docs sync（**推薦並由 pm-20 執行**）/ C 暫不做 |
+
+#### 13.12.2 pm-20：Admin B5 audit sync（B 候選落地）
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-20-admin-b5-audit-sync-a` |
+| Commit | `b59a004 docs(admin): mark b5 sort indicator optional` |
+| 性質 | docs-only |
+| 修改檔 | `docs/admin-overview-audit-20260523.md`（+5 / -5）|
+| 內容 | 5 處 in-place 替換（§7.2 / §8.3 row #6 / §10.1 B5 / §10.2 / §10.4 dependency table）皆標 🟡 **low priority / optional**；B5 阻擋欄改 `optional`；B5 從「候選 / 待 user 表態」reclassified 為 low priority |
+| 未動之 audit references | B1 / B2 / B3 / B6 references 全部保留；仍標「待 user 表態」 |
+
+#### 13.12.3 累計 Final Baseline 更新（pm-20 push 後 → pm-21 補記）
+
+| 項目 | 值 |
+|---|---|
+| **HEAD**（pm-20 push 後）| `b59a004 docs(admin): mark b5 sort indicator optional` |
+| **HEAD**（pm-21 commit + push 後預期）| 本批 mini addendum 之新 commit hash（pm-21 commit + push 後將 supersede `b59a004`）|
+| **branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0（pm-20 push 後驗證；pm-21 commit + push 後再驗證）|
+| **working tree** | pm-20 push 後 clean；pm-21 mini addendum commit + push 後預期重新 clean |
+| **下午累計 commits**（含 pm-21 前）| **10**：pm-7 / pm-8 / pm-10 / pm-11 / pm-12 / pm-14 / pm-16 / pm-17 / pm-18 / pm-20（pm-9 / pm-13 / pm-15 / pm-19 為 read-only 無 commit）|
+| **下午累計 pushes** | 10（皆 fast-forward；無 force / rebase / amend）|
+| **下午 source commits** | 3（pm-7 / pm-10 / pm-16）|
+| **下午 docs-only commits** | 7（pm-8 / pm-11 / pm-12 / pm-14 / pm-17 / pm-18 / pm-20）|
+| **下午 read-only audit phases** | 4（pm-9 / pm-13 / pm-15 / pm-19；無 commit）|
+| **下午 deploy** | ❌ 0 |
+| **下午 gh-pages 動作** | ❌ 0 |
+| **下午 Blogger 後台動作** | ❌ 0 |
+| **下午 Blogger theme CSS 重產 / 重貼** | ❌ 0 |
+| **下午 production impact** | ❌ 零（Admin 屬 dev-mode-only / Plan B / prod build 跳過；DT-A2 mirror source 已 push 但未 deploy / 未重貼）|
+
+#### 13.12.4 Admin overview B 系列狀態（pm-20 後）
+
+| 候選 | 狀態（pm-20 後）|
+|---|---|
+| **A1-A7** | ✅ 全收斂（per pm-14 sync）|
+| **B4** | ✅ 落地（per pm-16 source + pm-17 sync）|
+| **B5** | 🟡 **low priority / optional**（per pm-20 sync；非 completed；非 candidate；不建議目前做 source polish）|
+| **B1 / B2 / B3 / B6** | 🟡 仍待 user 表態 |
+| **C 系列**（tag 多選 / per-row action / pagination）| 🟡 屬 Phase 2 |
+| **D 系列**（FB write / SEO write / new sidecar）| 🔴 blocked（user 8+6 項 preflight 未勾）|
+| **Blogger 後台 CSS 重貼**（per pm-7 mirror sync）| 🟡 後續可選；user 自決時機 |
+
+#### 13.12.5 邊界遵守（pm-19 / pm-20 / pm-21）
+
+- ✅ pm-19：read-only；零修改 / 零 commit
+- ✅ pm-20：docs-only；單檔 `docs/admin-overview-audit-20260523.md` +5 / -5；已 commit + push
+- ✅ pm-21（本批）：docs-only；單檔 `docs/20260523-eod-report.md`；採 append-only 補入 §13.12；待 commit + push
+- ✅ 三批皆 不 build / 不 validate / 不 deploy / 不 push gh-pages
+- ✅ 三批皆 不碰 Blogger 後台 / 不重產 Blogger theme CSS / 不重貼 Blogger CSS
+- ✅ 三批皆 不碰 `.claude/` / `src/` / `content/` / `dist/` / `dist-blogger/` / `dist-promotion/` / `settings JSON` / `scripts`
+
 ---
 
 （本文件結束）
