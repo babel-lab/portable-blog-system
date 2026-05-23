@@ -246,6 +246,52 @@ per `docs/ga4-parameter-naming-registry.md` §6.1（雖屬 utm_term 但 registry
 | otherLinks aside link | `?utm_source=blogger&utm_medium=referral&utm_campaign=portable_blog_system&utm_content=other_links` |
 | article body inline cross-link（若支援）| `?utm_source=blogger&utm_medium=referral&utm_campaign=portable_blog_system&utm_content=article_cross_links` |
 
+### 5.7 與既有 3 個 UTM 方向之一致性比較
+
+本小節為 docs-only 補入；對應 phase `20260523-pm-22-reverse-utm-step1-docs-a` 之 user 第 4 問（「與目前 GitHub → Blogger / FB → Blogger / FB → GitHub 的 UTM 規則是否一致」）。
+
+#### 5.7.1 4-direction UTM 一覽
+
+| 方向 | utm_source | utm_medium | utm_campaign | utm_content | 來源 / 狀態 |
+|---|---|---|---|---|---|
+| **FB → Blogger** | `facebook` | `social` | `{page}_post`（pattern；例：`fan1_post`）| `{slug}`（pattern；例：`we-media-myself2`）| `content/settings/promotion.config.json` 之 UTM block；既有實作；production |
+| **FB → GitHub** | `facebook` | `social` | `{page}_post`（同上 pattern）| `{slug}`（同上 pattern）| 同上 `promotion.config.json`；FB 推廣文案之 article URL 不分 target host；既有實作；production |
+| **GitHub Pages → Blogger** | `github_pages` | `referral` | `portable_blog_system`（static default）| `related_links` / `other_links`（snake_case slot；靜態二擇一）| `src/scripts/ga4-url-builder.js applyCrossSiteUtm`（per pm-6）+ `src/scripts/build-github.js deriveRenderedCrossLinks`；production |
+| **Blogger → GitHub Pages**（本 plan）| `blogger` | `referral` | `portable_blog_system`（mirror）| `related_links` / `other_links`（+ 可選 `article_cross_links`）| **未實作**；本 plan 之規格設計；mirror GitHub→Blogger |
+
+#### 5.7.2 一致性檢查 — 哪些對齊、哪些有意 diverge
+
+**對齊（symmetric / mirror）**：
+
+| 維度 | FB→Blogger | FB→GitHub | GH→Blogger | Blogger→GH | 一致性 |
+|---|---|---|---|---|---|
+| **utm_source 用「平台識別」** | ✅ facebook | ✅ facebook | ✅ github_pages | ✅ blogger | ✅ 一致（皆 source-side platform token；皆 lowercase；皆 snake_case 容忍）|
+| **平台 token 之 lowercase + 單一 token 規則** | ✅ | ✅ | ✅（雙 token snake_case：`github_pages`）| ✅（單 token：`blogger`）| ✅ 符合 `ga4-parameter-naming-registry.md` §3.1 之 case 規則 |
+| **cross-link 之 utm_medium=referral / FB 之 utm_medium=social** | n/a（FB→Blogger 為 social）| n/a（FB→GitHub 為 social）| ✅ referral | ✅ referral（mirror GH→Blogger）| ✅ cross-link 雙向同 medium（referral）；FB 雙向同 medium（social）|
+| **cross-link 雙向之 utm_campaign 同值** | n/a | n/a | ✅ portable_blog_system | ✅ portable_blog_system（mirror）| ✅ cross-link 雙向 campaign 對稱 |
+| **cross-link 雙向之 utm_content 同 slot 命名** | n/a | n/a | ✅ related_links / other_links | ✅ related_links / other_links（mirror）| ✅ snake_case plural；mirror existing |
+| **snake_case convention** | ✅ `fan1_post`（campaign pattern）| ✅ `fan1_post` | ✅ all snake_case | ✅ all snake_case | ✅ 全方向 snake_case；對齊 `ga4-parameter-naming-registry.md` §3 |
+
+**有意 diverge（差異有理由）**：
+
+| 維度 | FB 方向 | cross-link 方向（含本 plan）| diverge 理由 |
+|---|---|---|---|
+| **utm_medium** | `social` | `referral` | FB 為社群平台貼文（social channel）；GH↔Blogger 為跨站 publishing platform 之 referral；GA4 channel grouping 對二者識別 path 不同（per §5.2）|
+| **utm_campaign 是否 pattern-based** | `{page}_post`（per-page pattern；多粉絲頁可擴展）| `portable_blog_system`（static default）| FB 多粉絲頁時需區分 source page；cross-link 為自家雙站，campaign attribution 走 utm_content slot 即可；無需 pattern |
+| **utm_content 顆粒度** | `{slug}`（per-post 顆粒）| `related_links` / `other_links`（per-slot 顆粒）| FB 一篇貼文對應一篇文章；utm_content=slug 直接對應；cross-link 一文可含多個 slot；utm_content=slot 切片至 link 位置 |
+
+#### 5.7.3 結論
+
+| 問題 | 答 |
+|---|---|
+| **本 plan 之 reverse UTM 是否與既有 GitHub → Blogger 完全 mirror？** | ✅ 是；4 個 UTM 欄位皆 mirror（source 由 `github_pages` ↔ `blogger` 對換；其他 3 欄完全相同）|
+| **是否與 FB → Blogger / FB → GitHub 完全一致？** | ❌ 否；**有意 diverge**：FB 為 social medium + per-page campaign + per-post content；cross-link 為 referral medium + static campaign + per-slot content |
+| **diverge 是否合理？** | ✅ 是；對齊 GA4 channel grouping 慣例（social vs referral）+ cross-link 雙向對稱 + 既有 production validated |
+| **本 plan 是否需修改既有 FB UTM 規則以求 4-direction 統一？** | ❌ 不需；既有 FB UTM 為 production-validated 多月；強行統一會破壞 FB 流量 attribution 之 channel grouping |
+| **本 plan 是否需修改既有 GitHub→Blogger UTM 規則？** | ❌ 不需；本 plan 為 mirror；既有規則為設計起點 |
+
+→ **本 plan 之 UTM 設計為「最大 mirror 對稱（vs GH→Blogger）+ 與 FB 雙向之 有意 diverge 保留」**；docs 規格設計階段（step 1）已完成一致性 audit。
+
 ---
 
 ## §6 Link Slot / utm_content 涵蓋範圍
@@ -614,6 +660,7 @@ per spec 之「禁止事項」+ docs-only 性質：
 | 3 | 提出 utm_source / medium / campaign / content 建議 | ✅ §5 四 sub-section + §5.6 範例 |
 | 4 | 列出未來實作位置但不修改 source | ✅ §7 含 ga4-url-builder.js / build-blogger.js / blogger-post-full.ejs 之 read-only 分析 |
 | 5 | 完全 docs-only | ✅ §11 列 15 項不做事項 |
+| 6 | 與既有 3 個 UTM 方向（GH→Blogger / FB→Blogger / FB→GitHub）一致性 audit | ✅ §5.7 四方向比較表 + 對齊 / 有意 diverge 之分類 + 5 結論 row |
 
 ---
 
