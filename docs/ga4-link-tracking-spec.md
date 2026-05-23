@@ -118,7 +118,7 @@
   - `utm_content` = `related_links` | `other_links`（per cross-site link 區塊）
 - **GA4 event**：可同步送 `cross_site_click` with `source_platform=blogger` / `target_platform=github_pages`
 - **狀態**：🟡 **source landed pm-24a/b/c（commits `7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）；un-deployed；live but dormant**；pm-26 deploy verify 才啟動 user 手動重貼 Blogger + GA4 Realtime 驗收。實作位置：`src/scripts/ga4-url-builder.js`（`isGithubCrossLink` / `applyCrossSiteUtm` `direction='to_github'`）+ `src/scripts/build-blogger.js`（`deriveRenderedCrossLinks` 於 `renderFullPost` 前）+ `src/views/blogger/blogger-post-full.ejs`（`relatedLinksRendered` / `otherLinksRendered`）。
-- **Cross-ref**：`click-tracking-governance.md` §4 row 3 / `CLAUDE.md` §16.4 / `blogger-to-github-reverse-utm-plan.md` §10
+- **Cross-ref**：`click-tracking-governance.md` §4 row 3 / `CLAUDE.md` §16.4 / `blogger-to-github-reverse-utm-plan.md` §10；驗收 fixture SOP 見 `docs/reverse-utm-fixture-plan.md`
 
 ### 3.6 GitHub to Blogger UTM（已實作 + click event 對接已落地）
 

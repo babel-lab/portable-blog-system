@@ -87,6 +87,7 @@
 - `docs/hashtag-slug-decision.md` — hashtag slug 派生策略（tags.json lookup 推薦；GA4 click_hashtag + span→a 前置 spec）
 - `docs/blogger-listener-strategy.md` — Blogger 端 GA4 click tracking 策略（短期 reverse UTM；listener deferred）
 - `docs/blogger-to-github-reverse-utm-plan.md` — Blogger → GitHub 反向 UTM 注入計畫（mirror 既有 github_pages→blogger；listener-free 跨站 attribution）
+- `docs/reverse-utm-fixture-plan.md` — Blogger → GitHub reverse UTM 驗收 fixture 建立 SOP（pm-26b 啟動條件 / fixture 設計原則 / 驗收 invariant / 驗收後處理）
 
 ### 3.5 Design System
 

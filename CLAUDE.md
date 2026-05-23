@@ -1253,6 +1253,7 @@ target / rel 自動處理：
 - ❌ 尚未 deploy；尚未碰 gh-pages
 - ❌ Blogger 後台尚未重貼；live 狀態 dormant
 - ⏭ pm-26 deploy verify 階段才會啟動 user 手動重貼 Blogger + GA4 Realtime 驗收
+- ⏭ pm-26 啟動條件詳見 `docs/reverse-utm-fixture-plan.md` §6；fixture 必須符合 §3 設計原則與 §4 fixture 類型
 
 套用範圍：Blogger 文章頁（`bloggerMode: 'full'`）之 `relatedLinks` / `otherLinks` 中之 GitHub Pages cross-link。
 

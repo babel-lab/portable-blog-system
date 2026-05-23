@@ -33,7 +33,7 @@
 | 4 | build-blogger preprocess | ✅ pm-24b `e2309e9` |
 | 5 | blogger-post-full.ejs 改讀 `*Rendered` | ✅ pm-24c `7c769fe` |
 | 6 | build + validate 既有 fixture byte-identical | ✅ pm-24d |
-| 7 | user 手動重貼 Blogger + GA4 Realtime 驗收 | ⏭ pending（pm-26）|
+| 7 | user 手動重貼 Blogger + GA4 Realtime 驗收 | ⏭ pending（pm-26；啟動條件詳見 `docs/reverse-utm-fixture-plan.md` §6）|
 
 ---
 
@@ -45,6 +45,7 @@
 - `docs/blogger-listener-strategy.md` §5.1 / §6.4 / §7（短期推薦方案 D；reverse UTM 命名；implementation 順序）
 - `docs/20260522-pm-phase-2-batch-plan.md` §10（Reverse UTM Plan）
 - `docs/20260523-eod-report.md` §14.3-14.7（pm-22 ~ pm-25 完整工作流；含 commit hash + build verification + final baseline）
+- `docs/reverse-utm-fixture-plan.md`（reverse UTM 驗收 fixture SOP；pm-26 啟動前置；§6 啟動條件 / §3 設計原則 / §4 fixture 類型 / §5 驗收 invariant / §7 驗收後處理）
 
 > 以下 §1-§12 為 step 1 原 plan snapshot（2026-05-22 留存）；body 中之「未實作」/「尚未實作」等狀態描述為 step 1 當時之事實，非 2026-05-23 之現狀。如需現狀請以 §0 為準。
 
