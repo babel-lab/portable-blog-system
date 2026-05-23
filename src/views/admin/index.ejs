@@ -634,6 +634,12 @@
       <% }); %>
     </tbody>
   </table>
+  <%# Phase 20260523-pm-10-admin-empty-filter-state-a: fallback message when search / filter yields 0 matched rows
+      （per docs/admin-overview-audit-20260523.md §10.1 A7）；matchedCount === 0 且 isFilterActive 時由 applyFilters()
+      觸發顯示；初始 posts.length === 0 之 empty state 由 line 143 EJS 條件 render，與此 fallback 為兩個獨立情境。 -%>
+  <div id="admin-empty-filter-state" class="empty" hidden>
+    沒有符合目前搜尋 / 篩選條件的文章。請調整關鍵字或篩選條件。
+  </div>
   <% } %>
 
   <div class="admin-meta" style="margin-top: 1rem;">
@@ -655,6 +661,8 @@
       var visibleCount = document.getElementById('admin-visible-count');
       var showAllToggle = document.getElementById('admin-show-all-toggle');
       var sort = document.getElementById('admin-sort');
+      // Phase 20260523-pm-10-admin-empty-filter-state-a: empty-filter-state element ref（per docs/admin-overview-audit-20260523.md §10.1 A7）
+      var emptyFilterState = document.getElementById('admin-empty-filter-state');
       var rows = Array.prototype.slice.call(document.querySelectorAll('tr.post-row'));
       var details = Array.prototype.slice.call(document.querySelectorAll('tr.post-detail'));
 
@@ -716,6 +724,11 @@
           }
         });
         visibleCount.textContent = 'showing ' + shownCount + ' of ' + matchedCount + ' matched (' + rows.length + ' total)';
+        // Phase 20260523-pm-10-admin-empty-filter-state-a: toggle fallback message when filter yields 0 matched rows
+        // （per docs/admin-overview-audit-20260523.md §10.1 A7）；初始 posts.length === 0 為獨立 EJS-rendered empty state
+        if (emptyFilterState) {
+          emptyFilterState.hidden = !(isFilterActive && matchedCount === 0);
+        }
         if (showAllToggle) {
           // Phase 20260522-night-3-b：search/filter active 時隱藏 toggle（已全顯）
           var needsToggle = !isFilterActive && matchedCount > SHOW_LIMIT;
