@@ -1,6 +1,6 @@
 # 20260523 End-of-Day Report
 
-本文件為 BLOG / portable-blog-system 之 **2026-05-23 全日收尾報告**；屬 docs-only；本批 phase `20260523-pm-4-eod-report-a` **不**修改 src / content / template / dist；不 build / 不 validate / 不 deploy / 不 push gh-pages / 不碰 Blogger 後台。
+本文件為 BLOG / portable-blog-system 之 **2026-05-23 全日收尾報告**；屬 docs-only；初版於 phase `20260523-pm-4-eod-report-a` 落地（commit `76872a5`），後經 phase `20260523-pm-6-eod-addendum-a` 補記 pm-5 Admin A2 完成 + final baseline 更新（本次補記亦為 docs-only；**不**修改 src / content / template / dist；不 build / 不 validate / 不 deploy / 不 push gh-pages / 不碰 Blogger 後台）。
 
 本文件**不是** roadmap，**不是**新 spec，**不是**啟動指令；屬今日工作收尾紀錄，方便明日 cold-start 接續。
 
@@ -11,10 +11,10 @@
 | 項目 | 值 |
 |---|---|
 | **日期** | 2026-05-23 |
-| **工作範圍** | 5 個 docs-only 大批盤點（Phase 1 status / GA4 spec 固化 / Admin overview audit / Publishing workflow / Design token audit）+ 1 個 audit drift 補正 + 1 個 Admin A1 source 小修 |
-| **工作性質** | **穩定收斂為主**；5 docs-only + 1 docs 補正 + 1 單檔 source 小修（11 行）；不啟動大型 Phase 2 / GA4 implementation / Blogger listener / custom domain / Admin write |
+| **工作範圍** | 5 個 docs-only 大批盤點（Phase 1 status / GA4 spec 固化 / Admin overview audit / Publishing workflow / Design token audit）+ 1 個 audit drift 補正 + 2 個 Admin source 小修（A1 sourceSite + A2 fbBadge）+ 1 EOD doc + 1 EOD addendum |
+| **工作性質** | **穩定收斂為主**；5 docs-only + 1 docs 補正 + 2 單檔 source 小修（共 26 行）+ EOD 文件 / addendum；不啟動大型 Phase 2 / GA4 implementation / Blogger listener / custom domain / Admin write |
 | **session 起點** | 10:48（day-1-batch-1：Phase 1 status audit）|
-| **session 終點** | EOD（本批；pm-4）|
+| **session 終點** | EOD addendum 落地後（pm-6；本次補記）|
 
 ---
 
@@ -30,22 +30,24 @@
 | **下午**（pm）| `20260523-pm-2-admin-audit-drift-fix-a` | docs modify（commit `90d81ce`）| 補正 admin-overview-audit-20260523.md：A3 URL linkify 已於 2026-05-21 `da00f53` 落地，audit 初版誤列為候選屬 stale info bug；4 處標 ✅ 已實作 |
 | | `20260523-pm-3-admin-a1-source-site-filter-optgroup-a` | **source small fix**（commit `f7dd897`）| `src/views/admin/index.ejs` +11 行：新增 sourceSite filter optgroup（📘 blogger / 🐙 github）+ data-source-site row attr + matchesFilter case；per `admin-overview-audit-20260523.md` §10.1 A1 |
 | | `20260523-pm-3-admin-a1-post-push-final-verify-a` | read-only verify（無 commit）| post-push final clean check |
-| | `20260523-pm-4-eod-report-a`（本批）| docs new | 本文件 |
+| | `20260523-pm-4-eod-report-a` | docs new（commit `76872a5`）| EOD report 初版 |
+| | `20260523-pm-5-admin-a2-fb-badge-filter-optgroup-a` | **source small fix**（commit `b9b76c6`）| `src/views/admin/index.ejs` +15 行：新增 fbBadge filter optgroup（4 well-known values：posted / ready / none / disabled）+ data-fb-badge row attr + matchesFilter case；per `admin-overview-audit-20260523.md` §10.1 A2 |
+| | `20260523-pm-6-eod-addendum-a`（本次補記）| docs modify | 本文件補記 pm-5 完成 + final baseline 更新 |
 
 ### 2.1 統計
 
 - **read-only / verify phases**：1（post-push final verify；無 commit）
-- **docs commits**：6（5 大批 + 1 audit drift 補正）
-- **source commits**：1（Admin A1 sourceSite filter；單檔 11 行）
-- **remote push 動作**：本日所有 7 commits 皆已 push origin/main（含本日尾段 user 手動 push + assistant push）
-- **idle freeze phases**：1（post-push final verify 後 + 本批 EOD 後）
-- **重點轉折**：上午 5 大 audit 完成後，下午發現 admin-audit 初版 A3 列為候選但實際已實作（drift fix）→ 接續 A1 落地 → final clean verify
+- **docs commits**：7（5 大批 + 1 audit drift 補正 + 1 EOD 初版；本次 addendum 為第 8）
+- **source commits**：2（Admin A1 sourceSite filter 11 行 + Admin A2 fbBadge filter 15 行；共 26 行；皆單檔 `src/views/admin/index.ejs`）
+- **remote push 動作**：本日所有 commits 皆已 push origin/main（含 pm-4 之 `76872a5` + pm-5 之 `b9b76c6`；本次 addendum 為 9th push）
+- **idle freeze phases**：2（post-push final verify 後 + pm-5 後 idle freeze；本次 addendum 後為第 3 次）
+- **重點轉折**：上午 5 大 audit 完成後，下午發現 admin-audit 初版 A3 列為候選但實際已實作（drift fix）→ 接續 A1 落地 → EOD 初版 → 接續 A2 落地 → addendum 補正
 
 ---
 
 ## 3. Commits Today
 
-7 個 commits（按時序由舊至新）：
+9 個 commits（按時序由舊至新；不含本次 pm-6 addendum 自身之 commit，將為第 10）：
 
 | # | commit | message | 段 | 類型 |
 |---|---|---|---|---|
@@ -56,12 +58,14 @@
 | 5 | `e0c87b4` | `docs(design): add 20260523 design token audit` | 下午 13:10 | docs new |
 | 6 | `90d81ce` | `docs(admin): mark url linkify audit item completed` | 下午 13:31 | docs modify（audit drift fix）|
 | 7 | `f7dd897` | `fix(admin): group source site filter options` | 下午 13:53 | source（Admin A1；單檔 EJS）|
+| 8 | `76872a5` | `docs(report): add 20260523 eod summary` | 下午 EOD（pm-4）| docs new（EOD 初版）|
+| 9 | `b9b76c6` | `fix(admin): group fb badge filter options` | 下午（pm-5）| source（Admin A2；單檔 EJS）|
 
 ### 3.1 Push 狀態
 
-- **已 push origin/main**：✅ 全部 7 commits
-- main 與 origin/main 同步：`f7dd897e707fee62860368987e64fd8cb575dfe0`
-- ahead/behind：`0 / 0`
+- **已 push origin/main**：✅ 全部 9 commits（含 EOD 初版 + Admin A2）；本次 pm-6 addendum 之 commit 也將 push
+- main 與 origin/main 同步（pm-5 落地後）：`b9b76c69d724538fdd69cb18c2f7c81fe7c7ea0f`
+- ahead/behind：`0 / 0`（pm-6 commit + push 後重新驗證）
 
 ### 3.2 變動類型分布
 
@@ -70,7 +74,8 @@
 - `docs(admin)`：2（overview audit + drift fix）
 - `docs(workflow)`：1（publishing workflow）
 - `docs(design)`：1（design token audit）
-- `fix(admin)`：1（**唯一** source 變動；單檔 EJS +11 行）
+- `docs(report)`：1（EOD 初版；本次 addendum 為 docs(report) 之第 2 commit）
+- `fix(admin)`：2（**唯二** source 變動；皆單檔 `src/views/admin/index.ejs`；A1 +11 行 + A2 +15 行 = 共 26 行）
 - **無**：content / settings JSON / build script / template 其他檔 / SCSS / public assets 變動
 
 ---
@@ -168,6 +173,40 @@
 
 ---
 
+## 6B. Admin A2 source 小修摘要（pm-5）
+
+### 6B.1 範圍
+
+- commit：`b9b76c6 fix(admin): group fb badge filter options`
+- 檔案：`src/views/admin/index.ejs`（+15 / -0；單檔）
+- 對應 audit：`docs/admin-overview-audit-20260523.md` §10.1 A2
+
+### 6B.2 修改內容
+
+1. **新增 optgroup**：`<optgroup label="fbBadge (FB 狀態)">` 含 4 well-known options（FB badge: posted / ready / none / disabled）；values 為 `fbBadge:posted` / `fbBadge:ready` / `fbBadge:none` / `fbBadge:disabled`
+2. **新增 row data attribute**：`data-fb-badge="<%= p.fbBadge || '' %>"`
+3. **新增 matchesFilter case**：`case 'fbBadge': return row.dataset.fbBadge === val;`
+
+### 6B.3 邊界遵守
+
+- ✅ 不改 filter 既有 value（A1 之 sourceSite 既有 value 完全不動）
+- ✅ 不改既有 matchesFilter 既有 case（A1 後 7 個 case 完全不動；只 append 第 8 個新 case `'fbBadge'`）
+- ✅ 不改 optgroup 排序（新 fbBadge optgroup 插在 completeness 與 contentKind 之間；理由：completeness 與 fbBadge 同屬「狀態 / 完成度」維度，相鄰提升 UX 連貫性）
+- ✅ 不改 loader（`p.fbBadge` / `deriveFbBadge` 既有於 `src/scripts/load-admin-posts.js`；本 phase 只讀）
+- ✅ 不改資料格式（無 schema / settings JSON / content / config 變動）
+- ✅ 不使用 emoji（與既有 status / channel / completeness / contentKind optgroup options 之 text-only convention 一致；A1 使用 📘/🐙 emoji 是因 URLs 欄已有相同 emoji precedent，fbBadge 無對應 precedent 故不引入新 emoji）
+- ⚠️ passthrough status values（draft / archived 等）user 仍可透過 search 或 completeness filter 觸及；本批不展開以維持 A2 zero-cost scope
+
+### 6B.4 驗證
+
+- EJS compile：✅ OK（透過 `ejs.compile` 確認）
+- 不跑 `npm run build`（Admin 屬 dev-mode-only / Plan B / prod build 跳過）
+- 不跑 `validate:content`（本批不動 content；pm-5 phase 之邊界已限制）
+- 無 dist 變動（未 build）
+- 無 deploy（未 push gh-pages）
+
+---
+
 ## 7. 今日未動項目
 
 per 本日所有 phases 之邊界遵守：
@@ -187,7 +226,10 @@ per 本日所有 phases 之邊界遵守：
 | **package.json / vite.config.js / .gitignore** | ❌ 完全未動 |
 | **.claude/** | ❌ 不重新建立（per 既有 ignore policy）|
 
-→ **唯一 source 變動**：`src/views/admin/index.ejs` +11 行（Admin A1 sourceSite filter；commit `f7dd897`）。
+→ **唯二 source 變動**：皆於同檔 `src/views/admin/index.ejs`：
+  - Admin A1 sourceSite filter（+11 行；commit `f7dd897`；pm-3）
+  - Admin A2 fbBadge filter（+15 行；commit `b9b76c6`；pm-5）
+  - 累積 +26 行；皆 dev-mode-only Admin EJS；不進入 prod build / 不進入 dist；對線上 production 零影響。
 
 ---
 
@@ -197,10 +239,11 @@ per 本日所有 phases 之邊界遵守：
 
 | 項目 | 值 |
 |---|---|
-| **HEAD** | `f7dd897 fix(admin): group source site filter options`（pm-3 結果；EOD doc commit 後將變動）|
-| **working tree** | clean（per pm-3-post-push-final-verify-a 確認）|
-| **branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0 |
-| **是否 push remote** | ✅ **全部 7 commits 已 push**（本日尾段 user 手動 push f7dd897 之前 commits + assistant push f7dd897）|
+| **HEAD**（pm-6 addendum 之 commit 落地前）| `b9b76c6 fix(admin): group fb badge filter options`（pm-5 結果；本次 addendum commit + push 後將變動）|
+| **HEAD**（pm-6 addendum 之 commit 落地後預期）| 本次 addendum 之新 commit hash（pm-6 commit + push 後將 supersede `b9b76c6`）|
+| **working tree** | pm-5 後驗證 clean；pm-6 addendum 落地 + push 後預期重新 clean |
+| **branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0（pm-5 後驗證；pm-6 push 後再驗證）|
+| **是否 push remote** | ✅ **全部 9 commits 已 push**（pm-3 / pm-4 / pm-5 皆已分別 push）；pm-6 addendum 之 commit 將為第 10 push |
 
 ### 8.2 Deploy repo / gh-pages
 
@@ -214,8 +257,8 @@ per 本日所有 phases 之邊界遵守：
 
 | 項目 | 值 |
 |---|---|
-| **是否跑 build** | ❌ 未跑（pm-3 只跑 `ejs.compile` syntax check + `validate:content`）|
-| **是否跑 validate** | 🟡 跑過一次（pm-3 中；0 errors / 39 warnings 全為既有 fixtures；與本批無關）|
+| **是否跑 build** | ❌ 未跑（pm-3 / pm-5 皆只跑 `ejs.compile` syntax check；pm-3 額外跑 `validate:content` 一次）|
+| **是否跑 validate** | 🟡 跑過一次（pm-3 中；0 errors / 39 warnings 全為既有 fixtures；與本批無關）；pm-5 / pm-6 皆未跑 |
 | **最後一次 production build** | 5/21 pm-43（per `20260522-eod-report.md` §8.3；本日未更新）|
 
 ### 8.4 線上 production state
@@ -224,7 +267,7 @@ per 本日所有 phases 之邊界遵守：
 - GA4 production：✅ live（自 5/21 pm-46 驗收通過後持續）
 - 線上 sitemap.xml：14 url entries（per 5/21 build）
 - 線上 robots.txt：含 Disallow + Sitemap
-- **5/23 全日變更（5 docs + 1 audit drift + 1 Admin source）對線上 production 完全無影響**（Admin 屬 dev-mode-only）
+- **5/23 全日變更（5 docs + 1 audit drift + 2 Admin source 小修 + 1 EOD doc + 1 EOD addendum）對線上 production 完全無影響**（Admin 屬 dev-mode-only / Plan B / prod build 跳過）
 
 ---
 
@@ -232,16 +275,11 @@ per 本日所有 phases 之邊界遵守：
 
 **僅列；不啟動**：
 
-### A. Admin A2 fbBadge filter optgroup（推薦明日優先）
+### ~~A. Admin A2 fbBadge filter optgroup~~ ✅ 已於 pm-5 落地（commit `b9b76c6`；非明日候選）
 
-- **scope**（per `admin-overview-audit-20260523.md` §10.1 A2）：
-  - 新增 fbBadge filter optgroup 至 `src/views/admin/index.ejs`
-  - 5 options：none / disabled / posted / ready / missing（per `fb-sidecar-metadata-pre-analysis.md` §6.2 derived badge 規則）
-  - 既有 `data-fb`（completeness）已存在；可重用或新增 `data-fb-badge` row attr
-- **時間**：~20 min（單檔 EJS；對齊 A1 落地模式）
-- **變動**：`src/views/admin/index.ejs`（~10 行）
-- **風險**：🟢 低
-- **理由**：對齊 A1 落地模式；最低風險；最快驗收
+- ~~原列為明日第一順位候選；於 EOD 初版（pm-4 / `76872a5`）落地後接續啟動 pm-5 並完成~~
+- 詳見本文件 §6B（Admin A2 source 小修摘要）
+- 本批 pm-6 addendum 後，明日第一順位候選改為 **B. DT-A1 / DT-A2（Design token 小修系列）**
 
 ### B. DT-A1 / DT-A2（Design token 小修系列）
 
@@ -295,27 +333,28 @@ per 本日所有 phases 之邊界遵守：
 
 ## 10. 明日建議優先順序
 
-### 10.1 推薦明日 第一個候選：**A. Admin A2 fbBadge filter optgroup**
+### 10.1 推薦明日 第一個候選：**B. DT-A1 / DT-A2（Design token 小修系列）**
 
 **理由**：
 
-- 🟢 風險最低（單檔 EJS；對齊 A1 落地模式）
-- 利用今日 A1 落地之 pattern（add data attr → add optgroup → add matchesFilter case）；複製貼上少改即成
-- 預估 ~20 min；user 可一次驗收
-- 不阻擋 B-H 任一其他批
-- 完成後可接 B 系列（DT 小修）形成「Admin 系列穩定收斂日」
+- 🟢 風險低（純 CSS / inline style；零 loader / 零 schema / 零 settings JSON 變動）
+- 對齊 `design-token-audit-20260523.md` 之 DT-A 高優先序
+- 預估 ~30 min per 子修；可單批合做
+- 不阻擋 C-H 任一其他批
+- 完成後 Admin 系列（A1 / A2 + DT-A1 / A2）形成「Admin polish 收斂段」之自然結束
 
-### 10.2 推薦第二：**B. DT-A1 / DT-A2 polish**
+### 10.2 推薦第二：**C. Reverse UTM step 1 docs（Blogger → GitHub）**
 
 **理由**：
 
-- 純 CSS / inline style；零 loader / 零 schema 變動
-- 對齊 design-token-audit-20260523.md 之 DT-A 高優先序
-- 可在 A2 完成後接著做；同樣單檔 / 低風險
+- 📄 純 docs-only step；零 source / settings 變動
+- 對齊 `blogger-to-github-reverse-utm-plan.md`；屬規則設計階段
+- 後續 step 2 為 source implementation；本步驟先收斂規則
+- 不阻擋任何其他批
 
 ### 10.3 更保守備選
 
-若 user 希望再退一步：**先繼續 docs-only**（如 reverse UTM step 1 docs / phase-2-candidate-roadmap.md 對齊 5/23 docs）→ 零 source 變動 → 確認累積資訊一致後再啟動 Admin A2 / DT polish。
+若 user 希望再退一步：**先繼續 docs-only**（如 phase-2-candidate-roadmap.md 對齊 5/23 docs / README §7 baseline drift 補正）→ 零 source 變動 → 確認累積資訊一致後再啟動 B / DT polish。
 
 ### 10.4 不建議明日立即啟動
 
@@ -335,10 +374,10 @@ per 本日所有 phases 之邊界遵守：
 
 ### 11.2 Cold-start 明日 onboarding 順序建議
 
-1. 讀 `docs/20260523-eod-report.md`（本文件）— 5 min 掌握今日全貌
-2. 讀 `docs/admin-overview-audit-20260523.md` §10.1 推薦序 — 確認 A2 是接續 A1 之合理下一步
+1. 讀 `docs/20260523-eod-report.md`（本文件；含 pm-6 addendum）— 5 min 掌握今日全貌（注意：Admin A1 + A2 皆已落地；明日第一候選為 B. DT-A1 / DT-A2）
+2. 讀 `docs/design-token-audit-20260523.md` 之 DT-A 段落 — 確認 DT-A1 / DT-A2 落地細節
 3. 讀 `docs/phase-status-20260523.md` — 確認 Phase 1 整體 baseline
-4. 若選 A2：直接讀 `src/views/admin/index.ejs` 之 A1 落地段（filter optgroup + data attr + matchesFilter case）作為 A2 之 reference
+4. 若選 DT 系列：直接讀 `src/views/admin/index.ejs` 之 inline `<style>` 區塊 + `src/styles/components/_hashtag.scss` 作為 DT-A1 / DT-A2 之 reference
 
 ### 11.3 確認無 dirty / untracked
 
@@ -357,11 +396,12 @@ per 本日所有 phases 之邊界遵守：
 - `docs/admin-overview-audit-20260523.md`（day-1-batch-3；`430ecb0`；+ pm-2 drift fix `90d81ce`）
 - `docs/publishing-workflow-20260523.md`（day-1-batch-4；`50a5b24`）
 - `docs/design-token-audit-20260523.md`（day-1-batch-5；`e0c87b4`）
-- `docs/20260523-eod-report.md`（本文件；pm-4）
+- `docs/20260523-eod-report.md`（本文件；pm-4 初版 `76872a5` + pm-6 addendum 本次補記）
 
-### 12.2 今日唯一 source 變動
+### 12.2 今日 source 變動（共 2 個 commits；皆同檔）
 
 - `src/views/admin/index.ejs`（pm-3；`f7dd897`；+11 行；Admin A1 sourceSite filter optgroup）
+- `src/views/admin/index.ejs`（pm-5；`b9b76c6`；+15 行；Admin A2 fbBadge filter optgroup）
 
 ### 12.3 上層 / 對齊 docs
 
@@ -373,8 +413,8 @@ per 本日所有 phases 之邊界遵守：
 
 ### 12.4 明日候選對應 docs
 
-- A：`docs/admin-overview-audit-20260523.md` §10.1 A2
-- B：`docs/design-token-audit-20260523.md` DT-A1 / DT-A2
+- ~~A：`docs/admin-overview-audit-20260523.md` §10.1 A2~~ ✅ 已於 pm-5 落地（`b9b76c6`）；非明日候選
+- **B**：`docs/design-token-audit-20260523.md` DT-A1 / DT-A2（pm-6 addendum 後升為明日第一候選）
 - C：`docs/blogger-to-github-reverse-utm-plan.md`
 - D：`docs/custom-domain-root-files-strategy.md`
 - E：（無單一專屬 doc；散見於 `docs/seo-ga4-adsense.md` 等）
