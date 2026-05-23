@@ -162,6 +162,14 @@
           <option value="github:enabled">GitHub enabled</option>
           <option value="github:disabled">GitHub disabled</option>
         </optgroup>
+        <%# Phase 20260523-pm-3-admin-a1-source-site-filter-optgroup-a: sourceSite filter optgroup
+            （per docs/admin-overview-audit-20260523.md §10.1 A1）；sourceSite 為文章原始檔位置
+            content/{site}/posts/，僅 2 值（blogger / github），與 channel 之 publishTargets enabled
+            概念不同。emoji 對齊 URLs 欄之既有 📘 / 🐙 convention。 -%>
+        <optgroup label="sourceSite (來源)">
+          <option value="sourceSite:blogger">📘 sourceSite: blogger</option>
+          <option value="sourceSite:github">🐙 sourceSite: github</option>
+        </optgroup>
         <optgroup label="completeness">
           <option value="completeness:seo-missing">SEO missing</option>
           <option value="completeness:fb-missing">FB missing</option>
@@ -236,6 +244,7 @@
           data-cat-tags="<%= p.completeness.categoryTags %>"
           data-fb-published="<%= p.completeness.fbPublished %>"
           data-content-kind="<%= p.contentKind || '' %>"
+          data-source-site="<%= p.sourceSite || '' %>"
           data-category="<%= p.category || '' %>"
           data-series="<%= (p.series && (p.series.id || p.series.slug)) || '' %>"
           data-published-at="<%= p.publishedAt || '' %>"
@@ -649,6 +658,8 @@
           // Phase 20260522-night-3-c: category / series filter；對齊 row data-category / data-series；isFilterActive 自動觸發（per night-3-b 既有邏輯）
           case 'category': return row.dataset.category === val;
           case 'series': return row.dataset.series === val;
+          // Phase 20260523-pm-3-admin-a1-source-site-filter-optgroup-a: sourceSite filter（per docs/admin-overview-audit-20260523.md §10.1 A1）；對齊 row data-source-site
+          case 'sourceSite': return row.dataset.sourceSite === val;
           case 'completeness':
             // val 形如 "seo-missing" / "fb-missing" / "url-missing" / "categoryTags-missing"
             if (val === 'seo-missing') return row.dataset.seo === 'missing';
