@@ -221,6 +221,8 @@
         <option value="publishedAt-desc">publishedAt desc</option>
         <option value="updatedAt-desc">updatedAt desc</option>
         <option value="title-asc">title asc</option>
+        <%# Phase 20260523-pm-16-admin-fbpostedat-sort-a: 補 fbPostedAt desc 排序選項；per docs/admin-overview-audit-20260523.md §10.1 B4；row 對應 attr 為 data-fb-posted-at -%>
+        <option value="fbPostedAt-desc">fbPostedAt desc</option>
       </select>
     </label>
     <button type="button" id="admin-show-all-toggle" style="padding: 0.35rem 0.7rem; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; font-size: 0.9em;" hidden>Show all</button>
@@ -262,6 +264,7 @@
           data-series="<%= (p.series && (p.series.id || p.series.slug)) || '' %>"
           data-published-at="<%= p.publishedAt || '' %>"
           data-updated-at="<%= p.updatedAt || p.publishedAt || '' %>"
+          data-fb-posted-at="<%= p.fbPostedAt || '' %>"
           data-title="<%= p.title || '' %>">
         <td>
           <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(empty)</span><% } %>
@@ -755,6 +758,10 @@
           }
           if (sortBy === 'updatedAt-desc') {
             return (rb.dataset.updatedAt || '').localeCompare(ra.dataset.updatedAt || '');
+          }
+          // Phase 20260523-pm-16-admin-fbpostedat-sort-a: fbPostedAt desc 排序；per docs/admin-overview-audit-20260523.md §10.1 B4；dataset.fbPostedAt 來自 row data-fb-posted-at
+          if (sortBy === 'fbPostedAt-desc') {
+            return (rb.dataset.fbPostedAt || '').localeCompare(ra.dataset.fbPostedAt || '');
           }
           if (sortBy === 'title-asc') {
             return (ra.dataset.title || '').localeCompare(rb.dataset.title || '');
