@@ -104,6 +104,23 @@ export function isBloggerCrossLink(rawUrl, settings) {
   }
 }
 
+// Phase 20260523-pm-24-reverse-utm-step2-impl-related-other-a：mirror isBloggerCrossLink。
+//   判斷 url 是否為指向 GitHub Pages cross-site host 之連結。
+//   依據 settings.site.githubSiteUrl 之 hostname 比對；忽略 kind 欄位。
+//   用於 Blogger 端 relatedLinks / otherLinks 之 reverse UTM 處理（per docs/blogger-to-github-reverse-utm-plan.md §7.1.1）。
+export function isGithubCrossLink(rawUrl, settings) {
+  if (typeof rawUrl !== 'string' || !rawUrl) return false;
+  const githubSiteUrl = settings?.site?.githubSiteUrl;
+  if (!githubSiteUrl) return false;
+  try {
+    const u = new URL(rawUrl);
+    const githubHost = new URL(githubSiteUrl).hostname;
+    return u.hostname === githubHost;
+  } catch {
+    return false;
+  }
+}
+
 // mergeRel：合併 rel token strings；保留原順序 + 不重複 token。
 //   primary 為既有 rel string；additions 為要加入之 token array。
 export function mergeRel(primary, additions) {
@@ -122,14 +139,25 @@ export function mergeRel(primary, additions) {
   return result.join(' ');
 }
 
-// applyCrossSiteUtm：對 GitHub Pages → Blogger cross-link 之 UTM 注入 + target/rel 標記。
-//   - 非 Blogger cross-link → 回傳 { url, target: null, rel: null, applied: false }（不改動）
+// applyCrossSiteUtm：對 cross-site link 之 UTM 注入 + target/rel 標記。
+//   direction（Phase 20260523-pm-24-reverse-utm-step2-impl-related-other-a 新增）：
+//     - 'to_blogger'（default；backward compat；既有 GitHub Pages → Blogger caller 不需改）：
+//         hostname 比對 settings.site.bloggerSiteUrl；注入 utm_source=github_pages
+//     - 'to_github'（新增；Blogger → GitHub Pages reverse UTM）：
+//         hostname 比對 settings.site.githubSiteUrl；注入 utm_source=blogger
+//   兩方向同：utm_medium=referral / utm_campaign=portable_blog_system / utm_content=<slot>
+//   per docs/blogger-to-github-reverse-utm-plan.md §5（命名）+ §7.1.2 方案 A（參數化方向）
+//   - 非 cross-link（hostname 不 match）→ 回傳 { url, target: null, rel: null, applied: false }（不改動）
 //   - 已含任一 utm_source / utm_medium / utm_campaign / utm_content → 策略 A：保留 author intent，
 //     不覆寫 UTM；但仍套 target=_blank + rel merge（per Phase related-links-ga4-audit spec 點 10）
 //   - 否則注入 4 個 UTM + 設 target=_blank + 合併 rel ['nofollow', 'noopener', 'noreferrer']
 //   slot：'related_links' | 'other_links'（決定 utm_content）
-export function applyCrossSiteUtm({ url, settings, slot, existingRel = '' }) {
-  if (!isBloggerCrossLink(url, settings)) {
+export function applyCrossSiteUtm({ url, settings, slot, existingRel = '', direction = 'to_blogger' }) {
+  const isCrossLink =
+    direction === 'to_github'
+      ? isGithubCrossLink(url, settings)
+      : isBloggerCrossLink(url, settings);
+  if (!isCrossLink) {
     return { url, target: null, rel: null, applied: false };
   }
   let u;
@@ -144,7 +172,8 @@ export function applyCrossSiteUtm({ url, settings, slot, existingRel = '' }) {
   if (hasUtm) {
     return { url, target: '_blank', rel: mergedRel, applied: false };
   }
-  u.searchParams.set('utm_source', 'github_pages');
+  const utmSource = direction === 'to_github' ? 'blogger' : 'github_pages';
+  u.searchParams.set('utm_source', utmSource);
   u.searchParams.set('utm_medium', 'referral');
   u.searchParams.set('utm_campaign', 'portable_blog_system');
   u.searchParams.set('utm_content', slot);
