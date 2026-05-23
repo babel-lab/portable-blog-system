@@ -177,6 +177,18 @@
           <option value="completeness:categoryTags-missing">category/tags missing</option>
           <option value="completeness:fbPublished-missing">FB published missing</option>
         </optgroup>
+        <%# Phase 20260523-pm-5-admin-a2-fb-badge-filter-optgroup-a: fbBadge filter optgroup
+            （per docs/admin-overview-audit-20260523.md §10.1 A2）；fbBadge 為 FB sidecar
+            derived 狀態（per docs/fb-sidecar-metadata-pre-analysis.md §6.2 + load-admin-posts.js
+            deriveFbBadge）；4 well-known values（none / disabled / posted / ready）；
+            passthrough status（draft / archived 等）user 仍可透過 search 或 completeness filter
+            觸及，本批不展開以維持 zero-cost。 -%>
+        <optgroup label="fbBadge (FB 狀態)">
+          <option value="fbBadge:posted">FB badge: posted (已發文)</option>
+          <option value="fbBadge:ready">FB badge: ready (待發文)</option>
+          <option value="fbBadge:none">FB badge: none (無 sidecar)</option>
+          <option value="fbBadge:disabled">FB badge: disabled (sidecar enabled=false)</option>
+        </optgroup>
         <optgroup label="contentKind">
           <option value="kind:post">contentKind: post</option>
           <option value="kind:page">contentKind: page</option>
@@ -245,6 +257,7 @@
           data-fb-published="<%= p.completeness.fbPublished %>"
           data-content-kind="<%= p.contentKind || '' %>"
           data-source-site="<%= p.sourceSite || '' %>"
+          data-fb-badge="<%= p.fbBadge || '' %>"
           data-category="<%= p.category || '' %>"
           data-series="<%= (p.series && (p.series.id || p.series.slug)) || '' %>"
           data-published-at="<%= p.publishedAt || '' %>"
@@ -660,6 +673,8 @@
           case 'series': return row.dataset.series === val;
           // Phase 20260523-pm-3-admin-a1-source-site-filter-optgroup-a: sourceSite filter（per docs/admin-overview-audit-20260523.md §10.1 A1）；對齊 row data-source-site
           case 'sourceSite': return row.dataset.sourceSite === val;
+          // Phase 20260523-pm-5-admin-a2-fb-badge-filter-optgroup-a: fbBadge filter（per docs/admin-overview-audit-20260523.md §10.1 A2）；對齊 row data-fb-badge；4 well-known values
+          case 'fbBadge': return row.dataset.fbBadge === val;
           case 'completeness':
             // val 形如 "seo-missing" / "fb-missing" / "url-missing" / "categoryTags-missing"
             if (val === 'seo-missing') return row.dataset.seo === 'missing';
