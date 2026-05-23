@@ -1208,7 +1208,7 @@ target="_blank" rel="sponsored nofollow noopener noreferrer"
 
 ## 16.4 Blogger ↔ GitHub 互導
 
-Blogger 與 GitHub 互導視為自家跨站導流，會自動加 UTM 與 target / rel 控制。第一版**已實作 GitHub Pages → Blogger 方向之自動處理**（per Phase related-links-ga4-audit）；Blogger → GitHub Pages 反向尚未實作，列為 future phase。
+Blogger 與 GitHub 互導視為自家跨站導流，會自動加 UTM 與 target / rel 控制。第一版**已實作 GitHub Pages → Blogger 方向之自動處理**（per Phase related-links-ga4-audit；production live）；Blogger → GitHub Pages 反向之 **source 已於 pm-24a/b/c 落地（commits `7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）**，但**尚未 deploy / 尚未重貼 Blogger 後台**；live 狀態為 dormant，待 pm-26 階段 user 手動重貼 Blogger + GA4 Realtime 驗收後始進入 production。
 
 ### GitHub Pages → Blogger（已實作）
 
@@ -1241,18 +1241,48 @@ target / rel 自動處理：
 
 實作位置：`src/scripts/ga4-url-builder.js`（`isBloggerCrossLink` / `mergeRel` / `applyCrossSiteUtm`）+ `src/scripts/build-github.js`（`deriveRenderedCrossLinks` 於 post-detail render 前套用）+ `src/views/pages/post-detail.ejs`（render 端讀 `relatedLinksRendered` / `otherLinksRendered` 並使用 `item.target` / `item.rel`）。
 
-### Blogger → GitHub Pages（future phase；未實作）
+### Blogger → GitHub Pages（source landed；un-deployed；live but dormant）
 
-未來若實作 Blogger 端對 GitHub Pages 連結之自動處理，**建議**規則（**尚未生效**）：
+狀態（2026-05-23 EOD）：
+
+- ✅ source 已 push origin/main：
+  - pm-24a `7e1d356`：`src/scripts/ga4-url-builder.js`（新增 `isGithubCrossLink`；`applyCrossSiteUtm` 加 `direction` 參數，default `'to_blogger'` 保留 backward compat）
+  - pm-24b `e2309e9`：`src/scripts/build-blogger.js`（新增 `deriveRenderedCrossLinks` mirror build-github.js pattern；`direction: 'to_github'`）
+  - pm-24c `7c769fe`：`src/views/blogger/blogger-post-full.ejs`（讀 `relatedLinksRendered` / `otherLinksRendered`；fallback `post.relatedLinks` / `post.otherLinks` raw）
+- ✅ build verification 通過（pm-24d）：`dist-blogger/` 既有 3 ready posts post.html byte-identical-modulo-builtAt；無 GitHub cross-link 之 ready post 無新 UTM 注入
+- ❌ 尚未 deploy；尚未碰 gh-pages
+- ❌ Blogger 後台尚未重貼；live 狀態 dormant
+- ⏭ pm-26 deploy verify 階段才會啟動 user 手動重貼 Blogger + GA4 Realtime 驗收
+
+套用範圍：Blogger 文章頁（`bloggerMode: 'full'`）之 `relatedLinks` / `otherLinks` 中之 GitHub Pages cross-link。
+
+判斷依據：URL hostname 等於 `settings.site.githubSiteUrl` 之 host → 視為 GitHub cross-link；**不**依賴 frontmatter 之 `kind` 欄位（即使 `kind: internal` 亦同樣套用）。
+
+正式 UTM 規則：
 
 ```text
 utm_source=blogger
 utm_medium=referral
 utm_campaign=portable_blog_system
-utm_content=related_links | other_links
+utm_content=related_links     ← relatedLinks aside 內之連結
+utm_content=other_links       ← otherLinks aside 內之連結
 ```
 
-當前 Blogger 端對 GitHub Pages 連結**不**自動加 UTM / 不自動套 target / rel；作者若需 UTM 可於 frontmatter 之 url 欄位手動加入。
+target / rel 自動處理：
+
+- 強制 `target="_blank"`（開新分頁）
+- 合併 `rel="nofollow noopener noreferrer"`；保留既有 token，不重複
+
+策略 A（已含 UTM 之 url 處理）：若原 URL 已含**任一** `utm_source` / `utm_medium` / `utm_campaign` / `utm_content`，視為作者手動指定 → 系統**不覆蓋**、**不重複注入** UTM；但仍套 `target="_blank"` + `rel` 合併。
+
+未受影響範圍：
+
+- ❌ Blogger 同站內部連結 → 不加 UTM
+- ❌ 第三方非 GitHub external links → 不加 Blogger→GitHub UTM；仍按 §16.1 預設 `target="_blank" rel="nofollow noopener noreferrer"` 處理
+- ❌ Blogger summary / redirect-card / home-index / category-index 模式 → 本批不串接，不受影響（`renderFullPost` 為唯一 caller）
+- ❌ `buildBloggerToGithubUrl` / canonical / JSON-LD / summary CTA / redirect CTA / index CTA → 不變
+
+實作位置：`src/scripts/ga4-url-builder.js`（`isGithubCrossLink` / `applyCrossSiteUtm` `direction='to_github'`）+ `src/scripts/build-blogger.js`（`deriveRenderedCrossLinks` 於 `renderFullPost` 前套用）+ `src/views/blogger/blogger-post-full.ejs`（render 端讀 `relatedLinksRendered` / `otherLinksRendered` 並使用 `item.target` / `item.rel`）。
 
 ## 16.5 relatedLinks / otherLinks 連結處理
 

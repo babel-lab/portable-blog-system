@@ -220,7 +220,7 @@ CLAUDE.md §16.4 描述 Blogger ↔ GitHub 互導之 UTM 與 target / rel 規則
 - Blogger templates / `dist-blogger/` 輸出 → 不變
 - `design-system` / `sitemap.xml` / `robots.txt` → 不變
 
-**Blogger → GitHub Pages 反向 UTM**：未實作；屬 future phase。當前 Blogger 端對 GitHub Pages 連結**不**自動處理；作者若需 UTM 可於 frontmatter 之 url 欄位手動加入。
+**Blogger → GitHub Pages 反向 UTM**：source 已於 pm-24a/b/c 落地（commits `7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）；**尚未 deploy / 尚未重貼 Blogger 後台**；live 狀態 dormant。規則：`utm_source=blogger` / `utm_medium=referral` / `utm_campaign=portable_blog_system` / `utm_content=related_links | other_links`；`target="_blank"` + `rel` 合併 `nofollow noopener noreferrer`。策略 A 同 forward 方向（已含任一 utm_* 不覆寫；仍套 target/rel）。實作位置：`src/scripts/ga4-url-builder.js`（`isGithubCrossLink` / `applyCrossSiteUtm` `direction='to_github'`）+ `src/scripts/build-blogger.js`（`deriveRenderedCrossLinks` 於 `renderFullPost` 前）+ `src/views/blogger/blogger-post-full.ejs`（`relatedLinksRendered` / `otherLinksRendered`）。詳見 `CLAUDE.md` §16.4。
 
 **實作位置**：
 
