@@ -3,7 +3,7 @@
 本文件為 BLOG / GitHub Pages / Blogger / FB promotion / Affiliate CTA 之**點擊追蹤治理 proposal**；**屬 docs-only governance spec**，**不**代表已全部實作；**本批 phase `20260522-day-1-click-tracking-governance-a` 不修改任何 source / template / JS / GA4 config / build / deploy**。
 
 對應上層：
-- `CLAUDE.md` §16（連結處理規則；含 §16.4 GitHub→Blogger 已實作 / Blogger→GitHub 未實作）
+- `CLAUDE.md` §16（連結處理規則；含 §16.4 GitHub→Blogger 已實作 production / Blogger→GitHub source landed pm-24a/b/c un-deployed dormant）
 - `docs/ga4-parameter-naming-registry.md`（既有 GA4 / UTM naming registry；snake_case convention）
 - `docs/seo-ga4-adsense.md`（GA4 / AdSense 整體報告；§5.3 9 個預定義 event）
 - `docs/related-links-schema.md`（relatedLinks / otherLinks schema；§9 GA4 attribution）
@@ -46,7 +46,7 @@
 | GA4 production gating | ✅ live | `content/settings/ga4.config.json` enabled=true / measurementId=`G-C77SMPF8VD`；4-AND gating（ga4 + enabled + measurementId + isProdBuild）|
 | GitHub → Blogger cross-link UTM | ✅ 已實作 | `src/scripts/ga4-url-builder.js` 之 `isBloggerCrossLink` / `mergeRel` / `applyCrossSiteUtm`；utm_source=`github_pages` / utm_medium=`referral` / utm_campaign=`portable_blog_system` / utm_content=`related_links` \| `other_links`；策略 A（已含 UTM 保留 author intent） |
 | FB UTM 基礎 | ✅ 已實作 | `content/settings/promotion.config.json` 之 `campaignPattern` / `contentPattern`；`docs/ga4-parameter-naming-registry.md`（pm-48 + pm-52）對齊 snake_case convention |
-| Blogger → GitHub 反向 UTM | 🔴 **尚未實作** | per `CLAUDE.md` §16.4 列為 future phase；Blogger build pipeline 對 GitHub Pages 連結不自動加 UTM；作者可手動於 frontmatter url 帶 UTM |
+| Blogger → GitHub 反向 UTM | 🟡 **source landed pm-24a/b/c（`7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）；un-deployed；dormant** | per `CLAUDE.md` §16.4：Blogger build pipeline（`renderFullPost` 路徑）對 GitHub Pages 連結之 UTM / target / rel 自動處理已 wire；尚未 deploy；尚未重貼 Blogger 後台；pm-26 才啟動 user 手動重貼 + GA4 Realtime 驗收 |
 | GA4 click event rollout to templates | 🔴 **尚未實作** | `content/settings/ga4.config.json` 已預定義 9 個 event 名（per `CLAUDE.md` §5；page_view / internal_link_click / tag_click / category_click / affiliate_click / download_click / social_click / blogger_to_github_click / github_to_blogger_click）；但 EJS templates 尚未統一注入 `data-ga4-*` attr；JS listener 尚未掃描；Phase 2 多 batch rollout |
 | Affiliate CTA top / bottom 集中 event governance | 🔴 **尚未實作** | `src/styles/components/_affiliate-box.scss` 已存在；`src/views/blogger/blogger-post-full.ejs` 兩個 conditional `<aside>` 已 render；但**provider / placement / campaign / link_url / link_label** 等 metadata 未從 frontmatter / settings 集中標 GA4 event；ad-affiliate schema proposal 屬 `20260522-day-1-readonly-a-report.md` §4 #2 候選 |
 | hashtag 點擊治理 | 🟡 partial | hashtag 區塊兩端 render 已完成；但 click event 治理尚未集中 |
@@ -127,7 +127,7 @@
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | FB → Blogger | 使用者從 FB 粉絲頁貼文進入 Blogger 文章 | `facebook` | `social` | per post（如 `book_review`）| `fb_post_<YYYYMMDD>` | `page_view`（自動）| `source_platform`=`facebook` / `target_platform`=`blogger` / `post_slug` | ✅ UTM 已 by promotion.config.json | Phase 1 已完成 UTM；無 GA4 event 額外實作 |
 | 2 | FB → GitHub | 使用者從 FB 粉絲頁貼文進入 GitHub Pages 文章 | `facebook` | `social` | per post | `fb_post_<YYYYMMDD>` | `page_view`（自動）| `source_platform`=`facebook` / `target_platform`=`github_pages` / `post_slug` | ✅ UTM 已 by promotion.config.json | 同上 |
-| 3 | Blogger → GitHub | 使用者於 Blogger 文章內點擊指向 GitHub Pages 之連結 | `blogger` | `referral` | `portable_blog_system` | `related_links` \| `other_links` | `click_cross_site_link` | `source_platform`=`blogger` / `target_platform`=`github_pages` / `link_url` / `link_label` / `post_slug` | 🔴 UTM 未實作（CLAUDE.md §16.4 future）；event 未實作 | Phase 2-d（per §10 順序 6）|
+| 3 | Blogger → GitHub | 使用者於 Blogger 文章內點擊指向 GitHub Pages 之連結 | `blogger` | `referral` | `portable_blog_system` | `related_links` \| `other_links` | `click_cross_site_link` | `source_platform`=`blogger` / `target_platform`=`github_pages` / `link_url` / `link_label` / `post_slug` | 🟡 UTM source landed pm-24a/b/c（un-deployed；dormant；CLAUDE.md §16.4）；event 未實作 | UTM Phase 2-d step 3-6 ✅；step 7 deploy verify pending pm-26；event Phase 2-a |
 | 4 | GitHub → Blogger | 使用者於 GitHub Pages 文章內點擊指向 Blogger 之連結 | `github_pages` | `referral` | `portable_blog_system` | `related_links` \| `other_links` | `click_cross_site_link` | `source_platform`=`github_pages` / `target_platform`=`blogger` / `link_url` / `link_label` / `post_slug` | ✅ UTM 已實作（ga4-url-builder.js）；event 未實作 | UTM Phase 1 ✅；event Phase 2-a |
 | 5 | relatedLinks | 使用者點擊文章 `relatedLinks` aside 內連結（語意相關之延伸閱讀）| —（看 link_type）| —（看 link_type）| —（看 link_type）| `related_links`（若跨站；其餘 N/A）| `click_related_link` | `link_type` / `link_url` / `link_label` / `post_slug` / `outbound`（true if external）| 🟡 UTM partial（僅跨 Blogger 方向）；event 未實作 | Phase 2-b（per §10 順序 4）|
 | 6 | otherLinks | 使用者點擊文章 `otherLinks` aside 內連結（補充外部資源）| —（看 link_type）| —（看 link_type）| —（看 link_type）| `other_links`（若跨站；其餘 N/A）| `click_other_link` | 同上 | 同上 | 同上 |

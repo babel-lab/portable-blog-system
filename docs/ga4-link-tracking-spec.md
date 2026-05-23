@@ -106,7 +106,7 @@
 - **既有實作**：`content/settings/promotion.config.json` 之 `campaignPattern` / `contentPattern`
 - **Cross-ref**：`click-tracking-governance.md` §3.1 / §4 row 1+2
 
-### 3.5 Blogger to GitHub UTM（反向；尚未實作）
+### 3.5 Blogger to GitHub UTM（反向；source landed；un-deployed）
 
 - **方向**：Blogger article → GitHub Pages article（relatedLinks / otherLinks 內 cross-site link）
 - **UTM 建議**：
@@ -117,8 +117,8 @@
   - `utm_campaign` = 與文章 campaign metadata 對齊（如 `portable_blog_system` default）
   - `utm_content` = `related_links` | `other_links`（per cross-site link 區塊）
 - **GA4 event**：可同步送 `cross_site_click` with `source_platform=blogger` / `target_platform=github_pages`
-- **狀態**：🔴 **尚未實作**；per `CLAUDE.md` §16.4 future；implementation 屬 Phase 2（per `pm-phase-2-batch-plan.md` §10）
-- **Cross-ref**：`click-tracking-governance.md` §4 row 3
+- **狀態**：🟡 **source landed pm-24a/b/c（commits `7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）；un-deployed；live but dormant**；pm-26 deploy verify 才啟動 user 手動重貼 Blogger + GA4 Realtime 驗收。實作位置：`src/scripts/ga4-url-builder.js`（`isGithubCrossLink` / `applyCrossSiteUtm` `direction='to_github'`）+ `src/scripts/build-blogger.js`（`deriveRenderedCrossLinks` 於 `renderFullPost` 前）+ `src/views/blogger/blogger-post-full.ejs`（`relatedLinksRendered` / `otherLinksRendered`）。
+- **Cross-ref**：`click-tracking-governance.md` §4 row 3 / `CLAUDE.md` §16.4 / `blogger-to-github-reverse-utm-plan.md` §10
 
 ### 3.6 GitHub to Blogger UTM（已實作 + click event 對接已落地）
 
@@ -442,7 +442,7 @@ per `ad-affiliate-schema-proposal.md` §4 + §6.2-§6.4 + 本 spec 補強：
 | **Admin preview 顯示 tracking metadata** | 🟡 **Partial（5/22 night）** — 5 fixes 落地後 detail panel 顯示 fbPostUrl / fbPostedAt / fbPostId / fbCampaign / publishedAt + missing metadata warning banner；尚未顯示 GA4 event-level metadata（per §13）| `20260522-night-admin-usability-report.md` |
 | **Validator 檢查必要欄位**（如 affiliateBlocks[] schema）| ❌ **Phase 2** | per `validate-content.js` 既有 rule 擴充 |
 | **Dry-run report 檢查連結追蹤設定** | ❌ **Phase 2** | per `report-*.js` 系列擴充 |
-| **Blogger → GitHub reverse UTM** | 🟡 **規格 docs 完成；未實作** | per `blogger-to-github-reverse-utm-plan.md` §10 之 7 步 |
+| **Blogger → GitHub reverse UTM** | 🟡 **source landed pm-24a/b/c（`7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）；un-deployed；dormant** | per `blogger-to-github-reverse-utm-plan.md` §10 step 3-6 已落地；step 7（user 重貼 Blogger + GA4 Realtime 驗收）pending（pm-26）|
 
 ---
 

@@ -93,9 +93,9 @@
 | `utm_campaign` | `{page}_post`（per `content/settings/promotion.config.json` 之 `campaignPattern` 既有設定；snake_case；對齊 production）|
 | `utm_content` | `{slug}`（即 post slug；per `contentPattern`）|
 
-### 4.2 Blogger → GitHub Pages cross-link（**future phase；尚未實作**）
+### 4.2 Blogger → GitHub Pages cross-link（**source landed pm-24a/b/c；un-deployed；live but dormant**）
 
-per `CLAUDE.md` §16.4：當 Blogger 端 cross-link 自動化實作時，**對齊 GitHub→Blogger 既有命名 convention 之 mirror**：
+per `CLAUDE.md` §16.4：source 已於 pm-24a/b/c 落地（commits `7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）；尚未 deploy / 尚未重貼 Blogger 後台；live 狀態 dormant；pm-26 deploy verify 才進入 production。命名**對齊 GitHub→Blogger 既有 convention 之 mirror**：
 
 | 欄位 | 值 |
 |---|---|
@@ -227,7 +227,7 @@ per `CLAUDE.md` §16.4 + `src/scripts/ga4-url-builder.js`：自 pm-6 / pm-45 dep
 | `.fb.md` 之 `page`（如 `fan1`）→ FB promotion txt | `promotion.config.json` 之 `utm.campaignPattern` 展開（`{page}-post`；建議從 `{page}_post` 改 per §9）|
 | `.md` frontmatter 之 `slug` → FB promotion txt 之 article URL | `promotion.config.json` 之 `utm.contentPattern` 展開（`{slug}`）|
 | GitHub Pages 之 cross-link to Blogger | per CLAUDE.md §16.4 之自動 UTM 注入（已實作 ga4-url-builder.js）|
-| Blogger → GitHub cross-link | per CLAUDE.md §16.4 之 future phase；尚未實作 |
+| Blogger → GitHub cross-link | per CLAUDE.md §16.4：source 已落地（pm-24a/b/c；`7e1d356` / `e2309e9` / `7c769fe`）；un-deployed；dormant；pm-26 才 deploy verify |
 
 ### 7.2 FB promotion posts 之 UTM 從 article metadata 產生
 
