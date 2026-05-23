@@ -6,7 +6,7 @@
 - `CLAUDE.md` §2.1（Blogger 站定位：既有流量 + AdSense 收益；手動發布流程）/ §5（既有 GA4 events）/ §17（文章頁版型）
 - `docs/click-tracking-governance.md` §9.3（Phase 2 Rollout：GitHub vs Blogger listener 不對稱）
 - `docs/20260522-pm-phase-2-batch-plan.md` §9（Blogger Strategy 三 candidate plan）/ §10（Reverse UTM Plan）
-- `docs/ga4-link-tracking-spec.md` §3.5（Blogger to GitHub UTM；尚未實作）
+- `docs/ga4-link-tracking-spec.md` §3.5（Blogger to GitHub UTM；source landed pm-24a/b/c；un-deployed；dormant）
 - `docs/hashtag-slug-decision.md`（hashtag span→a + tag_slug 之另一前置 spec；本 doc 與其平行）
 - `docs/blogger-export.md`（Blogger 匯出系統；HTML / theme CSS / copy-helper pipeline）
 
@@ -79,7 +79,7 @@ Markdown 文章
 | `blogger-post-full.ejs` HTML 渲染 | ✅ 完整（含 affiliate / relatedLinks / otherLinks / hashtag 區塊）|
 | `data-ga4-*` attr 注入 | 🔴 **無**；template 未加任何 attr |
 | Listener strategy | 🔴 **無**（本 doc 之決議目標）|
-| Blogger → GitHub Pages reverse UTM | 🔴 **未實作**（per `CLAUDE.md` §16.4 future）|
+| Blogger → GitHub Pages reverse UTM | 🟡 **source landed pm-24a/b/c（`7e1d356` / `e2309e9` / `7c769fe`；2026-05-23）；un-deployed；dormant**（per `CLAUDE.md` §16.4；pm-26 deploy verify 才 user 手動重貼 + GA4 Realtime 驗收）|
 | Blogger 端 GA4 gtag.js | ✅ 主題級已貼（pm-45 `f32f7d3` deploy；user Realtime 驗收通過）|
 | Blogger 端 GA4 自動 `page_view` event | ✅ 自動 fire（gtag.js 內建）|
 
@@ -90,7 +90,7 @@ Markdown 文章
 | FB → Blogger | `utm_source=facebook&utm_medium=social&utm_campaign={page}_post&utm_content={slug}` + `page_view` | ✅ 已實作 |
 | FB → GitHub | 同上 | ✅ 已實作 |
 | GitHub → Blogger（cross-link）| `utm_source=github_pages&utm_medium=referral&utm_campaign=portable_blog_system&utm_content=related_links\|other_links` + `page_view` | ✅ 已實作（`ga4-url-builder.js` `applyCrossSiteUtm`）|
-| **Blogger → GitHub（cross-link）** | reverse UTM **尚未實作** | 🔴 deferred |
+| **Blogger → GitHub（cross-link）** | reverse UTM **source landed pm-24a/b/c**（`utm_source=blogger&utm_medium=referral&utm_campaign=portable_blog_system&utm_content=related_links\|other_links` + `target="_blank"` + `rel` 合併 `nofollow noopener noreferrer`）；un-deployed；dormant | 🟡 source live；deploy 待 pm-26 |
 | Blogger 內部 click（affiliate / related / other / hashtag）| **無 click event**；僅 `page_view` 之 referrer 可看出 source | 🔴 無 listener |
 
 ---
@@ -517,7 +517,7 @@ per spec 之「禁止事項」+ docs-only 性質：
 
 - `CLAUDE.md` §2.1（Blogger 站定位）/ §5（既有 GA4 events）/ §16.4（cross-link UTM；含 future Blogger → GitHub）/ §17（文章頁版型）
 - `docs/click-tracking-governance.md` §4 row 3（reverse UTM 規格）/ §5（GA4 event name 對照）/ §9.3（GitHub vs Blogger listener 不對稱）/ §10（Phase 2 rollout 順序）
-- `docs/ga4-link-tracking-spec.md` §3.5（Blogger → GitHub UTM；尚未實作）
+- `docs/ga4-link-tracking-spec.md` §3.5（Blogger → GitHub UTM；source landed pm-24a/b/c；un-deployed；dormant）
 - `docs/ga4-parameter-naming-registry.md` §4.2（Blogger → GitHub UTM 既建議規格）/ §6.1（event name 命名規則）/ §6.4（param 命名規則）
 - `docs/20260522-pm-phase-2-batch-plan.md` §9（Blogger Strategy 三 candidate plan：A/B/C 對應本 doc 之 B-inline/B-theme/A）/ §10（Reverse UTM Plan）
 - `docs/hashtag-slug-decision.md`（hashtag span→a + tag_slug；本 doc §7 #9 之前置）

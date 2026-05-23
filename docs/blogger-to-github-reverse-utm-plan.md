@@ -1,14 +1,52 @@
 # Blogger → GitHub Pages Reverse UTM Plan
 
-本文件為 **Blogger 文章內連回 GitHub Pages 之 GA4 UTM 注入策略**之 docs-only read-only plan；屬未來 implementation phase 之前置規格。**本批 phase `20260522-blogger-to-github-reverse-utm-plan-a` 不修改任何 source / template / content / settings / build / dist / deploy**。
+本文件為 **Blogger 文章內連回 GitHub Pages 之 GA4 UTM 注入策略**之原始 plan；最初為 docs-only read-only spec（phase `20260522-blogger-to-github-reverse-utm-plan-a`）。**§1-§12 為 step 1 原 plan snapshot；step 2 source 已於 2026-05-23 落地（詳見 §0 status update）。**
+
+---
+
+## §0 Status Update（2026-05-23 pm-28b）
+
+本 plan 之 step 2 source implementation 已落地；本 doc body §1-§12 保留為 step 1 原規格 snapshot，未隨 step 2 大改：
+
+| 項目 | 狀態 |
+|---|---|
+| step 2 source landed | ✅ pm-24a `7e1d356` + pm-24b `e2309e9` + pm-24c `7c769fe`（2026-05-23）|
+| build verification | ✅ pm-24d（`dist-blogger/` 既有 3 ready posts post.html byte-identical-modulo-builtAt；無 GitHub cross-link 之 ready post 無新 UTM 注入）|
+| deploy | ❌ 尚未；未碰 gh-pages |
+| Blogger 後台重貼 | ❌ 尚未 |
+| live 狀態 | 🟡 dormant（source live；無 production effect 直到 Blogger 後台重貼）|
+| 後續 step | pm-26 deploy verify（user 手動重貼 Blogger 一篇代表性文章 + GA4 Realtime 驗收 reverse UTM 接收）|
+
+實作位置（pm-24a/b/c 後狀態）：
+
+- `src/scripts/ga4-url-builder.js`：新增 `isGithubCrossLink`；`applyCrossSiteUtm` 加 `direction` 參數（default `'to_blogger'` 維持 backward compat；`'to_github'` 為新方向，注入 `utm_source=blogger`）
+- `src/scripts/build-blogger.js`：新增 `deriveRenderedCrossLinks` mirror build-github.js pattern（唯一 diff 為 `direction: 'to_github'`）；`renderFullPost` 簽名加 `settings` 第 4 參數；EJS context 新增 `relatedLinksRendered` / `otherLinksRendered`
+- `src/views/blogger/blogger-post-full.ejs`：讀 `relatedLinksRendered` / `otherLinksRendered`（fallback `post.relatedLinks` / `post.otherLinks` raw）；`item.target` / `item.rel` 優先使用預處理值，否則 fallback `isInternal` 預設
+
+§10 plan 之 7 步狀態對照：
+
+| step | plan 描述 | 狀態 |
+|---|---|---|
+| 1 | docs-only plan（本 doc）| ✅ phase `20260522-...` |
+| 2 | pm-22 docs consistency audit | ✅ `feb8635` |
+| 3 | ga4-url-builder helper layer | ✅ pm-24a `7e1d356` |
+| 4 | build-blogger preprocess | ✅ pm-24b `e2309e9` |
+| 5 | blogger-post-full.ejs 改讀 `*Rendered` | ✅ pm-24c `7c769fe` |
+| 6 | build + validate 既有 fixture byte-identical | ✅ pm-24d |
+| 7 | user 手動重貼 Blogger + GA4 Realtime 驗收 | ⏭ pending（pm-26）|
+
+---
 
 對應上層：
-- `CLAUDE.md` §16.4（cross-link UTM 規則；含 future Blogger → GitHub 反向 UTM 為 future phase）
+- `CLAUDE.md` §16.4（cross-link UTM 規則；含 Blogger → GitHub Pages source landed pm-24a/b/c；un-deployed；dormant）
 - `docs/click-tracking-governance.md` §4 row 3（reverse UTM 規格）/ §10 順序 5（Phase 2-d Blogger → GitHub reverse UTM）
-- `docs/ga4-link-tracking-spec.md` §3.5（Blogger to GitHub UTM；尚未實作）
-- `docs/ga4-parameter-naming-registry.md` §4.2（Blogger → GitHub UTM 既建議規格；snake_case）
+- `docs/ga4-link-tracking-spec.md` §3.5（Blogger to GitHub UTM；source landed pm-24a/b/c；un-deployed；dormant）
+- `docs/ga4-parameter-naming-registry.md` §4.2（Blogger → GitHub UTM 既建議規格；snake_case；source landed pm-24a/b/c；un-deployed）
 - `docs/blogger-listener-strategy.md` §5.1 / §6.4 / §7（短期推薦方案 D；reverse UTM 命名；implementation 順序）
 - `docs/20260522-pm-phase-2-batch-plan.md` §10（Reverse UTM Plan）
+- `docs/20260523-eod-report.md` §14.3-14.7（pm-22 ~ pm-25 完整工作流；含 commit hash + build verification + final baseline）
+
+> 以下 §1-§12 為 step 1 原 plan snapshot（2026-05-22 留存）；body 中之「未實作」/「尚未實作」等狀態描述為 step 1 當時之事實，非 2026-05-23 之現狀。如需現狀請以 §0 為準。
 
 ---
 

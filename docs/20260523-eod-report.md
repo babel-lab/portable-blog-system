@@ -306,6 +306,8 @@ per 本日所有 phases 之邊界遵守：
 - **時間**：~1-2h docs work
 - **風險**：🟢 低（docs-only step）
 
+> **forward cross-ref**：step 2 source implementation 已於同日下午（pm-22 ~ pm-25）落地；完整工作流（含 commit hash + build verification + final baseline）詳見本 doc §14.3-14.7。
+
 ### D. Custom domain prep
 
 - **scope**：per `docs/custom-domain-root-files-strategy.md` §4 preflight

@@ -94,6 +94,7 @@ per `docs/click-tracking-governance.md` §2.1（pm reconcile 後補記）：
 
 - GitHub → Blogger UTM **已存在**（per `src/scripts/ga4-url-builder.js applyCrossSiteUtm`）
 - Blogger → GitHub reverse UTM **尚未實作**（per `CLAUDE.md` §16.4 future）
+  - **2026-05-23 status update**：source 已於 pm-24a/b/c 落地（commits `7e1d356` / `e2309e9` / `7c769fe`）+ pm-24d build verification 通過；un-deployed；Blogger 後台未重貼；live 狀態 dormant；pm-26 才 deploy verify。詳見 `docs/20260523-eod-report.md` §14.3-14.7 + `docs/blogger-to-github-reverse-utm-plan.md` §0。
 - 需要 **user 表態是否值得做**：
   - 已發布 Blogger 文章（如 `we-media-myself2`）可能需要**重貼**才會帶反向 UTM
   - 是否真有 attribution 價值（GA4 後台 referrer 觀察是否已足夠？）

@@ -383,7 +383,7 @@ Admin 重 build:promotion → FB 推廣 txt 含正式 URL
 | 多 FB page per 一文章之 cross-post | 當前 .fb.md 為 single page 設計 | Admin Phase 5+ |
 | 圖片 metadata（sourceAssets / images[]）| 當前部分支援（per CLAUDE.md §22）；無系統化欄位 | Admin Phase 5+ |
 | GA4 per-event customization | 當前 events 為全站清單 | post-MVP；非 MVP scope |
-| Blogger → GitHub Pages 反向 UTM | 當前未實作（per Phase related-links-ga4-docs-sync §16.4）| 反向 UTM 實作批次 |
+| Blogger → GitHub Pages 反向 UTM | 當前未實作（per Phase related-links-ga4-docs-sync §16.4）（**2026-05-23 update**：source 已於 pm-24a/b/c 落地；un-deployed；dormant；pm-26 deploy verify）| 反向 UTM 實作批次 |
 
 ---
 
