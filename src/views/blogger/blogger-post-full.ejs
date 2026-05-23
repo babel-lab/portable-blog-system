@@ -114,10 +114,12 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
   <%# - per docs/related-links-schema.md §8.2 之預期 markup -%>
   <%# - renderable pre-filter：plain object + url non-empty + title non-empty 才渲染；其餘 skip -%>
   <%# - kind === 'internal' → 無 target / rel；其他（含 external / 缺漏 / invalid）→ external default _blank + nofollow noopener -%>
-  <%# - 不支援 item.target / item.rel author override；本批忽略 order，照 array 原順序 -%>
   <%# - trim-newline pattern：對無 relatedLinks / otherLinks 之 ready post，post.html 結構性 byte-identical-modulo-builtAt -%>
+  <%# - Phase 20260523-pm-24c-reverse-utm-step2-blogger-template-wiring-a：優先讀 relatedLinksRendered（含 reverse UTM + target/rel 預處理）；fallback 至 post.relatedLinks raw -%>
+  <%# - item.target / item.rel：若預處理填入則用其值（GitHub cross-link 走此路徑）；否則 fallback 至 isInternal 預設 -%>
   <%
-    const renderableRelated = (Array.isArray(post.relatedLinks) ? post.relatedLinks : []).filter(function(item) {
+    const relatedSource = Array.isArray(relatedLinksRendered) ? relatedLinksRendered : (Array.isArray(post.relatedLinks) ? post.relatedLinks : []);
+    const renderableRelated = relatedSource.filter(function(item) {
       return item && typeof item === 'object' && !Array.isArray(item)
         && typeof item.url === 'string' && item.url.trim() !== ''
         && typeof item.title === 'string' && item.title.trim() !== '';
@@ -131,9 +133,11 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
         const isInternal = item.kind === 'internal';
         const platform = (typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '';
         const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
+        const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
+        const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
       %>
       <li class="lab-related-links__item lab-related-links__item--<%= isInternal ? 'internal' : 'external' %>">
-        <a class="lab-related-links__link" href="<%= item.url %>"<% if (!isInternal) { %> target="_blank" rel="nofollow noopener"<% } %>>
+        <a class="lab-related-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %>>
           <% if (platform) { %><span class="lab-related-links__platform">[<%= platform %>]</span> <% } %><span class="lab-related-links__title-text"><%= item.title %></span>
         </a>
         <% if (hasDesc) { %><p class="lab-related-links__description"><%= item.description %></p><% } %>
@@ -145,8 +149,10 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
 
   <%# === Other Links（作者手動指定；其他連結） === -%>
   <%# - 同 lab-related-links 之 markup 與規則，class prefix 改 lab-other-links -%>
+  <%# - Phase 20260523-pm-24c-reverse-utm-step2-blogger-template-wiring-a：優先讀 otherLinksRendered（含 reverse UTM + target/rel 預處理）；fallback 至 post.otherLinks raw -%>
   <%
-    const renderableOther = (Array.isArray(post.otherLinks) ? post.otherLinks : []).filter(function(item) {
+    const otherSource = Array.isArray(otherLinksRendered) ? otherLinksRendered : (Array.isArray(post.otherLinks) ? post.otherLinks : []);
+    const renderableOther = otherSource.filter(function(item) {
       return item && typeof item === 'object' && !Array.isArray(item)
         && typeof item.url === 'string' && item.url.trim() !== ''
         && typeof item.title === 'string' && item.title.trim() !== '';
@@ -160,9 +166,11 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
         const isInternal = item.kind === 'internal';
         const platform = (typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '';
         const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
+        const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
+        const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
       %>
       <li class="lab-other-links__item lab-other-links__item--<%= isInternal ? 'internal' : 'external' %>">
-        <a class="lab-other-links__link" href="<%= item.url %>"<% if (!isInternal) { %> target="_blank" rel="nofollow noopener"<% } %>>
+        <a class="lab-other-links__link" href="<%= item.url %>"<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %>>
           <% if (platform) { %><span class="lab-other-links__platform">[<%= platform %>]</span> <% } %><span class="lab-other-links__title-text"><%= item.title %></span>
         </a>
         <% if (hasDesc) { %><p class="lab-other-links__description"><%= item.description %></p><% } %>
