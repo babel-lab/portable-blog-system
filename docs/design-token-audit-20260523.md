@@ -272,8 +272,8 @@ per `CLAUDE.md` §9.1 / §9.3：
 
 | 元素 | 狀態 |
 |---|---|
-| 長 slug / 長 URL 顯示（detail panel）| 🟡 partial；當前 mono 顯示；未加 `word-break` / `overflow-wrap: anywhere`；極長 URL 可能 overflow |
-| 長 hashtag 字串 | 🟡 partial；hashtag 為 inline `<span>`；長中文 hashtag 不會破版但可能 wrap 不雅 |
+| 長 slug / 長 URL 顯示（detail panel）| ✅ 既有 source 已涵蓋；`.mono`（line 38）+ `.detail-grid dd`（line 43）皆有 `word-break: break-all`；DT-A1 stale / no-op（per 20260523-pm-7 偵察）|
+| 長 hashtag 字串 | ✅ 已修；`.lab-hashtag` 加入 `max-width: 100%` + `overflow-wrap: anywhere`（GitHub source + Blogger mirror 同步；20260523-pm-7 commit `0f71d6e`）|
 | 長 title 多語顯示 | ✅ 已正確 wrap；無 overflow |
 | 表格 / pre code block 長行 | ✅ `_code-block.scss` 含 `overflow-x: auto` |
 | 圖片寬度 | ✅ `max-width: 100%` |
@@ -382,8 +382,8 @@ per `CLAUDE.md` §9.4：
 
 | # | 項目 | 對應 | 預估 LOC |
 |---|---|---|---|
-| 1 | 長 URL `word-break: break-all` 補強（Admin detail panel）| `src/views/admin/index.ejs` inline `<style>` | ~3 行 |
-| 2 | 長 hashtag wrap polish | `components/_hashtag.scss` | ~3 行 |
+| 1 | ~~長 URL `word-break: break-all` 補強（Admin detail panel）~~ ✅ stale / no-op（per 20260523-pm-7 偵察；既有 CSS 已涵蓋）| `src/views/admin/index.ejs` inline `<style>` | — |
+| 2 | ~~長 hashtag wrap polish~~ ✅ 已於 20260523-pm-7 commit `0f71d6e` 落地 | `components/_hashtag.scss` + `blogger/_blogger-components-rules.scss`（mirror sync）| — |
 | 3 | Admin overview 視覺微調（stat-card density / detail panel spacing）| `src/views/admin/index.ejs` inline `<style>` | ~10 行 |
 
 ### 7.4 🔵 Nice to have
@@ -440,8 +440,8 @@ per §7 priority + 既有 docs 共識：
 
 | Batch ID | 主題 | 範圍 | 預估 LOC | 風險 |
 |---|---|---|---|---|
-| **DT-A1** | Admin detail panel 長 URL word-break 補強 | `src/views/admin/index.ejs` inline `<style>` | ~3 行 | 🟢 低 |
-| **DT-A2** | hashtag long-text wrap polish | `src/styles/components/_hashtag.scss` | ~3 行 | 🟢 低 |
+| ~~**DT-A1**~~ | ~~Admin detail panel 長 URL word-break 補強~~ ✅ **stale / no-op**（既有 `.mono` + `.detail-grid dd` 已具備 `word-break: break-all`；per 20260523-pm-7 偵察；無 source 修改）| `src/views/admin/index.ejs` inline `<style>` | — | — |
+| ~~**DT-A2**~~ | ~~hashtag long-text wrap polish~~ ✅ **已於 20260523-pm-7 落地**（commit `0f71d6e`；GitHub source + Blogger mirror 同步 `max-width: 100%` + `overflow-wrap: anywhere`）| `src/styles/components/_hashtag.scss` + `src/styles/blogger/_blogger-components-rules.scss` | +2 行 / 2 檔（實際）| — |
 | **DT-A3** | Admin stat-card density 微調 | `src/views/admin/index.ejs` inline `<style>` | ~5 行 | 🟢 低 |
 | **DT-A4** | mobile drawer transition timing polish | `src/styles/layout/_mobile-drawer.scss` | ~3 行 | 🟢 低 |
 | **DT-A5** | back-to-top button transition polish | `src/styles/components/_back-to-top.scss` | ~3 行 | 🟢 低 |
@@ -468,9 +468,16 @@ per §7 priority + 既有 docs 共識：
 
 ### 9.4 推薦短期 batch 順序
 
-⭐ **第一推薦**：**DT-A1**（Admin 長 URL word-break）+ **DT-A2**（hashtag wrap）合批
+⭐ ~~**第一推薦**：**DT-A1**（Admin 長 URL word-break）+ **DT-A2**（hashtag wrap）合批~~ ✅ **已於 20260523-pm-7-dt-a2-polish-a 收斂**
 
-理由：
+收斂結果：
+- DT-A1 偵察確認 stale / no-op（既有 `.mono` + `.detail-grid dd` 已具備 `word-break: break-all`；無 source 修改）
+- DT-A2 落地 commit `0f71d6e`（GitHub source `_hashtag.scss` + Blogger mirror `_blogger-components-rules.scss` 同步；+2 行 / 2 檔；`max-width: 100%` + `overflow-wrap: anywhere`）
+- ⚠️ **後續可選**：Blogger 後台 CSS 重貼（屬一次性；本批未 `build:blogger-theme` / 未重產 `dist-blogger/theme/blogger-full-style.css`；user 自決時機；可整合於下次 DT-B / DS-3-b-blogger-entry 批次）
+
+升級後 §9.1 第一推薦遞補為 **DT-A3**（Admin stat-card density）— 詳見下方第二推薦段。
+
+~~原第一推薦理由~~（保留作歷史參考）：
 - 🟢 風險最低（單檔 ≤ 5 行；零功能改動）
 - 修 §5.3 之兩個 low-priority overflow polish
 - 對齊 Admin overview audit §10 之 A 系列 candidate
@@ -541,7 +548,8 @@ per spec：
 - `docs/ga4-link-tracking-spec.md`（Batch 2；spec 固化）
 - `docs/admin-overview-audit-20260523.md`（Batch 3）
 - `docs/publishing-workflow-20260523.md`（Batch 4）
-- 本文件（Batch 5）
+- 本文件（Batch 5；後續於 20260523-pm-8-dt-audit-sync-a 補入 DT-A1 stale / DT-A2 done 狀態）
+- 同日 pm-7 `20260523-pm-7-dt-a2-polish-a`（DT-A2 source 落地；commit `0f71d6e`）+ pm-8 `20260523-pm-8-dt-audit-sync-a`（本批 audit docs sync）
 
 ### 11.5 Source refs
 

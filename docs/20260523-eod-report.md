@@ -281,7 +281,14 @@ per 本日所有 phases 之邊界遵守：
 - 詳見本文件 §6B（Admin A2 source 小修摘要）
 - 本批 pm-6 addendum 後，明日第一順位候選改為 **B. DT-A1 / DT-A2（Design token 小修系列）**
 
-### B. DT-A1 / DT-A2（Design token 小修系列）
+### B. ~~DT-A1 / DT-A2（Design token 小修系列）~~ ✅ **已於 5/23 pm-7 收斂**
+
+> **後加註（20260523-pm-8-dt-audit-sync-a）**：本候選 B 已於同日 pm-7-dt-a2-polish-a 部分收斂。
+> - **DT-A1**：偵察確認 stale / no-op（既有 `.mono` + `.detail-grid dd` 已具備 `word-break: break-all`；無 source 修改）
+> - **DT-A2**：落地 commit `0f71d6e`（GitHub source `_hashtag.scss` + Blogger mirror `_blogger-components-rules.scss` 同步；+2 行 / 2 檔）
+> - **Blogger 後台 CSS 重貼**：屬後續可選工作；本批未 `build:blogger-theme`；user 自決時機
+>
+> 以下原候選描述保留作歷史參考：
 
 - **scope**（per `design-token-audit-20260523.md` DT-A 系列）：
   - **DT-A1**：Admin overview 長 URL word-break polish（避免 mono cell 撐爆畫面）
@@ -333,9 +340,11 @@ per 本日所有 phases 之邊界遵守：
 
 ## 10. 明日建議優先順序
 
-### 10.1 推薦明日 第一個候選：**B. DT-A1 / DT-A2（Design token 小修系列）**
+### 10.1 ~~推薦明日 第一個候選：**B. DT-A1 / DT-A2（Design token 小修系列）**~~ ✅ **已於 5/23 pm-7 收斂**（per pm-8-dt-audit-sync-a 補記）
 
-**理由**：
+**實際結果**（pm-7 同日落地）：DT-A1 偵察 stale；DT-A2 落地 commit `0f71d6e`；Blogger 後台 CSS 重貼 deferred 為後續可選。下一順位候選改為 **C. Reverse UTM step 1 docs**（per §10.2）。
+
+**~~原推薦理由~~**（保留作歷史參考）：
 
 - 🟢 風險低（純 CSS / inline style；零 loader / 零 schema / 零 settings JSON 變動）
 - 對齊 `design-token-audit-20260523.md` 之 DT-A 高優先序
@@ -374,10 +383,10 @@ per 本日所有 phases 之邊界遵守：
 
 ### 11.2 Cold-start 明日 onboarding 順序建議
 
-1. 讀 `docs/20260523-eod-report.md`（本文件；含 pm-6 addendum）— 5 min 掌握今日全貌（注意：Admin A1 + A2 皆已落地；明日第一候選為 B. DT-A1 / DT-A2）
-2. 讀 `docs/design-token-audit-20260523.md` 之 DT-A 段落 — 確認 DT-A1 / DT-A2 落地細節
+1. 讀 `docs/20260523-eod-report.md`（本文件；含 pm-6 addendum + pm-8 補記）— 5 min 掌握今日全貌（注意：Admin A1 + A2 + DT-A2 皆已落地；DT-A1 stale；下一順位候選改為 **C. Reverse UTM step 1 docs** 或其他）
+2. 讀 `docs/design-token-audit-20260523.md` 之 DT-A 段落 — 確認 DT-A1 stale 與 DT-A2 落地細節（含 commit `0f71d6e`）
 3. 讀 `docs/phase-status-20260523.md` — 確認 Phase 1 整體 baseline
-4. 若選 DT 系列：直接讀 `src/views/admin/index.ejs` 之 inline `<style>` 區塊 + `src/styles/components/_hashtag.scss` 作為 DT-A1 / DT-A2 之 reference
+4. 若繼續 DT 系列：**DT-A3**（Admin stat-card density）為下一推薦；reference 仍為 `src/views/admin/index.ejs` 之 inline `<style>` 區塊
 
 ### 11.3 確認無 dirty / untracked
 
@@ -414,7 +423,7 @@ per 本日所有 phases 之邊界遵守：
 ### 12.4 明日候選對應 docs
 
 - ~~A：`docs/admin-overview-audit-20260523.md` §10.1 A2~~ ✅ 已於 pm-5 落地（`b9b76c6`）；非明日候選
-- **B**：`docs/design-token-audit-20260523.md` DT-A1 / DT-A2（pm-6 addendum 後升為明日第一候選）
+- ~~**B**：`docs/design-token-audit-20260523.md` DT-A1 / DT-A2（pm-6 addendum 後升為明日第一候選）~~ ✅ **已於 5/23 pm-7 收斂**（DT-A1 stale；DT-A2 commit `0f71d6e`；per pm-8-dt-audit-sync-a 補記）
 - C：`docs/blogger-to-github-reverse-utm-plan.md`
 - D：`docs/custom-domain-root-files-strategy.md`
 - E：（無單一專屬 doc；散見於 `docs/seo-ga4-adsense.md` 等）
