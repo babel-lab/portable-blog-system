@@ -636,4 +636,152 @@ per 本批 pm-18 addendum 之邊界：
 
 ---
 
+## 14. 後續批次補記（pm-22 + pm-23 ~ pm-25；reverse UTM step 2 source landing）
+
+本子節為 pm-21 mini addendum 落地（commit `1560092`；push 後 origin/main = `1560092`）之後新增；屬 pm-25 batch（本批）；補記 pm-22（docs consistency audit）+ pm-23（read-only impl audit）+ pm-24a/b/c/d（reverse UTM step 2 source 三層實作 + build verification）之完整工作流。
+
+### 14.1 pm-22：reverse UTM 4-direction UTM consistency docs
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-22-reverse-utm-step1-docs-a` |
+| Commit | `feb8635 docs(ga4): audit reverse utm consistency` |
+| 性質 | docs-only；單檔 `docs/blogger-to-github-reverse-utm-plan.md`（+47 / -0）|
+| 補入內容 | §5.7「與既有 3 個 UTM 方向之一致性比較」（含 5.7.1 4-direction UTM 一覽表 / 5.7.2 對齊 vs 有意 diverge / 5.7.3 結論）+ §12 Acceptance Criteria 新增第 6 條 |
+| 對應 user 提問 | 「與目前 GitHub → Blogger / FB → Blogger / FB → GitHub 的 UTM 規則是否一致」之系統化盤點 |
+| Push 後 origin/main | `feb8635` |
+
+### 14.2 pm-23：reverse UTM step 2 read-only implementation audit
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-23-reverse-utm-step2-readonly-implementation-audit-a` |
+| 性質 | read-only audit；無 commit |
+| 主要發現 | （1）既有 Phase 3-e-3 `buildBloggerToGithubUrl`（production live）UTM 命名（`utm_medium=internal_referral` / `utm_campaign=blogger_to_github` / `utm_content=<slug>`）與 reverse UTM plan §5 推薦（`referral` / `portable_blog_system` / `related_links` 等）**不一致**；（2）8 個 Blogger→GitHub link slots 全面盤點：summary CTA / redirect-card CTA / canonical / JSON-LD / home-index / category-index 皆走既有 `buildBloggerToGithubUrl`；relatedLinks / otherLinks 完全無 UTM（屬本 plan 主要目標）；（3）建議 4 個 user 決策 D1-D4 |
+| User 決策 | D1=c（不統一既有 CTA UTM）/ D2=不做 inline cross-link / D3=不修 canonical-with-UTM SEO bug / D4=拆小批 |
+
+### 14.3 pm-24a：ga4-url-builder helper layer
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-24-reverse-utm-step2-impl-related-other-a`（sub-batch 24a）|
+| Commit | `7e1d356 fix(ga4): add blogger to github cross-site utm helper` |
+| 性質 | source；單檔 `src/scripts/ga4-url-builder.js`（+34 / -5）|
+| 變動 | （1）新增 export `isGithubCrossLink(rawUrl, settings)` mirror `isBloggerCrossLink`；（2）`applyCrossSiteUtm` 加 `direction` 參數（default `'to_blogger'` 維持 backward compat）；（3）`direction='to_github'` 時注入 `utm_source=blogger` + 其餘 3 欄與既有 mirror |
+| 驗證 | smoke test 6 案例全 pass（backward compat / 新方向 / non-crosslink / 策略 A / isGithubCrossLink 正向 + 反向）|
+
+### 14.4 pm-24b：build-blogger preprocess layer
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-24b-reverse-utm-step2-build-blogger-preprocess-a` |
+| Commit | `e2309e9 fix(ga4): prepare blogger reverse utm cross links` |
+| 性質 | source；單檔 `src/scripts/build-blogger.js`（+46 / -3）|
+| 變動 | （1）import `applyCrossSiteUtm`；（2）新增 `deriveRenderedCrossLinks(rawLinks, settings, slot)` mirror build-github.js pattern（唯一 diff 為 `direction: 'to_github'`）；（3）`renderFullPost` 簽名加 `settings` 第 4 參數；（4）EJS context 新增 `relatedLinksRendered` / `otherLinksRendered` 兩 keys |
+| 不動 | `buildBloggerToGithubUrl` / `resolveCanonicalUrl` / JSON-LD / summary / redirect-card / home-index / category-index render path 完全保留 |
+| 驗證 | `node --check` syntax pass；read-only diff 驗證 `'full'` 分支只剩 1 個 caller（含 settings） |
+
+### 14.5 pm-24c：blogger-post-full.ejs template wiring
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-24c-reverse-utm-step2-blogger-template-wiring-a` |
+| Commit | `7c769fe fix(ga4): wire blogger reverse utm cross links` |
+| 性質 | source；單檔 `src/views/blogger/blogger-post-full.ejs`（+13 / -5）|
+| 變動 | （1）relatedLinks source：`(Array.isArray(relatedLinksRendered) ? relatedLinksRendered : (Array.isArray(post.relatedLinks) ? post.relatedLinks : []))`（fallback chain）；（2）otherLinks source：對稱；（3）inside `forEach` 新增 `finalTarget` / `finalRel` 計算 mirror `post-detail.ejs:169-170`；（4）`<a>` attr render 從 hard-code `<% if (!isInternal) { %> target="_blank" rel="nofollow noopener"<% } %>` 改為動態 `<% if (finalTarget) { %> target="<%= finalTarget %>"<% } %><% if (finalRel) { %> rel="<%= finalRel %>"<% } %>` |
+| 不動 | HTML 結構 / class / 文案 / `lab-related-links__platform` / `<aside>` / `<ul>` / `<li>`；summary / redirect-card / index templates；copy-helper / publish-checklist 未涉 |
+| 驗證 | EJS syntax-only compile pass；read-only diff 驗證無 `<% if (finalRel) } %>` 等語法錯誤 |
+
+### 14.6 pm-24d：build verification
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-24d-reverse-utm-step2-build-verification-a` |
+| 性質 | build + read-only fixture diff；無 commit（dist-blogger gitignored）|
+| Build 命令 | `npm run build:blogger`（done in 128ms；3 ready posts；0 validation warnings）|
+| 既有 fixture 之 post.html 語意 byte-identical 驗證 | ✅ 3/3：`portable-blog-system-mvp`（summary；delta=0）/ `github-pages-blog-planning`（summary；delta=0）/ `we-media-myself2`（full + 1 Blogger 同站 relatedLink；delta=+4 bytes 純空白 artifact）|
+| we-media-myself2 +4 bytes 細節 | EJS comment block 重排造成之 trailing whitespace（aside 上下兩行各 +2 spaces）；`<aside>` / `<a>` / class / href / 無 target / 無 rel 全部 byte-identical；無語意 HTML 變化；不影響瀏覽器 render；不影響 GA4 attribution |
+| 新 reverse UTM 注入跡象 | ❌ 零（grep `utm_medium=referral` / `utm_campaign=portable_blog_system` / `utm_content=related_links` / `utm_content=other_links` 於 `dist-blogger/posts/*/post.html` + `dist-blogger/index/*.html` 全部零匹配）|
+| 既有 UTM（canonical / JSON-LD / summary-CTA / index-CTA）保留 | ✅ 既有 `utm_medium=internal_referral` / `utm_campaign=blogger_to_github` / `utm_content=<slug>` 命名與數量完全不變 |
+| working tree | clean（dist-blogger gitignored；無 tracked file diff）|
+
+### 14.7 pm-25：本 EOD addendum
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-25-reverse-utm-step2-eod-addendum-a`（本批）|
+| 性質 | docs-only；單檔 `docs/20260523-eod-report.md`；採 append-only 補入 §14；待 commit + push |
+| 範圍 | 補記 pm-22 + pm-23 + pm-24a-d 之完整工作流 |
+
+### 14.8 累計 Final Baseline 更新（pm-25 補記前 → 補記後）
+
+| 項目 | 值 |
+|---|---|
+| **HEAD**（pm-24c push 後；pm-25 commit 前）| `7c769fe fix(ga4): wire blogger reverse utm cross links` |
+| **origin/main**（pm-24c push 後；pm-25 commit 前）| `7c769fe` |
+| **HEAD**（pm-25 commit + push 後預期）| 本批 addendum 之新 commit hash（pm-25 commit + push 後將 supersede `7c769fe`）|
+| **branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0（pm-24c push 後驗證；pm-25 commit + push 後再驗證）|
+| **working tree** | pm-24c + pm-24d 後 clean；pm-25 commit + push 後預期重新 clean |
+| **下午累計 commits**（含 pm-25 前）| **14**：pm-7 / pm-8 / pm-10 / pm-11 / pm-12 / pm-14 / pm-16 / pm-17 / pm-18 / pm-20 / pm-21 / pm-22 / pm-24a / pm-24b / pm-24c（其中 pm-9 / pm-13 / pm-15 / pm-19 / pm-23 / pm-24d 為 read-only / verification 無 commit）|
+| **下午 source commits 累計** | 6（pm-7 hashtag wrap / pm-10 admin a1 / pm-16 admin b4 / pm-24a ga4 helper / pm-24b build-blogger preprocess / pm-24c blogger template wiring）|
+| **下午 docs-only commits 累計** | 9（pm-8 / pm-11 / pm-12 / pm-14 / pm-17 / pm-18 / pm-20 / pm-21 / pm-22）|
+| **下午 read-only audit / verification phases** | 6（pm-9 / pm-13 / pm-15 / pm-19 / pm-23 / pm-24d）|
+| **下午 deploy** | ❌ 0 |
+| **下午 gh-pages 動作** | ❌ 0 |
+| **下午 Blogger 後台動作** | ❌ 0 |
+| **下午 Blogger theme CSS 重產 / 重貼** | ❌ 0 |
+| **下午 production impact** | ❌ 零（Admin 屬 dev-mode-only / Plan B；DT-A2 已 push 但未 deploy；reverse UTM step 2 屬 "live but dormant"，無 fixture 觸發）|
+
+### 14.9 Reverse UTM step 2 之 source landing 狀態
+
+| 維度 | 狀態 |
+|---|---|
+| **Helper layer**（`ga4-url-builder.js`）| ✅ 落地；`isGithubCrossLink` + `applyCrossSiteUtm` 支援 `direction='to_github'` |
+| **Build pipeline layer**（`build-blogger.js`）| ✅ 落地；`deriveRenderedCrossLinks` + `renderFullPost` 預處理 |
+| **Template layer**（`blogger-post-full.ejs`）| ✅ 落地；fallback chain + 動態 target/rel |
+| **目標 UTM 命名**（per plan §5）| `utm_source=blogger` / `utm_medium=referral` / `utm_campaign=portable_blog_system` / `utm_content=related_links` \| `other_links` |
+| **既有 production 之 dist-blogger 影響** | 🟢 零語意變動；3 個既有 post 之 post.html 語意 byte-identical |
+| **狀態** | 🟡 **"live but dormant"**：邏輯就位於 source；待第一篇有 GitHub cross-link 之 Blogger 文章寫出時自動觸發 UTM 注入 |
+
+### 14.10 未做事項（明確記錄）
+
+per pm-22 ~ pm-25 各批之邊界遵守：
+
+| 項目 | 狀態 |
+|---|---|
+| **deploy gh-pages** | ❌ 未做（本日無 deploy；reverse UTM step 2 屬 source-only landing）|
+| **重貼 Blogger 後台之既有 3 個 post** | ❌ 未做（既有 post.html 語意 byte-identical；無重貼壓力）|
+| **修 canonical-with-UTM SEO 反模式** | ❌ 未做（per D3 user 決策；屬獨立 SEO bug；另開 phase 處理）|
+| **修 BlogPosting JSON-LD URL-with-UTM 反模式** | ❌ 未做（同上）|
+| **統一既有 `buildBloggerToGithubUrl` 之 production UTM 命名**（`internal_referral` / `blogger_to_github` / `<slug>` → `referral` / `portable_blog_system` / slot 化）| ❌ 未做（per D1=c user 決策；不統一；新增 reverse UTM 為第二套 scheme）|
+| **處理 article body inline cross-link UTM 注入** | ❌ 未做（per D2 user 決策；屬可選擴展；本批不涵蓋）|
+| **新增 GitHub cross-link fixture / test post** | ❌ 未做（per pm-24d 邊界；如需驗證 UTM 注入正確需 user 表態後另開 phase）|
+| **driver 第一篇含 GitHub cross-link 之 Blogger 文章撰寫** | ❌ 未做（屬內容創作；不在 source phase 範圍）|
+| **GA4 production Realtime 驗收 reverse UTM** | ❌ 未做（待 user 寫第一篇觸發文章後才有可驗收資料）|
+
+### 14.11 後續待辦建議（明確列；不啟動）
+
+| # | 待辦 | 性質 | 阻擋 |
+|---|---|---|---|
+| 1 | 第一篇 Blogger relatedLinks / otherLinks 指向 GitHub 文章寫成後，重 build:blogger + 手動貼到 Blogger 後台 + GA4 Realtime 驗收 reverse UTM 接收 | content + 後台操作 + 驗收 | user 創作節奏 |
+| 2 | canonical-with-UTM / JSON-LD-with-UTM SEO 反模式 fix | source（修 `resolveCanonicalUrl` / `buildBloggerJsonLd`）| 獨立 SEO bug phase；建議獨立 phase 命名 `pm-XX-blogger-canonical-utm-seo-fix-a` 或類似 |
+| 3 | （可選）新增 GitHub cross-link 之 test fixture / 整合測試 | source + content | 視需要；非阻擋當前 step 2 落地 |
+| 4 | （可選）統一既有 `buildBloggerToGithubUrl` 之 UTM 命名 → plan §5（影響既有 production CTA URL）| source（修 `buildBloggerToGithubUrl` + 重 build + 重貼既有 Blogger 後台）| user 重貼成本評估；建議與 #2 SEO fix 合併考量 |
+| 5 | article body inline cross-link UTM 注入（D2 反向）| source（markdown post-process 或 EJS link rewriting）| 屬可選擴展；plan §6.2 標可選 |
+| 6 | reverse UTM step 2 之長期觀察報告（1-2 週後）| docs + GA4 後台分析 | 依賴 #1 觸發後 1-2 週累積 |
+
+### 14.12 邊界遵守（pm-22 / pm-23 / pm-24a-d / pm-25）
+
+- ✅ pm-22：docs-only；單檔 `docs/blogger-to-github-reverse-utm-plan.md` +47 / -0；已 commit + push（`feb8635`）
+- ✅ pm-23：read-only audit；零修改 / 零 commit
+- ✅ pm-24a：source；單檔 `src/scripts/ga4-url-builder.js` +34 / -5；已 commit + push（`7e1d356`）
+- ✅ pm-24b：source；單檔 `src/scripts/build-blogger.js` +46 / -3；已 commit + push（`e2309e9`）
+- ✅ pm-24c：source；單檔 `src/views/blogger/blogger-post-full.ejs` +13 / -5；已 commit + push（`7c769fe`）
+- ✅ pm-24d：build + read-only verification；無 commit；dist-blogger gitignored 不入 git
+- ✅ pm-25（本批）：docs-only；單檔 `docs/20260523-eod-report.md`；採 append-only 補入 §14；待 commit + push
+- ✅ 全 7 批皆 不 deploy / 不 push gh-pages / 不碰 Blogger 後台 / 不碰 deploy repo
+- ✅ 全 7 批皆 不碰 `.claude/` / `dist/` / `dist-promotion/` / `dist-reports/` / `settings JSON`（`promotion.config.json` 等）
+
+---
+
 （本文件結束）
