@@ -95,6 +95,12 @@
     let srcBlogger = 0, srcGithub = 0;
     // Phase 20260520-c-4: fbPublished completeness（fb.enabled=false 或 fbPostUrl/fbPostedAt 有值 → ok）
     let fbPublishedOk = 0;
+    // Phase 20260523-night-admin-b3: 拆 Missing Output URL → Missing Blogger URL + Missing GitHub URL
+    //   - 直接重用 loader 之 per-post completeness.blogger / completeness.github（per src/scripts/load-admin-posts.js:170-171）
+    //   - completeness.blogger === 'missing' 意指 blogger.enabled=true 且無 publishedUrl
+    //   - completeness.github === 'missing' 意指 github.enabled=true 且無 previewUrl（slug 缺漏）
+    //   - 與既有合併之 urlOk（OR 邏輯）為兩個不同概念；本批同時移除 Missing Output URL 總卡以避免語意混淆
+    let missingBloggerUrl = 0, missingGithubUrl = 0;
     posts.forEach(function(p) {
       const s = (p.status === 'ready' || p.status === 'draft' || p.status === 'published') ? p.status : 'other';
       byStatus[s] = (byStatus[s] || 0) + 1;
@@ -106,6 +112,8 @@
       if (p.completeness.seo === 'ok') seoOk++;
       if (p.completeness.url === 'ok') urlOk++;
       if (p.completeness.fbPublished === 'ok') fbPublishedOk++;
+      if (p.completeness.blogger === 'missing') missingBloggerUrl++;
+      if (p.completeness.github === 'missing') missingGithubUrl++;
     });
 
     // Phase 20260522-night-3-c: derive unique categories / series from posts（不改 loader 資料結構）
@@ -136,7 +144,8 @@
     <div class="stat-card"><strong><%= urlOk %></strong>URL ok</div>
     <div class="stat-card" title="FB disabled 或文章尚未 published 時視為 OK；文章已 published 且 FB enabled=true 時需填 fbPostUrl。per docs/fb-sidecar-schema.md §3.5.5 P3"><strong><%= fbPublishedOk %></strong>fb published ok</div>
     <div class="stat-card" title="總文章數扣除 fb published ok 之計算結果（total - fb published ok）；幫助直接定位需補 FB 貼文 URL 之文章；不等於 FB enabled 數。per Phase 20260522-night-3-a"><strong><%= total - fbPublishedOk %></strong>Missing FB URL</div>
-    <div class="stat-card" title="總文章數扣除 URL ok 之計算結果（total - URL ok）；幫助直接定位需補 publishedUrl 之文章；不等於 Blogger/GitHub enabled 數。per Phase 20260522-night-3-a"><strong><%= total - urlOk %></strong>Missing Output URL</div>
+    <div class="stat-card" title="計數 Blogger enabled=true 且 publishedUrl 為空之文章（completeness.blogger === 'missing'）；幫助直接定位需於 Blogger 後台發布並回填 URL 之文章。per Phase 20260523-night-admin-b3"><strong><%= missingBloggerUrl %></strong>Missing Blogger URL</div>
+    <div class="stat-card" title="計數 GitHub enabled=true 且 previewUrl 為空之文章（completeness.github === 'missing'；通常為 slug 缺漏）；幫助直接定位需補 slug / preview URL 之文章。per Phase 20260523-night-admin-b3"><strong><%= missingGithubUrl %></strong>Missing GitHub URL</div>
   </div>
 
   <% if (posts.length === 0) { %>
