@@ -786,4 +786,126 @@ per pm-22 ~ pm-25 各批之邊界遵守：
 
 ---
 
+## 15. Final Reverse UTM EOD Addendum（pm-26a + pm-29a/b + pm-30a/b）
+
+本節為 5/23 晚間最後階段補記；自 pm-25 commit `a38398c` 落地後至本批之間共增 **5 個 phase**（pm-26a structural verify + pm-29a fixture audit + pm-29b fixture plan landing + pm-30a cross-ref audit + pm-30b cross-ref sync），最終 HEAD 推進至 `74ed1a2`；reverse UTM 系列工作流之**所有 docs-only 階段已完整收尾**。
+
+### 15.1 pm-26a：build:blogger 結構驗證（read-only verify）
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-26a-reverse-utm-step2-build-blogger-structural-verify` |
+| 性質 | build read-only verify；無 commit；dist-blogger gitignored |
+| `npm run build:blogger` | ✅ 成功；0 error / 0 warning |
+| Build path 可執行性 | ✅ source + EJS + helper 全鏈通 |
+| Reverse UTM 注入 invariant | ✅「無 GitHub cross-link 之 ready post 不誤注入」維持成立 |
+| 唯一 full-mode ready post `we-media-myself2` 之 `relatedLinks` | ❌ 僅 Blogger 同站 cross-link；無 GitHub Pages cross-link → reverse UTM 路徑**無 fixture 可觸發** |
+| 結論 | pm-26b GA4 Realtime 驗收**條件不成立**；無法直接進 pm-26b |
+| 邊界 | ❌ 無 diff / ❌ 無 deploy / ❌ 無 Blogger 後台重貼 / ❌ 無 source 變動 |
+
+### 15.2 pm-29a：fixture candidate read-only audit
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-29a-reverse-utm-fixture-candidate-readonly-audit` |
+| 性質 | read-only audit；零修改；零 commit |
+| 候選 1：`we-media-myself2` 加 GitHub Pages cross-link | ⚠️ **不建議**（書評 → 系統開發類技術文章主題不自然；已 published 2026-05-15；變動 = 覆蓋既有發布內容） |
+| 候選 2：`github-pages-blog-planning` 轉 `mode: summary → full` | ⚠️ **不建議**（破壞既有 SEO 策略 canonical / JSON-LD / summary CTA GA4 數據連續性）|
+| 候選 3：`portable-blog-system-mvp` 轉 `mode: summary → full` | 🚫 **不可選**（該文已被 seo-2 / seo-3 鎖定為 SEO fixture sample；改 mode 破壞既有 fixture invariant） |
+| 候選 4：`sample-book-review` / `.fb.md` / `validation-fixtures/` | 🚫 **全部不適用**（draft 永不 export / 與 reverse UTM 路徑無關 / validator 錯誤樣本非 production-grade） |
+| 共同結論 | ⛔ **不可為驗收硬改既有正式內容**；所有候選皆會破壞至少一項既有 invariant |
+
+### 15.3 pm-29b：reverse UTM fixture plan landing
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-29b-reverse-utm-fixture-plan-a` |
+| 性質 | docs-only；新增單檔 `docs/reverse-utm-fixture-plan.md` |
+| Commit | `28ce1b1 docs(ga4): add reverse utm fixture validation plan` |
+| 文件結構 | §0 status snapshot / §1 背景 / §2 為何不改現有文章 / §3 fixture 設計原則 / §4 建議 fixture 類型 / §5 驗收條件 / §6 pm-26b 啟動條件 / §7 驗收後處理 / §8 下一步路線 / §9 invariant |
+| 文件性質 | 「未來如需主動驗收 reverse UTM，應如何建立 fixture」之 **docs-only 前置設計文件 / SOP** |
+| 不觸發行為 | ❌ 不觸發 content / src / build / deploy / Blogger 後台任何行為 |
+
+### 15.4 pm-30a：reverse UTM fixture plan cross-reference read-only audit
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-30a-reverse-utm-fixture-plan-cross-reference-readonly-audit` |
+| 性質 | read-only audit；零修改；零 commit |
+| 關鍵發現 | `docs/reverse-utm-fixture-plan.md` 為 **orphan doc**；除自身外，**零外部引用**（grep `reverse-utm-fixture-plan` / `fixture plan` / `pm-29b` / `reverse UTM fixture` 全 repo 僅 1 命中 = 自身）|
+| 風險 | 未來 session restore / 第三方接手時，**無法**從 docs/README.md / CLAUDE.md / 上游 reverse UTM plan 任一入口導航到 fixture plan |
+| 建議補 cross-ref 位置（共 4）| 🔴 `docs/README.md` §3.4 / 🔴 `docs/blogger-to-github-reverse-utm-plan.md` §0 + step 7 row / 🟡 `CLAUDE.md` §16.4 / 🟢 `docs/ga4-link-tracking-spec.md` §3.5 |
+| 不採用補 cross-ref 位置 | `docs/click-tracking-governance.md`（governance 與 SOP 邏輯距離過遠）/ `docs/related-links-schema.md`（無 reverse UTM 段落）/ `docs/20260523-eod-report.md`（屬下次 EOD addendum 範疇） |
+
+### 15.5 pm-30b：reverse UTM fixture plan docs-only cross-reference sync
+
+| 項目 | 值 |
+|---|---|
+| Phase | `20260523-pm-30b-reverse-utm-fixture-plan-cross-reference-sync` |
+| 性質 | docs-only；4 檔；+5 / −2 |
+| Commit | `74ed1a2 docs(ga4): cross-reference reverse utm fixture plan` |
+| 變動 1 | `docs/README.md` §3.4 新增 `reverse-utm-fixture-plan.md` 條目 |
+| 變動 2 | `docs/blogger-to-github-reverse-utm-plan.md` §0 step 7 row 補「啟動條件詳見 fixture plan §6」+ §0 對應上層清單新增 fixture plan 條目 |
+| 變動 3 | `CLAUDE.md` §16.4 Blogger → GitHub Pages 狀態清單末尾補「pm-26 啟動條件詳見 fixture plan §6」 |
+| 變動 4 | `docs/ga4-link-tracking-spec.md` §3.5 Cross-ref 行末追加「驗收 fixture SOP 見 fixture plan」 |
+| Cross-reference 閉環狀態 | ✅ **已完成**；fixture plan 自此可從 docs index / 上游 plan / CLAUDE.md / spec doc 四個入口導航到 |
+
+### 15.6 累計 Final Baseline 更新（pm-25 補記後 → 本批補記後）
+
+| 項目 | pm-25 後 | 本批（pm-31a）後 |
+|---|---|---|
+| HEAD | `a38398c` | `74ed1a2`（本批 commit 為 pm-31a 自身；下方 §15.7 動態替換）|
+| 與 origin/main | 同步 | 同步（本批 push 後）|
+| Working tree | clean | clean |
+| 5/23 累計 source commits（reverse UTM 系列）| 3（pm-24a/b/c：`7e1d356` / `e2309e9` / `7c769fe`）| 3（無增加；pm-26a/29a/30a 皆 read-only；pm-29b/30b/31a 皆 docs-only）|
+| 5/23 累計 docs commits（reverse UTM 系列）| 5（pm-22 `feb8635` / pm-25 `a38398c` + 中間 sync `143c0c6` / `c49ec37` / `ba77c93`）| 7（pm-25 後新增 pm-29b `28ce1b1` + pm-30b `74ed1a2`；本批 pm-31a +1）|
+| Deploy gh-pages | 不變（無 deploy）| 不變（無 deploy）|
+
+### 15.7 Reverse UTM 系列最終狀態（pm-31a EOD freeze 前）
+
+| 項目 | 狀態 |
+|---|---|
+| Source landed（pm-24a/b/c）| ✅ |
+| Docs synced（pm-22 ~ pm-28b）| ✅ |
+| Fixture plan landed（pm-29b：`28ce1b1`）| ✅ |
+| Cross-reference closed（pm-30b：`74ed1a2`）| ✅ |
+| EOD report final addendum（pm-31a：本批；commit hash 取本批 push 後值）| ✅ |
+| Un-deployed（gh-pages 未動）| ❌ |
+| Un-pasted（Blogger 後台未重貼）| ❌ |
+| Un-verified（GA4 Realtime 未驗收）| ❌ |
+| **Live 狀態** | 🟡 **Dormant** |
+
+→ Reverse UTM 系列工作流之**所有 docs-only / source 階段已完整收尾**；剩餘步驟（fixture 建立 / Blogger 後台重貼 / GA4 Realtime 驗收）皆依賴 user 主動行為，非 Claude session 可推進。
+
+### 15.8 下一步建議（明日 / 下一 session）
+
+🟢 **主軌（推薦）：維持 dormant，等自然 full-mode Blogger 文章**
+- 對齊 `docs/reverse-utm-fixture-plan.md` §8.1
+- 未來作者撰寫之新書評 / 心得 / 教具文章，若主題自然涉及 GitHub Pages 技術內容，可於 `relatedLinks` 自然引用 → reverse UTM 注入發生於自然引用，非硬塞
+- 時程不可預測，但屬最高 production-grade 真實性
+- 無時間壓力，無 deadline
+
+🟡 **副軌：user 明確指示後才啟動 pm-29c**（fixture 建立實作）
+- 對齊 `docs/reverse-utm-fixture-plan.md` §8.2
+- 屬主動驗收路徑；需 user 表態題目選擇 + 同意建立
+- 非 Claude 主動推進
+
+🔴 **不建議：直接啟動 pm-26b**
+- 違反 `docs/reverse-utm-fixture-plan.md` §6 啟動條件 #1（無 fixture）
+- 強行啟動將觸發 Blogger 後台覆蓋已發布內容之風險
+- 必須先過 pm-29c 或自然文章路徑
+
+### 15.9 邊界遵守（pm-26a / pm-29a / pm-29b / pm-30a / pm-30b / pm-31a）
+
+- ✅ pm-26a：build read-only verify；無 commit；dist-blogger gitignored 不入 git
+- ✅ pm-29a：read-only audit；零修改 / 零 commit
+- ✅ pm-29b：docs-only；新增單檔 `docs/reverse-utm-fixture-plan.md`；commit + push（`28ce1b1`）
+- ✅ pm-30a：read-only audit；零修改 / 零 commit
+- ✅ pm-30b：docs-only；4 檔（CLAUDE.md / docs/README.md / docs/blogger-to-github-reverse-utm-plan.md / docs/ga4-link-tracking-spec.md）；commit + push（`74ed1a2`）
+- ✅ pm-31a（本批）：docs-only；單檔 `docs/20260523-eod-report.md`；採 append-only 補入 §15；待 commit + push
+- ✅ 全 6 批皆 不 deploy / 不 push gh-pages / 不碰 Blogger 後台 / 不碰 deploy repo
+- ✅ 全 6 批皆 不碰 `.claude/` / `dist/` / `dist-promotion/` / `dist-reports/` / `settings JSON` / `content/` / `src/` / `views/` / `scripts/`
+
+---
+
 （本文件結束）
