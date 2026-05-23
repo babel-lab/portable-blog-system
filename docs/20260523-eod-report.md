@@ -433,4 +433,142 @@ per 本日所有 phases 之邊界遵守：
 
 ---
 
+## 13. Afternoon Progress（pm-7 ~ pm-17）— Addendum
+
+本節為 EOD 初版（pm-4 `76872a5`）+ EOD addendum（pm-6）+ pm-8 部分前段 sync 後之**下午段追加成果補記**；屬 docs-only；單批落地（pm-18）；採 append-only；**不變動** §1-§12 既有結構與內容。
+
+### 13.1 概覽
+
+下午段（pm-7 起）原預期接續 admin-polish 收斂 + design token 小修；實際進度遠超 EOD 初版之「明日候選」估計：
+
+- **8 個追加 batches 全部落地**（5 docs-only + 3 source 小修）
+- **Admin overview A 系列 A1-A7 完整收斂**（A1 / A2 / A7 ✅ 落地 + A3 stale + A4 essentially done + A5 / A6 stale no-op）
+- **B 系列首個非阻擋候選 B4 落地**（fbPostedAt sort option）
+- **Design Token DT-A 系列收斂**（DT-A1 stale + DT-A2 落地）
+- **未動**：deploy / gh-pages / Blogger 後台 / Blogger theme CSS 重貼 / loader / schema / content / `.fb.md` / settings JSON / build scripts / public assets；SCSS 例外為 pm-7 之 `_hashtag.scss` + Blogger mirror partial 2 檔（同步 +2 行 / 檔）
+
+### 13.2 8 個下午追加 batches 一覽
+
+| # | Phase | commit | 性質 | 範圍 |
+|---|---|---|---|---|
+| 1 | `20260523-pm-7-dt-a2-polish-a` | `0f71d6e` | **source small fix** | `src/styles/components/_hashtag.scss` + `src/styles/blogger/_blogger-components-rules.scss` mirror 同步；`.lab-hashtag` 加 `max-width: 100%` + `overflow-wrap: anywhere`；長字串防爆版 |
+| 2 | `20260523-pm-8-dt-audit-sync-a` | `14f861e` | docs-only | DT-A1 stale / DT-A2 completed 同步至 `design-token-audit-20260523.md` + 本 EOD report 部分前段（§9 / §10.1 / §11.2 / §12.4） |
+| 3 | `20260523-pm-10-admin-empty-filter-state-a` | `53bf60c` | **source small fix** | `src/views/admin/index.ejs` +13 行：filter / search 後 matchedCount === 0 之 fallback message；reuse 既有 `.empty` class；無 inline style |
+| 4 | `20260523-pm-11-admin-audit-sync-a` | `b30f70b` | docs-only | A7 completed 同步至 `admin-overview-audit-20260523.md`（§7.2 / §8.2 / §10.1 / §10.4 共 4 處） |
+| 5 | `20260523-pm-12-admin-a1-a2-audit-sync-a` | `16bc610` | docs-only | A1 / A2 pre-existing drift completed 同步（§3.2 / §8.2 / §10.1 / §10.2 / §10.4 共 7 處） |
+| 6 | `20260523-pm-14-admin-a4-a6-audit-sync-a` | `c7522e2` | docs-only | A4 essentially done + A5 / A6 stale no-op；**Admin A 系列全收斂**（§7.2 / §8.2 / §10.1 / §10.2 / §10.4 共 9 處） |
+| 7 | `20260523-pm-16-admin-fbpostedat-sort-a` | `2df85e2` | **source small fix** | `src/views/admin/index.ejs` +7 行：B4 fbPostedAt desc sort option + `data-fb-posted-at` row attr + applySort case |
+| 8 | `20260523-pm-17-admin-b4-audit-sync-a` | `46ae0e9` | docs-only | B4 completed 同步（§5.3 / §8.3 / §10.1 / §10.2 / §10.4 共 5 處） |
+
+註：未列 pm-9 / pm-13 / pm-15（皆為 read-only audit；無 commit；提供下午批次選擇之依據）。
+
+### 13.3 統計
+
+- **下午 commits**：8（3 source + 5 docs-only）
+- **下午 pushes**：8（每 commit 落地後 user 明示 push origin/main；皆 fast-forward；無 force / rebase / amend）
+- **下午 read-only audit phases**：3（pm-9 Admin usability / pm-13 A4-A6 / pm-15 B-series；無 commit）
+- **下午 build runs**：3（pm-7 / pm-10 / pm-16 之 source batch；皆 pass；無 regression；皆驗證 EJS compile / SCSS bundle 正常）
+- **下午 validate:content runs**：1（pm-7；`0 error / 39 warnings / 34 posts` 與 baseline 一致）
+- **下午 deploy runs**：❌ 0
+- **下午 Blogger 後台動作**：❌ 0
+- **下午 Blogger theme CSS 重產 / 重貼**：❌ 0（pm-7 之 source 已 push origin/main；Blogger 後台 CSS 重貼 user 自決時機）
+
+### 13.4 source 變動範圍（下午累計 +20 行 / 3 檔）
+
+| 檔案 | 行數累計 | 觸及 Phases |
+|---|---|---|
+| `src/views/admin/index.ejs` | +20 行（pm-10 +13 + pm-16 +7） | pm-10 / pm-16 |
+| `src/styles/components/_hashtag.scss` | +1 char on 1 line（property additive） | pm-7 |
+| `src/styles/blogger/_blogger-components-rules.scss` | +1 char on 1 line（Blogger mirror sync） | pm-7 |
+
+合 EOD 初版前（pm-3 `f7dd897` +11 行 + pm-5 `b9b76c6` +15 行 = 26 行）+ 下午（+20 行 / 3 檔）= **全日 source 累計 5 commits / 4 檔 / +46 行**。
+
+### 13.5 docs 變動範圍（下午 5 commits）
+
+| 檔案 | 主要更新 phases |
+|---|---|
+| `docs/admin-overview-audit-20260523.md` | pm-11 / pm-12 / pm-14 / pm-17（4 次 sync；累計覆蓋 A1-A7 + B4 status markers）|
+| `docs/design-token-audit-20260523.md` | pm-8（DT-A1 / DT-A2 status sync）|
+| `docs/20260523-eod-report.md` | pm-8（部分前段 sync）+ pm-18 本批（afternoon progress addendum）|
+
+### 13.6 仍待 user 表態 / 後續處理
+
+| 項目 | 狀態 |
+|---|---|
+| **Blogger 後台 CSS 重貼** | 🟡 **後續可選**；pm-7 之 source 已 push origin/main；user 自決重貼時機；可整合於下次 DT-B / DS-3-b-blogger-entry 批次 |
+| **Admin B1**（FB posted ok stat-card）| 🟡 待 user 確認與既有 `fb published ok` 之語意區別 |
+| **Admin B2**（affiliate enabled stat-card）| 🟡 待 user 確認展示需求；loader 需 +1 derived field `affiliateEnabled` |
+| **Admin B3**（Missing Blogger URL / Missing GitHub URL 拆分 stat-card）| 🟡 待 user 確認 14→16 stat-card 展示密度 |
+| **Admin B5**（Sort indicator ↑↓ icon）| 🟡 可啟動但屬純視覺 polish；既有 sort label 已含 asc/desc 文字；邊際價值低 |
+| **Admin B6**（Relative time `5 days ago` 顯示）| 🟡 待 user 確認顯示格式（替換 vs 並排 absolute + relative） |
+| **Admin C 系列**（tag 多選 filter / per-row action links / numeric pagination）| 🟡 屬 Phase 2 候選；當前無觸發需求 |
+| **Admin D 系列**（FB write FB-P5-c-a / -c-b / Admin-2-b-2 SEO write / P5-e new sidecar）| 🔴 blocked；需 user 勾 8+6 項 preflight |
+| **Admin A5 延伸**（7 個無 tooltip stat-card 補充）| 🔵 audit scope 外；optional future enhancement |
+
+### 13.7 §8 Final Baseline 更新（pm-18 補記後）
+
+| 項目 | 值 |
+|---|---|
+| **HEAD**（pm-18 commit 前）| `46ae0e9 docs(admin): sync b4 fbpostedat sort audit status`（pm-17 結果）|
+| **HEAD**（pm-18 commit + push 後預期）| 本批 addendum 之新 commit hash（pm-18 commit + push 後將 supersede `46ae0e9`）|
+| **branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0（pm-17 push 後驗證；pm-18 commit + push 後再驗證）|
+| **working tree** | pm-17 push 後 clean；pm-18 addendum commit + push 後預期重新 clean |
+| **下午 deploy / gh-pages 動作** | ❌ 0 |
+| **下午 Blogger 後台動作** | ❌ 0 |
+| **dist 狀態** | 本機 `dist/` 自 pm-16 build 後未重產；未推上線 |
+| **dist-blogger 狀態** | 自 5/21 起未動 |
+| **下午之線上 production impact** | ❌ **零**（Admin 屬 dev-mode-only / Plan B / prod build 跳過；DT-A2 `_hashtag.scss` 源已 push 但未 deploy；Blogger mirror 同步亦未重產 / 重貼後台 CSS）|
+
+### 13.8 對 §9 / §10「明日候選」之效應
+
+| 候選 | EOD 初版預估 | 下午實際 |
+|---|---|---|
+| ~~A. Admin A2 fbBadge filter~~ | ✅ 落地 pm-5（已記載於 §6B） | — |
+| ~~B. DT-A1 / DT-A2~~ | EOD 初版列為明日第一 | ✅ 落地 pm-7（per pm-8 sync）|
+| C. Reverse UTM step 1 docs | 第二推薦 | 🟡 未啟動；保留為後續候選 |
+| D. Custom domain prep | 等 user DNS access | 🟡 未啟動；阻擋未解 |
+| E. SEO polish | 第三候選 | 🟡 未啟動 |
+| F. Admin write FB-P5-c | blocked（user 8+6 項 preflight）| 🟡 仍 blocked |
+| G. Content expansion | 無工程阻擋 | 🟡 未啟動 |
+| H. GA4 click event implementation | first non-Admin source batch | 🟡 未啟動 |
+
+**下午實際走向**：超越 EOD 初版預估之 B（DT 系列），延伸至 Admin polish 連續 9 個 batches（pm-7 DT-A2 source + pm-8 docs sync + pm-9 audit + pm-10 source + pm-11 sync + pm-12 sync + pm-13 audit + pm-14 sync + pm-15 audit + pm-16 source + pm-17 sync），完整收斂 Admin A1-A7 + B4。
+
+### 13.9 明日候選收斂後新狀態（pm-18 補記後）
+
+| 候選 | 狀態 |
+|---|---|
+| ~~A. Admin A2~~ | ✅ 已落地 pm-5 |
+| ~~B. DT-A1 / DT-A2~~ | ✅ 已落地 pm-7 |
+| **C. Reverse UTM step 1 docs** | 🟡 未啟動；推薦明日第一候選（保守 docs-only step） |
+| D. Custom domain prep | 🟡 阻擋於 user DNS |
+| E. SEO polish | 🟡 未啟動 |
+| F. Admin write FB-P5-c / Admin-2-b-2 | 🔴 blocked |
+| G. Content expansion | 🟡 user 自由創作 |
+| H. GA4 click event implementation | 🟡 first non-Admin source batch；屬 Phase 2 |
+| **新增**：Admin B5（Sort indicator）| 🟡 純視覺 polish；邊際價值低 |
+| **新增**：Admin B6（Relative time）| 🟡 待 user 確認顯示格式 |
+| **新增**：Admin B1 / B2 / B3（stat-card 擴展）| 🟡 待 user 表態語意 + 展示密度 |
+| **新增**：Blogger 後台 CSS 重貼（per pm-7 mirror sync）| 🟡 user 自決時機；可整合於 DT-B / DS-3-b-blogger-entry |
+
+### 13.10 Cold-start 明日 onboarding 順序建議（pm-18 補記後）
+
+1. 讀 `docs/20260523-eod-report.md`（本文件；含 pm-6 addendum + pm-8 partial sync + **pm-18 afternoon progress addendum**）— ~10 min 掌握全日 18 個 phases（含 8 個下午追加 batches）
+2. 讀 `docs/admin-overview-audit-20260523.md` — 確認 Admin A1-A7 全收斂 + B4 完成；B1 / B2 / B3 / B5 / B6 待表態
+3. 讀 `docs/design-token-audit-20260523.md` — 確認 DT-A1 / DT-A2 收斂；DT-B / DT-C 候選保留
+4. 若選 C：讀 `docs/blogger-to-github-reverse-utm-plan.md` 啟動 Reverse UTM step 1 docs
+
+### 13.11 邊界遵守
+
+per 本批 pm-18 addendum 之邊界：
+
+- ✅ 不修改 §1-§12 既有結構與內容（採 append-only 補入新 §13）
+- ✅ 不重寫敘事 / 不變動既有 commits 描述
+- ✅ 純 docs-only；零 src / content / settings / scripts / dist / dist-blogger 變動
+- ✅ 不 build / 不 validate / 不 deploy / 不 push gh-pages
+- ✅ 不碰 Blogger 後台 / 不重產 Blogger theme CSS
+- ✅ 不碰 `.claude/`
+
+---
+
 （本文件結束）
