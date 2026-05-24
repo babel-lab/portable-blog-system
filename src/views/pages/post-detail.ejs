@@ -168,8 +168,8 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
           const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
           const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
           const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
-          const isCrossSite = !isInternal && typeof item.target === 'string' && item.target !== '';
-          const linkType = isInternal ? 'internal' : (isCrossSite ? 'cross_site' : 'external');
+          const isCrossSite = typeof item.target === 'string' && item.target !== '';
+          const linkType = isCrossSite ? 'cross_site' : (isInternal ? 'internal' : 'external');
           const outbound = (isInternal || isCrossSite) ? 'false' : 'true';
         %>
         <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on relatedLinks anchor；移除 helper include 避開 async EJS issue；href/target/rel/class 不動 -%>
@@ -205,8 +205,8 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
           const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
           const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
           const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
-          const isCrossSite = !isInternal && typeof item.target === 'string' && item.target !== '';
-          const linkType = isInternal ? 'internal' : (isCrossSite ? 'cross_site' : 'external');
+          const isCrossSite = typeof item.target === 'string' && item.target !== '';
+          const linkType = isCrossSite ? 'cross_site' : (isInternal ? 'internal' : 'external');
           const outbound = (isInternal || isCrossSite) ? 'false' : 'true';
         %>
         <%# Phase 20260522-ga4-inline-attrs-after-revert-a: inline GA4 click tracking attrs on otherLinks anchor；mirror relatedLinks；唯一 diff: event 為 click_other_link；移除 helper include 避開 async EJS issue -%>
