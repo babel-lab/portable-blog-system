@@ -350,7 +350,7 @@ function buildBloggerToGithubUrl(rawUrl, slug) {
 | # | Item | Detail | 影響 |
 |---|---|---|---|
 | ~~**G1**~~ | ~~Affiliate placement value drift~~ ✅ **resolved 2026-05-24 am-3**（docs-only；spec §3.7 / §11.1 enum 表 / §11.4 / §12.2.5 / §12.2.6 / §14.1 / §14.3 收斂為 `article_top` / `article_bottom`；historical 標 §11.4.2 rejected；source 端 EJS 不變；per `20260524-am-3-ga4-spec-placement-enum-drift-fix-a`）| ~~原描述：source 採 `article_top` / `article_bottom`；spec §3.7 / §11.1 row 7-8 / §12.2.5 manual checklist 預期 `affiliate_top` / `affiliate_bottom`；spec §11.1 內部也同時列了 `article_top`/`article_bottom` 為 reserved（內部矛盾）~~ | ✅ spec 收斂後 GA4 後台 placement dimension 與 spec 一致；validation checklist 對齊實際 attr |
-| **G2** | relatedLinks linkType 誤分類 | 作者標 `kind: internal` 但 URL 為跨站 → `applyCrossSiteUtm` 注入 UTM + 設 target/rel；但 EJS 之 `linkType` 仍輸出 `'internal'` | GA4 event dimension 與 URL UTM 矛盾；分析 cross-site CTR 時內外 linkType 互衝 — 🟡 **root cause identified；spec rule landed（2026-05-24 am-5）；source fix pending（待 am-6）**；spec §4.5 / governance §3.3 / §8.2 / schema §7.3 / §7.4 已 docs 收斂派生規則 |
+| ~~**G2**~~ | ~~relatedLinks linkType 誤分類~~ ✅ **fully resolved 2026-05-24**：root cause identified（am-4 / `c783c3e`）→ spec rule landed（am-5 / `93fec24`；spec §4.5 / governance §3.3 / §8.2 / schema §7.3 / §7.4）→ source fix landed（am-6 / `e6f0a5f`；`post-detail.ejs` +4/-4）→ deployed（am-7b / gh-pages `960f234`）→ **user manual validation passed**（線上 we-media-myself2 之 relatedLinks anchor `link_type=cross_site` + GA4 DebugView `click_related_link` event 含 cross_site params 確認；per `20260524-eod-report.md` §5.7）| ~~原描述：作者標 `kind: internal` 但 URL 為跨站 → `applyCrossSiteUtm` 注入 UTM + 設 target/rel；但 EJS 之 `linkType` 仍輸出 `'internal'`~~ → ✅ 修正後 EJS render 採 cross-site fingerprint 優先派生；`link_type` 與 URL UTM 一致 |
 | ~~**G3**~~ | ~~spec §11.1 placement enum 內部矛盾~~ ✅ **resolved 2026-05-24 am-3**（同 G1；spec §11.1 移除重複 `affiliate_top` / `affiliate_bottom` 行；historical 收錄於 §11.4.2）| ~~原描述：row 1 `article_top` 註解「當前 `affiliate_top` 已啟用此語意」+ row 7 `affiliate_top` 註解「✅ GitHub 端已落地」→ 同一個概念兩 row~~ | ✅ 收斂後僅 11 row；無重複；未來 reader 不再需在兩值間挑選 |
 
 ### 7.2 🟡 Source 缺漏（CLAUDE.md §5 與 spec 未 reconcile）
@@ -637,7 +637,7 @@ const outbound = (linkType === 'internal' || linkType === 'cross_site') ? 'false
 | 批次 | 性質 | 範圍 | 阻擋 |
 |---|---|---|---|
 | ~~**am-5（建議下批）**~~ ✅ **已於 2026-05-24 am-5 落地** | docs-only | Option 3：spec §4.5 canonical 派生規則 + governance §3.3 / §8.2 + schema §7.3 / §7.4 兩軸命名分離 + 本 audit doc 同步 G2 status | ✅ landed |
-| **am-6（下批；user 同意 source change 後可啟動）**| source | Option 2：post-detail.ejs L171-173（related）+ L206-208（other）linkType 派生邏輯 swap；mirror otherLinks | 阻擋於 user 同意 source change + build/deploy verify checkpoint；spec rule am-5 已就位作為實作依據 |
+| ~~**am-6（下批；user 同意 source change 後可啟動）**~~ ✅ **landed + deployed + user validated 2026-05-24** | source | Option 2：post-detail.ejs L171-173（related）+ L208-210（other）linkType 派生邏輯 swap；mirror otherLinks | ✅ landed (`e6f0a5f`) + deployed (`960f234` gh-pages) + user validated；per `20260524-eod-report.md` §5 |
 
 ### 12.7 修法所需後續動作
 
@@ -657,8 +657,8 @@ const outbound = (linkType === 'internal' || linkType === 'cross_site') ? 'false
 | Phase 候選 | 主題 | 範圍 | 預估 LOC | 風險 |
 |---|---|---|---|---|
 | ~~`20260524-am-5-ga4-spec-link-type-derivation-rule-a`~~ ✅ **已落地** | ~~Option 3 docs-only：spec / governance / schema 補裁決規則~~ | spec §4.5（含 7 子節）/ governance §3.3 + §8.2 / schema §7.3 + §7.4 / audit §7.1 + §8.1 + §12.6 + §12.8 sync | docs ~200 行 / 4 檔 | ✅ landed |
-| `20260524-am-6-ga4-link-type-cross-site-priority-source-fix-a` | Option 2 source：post-detail.ejs linkType 派生邏輯 swap；mirror related + other；對齊 am-5 之 spec §4.5 canonical 規則 | `src/views/pages/post-detail.ejs` L166-173 + L202-210 | source 4-6 行 / 1 檔 | 🟢 低 |
-| （後續可選）`20260524-am-7-ga4-link-type-deploy-verify-a` | build + deploy + dist diff sanity check；user GA4 Realtime 手動驗收 | dist 重建 + push gh-pages + manual sign-off | n/a | 🟡 中（首次非 Admin source 變更落地 production；deploy / GA4 manual verify）|
+| ~~`20260524-am-6-ga4-link-type-cross-site-priority-source-fix-a`~~ ✅ **landed** | ~~Option 2 source：post-detail.ejs linkType 派生邏輯 swap~~ | `src/views/pages/post-detail.ejs` +4 / -4 | source 4 行 / 1 檔 | ✅ landed (`e6f0a5f`) |
+| ~~`20260524-am-7-ga4-link-type-deploy-verify-a`~~ ✅ **landed + user validated**（am-7a / am-7b / am-7c）| ~~build + deploy + dist diff sanity check；user GA4 Realtime 手動驗收~~ | deploy `960f234` on gh-pages + user manual validation passed | n/a | ✅ landed + user validated |
 
 ### 12.9 為何不建議 Option 1（content-only）
 
