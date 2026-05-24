@@ -32,7 +32,7 @@
 | **am-6b** | source push | push only | source fix 推上 origin/main 作為 deploy 前 checkpoint | — |
 | **am-7a** | `20260524-am-7a-pre-deploy-readiness-audit` | read-only | 比對 dist 與 deploy repo；確認 deploy delta = 1 個語意 HTML attr（G2 fix）+ 1 個 CSS rule（DT-A2 hashtag wrap）+ sitemap lastmod + bundle hash refresh；風險 🟢 低；建議進入 am-7b | — |
 | **am-7b** | `20260524-am-7b-deploy-accumulated-gh-pages-update` | deploy | `npm run build` → `cp -r dist/*` → `git rm` 2 個 stale bundles → commit `960f234` → push gh-pages；deploy repo HEAD = origin/gh-pages = `960f234` | deploy `960f234 deploy: update ga4 link_type and hashtag wrap` |
-| **am-7c**（本批）| `20260524-am-7c-eod-checkpoint-a` | docs-only | 新增本 EOD report + sync audit doc 之 G2 status 為 fully resolved | （本批 commit 待 user 確認）|
+| **am-7c**（本批）| `20260524-am-7c-eod-checkpoint-a` | docs-only | 新增本 EOD report + sync audit doc 之 G2 status 為 fully resolved | `5ab7c05 docs(report): add 20260524 eod checkpoint` |
 
 ### 2.1 統計
 
@@ -205,10 +205,10 @@ User 確認線上驗收全部通過：
 | 項目 | 值 |
 |---|---|
 | **HEAD**（本批 EOD commit 前）| `e6f0a5f fix(ga4): prioritize cross-site link_type derivation`（am-6 結果；am-6b 已 push）|
-| **HEAD**（本批 EOD commit + push 後預期）| 本批 am-7c 之新 commit hash |
-| **working tree** | clean（am-7b deploy 後源 repo 未動；本批 docs-only 待 commit）|
-| **branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0（本批 commit + push 後再驗證）|
-| **是否 push remote** | ✅ am-5b + am-6b 已分別 push；本批 commit 後**待 user 確認**再 push |
+| **HEAD**（本批 EOD commit + push 後）| `5ab7c05 docs(report): add 20260524 eod checkpoint`（am-7c 結果；已 push）|
+| **working tree** | clean（am-7b deploy 後源 repo 未動；am-7c docs commit 已落地）|
+| **branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0（am-7c commit + push 後已驗證）|
+| **是否 push remote** | ✅ am-5b + am-6b + am-7c（`5ab7c05`）均已 push origin/main |
 
 ### 7.2 Deploy repo（本機 = origin/gh-pages）
 
