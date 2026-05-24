@@ -524,4 +524,165 @@ function buildBloggerToGithubUrl(rawUrl, slug) {
 
 ---
 
+## 12. G2 Root-Cause Note（追加；2026-05-24 am-4）
+
+本節為 phase `20260524-am-4-ga4-g2-relatedlinks-link-type-root-cause-audit-a` 之 read-only root-cause 補記；docs-only；不動 source / content / build / deploy。
+
+### 12.1 問題重述
+
+GitHub Pages 端 `dist/posts/we-media-myself2/index.html` relatedLinks anchor 抽樣（per §5.1）：
+
+| attr | 值 |
+|---|---|
+| `href` | `https://babel-lab.blogspot.com/2026/04/we-media-myself.html?utm_source=github_pages&utm_medium=referral&utm_campaign=portable_blog_system&utm_content=related_links` ← **含 cross-site UTM** |
+| `target` | `_blank` ← **由 `applyCrossSiteUtm` 設定** |
+| `rel` | `nofollow noopener noreferrer` ← **由 `mergeRel` 合併** |
+| `data-ga4-param-link_type` | **`internal`** ← ⚠️ 不一致 |
+| `data-ga4-param-outbound` | **`false`** ← 與 cross-site 之 retained-自家流量語意一致 |
+| `data-ga4-param-placement` | `related_links` ✓ |
+
+→ 同一個 `<a>` 之 URL 端被視為 cross-site（UTM 4 鍵注入 + target/rel 強制設定），但 GA4 event dimension `link_type` 仍報 `internal`；產生**內外語意衝突**。
+
+### 12.2 各層責任盤點
+
+| 層 | 行為 | 是否符合既有規格 |
+|---|---|---|
+| **Content / frontmatter**（`content/blogger/posts/20260515-we-media-myself2.md:74-77`）| 作者標 `kind: internal` + `platform: "blogger"` + Blogger 同站 URL | ✅ 符合 `related-links-schema.md` §5.4：「`kind: internal` 不等於 `platform === "blogger"`；internal 之語意為**本站任一已發布平台之連結**」。作者把 Blogger 自家文章標 internal 是**正確語意**（屬「我的內容；只是放在另一個平台」）|
+| **Schema spec**（`related-links-schema.md` §4.3）| 規定 cross-link 判斷**依 URL hostname，不依 `kind`** | ✅ 設計層面正確：「判斷依據：URL hostname；**不**依賴 `kind` 欄位（`kind: internal` 之 Blogger URL 亦適用）」|
+| **Build pipeline**（`src/scripts/build-github.js:480` → `applyCrossSiteUtm`）| 依 URL hostname 判定為 cross-site → 注入 UTM + 設 target/rel | ✅ 對齊 schema §4.3 規定 |
+| **EJS render**（`src/views/pages/post-detail.ejs:166-173`）| `linkType = isInternal ? 'internal' : (isCrossSite ? 'cross_site' : 'external')`；`isInternal = item.kind === 'internal'` | ❌ **不對齊 schema §4.3 原則**：此處 `linkType` 仍以 `item.kind` 為主導；當 `kind: internal` 時跳出 `'internal'` 不進入 `isCrossSite` 分支 |
+| **link-tracker JS**（`src/js/modules/link-tracker.js`）| 純 attr → param pass-through；無語意 | ✅ 不負責此類判定 |
+| **Spec / governance docs 對 GA4 `link_type` 規格**（`ga4-link-tracking-spec.md` §4.3 / `click-tracking-governance.md` §5.2 / §8.2 + `related-links-schema.md` §7.3）| `link_type` 列舉值 `internal` / `cross_site` / `external` / `affiliate`；但**未明示**「當 `kind: internal` + URL 為跨站時，`link_type` 應採何值」之裁決規則 | 🟡 spec 語意 underspecified；§8.2 雖列「連 Blogger ↔ GitHub Pages → `link_type=cross_site`」表，但與 `kind` 之優先序未顯式裁決 |
+
+### 12.3 根因分類（per A）
+
+**主因**：EJS render 端之 link_type 派生邏輯（`post-detail.ejs:166-173`）以 `kind` 為主導，而非以 cross-link 處理結果（`item.target` 已被 build pipeline 填入）為主導。
+
+**次因**：spec / governance 未顯式裁決 `kind` vs URL 何者優先決定 `link_type`；當前作者依 schema §5.4 之 internal 語意填寫時，會自然產生此 dimension 衝突。
+
+**非問題**：
+- ❌ Content / frontmatter **不錯**（per schema §5.4）；要求作者改 `kind` = 違反 schema 語意
+- ❌ `applyCrossSiteUtm` / `deriveRenderedCrossLinks` / build pipeline **不錯**（per schema §4.3）；改它 = 倒退到 kind-driven 判斷
+- ❌ link-tracker JS **不錯**；listener 為 pass-through
+
+**結論**：屬 **source helper 判斷問題**為主 + **spec 語意 underspecified** 為次因。**非** content 標記問題。
+
+### 12.4 受影響範圍量化
+
+| 維度 | 數量 |
+|---|---|
+| 全 content posts | 4（real production；含 1 Blogger + 2 GitHub + 1 sample-book-review fixture-grade）+ 4 validation-fixtures |
+| 有 `relatedLinks` / `otherLinks` 之 real production posts | **1**（`20260515-we-media-myself2.md`；single entry）|
+| 該 entry 之分類 | `kind: internal` + Blogger 同站 URL → 在 GitHub render context 為 cross-site；觸發 G2 |
+| `kind: external` + 本站 URL 之 inverse 案例 | **0**（無 production case；schema §4 規則為跨站 → cross-site UTM；author intent 矛盾的 inverse 案例現實不會發生）|
+| 其他既有 ready posts 是否會碰到 | **否**；其他 ready posts 之 `relatedLinks` 為空 array（per `content/github/posts/*.md` + `content/blogger/posts/*.md` grep）|
+| dist GitHub posts 受影響 | **1**：`dist/posts/we-media-myself2/index.html` 之 1 個 anchor |
+| dist Blogger posts 受影響 | **0**：Blogger 端無 data-ga4-* attrs（per `blogger-listener-strategy.md` §5.1）|
+
+→ 量化：**1 個生產 anchor 觸發**；scope 極小。
+
+### 12.5 Option 比較（per B）
+
+#### Option 1：Content-only 修正
+
+範圍：把 `content/blogger/posts/20260515-we-media-myself2.md:74` 之 `kind: internal` 改 `kind: external`。
+
+| 維度 | 評估 |
+|---|---|
+| 優點 | • 零 source change；零 build / deploy schema 變動<br>• docs / 框架不變 |
+| 缺點 | • **違反 `related-links-schema.md` §5.4 之 internal 語意**（「internal = 本站任一已發布平台」）<br>• 作者 display 意圖被迫扭曲（從「我的另一篇」變成「外部連結」）<br>• Schema §1.2 已明示「兩欄位皆可同時包含 `kind: internal` 與 `kind: external` 之 item」；本修法逼作者放棄 internal 語意<br>• 未來作者撰寫類似 cross-platform self-content 時又會重蹈覆轍<br>• 不解決系統層**根因**；只 patch 單篇 |
+| 風險 | 🟡 中（schema 語意 regression；author intent 失真）|
+| 操作 | content edit 1 行；無 source / build / deploy；需 user 同意違反 schema §5.4 |
+
+#### Option 2：Source helper 修正（推薦）
+
+範圍：`src/views/pages/post-detail.ejs:171-173`（GitHub 端唯一 GA4 attr render 落地檔）修正 linkType 派生邏輯，從 `kind`-driven 改為 cross-site-fingerprint-driven。
+
+具體修法（示意；尚未 commit）：
+```js
+const isInternal = item.kind === 'internal';
+const isCrossSite = typeof item.target === 'string' && item.target !== '';
+// 修正前：linkType = isInternal ? 'internal' : (isCrossSite ? 'cross_site' : 'external')
+// 修正後：以 cross-site fingerprint 為優先：
+const linkType = isCrossSite ? 'cross_site' : (isInternal ? 'internal' : 'external');
+const outbound = (linkType === 'internal' || linkType === 'cross_site') ? 'false' : 'true';
+```
+
+含 otherLinks 對應段（L202-210）mirror 同樣修正；共 ~4-6 行 LOC 變動。
+
+| 維度 | 評估 |
+|---|---|
+| 優點 | • **對齊 schema §4.3 之既有設計原則**（cross-link 判斷依 URL hostname）<br>• 作者繼續沿用 `kind: internal` 之 schema §5.4 語意；無需 content 變動<br>• GA4 `link_type` 正確反映實際 destination 行為（與 URL UTM 一致）<br>• 修法集中於單檔；可用 EJS compile + dist diff 快速驗證<br>• 未來作者撰寫 cross-platform self-content 時 GA4 自動正確分類 |
+| 缺點 | • 需 source change（首次 non-Admin source change since pm-24c reverse UTM source）<br>• 需 build → deploy → user GA4 Realtime / DebugView 手動驗收 dimension 變化（從 `internal` → `cross_site`）<br>• `outbound` 不變（仍 `false`）但 `link_type` dimension 變動會影響 GA4 後台 historical report continuity（屬可接受；單篇單 anchor）|
+| 風險 | 🟢 低（純 EJS render 邏輯 swap；4-6 行；無 schema / build pipeline / 框架變動）|
+| 操作 | source EJS edit ~4-6 行；需 `npm run build` 驗證 dist diff；建議 deploy → GA4 Realtime 點擊驗收 |
+
+#### Option 3：Spec 修正（補強 source change）
+
+範圍：在 `ga4-link-tracking-spec.md` §4.3 / `click-tracking-governance.md` §8.2 / `related-links-schema.md` §7.3 補入「link_type 由 cross-site fingerprint（URL hostname）優先 derive，kind 僅作 UI grouping」之**裁決規則**。
+
+| 維度 | 評估 |
+|---|---|
+| 優點 | • 修補 spec underspecified 處<br>• 未來工程師看 spec 即知 link_type 派生規則<br>• 純 docs；零 build / deploy |
+| 缺點 | • spec-only 不修 source；問題仍存在於 production<br>• 需與 Option 2 source 修一起做才能完整收尾 |
+| 風險 | 🟢 低（docs-only）|
+| 操作 | docs 3 個檔；~30-50 行 |
+
+→ **Option 3 為 Option 2 之 docs-side 補強；非獨立替代方案。**
+
+### 12.6 推薦方案（per C）
+
+**推薦：Option 2 + Option 3 拆兩批落地**
+
+| 批次 | 性質 | 範圍 | 阻擋 |
+|---|---|---|---|
+| **am-5（建議下批）**| docs-only | Option 3：spec §4.3 / governance §8.2 / related-links-schema §7.3 補裁決規則 + 本 audit doc §7.1 G2 標 update（spec 收斂 ✓；source 修正 pending）| 無 |
+| **am-6 或之後**| source | Option 2：post-detail.ejs L171-173（related）+ L206-208（other）linkType 派生邏輯 swap；mirror otherLinks | 阻擋於 user 同意 source change + build/deploy verify checkpoint |
+
+### 12.7 修法所需後續動作
+
+| 動作 | Option 1（content）| Option 2（source；推薦）| Option 3（spec）|
+|---|---|---|---|
+| Source change | ❌ | ✅ post-detail.ejs ~4-6 行 | ❌ |
+| Content change | ✅ 1 篇 | ❌ | ❌ |
+| Spec / docs change | ❌（但留 G2 未真正解決 root cause）| 🟡 建議併 docs sync | ✅ docs only |
+| Build | ❌ | ✅ `npm run build` | ❌ |
+| Validate | ❌ | 🟡 可選（per Admin / template 既有 pattern；非必需）| ❌ |
+| Deploy | ❌ | ✅ `npm run deploy` + push gh-pages | ❌ |
+| Blogger 後台重貼 | ❌ | ❌（Blogger 端無 data-ga4-* attrs）| ❌ |
+| GA4 Realtime 驗收 | ❌ | ✅ 建議 user 於 dist 部署後手動點擊 we-media-myself2 之 relatedLink 觀察 `link_type=cross_site`（從原 `internal` 變動）| ❌ |
+
+### 12.8 後續 micro-batch 建議（per D）
+
+| Phase 候選 | 主題 | 範圍 | 預估 LOC | 風險 |
+|---|---|---|---|---|
+| `20260524-am-5-ga4-spec-link-type-derivation-rule-a` | Option 3 docs-only：spec / governance / schema 補裁決規則 + audit doc G2 status sync | `docs/ga4-link-tracking-spec.md` §4.3 + `docs/click-tracking-governance.md` §8.2 + `docs/related-links-schema.md` §7.3 + 本 audit doc §7.1 G2 + §12.6 | docs ~30-50 行 / 4 檔 | 🟢 低 |
+| `20260524-am-6-ga4-link-type-cross-site-priority-source-fix-a` | Option 2 source：post-detail.ejs linkType 派生邏輯 swap；mirror related + other | `src/views/pages/post-detail.ejs` L166-173 + L202-210 | source 4-6 行 / 1 檔 | 🟢 低 |
+| （後續可選）`20260524-am-7-ga4-link-type-deploy-verify-a` | build + deploy + dist diff sanity check；user GA4 Realtime 手動驗收 | dist 重建 + push gh-pages + manual sign-off | n/a | 🟡 中（首次非 Admin source 變更落地 production；deploy / GA4 manual verify）|
+
+### 12.9 為何不建議 Option 1（content-only）
+
+| 反對理由 | 來源 |
+|---|---|
+| 違反 `related-links-schema.md` §5.4 之 internal 語意 | schema |
+| 違反 §1.2 之「kind 與 platform 無強制對應」原則 | schema |
+| 不解決系統層根因；只 patch 單篇 | 工程層 |
+| 未來作者撰寫類似內容時又會重蹈覆轍 | 維護層 |
+| 作者 intent 失真（從「我的另一篇」變成「外部」）| UX 層 |
+
+### 12.10 邊界遵守（本 am-4 phase）
+
+| 邊界 | 狀態 |
+|---|---|
+| 不改 source code | ✅ |
+| 不改 EJS template | ✅ |
+| 不改 JS helper / tracker | ✅ |
+| 不改 content / frontmatter | ✅ |
+| 不 build / 不 validate / 不 deploy | ✅ |
+| 不碰 Blogger 後台 | ✅ |
+| 不 push origin/main | ✅（待 user 確認後再 commit + push）|
+| 僅更新單檔 docs（本 audit doc 追加 §12）| ✅ |
+
+---
+
 （本文件結束）
