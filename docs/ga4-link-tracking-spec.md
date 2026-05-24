@@ -13,6 +13,7 @@
 | **2026-05-22** | initial spec 落地（principles / targets / event / UTM naming / metadata / SEO safety / open questions）| Phase `20260522-day-2-c`；commit `71b80ea` |
 | **2026-05-23** | 規格固化：§3.6 / §4.2 / §8 implementation status 更新；§9 Q1 closed；新增 §11 placement enum 對照表 / §12 驗收 checklist / §13 Admin 關係 / §14 結論分類 | Phase `20260523-day-1-batch-2`；反映 5/22 commits `6785bb6` / `221a87c` / `aa7b594` / `1bbedc4` / `b94cf77` 落地後狀態 |
 | **2026-05-24** | Affiliate placement enum 收斂：§3.7 / §4.2.1 example / §11.1 enum 表 / §12.2.5 / §12.2.6 / §14.3 統一採 `article_top` / `article_bottom`（對齊既有 source 5/22 落地之 inline attrs）；§11.1 移除重複 `affiliate_top` / `affiliate_bottom` 行；§11.4 新增 historical/rejected reconcile；解除 spec ↔ source drift（per `ga4-click-tracking-coverage-audit-20260524.md` G1）| Phase `20260524-am-3-ga4-spec-placement-enum-drift-fix-a`；docs-only；無 source / build / deploy |
+| **2026-05-24** | `link_type` 派生規則固化：新增 §4.5「link_type 派生規則」固化「`link_type` 依 URL hostname / cross-site fingerprint 優先派生；`item.kind` 為作者 UI grouping，不**直接** map 至 `link_type`」之裁決；§4.3 link_type 行補釋；§14.1 補入；解除 spec ↔ source 之 G2 dimension 衝突之**規範層**（source 端 EJS swap 留待 am-6）| Phase `20260524-am-5-ga4-spec-link-type-derivation-rule-a`；docs-only；無 source / build / deploy |
 
 ---
 
@@ -261,7 +262,7 @@ click_affiliate_cta
 
 | param | 用途 |
 |---|---|
-| `link_type` | `external` / `cross_site` / `hashtag` / `affiliate` / `related` / `other` |
+| `link_type` | `internal` / `cross_site` / `external` / `affiliate` / `hashtag` 等；**派生規則**：依 URL hostname / cross-site fingerprint 優先（per §4.5）；**不**直接吃 `relatedLinks[].kind`（author 之 UI grouping）|
 | `link_position` | `top` / `bottom` / `inline` / `sidebar` / `aside` |
 | `link_label` | UI 顯示文字 |
 | `link_url` / `destination_url` | 目標 URL（含 UTM 之版本，若有）|
@@ -281,6 +282,99 @@ click_affiliate_cta
 - attr 命名 convention（`data-ga4-event` + `data-ga4-param-<key>` snake_case；helper key regex）→ `click-tracking-governance.md` §6
 - helper / listener / wiring 既有 → `click-tracking-governance.md` §2.1
 - 既有 `ga4.config.json` event 清單（CLAUDE.md §5）vs 本 spec 命名差異 → `click-tracking-governance.md` §9.2（governance decision deferred）
+
+### 4.5 link_type 派生規則（canonical；2026-05-24 am-5 固化）
+
+本節為 `link_type` GA4 event param 之**派生規範來源 (canonical)**；`click-tracking-governance.md` §3.3 / §8.2 / `related-links-schema.md` §7.3 / §7.4 皆 cross-ref 本節。
+
+#### 4.5.1 兩軸命名切分
+
+避免 `kind` 與 `link_type` 之語意混用，採**兩軸獨立**之命名：
+
+| 軸 | 概念 | 來源 | 用途 |
+|---|---|---|---|
+| **author_kind**（content layer）| 作者在 `relatedLinks[].kind` / `otherLinks[].kind` 中之標記（`internal` / `external`）| `.md` frontmatter | • 作者 UI grouping / 內容分類；• 自動 `target` / `rel` 預設（per `related-links-schema.md` §4.1）；• Admin 後台篩選 / 顯示分組 |
+| **destination_type**（render / event layer；對外名稱為 `link_type`）| 系統依 URL hostname / cross-site fingerprint 判定之**實際目的地類型** | build / render pipeline | • GA4 event `link_type` param；• cross-site UTM 注入決策（已 enforced per schema §4.3 + `ga4-url-builder.js` 之 `applyCrossSiteUtm`）|
+
+⚠️ 兩軸**獨立**；不需嚴格對齊；典型 case：
+- author 標 `kind: internal` + URL 為本站另一平台 → `destination_type=cross_site`（不是 internal；per Blogger ↔ GitHub 互連語意）
+- author 標 `kind: external` + URL 為本站 host（極罕見）→ destination 仍依 hostname 判定為 internal
+- author 標 `kind: internal` + URL 為本站同平台 → `destination_type=internal`
+
+#### 4.5.2 link_type 派生優先序（決議）
+
+GA4 event `data-ga4-param-link_type` 值由以下優先序決定（高→低）：
+
+```
+1. URL hostname 為 affiliate URL → 'affiliate'
+   （由 affiliate-box render path 直接設；不走 relatedLinks / otherLinks 派生）
+
+2. URL hostname 比對 settings.site.bloggerSiteUrl 或 settings.site.githubSiteUrl
+   且**當前渲染 context 之 hostname 不同** → 'cross_site'
+   （cross-site fingerprint；對應 build pipeline 已注入 cross-site UTM 之事實）
+
+3. URL hostname 為 settings.site.{currentPlatform}Url（即同平台）→ 'internal'
+
+4. URL hostname 為其他 → 'external'
+
+5. URL 解析失敗 / 缺漏 → 'external'（保守 fallback）
+```
+
+#### 4.5.3 與 author_kind 之關係
+
+- ❌ **不可**直接 `link_type = item.kind`
+- ❌ **不可**用 `item.kind === 'internal'` 為 short-circuit 跳出 cross_site 判定（即 G2 之 source bug 模式）
+- ✅ `item.kind` 可保留為 `data-ga4-param-author_kind`（**可選**；future 擴充；本批 spec 不要求落地）
+- ✅ `item.kind` 仍驅動自動 `target` / `rel` 預設值（per `related-links-schema.md` §4.1）；屬 schema-level 行為，不混入 GA4 event dimension
+
+#### 4.5.4 對 outbound 之派生
+
+`outbound` 採以下 mapping（與 `link_type` 一致）：
+
+| `link_type` | `outbound` |
+|---|---|
+| `internal` | `false` |
+| `cross_site` | `false`（per `click-tracking-governance.md` §8.2「視同自家流量 retained」）|
+| `external` | `true` |
+| `affiliate` | `true` |
+
+⚠️ `outbound` 不再直接派生自 `item.kind`；改派生自 `link_type`，自動對齊。
+
+#### 4.5.5 適用範圍
+
+| Click point | 適用本規則 | 備註 |
+|---|---|---|
+| relatedLinks anchor（GitHub 端）| ✅ | 主要 G2 修正目標 |
+| otherLinks anchor（GitHub 端）| ✅ | mirror |
+| article body inline 連結（future）| ✅ | 規則一致；future implementation |
+| affiliate CTA（top/bottom）| 部分（直接 `link_type='affiliate'`；不走 hostname 派生）| per §4.5.2 priority 1 |
+| hashtag chip（future）| ✅ partial（hashtag 永遠 `internal`；不需 cross-site 判定）| per §3.3 站內導向 |
+| Blogger 端任一 anchor | ❌ N/A（Blogger 端不接 data-ga4-* attrs；per `blogger-listener-strategy.md` §5.1）|
+
+#### 4.5.6 與既有 source 落地之 gap
+
+| 既有 source | 狀態 | gap |
+|---|---|---|
+| `src/scripts/ga4-url-builder.js` 之 `isBloggerCrossLink` / `isGithubCrossLink` / `applyCrossSiteUtm` | ✅ 對齊本規則 priority 2 | 無 gap；本規則之 cross-site fingerprint 即本 helper 之 hostname 判定 |
+| `src/scripts/build-github.js` `deriveRenderedCrossLinks`（per pm-24a/b/c）| ✅ 對齊 | 預處理 `item.target` / `item.rel` 即為 cross-site fingerprint |
+| `src/views/pages/post-detail.ejs` L171 之 `linkType = isInternal ? 'internal' : (isCrossSite ? 'cross_site' : 'external')` | ❌ **未對齊**（kind 主導；應改為 cross-site 優先）| 待 am-6 source micro-fix |
+
+#### 4.5.7 後續 source micro-fix 指引（per am-6 候選）
+
+per `ga4-click-tracking-coverage-audit-20260524.md` §12.6 之 Option 2 source：
+
+| 項目 | 內容 |
+|---|---|
+| 範圍 | `src/views/pages/post-detail.ejs` L166-173（related）+ L202-210（other）；mirror swap |
+| 修法 | `const linkType = isCrossSite ? 'cross_site' : (isInternal ? 'internal' : 'external')`（移除 `!isInternal` 短路 guard）|
+| 預估 LOC | ~4-6 行 / 1 檔 |
+| 風險 | 🟢 低（純 EJS render 邏輯 swap）|
+| 是否需 build | ✅ `npm run build`；驗證 dist diff |
+| 是否需 validate | 🟡 可選（per template / Admin 既有 pattern；非必需）|
+| 是否需 deploy | ✅ `npm run deploy` + push gh-pages |
+| 是否需 Blogger 後台重貼 | ❌ Blogger 端不接 data-ga4-* attrs；不受影響 |
+| 是否需 content / frontmatter 修正 | ❌ schema §5.4 之 author intent 仍 valid；無需動 |
+| 是否需 GA4 Realtime 驗收 | ✅ user 應於 deploy 後手動點擊 we-media-myself2 之 relatedLink 觀察 `link_type` 從 `internal` 變動至 `cross_site` |
 
 ---
 
@@ -700,6 +794,7 @@ per `CLAUDE.md` §29 第一版不做清單：
 | GA4 event 命名 reconcile（governance + spec 對齊）| `click-tracking-governance.md` §6 + 本 spec §4.2 |
 | placement enum 對照表（本 spec §11 固化）| 本次更新（2026-05-23 day-1-batch-2）|
 | placement enum 收斂（affiliate CTA 統一採 `article_top` / `article_bottom`；移除重複 `affiliate_top` / `affiliate_bottom`；historical 收錄於 §11.4）| 2026-05-24 phase `20260524-am-3-ga4-spec-placement-enum-drift-fix-a`；docs-only |
+| `link_type` 派生規則固化（spec 層；§4.5 新增 canonical 兩軸命名 author_kind / destination_type + URL hostname / cross-site fingerprint 優先序）| 2026-05-24 phase `20260524-am-5-ga4-spec-link-type-derivation-rule-a`；docs-only；source 端 EJS swap 待 am-6 |
 | canonical / sitemap / OG URL 不含 UTM | per §7 SEO safety rules |
 | affiliate URL 不主動加 UTM 政策 | per §3.7 + §5.7 + `click-tracking-governance.md` §7.3 |
 

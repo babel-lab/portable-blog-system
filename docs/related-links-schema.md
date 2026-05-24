@@ -210,6 +210,7 @@ CLAUDE.md §16.4 描述 Blogger ↔ GitHub 互導之 UTM 與 target / rel 規則
 | `target` | 強制 `_blank`（開新分頁）|
 | `rel` | 合併 `nofollow noopener noreferrer`；保留既有 token（如作者 explicit `sponsored`）不重複 |
 | UTM 注入 | `utm_source=github_pages` / `utm_medium=referral` / `utm_campaign=portable_blog_system` / `utm_content=related_links` 或 `other_links`（依 aside 區塊）|
+| GA4 event `link_type` | `cross_site`（per `ga4-link-tracking-spec.md` §4.5 派生規則；與本表 cross-link fingerprint 一致；不依賴 `kind`）|
 
 **策略 A**（已含 UTM 之 url 處理）：若 url 已含**任一** `utm_source` / `utm_medium` / `utm_campaign` / `utm_content`，視為作者手動指定 → 系統**不覆蓋**、**不重複**注入 UTM；但仍套 `target="_blank"` + `rel` 合併。
 
@@ -344,11 +345,46 @@ otherLinks:
 ### 7.3 GA4 event 差異
 
 - `blocks.relatedPosts` 之點擊歸 `internal_link_click`（per CLAUDE.md §5）
-- `relatedLinks` / `otherLinks` 之點擊：
-  - `kind: internal` → `internal_link_click`
-  - `kind: external` → 視 platform 決定（YouTube → 可考慮 `external_video_click`；圖書館 / 官方網站 → `external_reference_click`；具體 event name 屬未來決策）
+- `relatedLinks` / `otherLinks` 之點擊（**當前實際 source 落地**；per `ga4-link-tracking-spec.md` §3.6 / §4.2）：
+  - `relatedLinks` aside → `click_related_link` event
+  - `otherLinks` aside → `click_other_link` event
+  - event 之 `data-ga4-param-link_type` 值**派生自 URL hostname / cross-site fingerprint**（per §7.4 兩軸命名 + `ga4-link-tracking-spec.md` §4.5 canonical 派生規則）；**非**直接吃 `item.kind`
 
-第一版實作建議：兩機制皆採 `internal_link_click` / 通用 external click event；不引入新 GA4 event。屬 Phase 9-g-d 落地時之決策。
+⚠️ **歷史說明**：本節初版（Phase 9-g-b）曾建議「依 `kind` 直接決定 event」（`kind: internal → internal_link_click` / `kind: external → external_*_click`）；該設計**已於 2026-05-24 am-5 收斂為**「event name 由 aside 區塊決定（related vs other）；`link_type` param 由 URL hostname 派生」之兩層分離，避免 `kind` 主導造成 GA4 dimension 與 URL UTM 注入語意衝突（per `ga4-click-tracking-coverage-audit-20260524.md` G2 root-cause）。
+
+### 7.4 kind vs link_type：兩軸命名分離（2026-05-24 am-5 固化）
+
+避免 `kind`（作者 UI grouping）與 GA4 `link_type`（系統 destination 判定）混用。兩軸**獨立**且**不需嚴格對齊**：
+
+| 軸 | 概念 | 來源 | 用途 |
+|---|---|---|---|
+| **author_kind**（本 schema 之 `kind`）| 作者於 `relatedLinks[].kind` / `otherLinks[].kind` 之標記（`internal` / `external`）| 本 schema §3.2 frontmatter | • UI grouping / 內容分類；• 自動 `target` / `rel` 預設（per §4.1）；• Admin 後台篩選 |
+| **destination_type**（GA4 event 之 `link_type` param）| 系統依 URL hostname / cross-site fingerprint 派生 | render / build pipeline | • GA4 event dimension；• cross-site UTM 注入決策 |
+
+#### 7.4.1 為何兩軸獨立
+
+per §5.4：`kind: internal` 之語意為「本站任一已發布平台之連結」（即 Blogger ↔ GitHub 互連亦屬 internal）。但從**渲染當下之平台 context** 看，該 URL 仍為跨 hostname / 跨平台 → destination_type 應為 `cross_site`，以與系統之 cross-site UTM 注入行為（§4.3）保持**一致**。
+
+#### 7.4.2 典型對應
+
+| author_kind | URL hostname 屬性 | destination_type (`link_type`) | 範例 |
+|---|---|---|---|
+| `internal` | 同平台 host | `internal` | GitHub 頁內連同站另一篇 |
+| `internal` | 自家另一平台 host | `cross_site` | GitHub 頁連自家 Blogger 文章 |
+| `external` | 第三方 host | `external` | GitHub 頁連 YouTube |
+| `external` | 同平台 host（極罕見；通常為誤標）| `internal`（系統判定為準）| — |
+
+#### 7.4.3 對作者之指引
+
+- 作者依本 schema §3.2 之 `kind` 規格填寫（`internal` / `external`），**不需**改變既有撰寫習慣
+- `kind: internal` 之 cross-platform self-content link **不需**改為 `kind: external`（per §5.4 internal 語意之保留）
+- GA4 dimension 之**正確分類**由 source / render 端負責（per `ga4-link-tracking-spec.md` §4.5）；作者**無需**關心
+
+#### 7.4.4 與 CLAUDE.md §5 既有 9 個 event 之關係
+
+CLAUDE.md §5 之 `internal_link_click` event name 為**廣義**站內導向（含 nav / breadcrumb / post-card / inline 連結等任何站內 anchor）；`relatedLinks` 之 `click_related_link` event 為**區塊特化**（aside-level）。兩者命名 reconcile 屬 deferred governance decision（per `click-tracking-governance.md` §9.2）；本 schema 對齊 spec / governance 之當前實際 source 落地命名。
+
+第一版實作建議（**已 landed**）：採 spec / governance 既有 `click_related_link` / `click_other_link` 命名；`link_type` param 由 URL hostname 派生；不引入「依 kind 區分 event name」之派生路徑。
 
 ---
 

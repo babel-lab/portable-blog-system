@@ -350,7 +350,7 @@ function buildBloggerToGithubUrl(rawUrl, slug) {
 | # | Item | Detail | 影響 |
 |---|---|---|---|
 | ~~**G1**~~ | ~~Affiliate placement value drift~~ ✅ **resolved 2026-05-24 am-3**（docs-only；spec §3.7 / §11.1 enum 表 / §11.4 / §12.2.5 / §12.2.6 / §14.1 / §14.3 收斂為 `article_top` / `article_bottom`；historical 標 §11.4.2 rejected；source 端 EJS 不變；per `20260524-am-3-ga4-spec-placement-enum-drift-fix-a`）| ~~原描述：source 採 `article_top` / `article_bottom`；spec §3.7 / §11.1 row 7-8 / §12.2.5 manual checklist 預期 `affiliate_top` / `affiliate_bottom`；spec §11.1 內部也同時列了 `article_top`/`article_bottom` 為 reserved（內部矛盾）~~ | ✅ spec 收斂後 GA4 後台 placement dimension 與 spec 一致；validation checklist 對齊實際 attr |
-| **G2** | relatedLinks linkType 誤分類 | 作者標 `kind: internal` 但 URL 為跨站 → `applyCrossSiteUtm` 注入 UTM + 設 target/rel；但 EJS 之 `linkType` 仍輸出 `'internal'` | GA4 event dimension 與 URL UTM 矛盾；分析 cross-site CTR 時內外 linkType 互衝 |
+| **G2** | relatedLinks linkType 誤分類 | 作者標 `kind: internal` 但 URL 為跨站 → `applyCrossSiteUtm` 注入 UTM + 設 target/rel；但 EJS 之 `linkType` 仍輸出 `'internal'` | GA4 event dimension 與 URL UTM 矛盾；分析 cross-site CTR 時內外 linkType 互衝 — 🟡 **root cause identified；spec rule landed（2026-05-24 am-5）；source fix pending（待 am-6）**；spec §4.5 / governance §3.3 / §8.2 / schema §7.3 / §7.4 已 docs 收斂派生規則 |
 | ~~**G3**~~ | ~~spec §11.1 placement enum 內部矛盾~~ ✅ **resolved 2026-05-24 am-3**（同 G1；spec §11.1 移除重複 `affiliate_top` / `affiliate_bottom` 行；historical 收錄於 §11.4.2）| ~~原描述：row 1 `article_top` 註解「當前 `affiliate_top` 已啟用此語意」+ row 7 `affiliate_top` 註解「✅ GitHub 端已落地」→ 同一個概念兩 row~~ | ✅ 收斂後僅 11 row；無重複；未來 reader 不再需在兩值間挑選 |
 
 ### 7.2 🟡 Source 缺漏（CLAUDE.md §5 與 spec 未 reconcile）
@@ -394,7 +394,7 @@ function buildBloggerToGithubUrl(rawUrl, slug) {
 |---|---|---|---|
 | ~~`20260524-ga4-spec-placement-enum-drift-fix-a`~~ ✅ **已於 am-3 落地** | ~~修 spec §11.1 placement enum 內部矛盾 + spec ↔ source 對齊 placement 值~~ | spec / publishing-workflow / 本 audit 共 3 docs 收斂；source 端 EJS 不變 | ✅ resolved（同步 G1 / G3）|
 | `20260524-ga4-spec-reconcile-claude-md-5-events-a` | spec / governance / CLAUDE.md §5 之 event reconcile 表固化（不改 ga4.config.json）| `docs/ga4-link-tracking-spec.md` 新增 §16 reconcile table 或補入 §4 / governance §9.2 之 cross-link | docs 50-100 行 |
-| `20260524-ga4-spec-link-type-classification-fix-docs-a` | 在 spec / governance 補入 `link_type` 之 cross_site vs internal vs kind 衝突之裁決規則（建議 source 端優先採 isCrossSite 而非 isInternal）| `docs/ga4-link-tracking-spec.md` / `docs/click-tracking-governance.md` | docs 30-50 行 |
+| ~~`20260524-ga4-spec-link-type-classification-fix-docs-a`~~ ✅ **已於 am-5 落地（phase `20260524-am-5-ga4-spec-link-type-derivation-rule-a`）** | ~~在 spec / governance 補入 `link_type` 之 cross_site vs internal vs kind 衝突之裁決規則~~ | spec §4.5（canonical 派生規則）+ governance §3.3 / §8.2（source row + 派生說明）+ schema §7.3 / §7.4（兩軸命名分離）+ 本 audit §7.1 / §8.1 / §12 sync；source 端 EJS swap pending am-6 | ✅ docs landed |
 
 ### 8.2 🟢 低風險 source micro-batches（可單檔合 docs 落地）
 
@@ -636,8 +636,8 @@ const outbound = (linkType === 'internal' || linkType === 'cross_site') ? 'false
 
 | 批次 | 性質 | 範圍 | 阻擋 |
 |---|---|---|---|
-| **am-5（建議下批）**| docs-only | Option 3：spec §4.3 / governance §8.2 / related-links-schema §7.3 補裁決規則 + 本 audit doc §7.1 G2 標 update（spec 收斂 ✓；source 修正 pending）| 無 |
-| **am-6 或之後**| source | Option 2：post-detail.ejs L171-173（related）+ L206-208（other）linkType 派生邏輯 swap；mirror otherLinks | 阻擋於 user 同意 source change + build/deploy verify checkpoint |
+| ~~**am-5（建議下批）**~~ ✅ **已於 2026-05-24 am-5 落地** | docs-only | Option 3：spec §4.5 canonical 派生規則 + governance §3.3 / §8.2 + schema §7.3 / §7.4 兩軸命名分離 + 本 audit doc 同步 G2 status | ✅ landed |
+| **am-6（下批；user 同意 source change 後可啟動）**| source | Option 2：post-detail.ejs L171-173（related）+ L206-208（other）linkType 派生邏輯 swap；mirror otherLinks | 阻擋於 user 同意 source change + build/deploy verify checkpoint；spec rule am-5 已就位作為實作依據 |
 
 ### 12.7 修法所需後續動作
 
@@ -656,8 +656,8 @@ const outbound = (linkType === 'internal' || linkType === 'cross_site') ? 'false
 
 | Phase 候選 | 主題 | 範圍 | 預估 LOC | 風險 |
 |---|---|---|---|---|
-| `20260524-am-5-ga4-spec-link-type-derivation-rule-a` | Option 3 docs-only：spec / governance / schema 補裁決規則 + audit doc G2 status sync | `docs/ga4-link-tracking-spec.md` §4.3 + `docs/click-tracking-governance.md` §8.2 + `docs/related-links-schema.md` §7.3 + 本 audit doc §7.1 G2 + §12.6 | docs ~30-50 行 / 4 檔 | 🟢 低 |
-| `20260524-am-6-ga4-link-type-cross-site-priority-source-fix-a` | Option 2 source：post-detail.ejs linkType 派生邏輯 swap；mirror related + other | `src/views/pages/post-detail.ejs` L166-173 + L202-210 | source 4-6 行 / 1 檔 | 🟢 低 |
+| ~~`20260524-am-5-ga4-spec-link-type-derivation-rule-a`~~ ✅ **已落地** | ~~Option 3 docs-only：spec / governance / schema 補裁決規則~~ | spec §4.5（含 7 子節）/ governance §3.3 + §8.2 / schema §7.3 + §7.4 / audit §7.1 + §8.1 + §12.6 + §12.8 sync | docs ~200 行 / 4 檔 | ✅ landed |
+| `20260524-am-6-ga4-link-type-cross-site-priority-source-fix-a` | Option 2 source：post-detail.ejs linkType 派生邏輯 swap；mirror related + other；對齊 am-5 之 spec §4.5 canonical 規則 | `src/views/pages/post-detail.ejs` L166-173 + L202-210 | source 4-6 行 / 1 檔 | 🟢 低 |
 | （後續可選）`20260524-am-7-ga4-link-type-deploy-verify-a` | build + deploy + dist diff sanity check；user GA4 Realtime 手動驗收 | dist 重建 + push gh-pages + manual sign-off | n/a | 🟡 中（首次非 Admin source 變更落地 production；deploy / GA4 manual verify）|
 
 ### 12.9 為何不建議 Option 1（content-only）

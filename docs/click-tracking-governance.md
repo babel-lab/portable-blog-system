@@ -112,7 +112,7 @@
 | post slug | `we-media-myself2` / `portable-blog-system-mvp` | `.md` frontmatter `slug` |
 | platform | `blogger` / `github_pages` | `.md` frontmatter `site` / `primaryPlatform` |
 | placement | `top` / `bottom` / `inline` / `sidebar` | frontmatter `affiliate.position.*` / future ad block schema |
-| link_type | `internal` / `cross_site` / `external` / `affiliate` | frontmatter `relatedLinks[].kind` / 派生 |
+| link_type | `internal` / `cross_site` / `external` / `affiliate` | **URL hostname / cross-site fingerprint** 優先派生（per `ga4-link-tracking-spec.md` §4.5）；**不**直接吃 `relatedLinks[].kind`（author 之 UI grouping，屬 author_kind 軸）|
 | affiliate provider | `通路王` / `聯盟網` | `content/settings/affiliate-networks.json` `id` |
 
 ⚠️ Metadata layer 為 build 階段之**輸入**；UTM 與 GA4 event params 為**輸出**。實作時 build script 讀 metadata 派生 UTM / params。
@@ -414,6 +414,8 @@ target="_blank" rel="sponsored nofollow noopener noreferrer"
 | 連聯盟導購連結 | `affiliate` | `true` | `false` |
 
 ⚠️ `cross_site` 視同自家流量；GA4 reporting 時可選擇是否計入 outbound（建議**不**計入，因為仍在自家內容生態圈）。
+
+⚠️ **派生來源**：本表之 `link_type` 取值**依 URL hostname / cross-site fingerprint 優先派生**；**不**直接吃 `relatedLinks[].kind` / `otherLinks[].kind`（屬 author_kind 軸）。canonical 規則 per `ga4-link-tracking-spec.md` §4.5。典型例：作者標 `kind: internal` 但 URL 為自家另一平台 → `link_type=cross_site`（不是 `internal`）。
 
 ### 8.3 與 cross-site UTM 之組合
 
