@@ -77,7 +77,7 @@
 - `docs/promotion-export.md` — FB 推廣文案匯出
 - `docs/publish-workflow.md` — 整體發布流程
 - `docs/backup-and-migration.md` — 備份與搬家
-- `docs/20260524-blogger-github-publishing-runbook.md` — **Operator-facing runbook**（commit `0b62a13`；2026-05-24 am-10a/b 落地）；整合 Blogger 手動重貼 + GitHub 文章頁檢查 + GA4 / UTM / reverse UTM 驗收 + affiliate 上下區塊 + related / other / hashtag click tracking 之單一 entry 操作 SOP；canonical 詳本仍為 `docs/20260524-blogger-repost-checklist.md`（am-8b）+ `docs/20260524-ga4-reverse-utm-observation.md`（am-8c）+ `docs/reverse-utm-fixture-plan.md` §10（am-9c）
+- `docs/20260524-blogger-github-publishing-runbook.md` — **Operator-facing runbook**（commit `0b62a13`；2026-05-24 am-10a/b 落地）；整合 Blogger 手動重貼 + GitHub 文章頁檢查 + GA4 / UTM / reverse UTM 驗收 + affiliate 上下區塊 + related / other / hashtag click tracking 之單一 entry 操作 SOP；canonical 詳本仍為 `docs/20260524-blogger-repost-checklist.md`（am-8b）+ `docs/20260524-ga4-reverse-utm-observation.md`（am-8c）+ `docs/reverse-utm-fixture-plan.md` §10（am-9c）；**5/24 SOP / runbook trail map 與建議 cold-start 讀取順序詳見** `docs/20260524-eod-report.md` §15（pm-11b 落地）
 
 ### 3.4 SEO / GA4 / AdSense
 

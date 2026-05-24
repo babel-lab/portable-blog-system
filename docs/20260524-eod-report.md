@@ -546,4 +546,154 @@ am-9 / am-10 series 收尾不改變既有 deferred items；§13.8 列項仍待 u
 
 ---
 
+## 15. Docs Trail / Cross-reference Map — 5/24 SOP and Runbook Index
+
+本章節為 **append-only 補記**；落地於 phase `20260524-pm-11b-docs-trail-consolidation-a`。§1-§14 內容未修改；本 §15 整理 5/24 全日新增 / 修改之主要 docs 之 cross-reference 圖、角色分工、與建議 cold-start 讀取順序，便於明日（或更晚）接手者**單檔可定位**整套 5/24 SOP 與 runbook，避免在密集 cross-link 網中迷路。
+
+本 §15 之落地**不**觸發任何 Blogger / GA4 / build / deploy 行為；屬純導讀工具。
+
+### 15.1 5/24 主要 docs 出生順序（時序由早至晚）
+
+| # | 文件 | 落地 phase | commit | 性質 |
+|---|---|---|---|---|
+| 1 | `docs/ga4-click-tracking-coverage-audit-20260524.md` | am-2 / am-3 / am-4 / am-5（多輪 append + sync）| `32f042a` / `073647a` / `c783c3e` / `93fec24` | docs new + 多輪 modify（audit 主檔；G1 / G2 / G3 root-cause + resolved；G4-G8 pending）|
+| 2 | `docs/ga4-link-tracking-spec.md`（既有；am-3 / am-5 修改）| am-3 / am-5 | 同 1 | docs modify（spec 主檔；§4.5 link_type 派生規則為 canonical）|
+| 3 | `docs/click-tracking-governance.md`（既有；am-5 修改）| am-5 | `93fec24` | docs modify |
+| 4 | `docs/related-links-schema.md`（既有；am-5 修改）| am-5 | `93fec24` | docs modify |
+| 5 | `docs/publishing-workflow-20260523.md`（既有；am-3 修改）| am-3 | `073647a` | docs modify |
+| 6 | `src/views/pages/post-detail.ejs`（唯一 source 變動）| am-6 | `e6f0a5f` | source small fix（+4 / -4；cross-site fingerprint 優先）|
+| 7 | （deploy 上線）`portable-blog-deploy@960f234` | am-7b | deploy `960f234` | deploy（GA4 link_type + DT-A2 hashtag wrap）|
+| 8 | `docs/20260524-eod-report.md`（本文件）| am-7c | `5ab7c05` | docs new（§1-§12 初版）|
+| 9 | 本文件 §13 addendum（am-8 series 補記）| am-8d | （待回填）| docs modify（append-only）|
+| 10 | `docs/20260524-blogger-repost-checklist.md` | am-8b | `058ebce` | docs new（Blogger 後台手動重貼 SOP）|
+| 11 | `docs/20260524-ga4-reverse-utm-observation.md` | am-8c | `fc2a852` | docs new（GA4 reverse UTM 觀察 SOP）|
+| 12 | `docs/reverse-utm-fixture-plan.md` §10 addendum | am-9c | `72ee459` | docs modify（append-only readiness review）|
+| 13 | `docs/20260524-blogger-github-publishing-runbook.md` | am-10a / am-10b | `0b62a13` | docs new（operator-facing entry runbook；715 行）|
+| 14 | `docs/README.md` §3.3 cross-link | am-10c | `7bdfb3a` | docs modify（+1 line；runbook entry）|
+| 15 | 本文件 §14 addendum（am-9 / am-10 series 補記）| am-10c | `7bdfb3a` | docs modify（append-only）|
+| 16（本批）| 本 §15 + `docs/README.md` §3.3 trail map 提示 | pm-11b | （待 commit）| docs modify（append-only + 1 line README）|
+
+### 15.2 各 docs 之角色分工
+
+| 角色 | 文件 | 用途 |
+|---|---|---|
+| **EOD checkpoint / decision log** | `docs/20260524-eod-report.md` | 全日工作總覽；§1-§12 為 am-2~am-7c；§13 為 am-8 addendum；§14 為 am-9 / am-10 addendum；§15 為本 trail map；屬歷史紀錄 + 接手導讀 |
+| **GA4 audit 主檔** | `docs/ga4-click-tracking-coverage-audit-20260524.md` | G1-G8 coverage gaps；G1 / G2 / G3 fully resolved；G4-G8 deferred；為未來 G4-G8 triage 之入口 |
+| **GA4 spec 主檔**（canonical 規則來源）| `docs/ga4-link-tracking-spec.md` | §4.5 link_type 派生規則；§11.1 placement enum；G2 / G3 收斂後之 canonical |
+| **Blogger repost canonical 詳本** | `docs/20260524-blogger-repost-checklist.md` | Blogger 後台 Theme CSS / per-post HTML 重貼之完整操作 SOP（備份 / 重貼 / 驗收 / 回滾）；operator 實際操作時開此檔 |
+| **GA4 reverse UTM observation canonical 詳本** | `docs/20260524-ga4-reverse-utm-observation.md` | GA4 後台 Realtime / DebugView / Reports 觀察指引；reverse UTM dormant→live 之常見誤判排查 |
+| **Reverse UTM fixture canonical 詳本** | `docs/reverse-utm-fixture-plan.md`（含 §10 addendum）| fixture 設計原則 / fixture 類型 / 啟動 6 phase 切分；fixture 建立前讀此檔 |
+| **Operator-facing entry runbook**（**非** canonical 詳本；屬整合 entry）| `docs/20260524-blogger-github-publishing-runbook.md` | 單檔可走完一輪 Blogger 重貼 → GitHub 對齊檢查 → GA4 / UTM / reverse UTM 驗收 → 紀錄；引用上述 3 件 canonical 詳本作 deep-dive |
+| **Docs index entry** | `docs/README.md` §3.3 | runbook 與 canonical 詳本三件套之 cross-link entry |
+
+### 15.3 Canonical 詳本 vs Entry Runbook 關係
+
+```
+                       docs/20260524-blogger-github-publishing-runbook.md
+                                     （am-10a；entry runbook；715 行）
+                                                  │
+                            ┌─────────────────────┼─────────────────────┐
+                            ↓                     ↓                     ↓
+       docs/20260524-blogger-repost-checklist.md  │   docs/20260524-ga4-reverse-utm-observation.md
+              （am-8b；canonical 詳本）           │           （am-8c；canonical 詳本）
+                            │                     │                     │
+                            │           docs/reverse-utm-fixture-plan.md │
+                            │           （含 §10 addendum；am-9c；canonical 詳本）
+                            │                     │                     │
+                            └─────────────────────┼─────────────────────┘
+                                                  ↓
+                              docs/ga4-link-tracking-spec.md §4.5
+                                  + docs/ga4-click-tracking-coverage-audit-20260524.md
+                                       （spec / audit 主檔；canonical 規則來源）
+```
+
+**讀法規則**：
+
+- **runbook**（am-10a）= **整合 entry**；提供 sequencing 與 cheat sheet；不重複 canonical 詳本之深度內容
+- **canonical 詳本**（am-8b / am-8c / am-9c）= **權威來源**；任何操作細節之 single source of truth
+- **spec / audit 主檔**（ga4-link-tracking-spec / ga4-click-tracking-coverage-audit）= **規則 / 缺口** 之 canonical；source / dist 行為對齊之基準
+- **runbook 與 canonical 詳本若衝突** → 以 canonical 詳本為準；runbook 應更新；spec 為最高權威
+
+### 15.4 建議 cold-start 讀取順序
+
+#### 15.4.1 5 分鐘快速讀法（只想掌握 5/24 全貌）
+
+1. `docs/20260524-eod-report.md` §1（Date / Context）→ §2.1（統計）→ §5.7（G2 最終狀態）→ §7（Final Baseline）→ §9（Deferred items）（~3 min）
+2. `docs/20260524-blogger-github-publishing-runbook.md` §1（Purpose）→ §2.3（Production state 摘要）→ §5.1（UTM 方向總表）（~2 min）
+
+✅ 結果：掌握「今日做了什麼 / production 現況 / 明日可做候選」三件事。
+
+#### 15.4.2 15 分鐘完整讀法（接手者；準備推進下一階段）
+
+1. `docs/20260524-eod-report.md` §1-§7（今日全貌）→ §13（am-8 addendum）→ §14（am-9 / am-10 addendum）→ §15（本 trail map）（~6 min）
+2. `docs/20260524-blogger-github-publishing-runbook.md`（runbook 通讀）（~5 min）
+3. `docs/ga4-click-tracking-coverage-audit-20260524.md` §7.2（G4-G8 pending）（~2 min）
+4. `docs/reverse-utm-fixture-plan.md` §10（readiness review）（~2 min）
+
+✅ 結果：掌握 5/24 + 接手可推進之具體下一階段候選。
+
+#### 15.4.3 Operator 實際操作前讀法
+
+依操作類型分流：
+
+| 操作 | 必讀 | 順序 |
+|---|---|---|
+| **Theme CSS 重貼** | runbook §3 路線 A → `20260524-blogger-repost-checklist.md` §3（深度步驟）| runbook 先；checklist 對深度步驟 |
+| **per-post HTML 重貼** | runbook §3 路線 B + §4 GitHub 對齊 → `20260524-blogger-repost-checklist.md` §4 → `20260524-ga4-reverse-utm-observation.md` §4-§6 | 三件 sequencing |
+| **Reverse UTM fixture 建立** | `reverse-utm-fixture-plan.md` §3 / §4 / §10.5 → runbook §6 → checklist §4 → observation guide §4 | fixture plan 先；其他為驗收支援 |
+| **GA4 後台觀察** | runbook §5 cheat sheet → `20260524-ga4-reverse-utm-observation.md`（深度指引）| runbook 先；observation 對細節 |
+
+### 15.5 Operator 必看 vs 歷史紀錄 / decision log
+
+| 文件 | Operator 實際操作必看？ | 歷史紀錄 / decision log？ |
+|---|---|---|
+| `docs/20260524-blogger-github-publishing-runbook.md` | ✅ **必看 entry** | △（同時兼具）|
+| `docs/20260524-blogger-repost-checklist.md` | ✅ 必看（深度步驟）| △ |
+| `docs/20260524-ga4-reverse-utm-observation.md` | ✅ 必看（GA4 操作時）| △ |
+| `docs/reverse-utm-fixture-plan.md`（含 §10）| ✅ fixture 建立時必看 | ✅ §10 為 readiness review snapshot |
+| `docs/ga4-click-tracking-coverage-audit-20260524.md` | ❌ 不為日常操作；G4-G8 triage 時讀 | ✅ G1-G8 root-cause 之歷史紀錄 |
+| `docs/ga4-link-tracking-spec.md` | ❌ 不為日常操作；source 改動前讀 | ✅ §4.5 為 canonical 規則來源 |
+| `docs/20260524-eod-report.md` | ❌ 不為日常操作 | ✅ **全日 decision log**；cold-start onboarding |
+| `docs/README.md` §3.3 | ❌ 不為日常操作 | ✅ docs 入口索引 |
+
+### 15.6 5/24 落地之 deferred items 對齊
+
+本 trail map **不**改變既有 deferred items；以下為各 deferred 對應之啟動 entry doc：
+
+| Deferred item | 啟動 entry doc | 對應 phase 切分 |
+|---|---|---|
+| Blogger 後台 Theme CSS 重貼 | runbook §3 路線 A → `20260524-blogger-repost-checklist.md` §3 | user 自決時機 |
+| Reverse UTM fixture 建立 | `reverse-utm-fixture-plan.md` §10.5 Phase 1-6 | user 自決 + 自然文章機會 |
+| Reverse UTM production GA4 觀察 | `20260524-ga4-reverse-utm-observation.md` §4-§6 + runbook §6 | blocked on fixture |
+| GA4 G4-G8 deferred triage | `ga4-click-tracking-coverage-audit-20260524.md` §7.2 | user 自決優先序 |
+| Blogger 端 click attrs | `blogger-listener-strategy.md` §5.1 | 設計層面決議；短期不做 |
+
+### 15.7 邊界保證（落地時）
+
+| 項目 | 狀態 |
+|---|---|
+| 修改 src（`src/`）| ❌ 無 |
+| 修改 content（`content/`）| ❌ 無 |
+| 修改 settings JSON | ❌ 無 |
+| 修改 template（`src/views/`）| ❌ 無 |
+| 修改 dist / dist-blogger / dist-promotion / dist-reports | ❌ 無 |
+| 修改 deploy repo（`portable-blog-deploy/`）| ❌ 無 |
+| 執行 `npm run build*` | ❌ 無 |
+| 執行 git push | ❌ 無（push 屬 user 確認後另行決定）|
+| 觸碰 Blogger 後台 | ❌ 無 |
+| 觸碰 GA4 後台 | ❌ 無 |
+| 啟動任何 deferred items | ❌ 無 |
+| 修改 §1-§14 既有內容 | ❌ 無（純 append §15）|
+| 修改其他 5/24 docs 之既有章節 | ❌ 無 |
+
+本 §15 為**純 docs trail / cross-reference map**；落地後**不**改變任何 production state；僅作為未來 cold-start onboarding 與 operator 操作前導讀工具。
+
+### 15.8 後續調整空間
+
+- 未來如有 5/24 之 docs 後續更新（如 G4-G8 落地、fixture 建立、Blogger 後台重貼完成）→ 應**新增** §15.x 子節 append，**不**改本 §15 既有內容
+- 5/25 起新一日之 docs trail → 應新建 `docs/20260525-eod-report.md` §15 同型結構，**不**塞回本日 EOD report
+- 若 runbook 與任何 canonical 詳本之 cross-link 漂移（如 canonical 詳本章節編號改動）→ 應同時更新 runbook + 本 §15 之引用
+
+---
+
 （本文件結束）
