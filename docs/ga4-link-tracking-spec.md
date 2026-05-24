@@ -12,6 +12,7 @@
 |---|---|---|
 | **2026-05-22** | initial spec 落地（principles / targets / event / UTM naming / metadata / SEO safety / open questions）| Phase `20260522-day-2-c`；commit `71b80ea` |
 | **2026-05-23** | 規格固化：§3.6 / §4.2 / §8 implementation status 更新；§9 Q1 closed；新增 §11 placement enum 對照表 / §12 驗收 checklist / §13 Admin 關係 / §14 結論分類 | Phase `20260523-day-1-batch-2`；反映 5/22 commits `6785bb6` / `221a87c` / `aa7b594` / `1bbedc4` / `b94cf77` 落地後狀態 |
+| **2026-05-24** | Affiliate placement enum 收斂：§3.7 / §4.2.1 example / §11.1 enum 表 / §12.2.5 / §12.2.6 / §14.3 統一採 `article_top` / `article_bottom`（對齊既有 source 5/22 落地之 inline attrs）；§11.1 移除重複 `affiliate_top` / `affiliate_bottom` 行；§11.4 新增 historical/rejected reconcile；解除 spec ↔ source drift（per `ga4-click-tracking-coverage-audit-20260524.md` G1）| Phase `20260524-am-3-ga4-spec-placement-enum-drift-fix-a`；docs-only；無 source / build / deploy |
 
 ---
 
@@ -134,10 +135,11 @@
 ### 3.7 Affiliate blocks（聯盟區塊；GitHub 端 click event 已實作）
 
 - **範圍**：affiliate-box 之 CTA 連結；可有上下兩個區塊
-- **placement enum**：`affiliate_top` / `affiliate_bottom`；未來可擴 `affiliate_inline` / `affiliate_sidebar`（per §11 placement enum 對照表）
+- **placement enum**：`article_top` / `article_bottom`（對齊既有 source 5/22 inline attrs 落地之命名；per §11 placement enum 對照表）；未來可擴 `article_inline` / `article_sidebar`
+- **⚠️ historical / rejected naming**：早期 spec 草稿曾使用 `affiliate_top` / `affiliate_bottom` 作為 placement value；**已於 2026-05-24 (am-3) 統一收斂為 `article_top` / `article_bottom`**；舊命名標 historical，不再為 valid placement enum value（per §11.4）
 - **未來可支援欄位**：`provider` / `campaign` / `slot` / `product_id` / `destination_domain`（per §6 affiliateBlocks[] schema）
 - **⚠️ 同 linkUrl 之區分**：同一個銷售連結放在上下時，**必須**能用 GA4 event 之 `placement` 參數區分點擊位置；不能只看 link_url
-- **GA4 event**：`click_affiliate_cta`（per `click-tracking-governance.md` §5.5 + §7）；含 `provider` / `placement=affiliate_top|affiliate_bottom` / `link_url` / `post_slug` / `outbound=true`
+- **GA4 event**：`click_affiliate_cta`（per `click-tracking-governance.md` §5.5 + §7）；含 `provider` / `placement=article_top|article_bottom` / `link_url` / `post_slug` / `outbound=true`
 - **GitHub 端 click event 對接狀態**：✅ **已實作**
   - top attr：5/22 commit `6785bb6 feat(ga4): add click_affiliate_cta attr on github affiliate top`
   - bottom attr：5/22 commit `221a87c feat(ga4): add click_affiliate_cta attr on github affiliate bottom`
@@ -233,7 +235,7 @@ click_affiliate_cta
    target="_blank"
    data-ga4-event="click_affiliate_cta"
    data-ga4-param-post_slug="<%= post.slug %>"
-   data-ga4-param-placement="affiliate_top"
+   data-ga4-param-placement="article_top"
    data-ga4-param-provider="<%= provider %>"
    data-ga4-param-link_label="<%= link.label %>"
    data-ga4-param-outbound="true">
@@ -320,7 +322,7 @@ click_affiliate_cta
   - `fb_post_20260522_part2`（同 campaign 之第 2 部分）
   - `related_links`（aside relatedLinks）
   - `other_links`（aside otherLinks）
-  - `affiliate_top` / `affiliate_bottom`
+  - `affiliate_top` / `affiliate_bottom`（⚠️ 此處為 **utm_content value**；非 placement value；utm_content vs placement 兩套獨立命名，per §11.4.2 reconcile；GA4 `placement` event param 對應之 canonical 為 `article_top` / `article_bottom`；當前 source 不對聯盟 URL 注入 UTM per P5 + §3.7，故本 utm_content 值屬未來提議）
   - `hashtag`（暫保留；當前 hashtag 不加 UTM）
 
 ### 5.5 utm_term
@@ -467,17 +469,17 @@ per `ad-affiliate-schema-proposal.md` §4 + §6.2-§6.4 + 本 spec 補強：
 
 | placement | 對應區塊 | 典型 click event | 注入位置（GitHub）| 注入位置（Blogger）| 落地狀態 |
 |---|---|---|---|---|---|
-| `article_top` | 文章本體上方（含標題、breadcrumb 上方 ad / affiliate 區）| `click_affiliate_cta` 或 `click_external_link` | post-detail.ejs（top 段）| blogger-post-full.ejs（top 段）| reserved；當前 `affiliate_top` 已啟用此語意 |
+| `article_top` | 文章本體上方（含標題後、article body 前；affiliate top CTA / 上方 ad 區共用此語意）| `click_affiliate_cta`（已落地）/ `click_external_link`（future）| post-detail.ejs L86（affiliate top）✅ | blogger-post-full.ejs ❌ | ✅ GitHub 端 affiliate top CTA 已落地（per `6785bb6`）|
 | `article_body` | 文章本體內 inline 連結 | `click_external_link` 或 `click_related_link` | post-detail.ejs（markdown render 區）| blogger-post-full.ejs（同）| 🔵 future |
-| `article_bottom` | 文章本體下方（含 hashtag / affiliate bottom / 下方 ad 區）| `click_affiliate_cta` 或 `click_external_link` | post-detail.ejs（bottom 段）| blogger-post-full.ejs（bottom 段）| reserved；當前 `affiliate_bottom` 已啟用此語意 |
+| `article_bottom` | 文章本體下方（含 affiliate bottom CTA / hashtag / 下方 ad 區共用此語意）| `click_affiliate_cta`（已落地）/ `click_external_link`（future）| post-detail.ejs L139（affiliate bottom）✅ | blogger-post-full.ejs ❌ | ✅ GitHub 端 affiliate bottom CTA 已落地（per `221a87c`）|
 | `related_links` | relatedLinks aside（語意相關之延伸閱讀）| `click_related_link` | post-detail.ejs（aside 段）✅ | blogger-post-full.ejs ❌ | ✅ GitHub 端已落地 |
 | `other_links` | otherLinks aside（補充外部資源）| `click_other_link` | post-detail.ejs（aside 段）✅ | blogger-post-full.ejs ❌ | ✅ GitHub 端已落地 |
 | `hashtag_list` | 文章底部 hashtag chip 區 | `click_hashtag` | post-detail.ejs（hashtag 段）❌ | blogger-post-full.ejs ❌ | 🔵 前置 span→a 未啟動 |
-| `affiliate_top` | affiliate-box 上方區塊 | `click_affiliate_cta` | post-detail.ejs（affiliate top）✅ | blogger-post-full.ejs ❌ | ✅ GitHub 端已落地 |
-| `affiliate_bottom` | affiliate-box 下方區塊 | `click_affiliate_cta` | post-detail.ejs（affiliate bottom）✅ | blogger-post-full.ejs ❌ | ✅ GitHub 端已落地 |
 | `card_list` | 文章卡片列表（首頁 / 分類頁 / 標籤頁之 post-card）| `click_post_card` 或 `click_internal_link` | home / post-list / category / tag ejs | N/A | 🔵 future |
 | `homepage` | 首頁特有區塊（hero / 推薦文章區等；非卡片列表）| `click_internal_link` | home.ejs | N/A | 🔵 future |
 | `post_detail` | 文章詳細頁全域 click context（非特定 sub-placement 時可用）| any | post-detail.ejs | blogger-post-full.ejs | reserved；用於 fallback context |
+
+⚠️ **2026-05-24 收斂**：本表移除早期重複行 `affiliate_top` / `affiliate_bottom`；affiliate CTA 之 placement value **統一採 `article_top` / `article_bottom`**（對齊既有 source 5/22 inline attrs 之落地命名 + `article_top` row 既有 reserved 語意）；historical / rejected naming 收錄於 §11.4 reconcile 表。
 
 ### 11.2 命名規則
 
@@ -492,10 +494,12 @@ per `ad-affiliate-schema-proposal.md` §4 + §6.2-§6.4 + 本 spec 補強：
 **核心原則**：同一 URL 出現在不同 placement 時，**必須**靠 `placement` 參數區分；**不能**只看 `link_url`。
 
 範例：
-- 同一書本之博客來連結若同時放在 `affiliate_top` + `affiliate_bottom`，GA4 後台應能看到兩個獨立 click event；ratio = 上方 CTA 效果 / 下方 CTA 效果
+- 同一書本之博客來連結若同時放在 `article_top` + `article_bottom`（per §11.1 placement enum；2026-05-24 收斂；早期 `affiliate_top` / `affiliate_bottom` 已標 historical per §11.4.2），GA4 後台應能看到兩個獨立 click event；ratio = 上方 CTA 效果 / 下方 CTA 效果
 - 同一篇 Blogger cross-link 若同時放在 `related_links` + `other_links`（不太可能但允許），GA4 後台應能看到兩個獨立 placement 之 click 數
 
-### 11.4 與既有 `link_position` / `link_slot` / `affiliate_slot` 之命名 reconcile
+### 11.4 與既有 `link_position` / `link_slot` / `affiliate_slot` 之命名 reconcile + historical placement value
+
+#### 11.4.1 param 名 reconcile
 
 | 既有 param 名 | 對應 spec 標準 | 狀態 |
 |---|---|---|
@@ -503,7 +507,18 @@ per `ad-affiliate-schema-proposal.md` §4 + §6.2-§6.4 + 本 spec 補強：
 | `link_slot` | → `placement` | deprecated；不再使用 |
 | `affiliate_slot` | → `placement` | deprecated；統一使用 `placement` |
 
-⚠️ 目前 production 程式碼一律使用 `placement`；本 §11.4 為防禦性 reconcile 表，避免未來 reader 困惑。
+⚠️ 目前 production 程式碼一律使用 `placement`；本表為防禦性 reconcile，避免未來 reader 困惑。
+
+#### 11.4.2 historical / rejected placement value（affiliate CTA）
+
+| historical value | 收斂後 canonical | 狀態 | 收斂日 |
+|---|---|---|---|
+| `affiliate_top` | → `article_top` | 🔴 **rejected / historical**；不再為 valid placement enum value | 2026-05-24（phase `20260524-am-3-ga4-spec-placement-enum-drift-fix-a`）|
+| `affiliate_bottom` | → `article_bottom` | 🔴 **rejected / historical**；不再為 valid placement enum value | 2026-05-24（同上）|
+
+⚠️ **背景**：早期 spec 草稿同時提到 `affiliate_top` / `affiliate_bottom` 與 `article_top` / `article_bottom` 兩套；5/22 source 落地時採 `article_top` / `article_bottom`（per `6785bb6` / `221a87c`）；spec 端兩套並存造成內部矛盾（per `ga4-click-tracking-coverage-audit-20260524.md` §7.1 G1）。本批 (am-3) 統一以 `article_top` / `article_bottom` 為 canonical placement value。
+
+⚠️ **注意 utm_content vs placement 為兩套獨立命名**：`docs/click-tracking-governance.md` §4.1 之 utm_content 仍列 `affiliate_top` / `affiliate_bottom` 作為**utm_content value**（GA4 後台之 source-medium 報表偏 short form）；屬不同概念，**不**與本表 placement 之 historical naming 衝突。詳對齊規則見 `docs/ad-affiliate-schema-proposal.md` §6 mapping table。
 
 ---
 
@@ -563,7 +578,7 @@ per `ad-affiliate-schema-proposal.md` §4 + §6.2-§6.4 + 本 spec 補強：
 
 | 項目 | 驗收 |
 |---|---|
-| [ ] 1 | DevTools Elements 觀察該 `<a>` 之 attrs：`data-ga4-event="click_affiliate_cta"` + `data-ga4-param-post_slug` + `data-ga4-param-provider` + `data-ga4-param-placement="affiliate_top"` + `data-ga4-param-link_label` + `data-ga4-param-outbound="true"` |
+| [ ] 1 | DevTools Elements 觀察該 `<a>` 之 attrs：`data-ga4-event="click_affiliate_cta"` + `data-ga4-param-post_slug` + `data-ga4-param-provider` + `data-ga4-param-placement="article_top"` + `data-ga4-param-link_label` + `data-ga4-param-outbound="true"` |
 | [ ] 2 | rel 屬性含 `sponsored nofollow noopener noreferrer` |
 | [ ] 3 | target="_blank" |
 | [ ] 4 | 點擊該 anchor |
@@ -572,7 +587,7 @@ per `ad-affiliate-schema-proposal.md` §4 + §6.2-§6.4 + 本 spec 補強：
 
 #### 12.2.6 點 affiliate bottom
 
-同 §12.2.5，但 `placement="affiliate_bottom"`；其餘 attrs 與行為一致。
+同 §12.2.5，但 `placement="article_bottom"`；其餘 attrs 與行為一致。
 
 ### 12.3 整體驗收判定
 
@@ -684,6 +699,7 @@ per `CLAUDE.md` §29 第一版不做清單：
 | inline attrs 實作模式（繞開 helper await）| commit `1bbedc4` + `1bbedc4 fix(ga4): inline click tracking attrs in post detail` |
 | GA4 event 命名 reconcile（governance + spec 對齊）| `click-tracking-governance.md` §6 + 本 spec §4.2 |
 | placement enum 對照表（本 spec §11 固化）| 本次更新（2026-05-23 day-1-batch-2）|
+| placement enum 收斂（affiliate CTA 統一採 `article_top` / `article_bottom`；移除重複 `affiliate_top` / `affiliate_bottom`；historical 收錄於 §11.4）| 2026-05-24 phase `20260524-am-3-ga4-spec-placement-enum-drift-fix-a`；docs-only |
 | canonical / sitemap / OG URL 不含 UTM | per §7 SEO safety rules |
 | affiliate URL 不主動加 UTM 政策 | per §3.7 + §5.7 + `click-tracking-governance.md` §7.3 |
 
@@ -704,7 +720,7 @@ per `CLAUDE.md` §29 第一版不做清單：
 | Blogger 端 click listener（option A inline / B 主題級 / C 不做）| per `blogger-listener-strategy.md` §5 |
 | Hashtag span→a + `click_hashtag` 對接 | per `hashtag-slug-decision.md` |
 | article body inline cross-link UTM 注入 | per `blogger-to-github-reverse-utm-plan.md` §6.2 |
-| Affiliate `affiliate_inline` / `affiliate_sidebar` placement 擴充 | per §3.7 + §11 |
+| Affiliate `article_inline` / `article_sidebar` placement 擴充（per 2026-05-24 收斂，採 `article_*` 前綴對齊既有 `article_top` / `article_bottom`）| per §3.7 + §11 |
 | `click_external_link` event（外部一般連結）| per §3.1 + §4.2 |
 | `campaign` per-post / per-series metadata schema | per §5.3 + §6.1 |
 | `affiliateBlocks[]` schema 落地至 frontmatter | per §6.2 + `ad-affiliate-schema-proposal.md` |
