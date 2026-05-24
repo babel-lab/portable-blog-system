@@ -347,4 +347,105 @@ per 本日所有 phases 之邊界遵守：
 
 ---
 
+## 13. Addendum — am-8 docs-only follow-up series（落地於 phase `20260524-am-8d-eod-addendum-docs-only-a`）
+
+am-7c EOD freeze 之後，5/24 上午接續啟動 am-8 系列 docs-only 收尾共 4 小批（含本 addendum 自身）。本 §13 為 append-only 補記；§1-§12 內容未修改。
+
+### 13.1 am-8 系列 commits（origin/main timeline；am-7c 後）
+
+| # | commit | message | 性質 | 段 |
+|---|---|---|---|---|
+| 6 | `581c0a1` | `docs(report): backfill am-7c commit hash in 20260524 eod report` | docs modify | am-8a |
+| 7 | `058ebce` | `docs(checklist): add 20260524 blogger backend repost checklist draft` | docs new | am-8b |
+| 8 | `fc2a852` | `docs(ga4): add reverse utm observation guide for blogger to github` | docs new | am-8c |
+
+（接續 §3 commits today 表之 #1-#5 + am-7c `5ab7c05`；am-8d 自身 commit 待 user 確認後落地）
+
+### 13.2 am-8 series 各批用途
+
+| 批次 | phase id | 用途 | 影響檔案 |
+|---|---|---|---|
+| am-8a | `20260524-am-8a-docs-sync-coldstart-followup-a` | cold-start verification 後補實 EOD report §2 / §7.1 五處 placeholder（am-7c commit `5ab7c05` 落地後 + push 後狀態同步至 EOD 文字）| `docs/20260524-eod-report.md`（modify；+5 / -5）|
+| am-8b | `20260524-am-8b-blogger-repost-checklist-a` | 新增 Blogger 後台手動重貼 SOP checklist（Theme CSS 重貼 + per-post reverse UTM HTML 重貼 + 備份 / 驗收 / 回滾）| `docs/20260524-blogger-repost-checklist.md`（new；354 lines）|
+| am-8c | `20260524-am-8c-ga4-reverse-utm-observation-doc-a` | 新增 GA4 reverse UTM dormant→live 長期觀察指引（Realtime / DebugView / Reports / 常見誤判 / live but dormant 釋義）| `docs/20260524-ga4-reverse-utm-observation.md`（new；323 lines）|
+| am-8d（本批）| `20260524-am-8d-eod-addendum-docs-only-a` | 將 am-8 系列補記入 EOD report；維持 §1-§12 既有內容不動 | `docs/20260524-eod-report.md`（append-only；§13 addendum）|
+
+### 13.3 新增文件對照（am-8 系列 docs new）
+
+| 文件 | 性質 | 上層對應 |
+|---|---|---|
+| `docs/20260524-blogger-repost-checklist.md` | 操作 SOP 草稿；7 章 + status snapshot + 邊界保證 + 後續調整空間（合計 10 章 / 354 行）| `CLAUDE.md` §16.4 / §10、`docs/blogger-to-github-reverse-utm-plan.md`、`docs/reverse-utm-fixture-plan.md`、`docs/design-system-ds3c-hardcoded-color-pre-analysis.md`、`docs/design-token-audit-20260523.md` |
+| `docs/20260524-ga4-reverse-utm-observation.md` | 觀察指引；7 章 + status snapshot + 邊界保證 + 後續調整空間（合計 9 章 + §0 / 323 行）| `CLAUDE.md` §16.4、`docs/ga4-enable-preflight.md`、`docs/ga4-link-tracking-spec.md`、`docs/ga4-parameter-naming-registry.md` §1 / §3 / §4.2、`docs/blogger-to-github-reverse-utm-plan.md`、`docs/reverse-utm-fixture-plan.md`、`docs/20260522-ga4-click-tracking-manual-validation.md`、`docs/20260524-blogger-repost-checklist.md` |
+
+### 13.4 狀態維持（unchanged through am-8 series）
+
+| 項目 | 狀態 | am-7c 起變化 |
+|---|---|---|
+| G2 fully resolved | ✅ live since am-7b deploy `960f234` | ❌ 無變化 |
+| DT-A2 hashtag wrap live | ✅ GitHub Pages live；Blogger 後台未重貼 | ❌ 無變化 |
+| Reverse UTM Blogger→GitHub live but dormant | 🟡 source live；無 production fixture；Blogger 後台未重貼 | ❌ 無變化 |
+| Blogger 後台重貼 deferred | 🟡 待 user 主動決定；am-8b checklist 已備 | 🆕 操作 SOP 已落地（不改變 deferred 狀態）|
+| GA4 reverse UTM observation 指引 | 🆕 落地於 am-8c | 🆕 觀察 SOP 已落地（不觸發任何 GA4 後台動作）|
+
+### 13.5 新凍結基準（am-8c push 後 / am-8d 落地前）
+
+| 項目 | 值 |
+|---|---|
+| **Source repo HEAD** | `fc2a852 docs(ga4): add reverse utm observation guide for blogger to github`（am-8c push 結果）|
+| **Source repo origin/main** | `fc2a852`（同步）|
+| **Source repo working tree** | clean |
+| **Source repo branch tracking** | `main` → `[origin/main]`；ahead 0 / behind 0 |
+| **Deploy repo HEAD** | `960f234 deploy: update ga4 link_type and hashtag wrap`（5/24 am-7b 結果；am-8 系列未動）|
+| **Deploy repo origin/gh-pages** | `960f234`（同步）|
+| **Deploy repo working tree** | clean |
+| **Deploy repo branch tracking** | `gh-pages` → `[origin/gh-pages]`；ahead 0 / behind 0 |
+
+（am-8d 自身 commit + push 後新凍結基準將推進至 am-8d commit hash；待 user 確認後更新）
+
+### 13.6 邊界遵守（整個 am-8 系列）
+
+| 項目 | am-8a | am-8b | am-8c | am-8d（本批）|
+|---|---|---|---|---|
+| 不改 src / 不改 source code | ✅ | ✅ | ✅ | ✅ |
+| 不改 content / settings / template / frontmatter | ✅ | ✅ | ✅ | ✅ |
+| 不改 dist / dist-blogger / dist-promotion / dist-reports | ✅ | ✅ | ✅ | ✅ |
+| 不改 deploy repo（`portable-blog-deploy/`）| ✅ | ✅ | ✅ | ✅ |
+| 不 build / 不 validate | ✅ | ✅ | ✅ | ✅ |
+| 不 deploy | ✅ | ✅ | ✅ | ✅ |
+| 不 push gh-pages | ✅ | ✅ | ✅ | ✅ |
+| 不碰 Blogger 後台 | ✅ | ✅ | ✅ | ✅ |
+| 不碰 GA4 後台 | ✅ | ✅ | ✅ | ✅ |
+| 純 docs（modify / new）| ✅ modify | ✅ new | ✅ new | ✅ append-only modify |
+
+整個 am-8 系列**無**任何 production state 變動；source code / dist / deploy / Blogger 後台 / GA4 後台皆完全未動。
+
+### 13.7 5/24 全日 commits 總覽（含 am-7c + am-8 系列）
+
+| # | commit | 段 | 性質 |
+|---|---|---|---|
+| 1 | `32f042a` | am-2 | docs new |
+| 2 | `073647a` | am-3 | docs modify |
+| 3 | `c783c3e` | am-4 | docs modify |
+| 4 | `93fec24` | am-5 | docs modify |
+| 5 | `e6f0a5f` | am-6 | **source small fix** |
+| 6 | `5ab7c05` | am-7c | docs new + modify（EOD report 新增 + audit doc sync）|
+| 7 | `581c0a1` | am-8a | docs modify |
+| 8 | `058ebce` | am-8b | docs new |
+| 9 | `fc2a852` | am-8c | docs new |
+| 10（待） | （am-8d commit hash 待 user 確認）| am-8d | docs modify（本 addendum）|
+
+deploy commits: 1（`960f234` on gh-pages；am-7b 結果；am-8 series 未推進）
+
+### 13.8 後續可能（deferred；不啟動）
+
+am-8 series 收尾不改變既有 deferred items；以下仍待 user 主動決定時機：
+
+- Blogger 後台 Theme CSS 重貼（per pm-7 mirror + DT-A2 + DS-3 累積）→ 可用 `docs/20260524-blogger-repost-checklist.md` §3 操作
+- Reverse UTM fixture 建立（具 GitHub cross-link 之 full-mode Blogger ready post）→ 詳見 `docs/reverse-utm-fixture-plan.md` §3-§6
+- Reverse UTM 進入 production 後之 GA4 觀察 → 可用 `docs/20260524-ga4-reverse-utm-observation.md` §4 / §5 / §6 操作
+- G4-G8 次要 gaps triage（per `docs/ga4-click-tracking-coverage-audit-20260524.md`）
+- Phase 9-f-e / 9-f-f / 9-f-g（per `docs/phase-9f-c-completion-report.md` 未收尾項）
+
+---
+
 （本文件結束）
