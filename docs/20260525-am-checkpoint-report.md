@@ -100,7 +100,7 @@
   - `we-media-myself2` 之 `affiliate.links[]` 已預填 2 筆但 `enabled=false` + `position.top/bottom=false`（render 階段被 skip）
   - `sample-book-review` 仍為 draft / sample（`status=draft`；`book.title` 空；body 僅 placeholder）
   - 不建議現在硬啟用（候選 C1 / C2 皆違反「不改既有 + 不硬升 draft」原則；§7.5 高風險）
-  - 主軌是等未來自然書評 / 心得文章再啟用（per `phase-1-usability-review.md` §5.4 row #1）
+  - 主軌是等未來自然書評 / 心得文章再啟用（per `20260525-phase1-usability-review.md` §5.4 row #1）
 
 ---
 

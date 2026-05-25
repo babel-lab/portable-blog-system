@@ -17,7 +17,7 @@
 - ❌ **不是**啟用指令（不啟用任何 post 之 `affiliate.enabled`；不修任何 frontmatter）
 - ❌ **不是**新 spec（schema proposal 屬 `docs/ad-affiliate-schema-proposal.md`；GA4 event 治理屬 `docs/click-tracking-governance.md`）
 - ❌ **不是** AdSense 啟用文件（AdSense blocked on custom domain + 審核；屬 Phase 2）
-- ❌ **不取代** `docs/phase-1-usability-review.md` §3.5（affiliate 維度盤點）/ §5.3 #4（補強候選列為「Affiliate 第一篇啟用 walkthrough」）
+- ❌ **不取代** `docs/20260525-phase1-usability-review.md` §3.5（affiliate 維度盤點）/ §5.3 #4（補強候選列為「Affiliate 第一篇啟用 walkthrough」）
 
 ### 1.3 本 phase 之嚴格邊界
 
@@ -168,7 +168,7 @@
 - 真實有內容驅動之書評
 - 自然觸發 `affiliate.enabled` + `links[]` 填入
 - 不破壞既有 production
-- 對齊 `phase-1-usability-review.md` §4 row #13 + §5.4 Phase 2 row #1 之預期路線
+- 對齊 `20260525-phase1-usability-review.md` §4 row #13 + §5.4 Phase 2 row #1 之預期路線
 
 **結論**：✅ **主軌推薦**。暫無候選；等 user 寫新書評時自然啟動。
 
@@ -283,7 +283,7 @@ per `docs/20260524-blogger-repost-checklist.md` + `dist-blogger/posts/{slug}/pub
 |------|------|
 | `click_affiliate_cta` event 只在 GitHub Pages 端 fire | per §6.6 #4；Blogger 端無 listener |
 | affiliate-box render 兩端 mirror，但 GA4 event 僅 GitHub 端有效 | per `ad-affiliate-schema-proposal.md` §9.1 |
-| source repo 與 deploy repo 是獨立流程 | per `phase-1-user-operation-guide.md` §2；多步手動（per `phase-1-usability-review.md` §5.2 痛點 #7）|
+| source repo 與 deploy repo 是獨立流程 | per `phase-1-user-operation-guide.md` §2；多步手動（per `20260525-phase1-usability-review.md` §5.2 痛點 #7）|
 
 驗證 path 必經：source `npm run build` → `cp` to deploy repo → commit + push gh-pages → 等 CDN → 驗。
 
@@ -295,7 +295,7 @@ per `docs/20260524-blogger-repost-checklist.md` + `dist-blogger/posts/{slug}/pub
 |---|---------|------|----------|
 | **7.1** | affiliate 連結格式風險 | 🟡 中 | 通路王 / 聯盟網 URL 自帶 affiliate tracking code（如 `?uid1=blog`）；若被 build 強 append UTM 會污染聯盟回傳；緩解：當前 build 階段不對 affiliate URL append UTM（per `CLAUDE.md` §16.4 cross-link UTM 範圍**不**含 affiliate）；風險可控但 future schema migration（per `ad-affiliate-schema-proposal.md` §4 `tracking.utmAllowed` 欄位）不可破此約束 |
 | **7.2** | GA4 click_affiliate_cta 首次驗證風險 | 🟡 中 | event 已 landed 但無歷史 fire；首次啟用即首次驗證；可能發現 listener attach 失敗 / params 缺漏 / placement 區分異常；緩解：先 DevTools Network + GA4 DebugView 觀察；若 fire 失敗 → 不 push enable commit → 開新 phase 修 listener；不影響 production |
-| **7.3** | Blogger 手動貼文遺漏風險 | 🟡 中 | per `phase-1-usability-review.md` §5.2 痛點 #2「Blogger 100% 手動貼 5-10 min；漏貼某區塊不易發現」；affiliate-box 屬 article body inline（非獨立 copy-helper 區塊）→ 若漏貼某段 body 則 affiliate-box 也漏；緩解：用 `publish-checklist.txt` + 桌機 + 手機預覽逐項對 |
+| **7.3** | Blogger 手動貼文遺漏風險 | 🟡 中 | per `20260525-phase1-usability-review.md` §5.2 痛點 #2「Blogger 100% 手動貼 5-10 min；漏貼某區塊不易發現」；affiliate-box 屬 article body inline（非獨立 copy-helper 區塊）→ 若漏貼某段 body 則 affiliate-box 也漏；緩解：用 `publish-checklist.txt` + 桌機 + 手機預覽逐項對 |
 | **7.4** | 過度商業化風險 | 🟡 中 | 首篇即上 top + bottom 兩個 CTA aside；讀者觀感影響 + AdSense 審核未來印象（即使現在沒 AdSense）；緩解：採 §6.3 建議「第一篇只開 bottom」；控制 `links.length` ≤ 2 |
 | **7.5** | 第一篇不適合硬啟用風險 | 🔴 **高** | 候選 C1（we-media-myself2）已 production live；翻轉 = 改動既有讀者頁面 + 主題契合度中等；候選 C2（sample-book-review）為 draft + 內容空白；強硬選任一都屬「為驗收而做」；對齊 `reverse-utm-fixture-plan.md` §2 deadlock；緩解：等主軌觸發（C3 user 真實寫新書評）|
 | **7.6** | disclosure 文案合規風險 | 🟢 低 | 預設 disclosure「本文包含聯盟行銷連結...」對齊台灣常見聯盟揭露慣例；未對齊任何特定法規 audit；緩解：未來上 AdSense / 收益增加時請 user 校稿 |
@@ -317,7 +317,7 @@ per `docs/20260524-blogger-repost-checklist.md` + `dist-blogger/posts/{slug}/pub
 | 2 | **不建議把 `content/blogger/posts/20260504-sample-book-review.md` 升成 ready** | 屬「為 affiliate 寫文章」反向；status=draft + 內容空白；§5.2 結論 |
 | 3 | **不建議現在實作 `docs/ad-affiliate-schema-proposal.md` 之統一 schema** | proposal 性質；§10 順序 1 需 user 先表態 a/b 兩選項（共用 schema vs 兩套獨立）；屬 Phase 2 |
 | 4 | **不建議現在啟用 `content/settings/ads.config.json` (AdSense)** | blocked on custom domain（per `docs/custom-domain-root-files-strategy.md` §4.5）+ AdSense 審核；屬 Phase 2 row #2 |
-| 5 | **主軌**：等真實新書評 / 心得文章自然觸發 | 對齊 `phase-1-usability-review.md` §5.4 row #1 + `reverse-utm-fixture-plan.md` §10.4 主軌精神 |
+| 5 | **主軌**：等真實新書評 / 心得文章自然觸發 | 對齊 `20260525-phase1-usability-review.md` §5.4 row #1 + `reverse-utm-fixture-plan.md` §10.4 主軌精神 |
 
 ---
 
