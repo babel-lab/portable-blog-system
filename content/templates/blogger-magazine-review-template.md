@@ -51,6 +51,24 @@ promotion:
     target: "auto"
     hashtags: []
     note: ""
+relatedLinks:
+  - kind: internal
+    platform: "blogger"
+    title: "{同雜誌前一期讀後筆記標題}"
+    url: "" # 待目標文章發布後回填正式 URL
+  - kind: external
+    platform: "雜誌官網"
+    title: "{該期特輯介紹頁}"
+    url: ""
+otherLinks:
+  - kind: external
+    platform: "台北市立圖書館"
+    title: "該期館藏頁"
+    url: ""
+  - kind: external
+    platform: "Youtube"
+    title: "{該期特輯相關訪談 / 講座影片}"
+    url: ""
 ---
 
 請在此撰寫雜誌特輯讀後筆記。
