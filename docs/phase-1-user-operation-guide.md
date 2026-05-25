@@ -91,6 +91,17 @@ Admin overview（`http://localhost:5173/admin/`；**dev-mode-only**；prod build
 
 → Admin 任何按鈕都**不會寫檔**；如需實際變動必須**用 VS Code 手動編輯**對應 `.md` / `.fb.md`。
 
+### 4.1 Admin 範圍與替代流程
+
+| 操作 | Admin 是否可做 | 正式流程 |
+|---|---|---|
+| 新增文章 | ❌ 不可 | `npm run new:post`（產生 `.md` template）→ VS Code 編輯 frontmatter / body |
+| 修改既有文章 metadata（含 SEO / FB / sidecar 欄位）| ❌ 不可（僅 dry-run preview）| VS Code 編輯對應 `.md` / `.fb.md` / `.publish.json` → `git diff` 檢查 |
+| 回填 Blogger publishedUrl | ❌ 不可 | `npm run backfill:url --slug={slug}` 或 VS Code 編輯 `.publish.json` |
+| FB promotion 文案產出 | ❌ 不可（無 Admin 按鈕觸發 build）| VS Code 編輯 `.fb.md` → `npm run build:promotion` 產 `dist-promotion/` txt |
+
+⚠️ Admin 目前定位為 **local-only / read-only / dry-run** 工具；任何「真實寫入」皆**不在 Phase 1 範圍**。未來若要啟動 Admin write，需另開 phase（per `docs/admin-2-write-pre-analysis.md` / `docs/fb-sidecar-write-preflight-decision.md`），並過對應 preflight checklist；**不可視為當前 Phase 1 已啟用**。
+
 ---
 
 ## 5. 如何新增文章的概念流程
