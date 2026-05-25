@@ -126,6 +126,19 @@ Admin overview（`http://localhost:5173/admin/`；**dev-mode-only**；prod build
 - `_sample-series-post.md` 是 **series 區塊片段範本**，不可單獨作為完整文章起點；完整文章仍需從 `post-template.md` / `github-tech-note-template.md` / `blogger-*-template.md` 等一般文章範本或 Blogger 類範本開始，再加入 series 區塊
 - 檔名建議維持既有 `YYYYMMDD-slug.md` 格式（對齊 `content/{github,blogger}/posts/` 既有檔案命名）；勿用 stdout 註解之 `YYYY-MM-DD-slug.md` 含連字版
 
+**GitHub primary 範本選用差異**
+
+`content/templates/` 下三個 GitHub primary 範本（皆為 `site: "github"` + `publishTargets.github.enabled: true`）用途有微差，依文章類型擇一起點：
+
+| Template | 適合情境 | 差異 |
+|---|---|---|
+| `post-template.md` | 通用 GitHub primary 起點 | 含 promotion 空殼；relatedLinks / otherLinks 預設空陣列 |
+| `github-tech-note-template.md` | 技術筆記、教學文、工具說明 | 含 relatedLinks / otherLinks 外部連結範例；較適合技術內容 |
+| `blogger-summary-template.md` | GitHub full + Blogger summary 雙平台摘要模式 | **不是 Blogger primary 文章範本**；用於 GitHub 長文搭配 Blogger summary 導流 |
+
+- 一般 GitHub 文章請優先從 `post-template.md` 或 `github-tech-note-template.md` 開始。
+- Blogger primary 文章（書評 / 雜誌 / 下載）仍應使用 `blogger-book-review-template.md` / `blogger-magazine-review-template.md` / `blogger-download-template.md`。
+
 ### 5.1 GitHub Pages 文章
 
 1. 複製 `content/templates/{post-template,github-tech-note-template}.md` 至 `content/github/posts/{YYYYMMDD-slug}.md`
