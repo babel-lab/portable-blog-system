@@ -2,6 +2,14 @@
 # ─────────────────────────────────────────────
 # _sample-series-post.md — 系列文章範本
 # ─────────────────────────────────────────────
+# ⚠️ 用途警示：
+# - 本範本僅示範 series 區塊與最小 frontmatter；**不是完整文章範本**。
+# - frontmatter 缺少完整文章必要欄位（id / site / slug / primaryPlatform / category / tags /
+#   cover / draft / canonical / publishTargets / blocks 等）。
+# - 建立完整文章請先從 post-template.md / github-tech-note-template.md /
+#   blogger-{book-review,magazine-review,download}-template.md 開始；
+#   若文章屬於系列，再把 series 區塊加入完整文章 frontmatter。
+# ─────────────────────────────────────────────
 # 1. 複製成 content/{site}/posts/{slug}.md 後，請填入實際 slug / title / description 等，並改 status: ready。
 # 2. series.id 必須對應 content/settings/series.json（或 _sample.series.json）中之 series.id；id 一旦寫入不得修改（詳見 docs/series-schema.md §3）。
 # 3. series.number 為系列創作編號，**非發布順序**。

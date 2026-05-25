@@ -123,6 +123,7 @@ Admin overview（`http://localhost:5173/admin/`；**dev-mode-only**；prod build
 - `new:post` 預設 `status: "draft"` + `draft: true`；新增後須手動切為 `ready` / `published` 才會進入 build 範圍
 - `new:post` template hardcoded 為 GitHub tech-note：`site: "github"` / `contentKind: "tech-note"` / `primaryPlatform: "github"` / `publishTargets.github.enabled: true` / `publishTargets.blogger.enabled: false`；文章類型不符時請改用 `content/templates/*.md` 對應範本
 - `blogger-summary-template.md` 是 **GitHub full + Blogger summary 之雙平台摘要模式範本**（與 `post-template.md` / `github-tech-note-template.md` 同屬 GitHub primary）；Blogger primary 之書評 / 雜誌 / 下載類文章請改用 `blogger-book-review-template.md` / `blogger-magazine-review-template.md` / `blogger-download-template.md`
+- `_sample-series-post.md` 是 **series 區塊片段範本**，不可單獨作為完整文章起點；完整文章仍需從 `post-template.md` / `github-tech-note-template.md` / `blogger-*-template.md` 等一般文章範本或 Blogger 類範本開始，再加入 series 區塊
 - 檔名建議維持既有 `YYYYMMDD-slug.md` 格式（對齊 `content/{github,blogger}/posts/` 既有檔案命名）；勿用 stdout 註解之 `YYYY-MM-DD-slug.md` 含連字版
 
 ### 5.1 GitHub Pages 文章
