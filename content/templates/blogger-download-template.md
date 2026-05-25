@@ -1,18 +1,18 @@
 ---
 id: "{YYYYMMDD-slug}"
-site: "github"
-contentKind: "tech-note"
-primaryPlatform: "github"
-title: "文章標題"
-titleEn: "GitHub Pages Free Hosting Limits and Blog Planning"
-slug: "github-pages-blog-planning"
+site: "blogger"
+contentKind: "download"
+primaryPlatform: "blogger"
+title: "{教具名稱}下載"
+titleEn: ""
+slug: "{teaching-material-slug}"
 date: "2026-05-04"
 updated: "2026-05-04"
 author: "Dean"
-category: "tech-note"
-tags: ["github", "vite", "static-site"]
-description: "整理 GitHub Pages 免費空間限制與可搬家部落格規劃。"
-searchDescription: "GitHub Pages 免費空間、Vite 靜態網站、Markdown 部落格、Google AdSense 與搬家規劃。"
+category: "download"
+tags: ["download"]
+description: "{教具下載文章摘要；說明素材內容、適用對象與使用方式；2-3 句話}"
+searchDescription: "{搜尋說明；含教具名稱 / 適用年齡 / 主題關鍵字}"
 cover: ""
 coverAlt: ""
 status: "draft"
@@ -20,11 +20,11 @@ draft: true
 canonical: "auto"
 publishTargets:
   github:
-    enabled: true
+    enabled: false
     mode: "full"
   blogger:
     enabled: true
-    mode: "summary"
+    mode: "full"
 blocks:
   toc: false
   adsenseTop: true
@@ -34,6 +34,13 @@ blocks:
   socialFollow: true
   relatedPosts: true
   sidebar: true
+download:
+  enabled: true
+  title: ""
+  description: ""
+  fileUrl: ""
+  fileType: "PDF"
+  licenseNote: "本素材僅供個人、家庭與教學使用，請勿轉售或大量散布。"
 relatedLinks:
   - kind: internal
     platform: "blogger"
