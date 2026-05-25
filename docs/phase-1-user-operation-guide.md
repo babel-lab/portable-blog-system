@@ -106,6 +106,24 @@ Admin overview（`http://localhost:5173/admin/`；**dev-mode-only**；prod build
 
 ## 5. 如何新增文章的概念流程
 
+### 5.0 `npm run new:post` 使用邊界與替代流程
+
+`npm run new:post [slug]` 目前**只輸出範本文字到 terminal stdout**，**不會自動建立檔案**。使用者必須手動複製 stdout 內容到目標路徑：
+
+| 場景 | new:post 是否適用 | 正式流程 |
+|---|---|---|
+| GitHub Pages tech-note draft | ✅ 適用 | `npm run new:post my-slug` → 複製 stdout → 手動建檔 `content/github/posts/YYYYMMDD-my-slug.md` → VS Code 編輯 frontmatter / body |
+| Blogger 書評 / 雜誌 / 下載 / summary 類文章 | ❌ 不建議 | 直接從 `content/templates/blogger-{book-review,magazine-review,download,summary}-template.md` 手動複製範本 → 改 slug / 日期 / 內容 |
+| FB promotion 推廣 | ❌ 不處理 | 另行從 `content/templates/_sample.fb.md` 複製為 `content/{site}/posts/{slug}.fb.md` 並改 `enabled: true`（per `docs/fb-sidecar-schema.md`）|
+| Blogger publishedUrl 回填 | ❌ 不處理 | 另行建立 `.publish.json`（per `docs/publish-bundle.md`）；發布後跑 `npm run backfill:url --slug={slug}` 或 VS Code 手動填 `blogger.publishedUrl` |
+
+⚠️ **使用 `new:post` 時注意**：
+
+- stdout 中之 `title: "請填寫文章標題..."` 與 `description: "請填寫 60 字內..."` 為 placeholder 文字；**必須手動替換為實際內容**，不可保留「請填寫...」文字（否則會被當成正式標題 / 摘要 render 並進入 SEO meta）
+- `new:post` 預設 `status: "draft"` + `draft: true`；新增後須手動切為 `ready` / `published` 才會進入 build 範圍
+- `new:post` template hardcoded 為 GitHub tech-note：`site: "github"` / `contentKind: "tech-note"` / `primaryPlatform: "github"` / `publishTargets.github.enabled: true` / `publishTargets.blogger.enabled: false`；文章類型不符時請改用 `content/templates/*.md` 對應範本
+- 檔名建議維持既有 `YYYYMMDD-slug.md` 格式（對齊 `content/{github,blogger}/posts/` 既有檔案命名）；勿用 stdout 註解之 `YYYY-MM-DD-slug.md` 含連字版
+
 ### 5.1 GitHub Pages 文章
 
 1. 複製 `content/templates/{post-template,github-tech-note-template}.md` 至 `content/github/posts/{YYYYMMDD-slug}.md`
