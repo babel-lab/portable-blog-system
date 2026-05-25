@@ -484,7 +484,7 @@ otherLinks:
 | 9-g-f-c | docs sync：本文件 §9 + `docs/future-roadmap.md` Phase 9-g row + `docs/phase-9g-completion-report.md` §3 / §4.12 / §5.2 / §8 補入 GitHub render 紀錄；可選 `docs/publish-workflow.md` §11 末段補一行；屬 **Phase 9-g-f 系列收尾** | ✅ completed（本批） |
 | 9-g-g（系列；含 a/b/c/d/z 5 子批） | JSON-LD `mentions` / `isPartOf` structured data；BlogPosting schema additive；Blogger / GitHub 兩端 mirror | ✅ completed（pre-plan commit `f5fb400` / isPartOf source commit `70fbf22` / mentions source commit `1d56f8a` / 收尾報告 `docs/phase-9g-g-completion-report.md`）|
 
-當前 validate baseline：**`0 error / 22 warning on 17 post(s)`**（簡稱 `0/22/17`）
+當前 validate baseline：**`0 error / 39 warning on 34 post(s)`**（簡稱 `0/39/34`；2026-05-25 實測值）
 
 baseline 演進：
 
@@ -493,6 +493,7 @@ baseline 演進：
 - Phase 9-g-c-d 至 9-g-f-c 期間：**baseline 維持 `0/22/17`**（本期間 9-g-d-b / 9-g-d-c / 9-g-d-c-fix / 9-g-e-b / 9-g-f-b 之 EJS template 變更不在 validate scan path；9-g-c-d / 9-g-e-c / 9-g-e-d / 9-g-r / 本批 9-g-f-c 為純 docs；validate 不掃 EJS / SCSS / docs）
 - 變動原因：+4 個 validation fixtures（`_test-related-links-*.md`），每 fixture 各觸發 1 條 dedicated warning，無 noise
 - 屬 fixture 落地之**預期變動**，**非 regression**（mirror 既有 book / series fixture pattern）
+- Phase 9-g-f-c 之後：基準漂移至 **`0/39/34`**（+17 warnings / +17 posts；2026-05-25 實測值）；漂移來源為 Phase 9-g 系列**之外**之後續批次新增 fixtures（含 book / blogger SEO 系列等）；warnings 與 posts 同步增加，每 fixture 各對應 dedicated warning，無 noise；mirror 既有 book / series / related-links fixture pattern，非 regression、非 Phase 9-g 子批引入
 
 ### 9.2 Phase 9-g 後續批次
 
