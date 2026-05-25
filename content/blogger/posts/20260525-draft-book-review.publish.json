@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "canonical": {
+    "url": "",
+    "source": "auto"
+  },
+  "ogImage": {
+    "url": "",
+    "alt": ""
+  },
+  "blogger": {
+    "type": "post",
+    "permalink": "",
+    "status": "draft",
+    "publishedUrl": "",
+    "publishedAt": "",
+    "bloggerPostId": "",
+    "publishYear": "",
+    "publishMonth": "",
+    "history": []
+  },
+  "github": {
+    "slug": "",
+    "path": "",
+    "status": "draft",
+    "publishedUrl": "",
+    "publishedAt": ""
+  },
+  "seo": {
+    "metaTitle": "",
+    "metaDescription": "",
+    "robots": "index,follow"
+  }
+}
