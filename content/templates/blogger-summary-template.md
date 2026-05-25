@@ -1,4 +1,11 @@
 ---
+# 用途：本範本示範 GitHub primary + Blogger summary mode 之 publishTargets 組合
+# （GitHub 出 full、Blogger 兼出 summary 導流卡；site / contentKind / primaryPlatform 皆為 github）。
+# 不是 Blogger primary 之獨立文章範本。
+# Blogger primary 之書評 / 雜誌 / 下載類文章請使用：
+#   - content/templates/blogger-book-review-template.md
+#   - content/templates/blogger-magazine-review-template.md
+#   - content/templates/blogger-download-template.md
 id: "{YYYYMMDD-slug}"
 site: "github"
 contentKind: "tech-note"
