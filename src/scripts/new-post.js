@@ -191,6 +191,6 @@ await maybeSuggestSeriesNumber();
 
 console.log(TEMPLATE);
 console.log('// ---');
-console.log(`// 將以上內容存到：content/github/posts/${today}-${slugArg}.md`);
+console.log(`// 將以上內容存到：content/github/posts/${idDate}-${slugArg}.md`);
 console.log(`// 然後修改 title / category / tags / description / cover / coverAlt 等欄位後即可進入 build`);
 console.log(`// 完整版（自動建立檔案）尚未實作；目前請複製 stdout 內容手動建檔`);
