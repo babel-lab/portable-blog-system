@@ -23,15 +23,15 @@
 | 產 Blogger 可貼用 HTML | `npm run build:blogger` → 輸出 `dist-blogger/posts/{slug}/post.html` | `docs/blogger-export.md` |
 | 產 Blogger 主題 CSS | `npm run build:blogger-theme` → 輸出 `dist-blogger/theme/*.css`（貼到 Blogger 主題一次） | 同上 |
 | 產 FB 推廣文案 | `npm run build:promotion` → 輸出 `dist-promotion/facebook/{site}/{slug}.txt`（手動複製到 FB） | `docs/promotion-export.md` |
-| 驗證文章 metadata | `npm run validate:content`（目前 baseline `0 error / 38 warning / 33 issue-post`） | `docs/seo-ga4-adsense.md` |
+| 驗證文章 metadata | `npm run validate:content`（最近一次已知 baseline `0 error / 39 warning / 34 post(s)`，2026-05-25；baseline 隨 fixture / ready post 自然漂移，以當次結果為準） | `docs/seo-ga4-adsense.md` |
 | 用 Admin 總覽看文章狀態 | `npm run dev` 後開 `http://localhost:5173/admin/` | `docs/admin-1-completion-report.md` |
 | 設定文章 indexing（GitHub Pages）| `.md` frontmatter 加 `seo: indexing: noindex-follow`；或 `contentKind: download` 自動 noindex | `docs/seo-indexing-rules.md` |
+| 觀察 GA4 click event / page_view | GA4 已啟用（measurementId `G-C77SMPF8VD`；自 2026-05-21 production live）；用 GA4 後台 DebugView / Realtime / Reports 觀察 | `docs/20260524-ga4-reverse-utm-observation.md` §4-§6 |
 
 ### ⏳ 機制就位但**尚未啟用**
 
 | 動作 | 為何尚未啟用 |
 |---|---|
-| GA4 收 event | 需 user 填 `content/settings/ga4.config.json` 之 `measurementId` + 切 `enabled: true`（per `docs/ga4-enable-preflight.md` §3.1 必勾 checklist）|
 | Admin 真實寫入 `.fb.md` | 需 user 勾選 `docs/fb-sidecar-write-preflight-decision.md` §7 之 8 項；目前只是 dry-run preview |
 | Admin 真實寫入 SEO 欄位 | 需 Admin-2-b-2 phase；目前只是 dry-run preview |
 
@@ -52,11 +52,11 @@
 | 路徑 | `D:\github\blog-new\portable-blog-system\` | `D:\github\blog-new\portable-blog-deploy\` |
 | 用途 | 寫文章 / build / 開發 | 部署檔（`dist/` 之輸出）|
 | 編輯對象 | `content/` / `src/` / `docs/` | **只接受 build 後之 dist 內容** |
-| Git 角色 | branch main；本機開發；當前無 upstream 不 push | branch gh-pages；推到 GitHub 觸發部署 |
+| Git 角色 | branch main → origin/main；push 屬常規 source 同步流程 | branch gh-pages；推到 GitHub 觸發部署 |
 | 操作 | `npm run dev` / `npm run build` / `git commit` | **本批不碰**；deploy pipeline 屬獨立操作 |
-| 當前 HEAD | 隨開發進展 | 固定於 `4ecd92d`（今日未動） |
+| 當前 HEAD | 隨開發進展 | 最近一次已知 deploy 為 `960f234`（2026-05-24；`deploy: update ga4 link_type and hashtag wrap`）；實際 deploy repo HEAD 仍以本機 deploy repo 檢查為準 |
 
-**重要**：source 改完 + commit ≠ 部署到 GitHub Pages。部署需另外把 `dist/` 內容推到 deploy repo 之 gh-pages branch。**今日所有 commits 都只在 source repo；GitHub Pages 線上版未變**。
+**重要**：source 改完 + commit ≠ 部署到 GitHub Pages。部署需另外把 `dist/` 內容推到 deploy repo 之 gh-pages branch。source repo 與 deploy repo 是獨立流程；GitHub Pages 是否更新需以 gh-pages deploy repo HEAD / production 驗證為準。
 
 ---
 
@@ -71,7 +71,7 @@
 | CSS | 內建於 dist | Blogger 主題一次性貼 `blogger-full-style.css`（per `docs/blogger-export.md` §10）|
 | SEO meta | 自動 inject（per `src/views/seo/*.ejs`）| Blogger 主題自動產 / 後台「搜尋設定」管 |
 | sitemap | 本系統 `dist/sitemap.xml`（14 url entries）| Blogger 平台自帶 sitemap |
-| GA4 | 本系統 `ga4.ejs` 雙條件 gating 注入 | **不插**；由 Blogger 主題層 / 後台 GA 設定管 |
+| GA4 | 本系統 `ga4.ejs` 四條件 gating 注入（① `ga4` config 存在；② `enabled === true`；③ `measurementId` 非空；④ `isProdBuild === true`） | **不插**；由 Blogger 主題層 / 後台 GA 設定管 |
 
 **重點**：Blogger 之主動配置（標題 / 搜尋說明 / 標籤 / 自訂網址 / 發布 / robots meta）**仍由作者手動到 Blogger 後台操作**；本系統用 `copy-helper.txt` + `publish-checklist.txt` 提供逐區複製輔助。
 
@@ -128,9 +128,9 @@ Admin overview（`http://localhost:5173/admin/`；**dev-mode-only**；prod build
 npm run validate:content
 ```
 
-預期：`0 error(s) / 38 warning(s) on 33 issue-post(s)`（本日 baseline）
+預期：`0 error(s) / 39 warning(s) on 34 post(s)`（最近一次已知 baseline；2026-05-25）
 
-如出現 error 必須先修；如新 warning 數異常上升需檢查改動。詳見 `docs/seo-indexing-rules.md` §11 之 baseline 計算說明。
+baseline 會隨新 fixture / ready post 自然漂移；operator 應以當次 `validate:content` 結果為準。如出現 error 必須先修；如新 warning 數異常上升需檢查改動。詳見 `docs/seo-indexing-rules.md` §11 之 baseline 計算說明。
 
 ### 6.2 sitemap 驗證
 
@@ -154,17 +154,26 @@ Admin 不會進 prod dist / 不會進 sitemap（per `docs/admin-1-completion-rep
 
 ## 7. GA4 目前狀態
 
-**機制完整就位；尚未啟用**。
+**GA4 已啟用**：production live since 2026-05-21。
 
-- ✅ `content/settings/ga4.config.json` 已含 `measurementId` 欄位（**目前空字串**）+ `enabled: false`
-- ✅ `src/views/tracking/ga4.ejs` 已實作雙條件 gating（只當 `enabled === true && measurementId 非空` 才輸出 gtag script）
+- ✅ `content/settings/ga4.config.json`：`enabled: true` + `measurementId: "G-C77SMPF8VD"`
+- ✅ `src/views/tracking/ga4.ejs` 四條件 gating（① `ga4` config 存在；② `enabled === true`；③ `measurementId` 非空；④ `isProdBuild === true`）→ dev mode 不送 event；prod build 才注入 gtag script
 - ✅ `build-github.js` 已將 `tracking/ga4` partial inject 至 head
-- ❌ **measurementId 未填**；**enabled 仍 false** → GitHub Pages 線上 **無 GA4 script**（grep 證實）
-- ❌ Blogger 端**不插** GA4（由 Blogger 主題 / 後台管；避免重複）
+- ✅ GitHub Pages production 線上含 GA4 script；`page_view` 自動發送
+- ✅ 2026-05-24 G2 click tracking source fix 已 deploy（最近一次已知 deploy `960f234`）；user manual validation passed
+- ❌ Blogger 端**不插** GA4 script（由 Blogger 主題 / 後台管；避免重複；per `docs/blogger-listener-strategy.md`）
+- 🟡 Reverse UTM Blogger → GitHub：source live but dormant；source 已 push（pm-24a/b/c）但 fixture 未建、Blogger 後台未重貼、GA4 reverse direction 無 production traffic；待 pm-26 階段啟動（per `docs/reverse-utm-fixture-plan.md` §10）
 
-**啟用步驟**：詳見 `docs/ga4-enable-preflight.md` §3.1 之 8 項必勾 checklist（含 measurementId 來源 / dev/prod gating 決策 / Search Console 連結）。
+### 7.1 觀察方式
 
-⚠️ **不要擅自填 measurementId**；應先看 `ga4-enable-preflight.md` 之決策後再操作。
+- **Realtime / DebugView**：在 GA4 後台觀察 `page_view` 與 `click_*` event 即時 fire
+- **Reports**：GA4 後台 Reports 看 7 天 / 28 天累計
+- **詳細 SOP**：`docs/20260524-ga4-reverse-utm-observation.md` §4-§6
+
+### 7.2 歷史註記 / 未來重設時參考
+
+- 2026-05-21 pm-46 完成 8 項必勾 preflight + 啟用 + 驗收（per `docs/ga4-enable-preflight.md` §3.1）
+- 若未來需重設 / 換 measurementId / 切站 / 啟用 dev/prod 分流：請先回看 `docs/ga4-enable-preflight.md`
 
 ---
 
@@ -263,20 +272,23 @@ baseline 不應「默默漂移」；應在 commit message + docs 明示變動原
 
 | # | 項目 | 文件 |
 |---|---|---|
-| 1 | GA4 measurementId 啟用（8 項必勾 checklist） | `docs/ga4-enable-preflight.md` §3.1 |
-| 2 | FB-P5-c 真實寫入啟動（8 項必勾 + 6 項前置確認） | `docs/fb-sidecar-write-preflight-decision.md` §7 + `docs/fb-sidecar-write-safety.md` §13.1 |
-| 3 | sitemap 拆分（不建議當前實作；user 可永遠不做）| `docs/seo-sitemap-split-pre-analysis.md` §7.7 |
-| 4 | DS-3-b platform theme 色票（user 設計師確認） | `docs/design-system-ds3b-theme-overrides-proposal.md` §5 |
-| 5 | DS-3-c hex 違規修正之視覺差確認（hero gradient）| `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §5.2 |
-| 6 | mirror partial 整合（屬 🔴 高風險；user 評估維護痛點再啟動）| `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §7.2 / DS-3-e |
-| 7 | Blogger 後台 CSS 重貼時機（若做 DS-3-b-blogger-entry） | `docs/design-system-ds3b-theme-overrides-proposal.md` §5.6 / §7.2 |
-| 8 | Blogger 文章發布後回填 publishedUrl（per `npm run backfill:url`） | `docs/publish-workflow.md` |
-| 9 | `vite host` 設定（0.0.0.0 vs localhost；影響 FB-P5-c write API 範圍） | `docs/fb-sidecar-write-preflight-decision.md` §3.2 |
-| 10 | YAML serializer 策略（A gray-matter / B raw text precise） | `docs/fb-sidecar-write-preflight-decision.md` §3.3 |
-| 11 | invalid URL severity（warning / error）| `docs/fb-sidecar-write-preflight-decision.md` §3.4 |
-| 12 | rollback automation level（Option A spawn / Option B manual）| `docs/fb-sidecar-write-preflight-decision.md` §3.5 |
-| 13 | 新 sidecar 建立流程（屬 FB-P5-e；FB-P5-c v1 不自動建立） | `docs/fb-sidecar-write-preflight-decision.md` §3.6 |
-| 14 | deploy repo push 時機與責任分工 | （目前手動操作；無自動化 CI） |
+| 1 | FB-P5-c 真實寫入啟動（8 項必勾 + 6 項前置確認） | `docs/fb-sidecar-write-preflight-decision.md` §7 + `docs/fb-sidecar-write-safety.md` §13.1 |
+| 2 | sitemap 拆分（不建議當前實作；user 可永遠不做）| `docs/seo-sitemap-split-pre-analysis.md` §7.7 |
+| 3 | DS-3-b platform theme 色票（user 設計師確認） | `docs/design-system-ds3b-theme-overrides-proposal.md` §5 |
+| 4 | DS-3-c hex 違規修正之視覺差確認（hero gradient）| `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §5.2 |
+| 5 | mirror partial 整合（屬 🔴 高風險；user 評估維護痛點再啟動）| `docs/design-system-ds3c-hardcoded-color-pre-analysis.md` §7.2 / DS-3-e |
+| 6 | Blogger 後台 CSS 重貼時機（若做 DS-3-b-blogger-entry） | `docs/design-system-ds3b-theme-overrides-proposal.md` §5.6 / §7.2 |
+| 7 | Blogger 文章發布後回填 publishedUrl（per `npm run backfill:url`） | `docs/publish-workflow.md` |
+| 8 | `vite host` 設定（0.0.0.0 vs localhost；影響 FB-P5-c write API 範圍） | `docs/fb-sidecar-write-preflight-decision.md` §3.2 |
+| 9 | YAML serializer 策略（A gray-matter / B raw text precise） | `docs/fb-sidecar-write-preflight-decision.md` §3.3 |
+| 10 | invalid URL severity（warning / error）| `docs/fb-sidecar-write-preflight-decision.md` §3.4 |
+| 11 | rollback automation level（Option A spawn / Option B manual）| `docs/fb-sidecar-write-preflight-decision.md` §3.5 |
+| 12 | 新 sidecar 建立流程（屬 FB-P5-e；FB-P5-c v1 不自動建立） | `docs/fb-sidecar-write-preflight-decision.md` §3.6 |
+| 13 | deploy repo push 時機與責任分工 | （目前手動操作；無自動化 CI） |
+
+### 歷史註記
+
+- 原 #1「GA4 measurementId 啟用」：✅ 已完成（2026-05-21 起 production live，measurementId `G-C77SMPF8VD`；2026-05-24 G2 click tracking source fix deploy 後再次驗收通過）。`docs/ga4-enable-preflight.md` 僅保留作為未來重設 / 換 measurementId / 新站啟用時之參考。
 
 ---
 
