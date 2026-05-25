@@ -24,8 +24,8 @@
 | repo | `portable-blog-system` |
 | working directory | `D:\github\blog-new\portable-blog-system` |
 | branch | `main` |
-| HEAD | `2470deb15b085c8eabe8c6719ccd9db9462922a5`（short `2470deb`；am-8 commit）|
-| origin/main | `2470deb15b085c8eabe8c6719ccd9db9462922a5` |
+| HEAD | `762386a9f054c3c2f43155795adb8fa2010acec3`（short `762386a`；am-11 commit）|
+| origin/main | `762386a9f054c3c2f43155795adb8fa2010acec3` |
 | ahead / behind | `0 / 0` |
 | working tree | clean |
 | modified / staged / untracked | ❌ 無 |
@@ -35,7 +35,7 @@
 
 ## §3 本日上午完成 commits timeline
 
-5 commits（按時序由舊至新；全 push origin/main；全 linear advance；無 merge）：
+7 commits（按時序由舊至新；全 push origin/main；全 linear advance；無 merge）：
 
 | # | commit | message | phase | 性質 |
 |---|--------|---------|-------|------|
@@ -44,13 +44,15 @@
 | 3 | `dc167a6` | `docs(audit): add 2026-05-25 phase 1 user guide drift check` | am-5 commit | docs new（297 行）|
 | 4 | `d6a8922` | `docs(guide): sync phase 1 user guide with D1-D8 drift` | am-6 commit | docs modify（+41 / -29；唯一 modify）|
 | 5 | `2470deb` | `docs(report): add 2026-05-25 reverse utm readiness snapshot` | am-8 commit | docs new（289 行）|
+| 6 | `62b7298` | `docs(report): add 2026-05-25 am checkpoint report` | am-9 commit | docs new（242 行；本檔自身初版）|
+| 7 | `762386a` | `docs(report): add 2026-05-25 affiliate first activation readiness` | am-11 commit | docs new（403 行）|
 
 ### 3.1 統計
 
-- **docs new**：4 commits（pc-handoff / usability-review / drift-check / reverse-utm-readiness-snapshot）
+- **docs new**：6 commits（pc-handoff / usability-review / drift-check / reverse-utm-readiness-snapshot / am-checkpoint-report 本檔 / affiliate-first-activation-readiness）
 - **docs modify**：1 commit（user-guide D1-D8 rewrite）
 - **source / content / settings / template / dist / deploy 變動**：0
-- **push 動作**：5 次 origin/main（每 commit 後一次 push）
+- **push 動作**：7 次 origin/main（每 commit 後一次 push）
 - **build / install / validate（除 audit 用之 read-only `validate:content`）**：0
 - **Blogger 後台 / GA4 後台操作**：0
 
@@ -88,6 +90,17 @@
 - 文件：`docs/20260525-reverse-utm-readiness-snapshot.md`（commit `2470deb`）
 - 內容：source live but dormant 狀態 5/24 → 5/25 跨日 drift = 0 之 read-only 確認 + 已完成 / 未完成 / blocked / deferred 全表 + 風險判斷（整體 🟢 低）+ 不建議現在建立 fixture 之 6 理由 + 後續啟動順序（per fixture-plan §10.5 Phase 1-6）
 - 結論：✅ 5/24 → 5/25 production state drift = 0；fixture 仍 deferred；live status 維持 🟡 dormant
+
+### 4.6 Affiliate first activation readiness（am-11）
+
+- 文件：`docs/20260525-affiliate-first-activation-readiness.md`（commit `762386a`）
+- 內容：affiliate 第一篇啟用前之 readiness snapshot + walkthrough；§1-§11 結構同型 reverse-utm-readiness-snapshot；含 audit baseline（9 個檢查過之檔案）+ 目前狀態表 + dormant 確認 + 候選文章盤點（C1 we-media-myself2 / C2 sample-book-review / C3 未來自然書評 / GitHub tech-note）+ 未來啟用 walkthrough 7 子節 + 風險判斷 7 項 + 不建議現在硬啟用 5 條 + 後續啟動條件 6 項
+- 結論：✅ affiliate 仍 dormant
+  - 0 ready post with `affiliate.enabled=true`
+  - `we-media-myself2` 之 `affiliate.links[]` 已預填 2 筆但 `enabled=false` + `position.top/bottom=false`（render 階段被 skip）
+  - `sample-book-review` 仍為 draft / sample（`status=draft`；`book.title` 空；body 僅 placeholder）
+  - 不建議現在硬啟用（候選 C1 / C2 皆違反「不改既有 + 不硬升 draft」原則；§7.5 高風險）
+  - 主軌是等未來自然書評 / 心得文章再啟用（per `phase-1-usability-review.md` §5.4 row #1）
 
 ---
 
@@ -173,6 +186,15 @@
 - ✅ git read-only commands（status / log / rev-parse / diff / grep）
 - ✅ git add / commit / push（per 各 commit phase；皆單檔；皆 linear advance）
 
+### §8.1 am-11 affiliate readiness 階段補充（11:05 後新增）
+
+- ✅ 唯一允許並執行之動作：新增 `docs/20260525-affiliate-first-activation-readiness.md`（403 行；commit `762386a`）
+- ✅ 未啟用 affiliate（任何 `affiliate.enabled` / `position.top` / `position.bottom` / `links[]` 皆未動）
+- ✅ 未修改任何文章（含 `we-media-myself2.md` / `sample-book-review.md` / 其他 post）
+- ✅ 未修改 settings（`affiliate-networks.json` / `ads.config.json`）/ templates
+- ✅ 未 build / 未 deploy
+- ✅ 未碰 Blogger / GA4 / FB 後台
+
 ---
 
 ## §9 下一步候選
@@ -210,7 +232,9 @@
 | 3 | `docs/20260525-phase1-usability-review.md` | Phase 1 7 維度能力盤點 + 13 流程 usability 表 + 痛點 + 文件補強候選 + Phase 2 待處理 | ~5 min |
 | 4 | `docs/20260525-phase1-user-guide-drift-check.md` | user guide 8 drift audit 紀錄；D1-D8 已於 am-6 修正 | ~3 min |
 | 5 | `docs/20260525-reverse-utm-readiness-snapshot.md` | Reverse UTM source live but dormant；fixture 仍 deferred | ~3 min |
-| 6 | 最後確認 | `git status --short --branch` 應為 `## main...origin/main`（clean）；`git rev-parse HEAD` 應等於 `git rev-parse origin/main`（皆 `2470deb` 或更新 HEAD） | ~1 min |
+| 6 | 最後確認 | `git status --short --branch` 應為 `## main...origin/main`（clean）；`git rev-parse HEAD` 應等於 `git rev-parse origin/main`（皆 `762386a` 或更新 HEAD） | ~1 min |
+
+**am-11 補充**：若下一 session 要看 affiliate 第一篇啟用規劃，讀 `docs/20260525-affiliate-first-activation-readiness.md`（~3 min）。
 
 讀完 1-6 後即可判斷下一步方向；不需再讀 5/24 docs trail（5/24 §15 trail map 已被本 checkpoint §3 / §4 摘要包含）。
 
