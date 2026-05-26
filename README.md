@@ -1,7 +1,7 @@
 # Portable Blog System
 
 依 `CLAUDE.md` 建立的「可搬家的本機資料夾型內容管理系統」。
-Phase 1 已正式 final（per `docs/phase-1-completion-report.md` Phase 9-z-d；commit `4d68f50`）；範圍涵蓋 Phase 0~9-z-d，含 GitHub Pages 站、Blogger 匯出、FB promotion、GA4 / sitemap / robots、Design System、sidecar bundle、book / series / relatedLinks schema。
+Phase 1 範圍涵蓋 Phase 0~9-z-d，**靜態發布系統可基礎運行**（per `docs/phase-1-completion-report.md`；commit `4d68f50`）：GitHub Pages 站、Blogger 匯出（HTML / 貼文素材 / metadata）、FB promotion（含 titleEn / hashtags / UTM）、GA4 click tracking、sitemap / robots、Design System、sidecar bundle、book / series / relatedLinks schema 等基礎能力已就位。系統仍持續改善 **usability、內容流程、SEO、GA4、廣告 / 聯盟區塊**；目前部分能力為 dormant（AdSense、affiliate block、Blogger→GitHub reverse UTM），待自然觸發或外部條件就位後再啟動。
 
 ## 專案定位
 
@@ -151,12 +151,12 @@ Blogger 文章另有 sidecar：
 
 ## Phase 1 已完成能力（摘要）
 
-Phase 1 final 範圍涵蓋 Phase 0~9-z-d；完整逐項對照見 `docs/phase-1-completion-checklist.md`（13 主節 / 525 行）+ 正式 final report `docs/phase-1-completion-report.md`。主要能力：
+Phase 1 範圍涵蓋 Phase 0~9-z-d；完整逐項對照見 `docs/phase-1-completion-checklist.md`（13 主節 / 525 行）+ 正式收尾報告 `docs/phase-1-completion-report.md`。主要能力：
 
-- **GitHub Pages 站**：production live（measurementId `G-C77SMPF8VD`，自 2026-05-21 起；最近 deploy `960f234`，2026-05-24）；首頁 / 列表 / 詳細 / 分類 / 標籤 / 404 / sitemap.xml（filter noindex）/ robots.txt / Design System 子頁全部 live
-- **Blogger 匯出**：full / summary / redirect-card 三模式；每篇產 4 檔 dist（post.html / 13 區塊 copy-helper / meta.json / publish-checklist）；Blogger theme CSS 4 檔；首頁 / category index；cross-source mirror（Blogger 文章可同步輸出至 GitHub dist）
-- **FB promotion**：`.fb.md` sidecar 12 欄位 schema；`build:promotion` 產 FB 文案 txt；UTM 自 `promotion.config.json` 注入；Admin detail panel 顯示 14 row FB metadata
-- **GA4 / click tracking**：4-AND gating；affiliate top / bottom + relatedLinks + otherLinks + placement params 之 click attrs 全 landed；GitHub→Blogger forward UTM live；Blogger→GitHub reverse UTM source landed but dormant（per `CLAUDE.md` §16.4）
+- **GitHub Pages 站**：production live（measurementId `G-C77SMPF8VD`，自 2026-05-21 起；最近 deploy `960f234`，2026-05-24）；首頁 / 列表 / 詳細 / 分類 / 標籤 / 404 / sitemap.xml（filter noindex）/ robots.txt / Design System 子頁全部 live；作為新網站之主要內容輸出
+- **Blogger 匯出**：full / summary / redirect-card 三模式；每篇產 4 檔貼文素材（post.html / 13 區塊 copy-helper / meta.json / publish-checklist）供手動貼至 Blogger 後台；Blogger theme CSS 4 檔；首頁 / category index；cross-source mirror（Blogger 文章可同步輸出至 GitHub dist）
+- **FB promotion**：`.fb.md` sidecar 12 欄位 schema（含 titleEn / hashtags / 推廣文案 / target page / UTM 等）；`build:promotion` 產 FB 文案 txt（UTM 自 `promotion.config.json` 注入）；Admin detail panel 顯示 14 row FB metadata
+- **GA4 / click tracking**：4-AND gating；click event 涵蓋 **affiliate block placement（top / bottom + placement params）**、**relatedLinks**、**otherLinks** 之 click attrs 全 landed；**hashtag 仍為 `<span>` 無 `click_hashtag` event**（屬 Phase 2 候選）；GitHub→Blogger forward UTM live；**Blogger→GitHub reverse UTM 為 landed but dormant — 尚未經 true production validation**（per `CLAUDE.md` §16.4）
 - **Design System**：tokens / themes / spacing / typography / breakpoints / mixins / z-index 完整；BEM + `lab-` prefix 一致；DS-3 hardcoded color resolved（10 fixes + 2 documented exemptions）
 - **連結處理**：外部連結自動 `target="_blank" rel="nofollow noopener noreferrer"`；聯盟連結自動 `sponsored`；站內連結不加 UTM；策略 A skip if author UTM exists
 - **Schema / validate / report**：sidecar bundle + book + series + relatedLinks 4 大 schema；`validate:content` 0 error baseline；report / check / smoke 共 9 個 helper script
@@ -169,9 +169,10 @@ Phase 1 final 範圍涵蓋 Phase 0~9-z-d；完整逐項對照見 `docs/phase-1-c
 - **Blogger 100% 手動貼文**：per `CLAUDE.md` §29「Blogger API 不做」；每篇貼文 5-10 min；`publish-checklist.txt` + `docs/20260524-blogger-repost-checklist.md` 為 SOP
 - **GitHub Pages deploy 為手動**：採 `cp -r dist/* ../portable-blog-deploy/` + `git rm` stale + commit + push gh-pages；per `docs/github-deploy.md` + `docs/20260524-blogger-github-publishing-runbook.md` §3-§4
 - **`vite.config.js` 採 `appType: 'mpa'`**：dev 階段不存在路徑回 Vite 預設 404，**不**自動載入 `/404.html`；GitHub Pages 部署後才會自動 fallback
-- **AdSense dormant**：`ads.config.json` 結構就位但 `enabled=false`；申請 blocked on custom domain + HTTPS Enforce + AdSense 審核
-- **Affiliate dormant**：schema / providers / `click_affiliate_cta` event 全就位；無 ready post 設 `affiliate.enabled=true`；待自然書評觸發（per `docs/20260525-affiliate-first-activation-readiness.md`）
-- **Reverse UTM dormant**：pm-24a/b/c source 已 push origin/main；fixture 未建；Blogger 未重貼；GA4 reverse direction 0 traffic；維持 dormant 至自然 fixture 出現（per `docs/reverse-utm-fixture-plan.md` §10）
+- **廣告 / 變現雙通路皆 dormant**：本專案變現非單一倚賴 Google AdSense；另有 affiliate block 通路（書評 / 教具下載文章內嵌聯盟連結）。兩通路 schema 均已就位但目前 dormant：
+  - **AdSense dormant**：`ads.config.json` 結構就位但 `enabled=false`；申請 blocked on custom domain + HTTPS Enforce + AdSense 審核
+  - **Affiliate dormant**：schema / providers（**通路王 / 聯盟網**；per `content/settings/affiliate-networks.json`）/ `click_affiliate_cta` event 全就位；無 ready post 設 `affiliate.enabled=true`；待自然書評觸發（per `docs/20260525-affiliate-first-activation-readiness.md`）
+- **Reverse UTM dormant（landed but not validated）**：pm-24a/b/c source 已 push origin/main；fixture 未建；Blogger 未重貼；GA4 reverse direction 0 traffic；**尚未經 true production validation**（未經 user 手動重貼 Blogger 後台 + GA4 Realtime 驗收）；維持 dormant 至自然 fixture 出現（per `docs/reverse-utm-fixture-plan.md` §10）
 - **hashtag 仍為 `<span>`**：無 click target / `click_hashtag` event；屬 Phase 2 候選（per `docs/hashtag-slug-decision.md`）
 - **Blogger 端不對接 click tracking**：設計層決議（per `docs/blogger-listener-strategy.md` §5.1）；Blogger 後台 GA4 僅有 page_view
 - **Custom domain 未綁**：仍用 GitHub Pages 預設 `babel-lab.github.io/portable-blog-system`（per `docs/custom-domain-root-files-strategy.md`）
