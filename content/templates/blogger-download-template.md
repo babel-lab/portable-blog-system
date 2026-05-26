@@ -44,11 +44,13 @@ download:
 relatedLinks:
   - kind: internal
     platform: "blogger"
+    sourceKey: "blogger"
     title: "{相關教具下載文章}"
     url: "" # 待目標文章發布後回填正式 URL
 otherLinks:
   - kind: external
     platform: "Youtube"
+    sourceKey: "youtube"
     title: "{教具使用示範影片}"
     url: ""
 ---

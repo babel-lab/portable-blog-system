@@ -59,6 +59,7 @@ affiliate:
 relatedLinks:
   - kind: internal
     platform: "blogger"
+    sourceKey: "bagel-books"
     title: "{同系列前一篇書評標題}"
     url: "" # 待目標文章發布後回填正式 URL
   - kind: external
@@ -68,10 +69,12 @@ relatedLinks:
 otherLinks:
   - kind: external
     platform: "台北市立圖書館"
+    sourceKey: "taipei-library"
     title: "書籍館藏頁"
     url: ""
   - kind: external
     platform: "Youtube"
+    sourceKey: "youtube"
     title: "{相關講座 / 作者訪談影片}"
     url: ""
 ---
