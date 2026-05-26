@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "description": "Central registry for relatedLinks / otherLinks source labels. This file is additive and currently has no renderer consumer.",
+  "sources": [
+    {
+      "sourceKey": "blogger",
+      "displayLabel": "BLOG",
+      "sourceType": "internalPlatform",
+      "defaultTargetType": "internal",
+      "defaultPlatform": "blogger",
+      "defaultRel": ["noopener"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 10
+    },
+    {
+      "sourceKey": "github",
+      "displayLabel": "GITHUB",
+      "sourceType": "internalPlatform",
+      "defaultTargetType": "internal",
+      "defaultPlatform": "github",
+      "defaultRel": ["noopener"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 20
+    },
+    {
+      "sourceKey": "bagel-books",
+      "displayLabel": "貝果書屋",
+      "sourceType": "internalCategory",
+      "defaultTargetType": "internal",
+      "defaultPlatform": "blogger",
+      "defaultRel": ["noopener"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 30
+    },
+    {
+      "sourceKey": "life",
+      "displayLabel": "生活",
+      "sourceType": "internalCategory",
+      "defaultTargetType": "internal",
+      "defaultPlatform": "blogger",
+      "defaultRel": ["noopener"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 40
+    },
+    {
+      "sourceKey": "tech-note",
+      "displayLabel": "技術文章",
+      "sourceType": "internalCategory",
+      "defaultTargetType": "internal",
+      "defaultPlatform": "github",
+      "defaultRel": ["noopener"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 50
+    },
+    {
+      "sourceKey": "youtube",
+      "displayLabel": "YouTube",
+      "sourceType": "mediaPlatform",
+      "defaultTargetType": "external",
+      "defaultPlatform": null,
+      "defaultRel": ["noopener", "noreferrer"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 60
+    },
+    {
+      "sourceKey": "netflix",
+      "displayLabel": "Netflix",
+      "sourceType": "mediaPlatform",
+      "defaultTargetType": "external",
+      "defaultPlatform": null,
+      "defaultRel": ["noopener", "noreferrer"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 70
+    },
+    {
+      "sourceKey": "taipei-library",
+      "displayLabel": "台北市立圖書館",
+      "sourceType": "library",
+      "defaultTargetType": "external",
+      "defaultPlatform": null,
+      "defaultRel": ["noopener", "noreferrer"],
+      "defaultTrackingPolicy": {
+        "enabled": true,
+        "ga4SourceKey": true,
+        "utm": false
+      },
+      "isActive": true,
+      "sortOrder": 80
+    }
+  ]
+}
