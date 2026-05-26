@@ -139,6 +139,18 @@ Admin overview（`http://localhost:5173/admin/`；**dev-mode-only**；prod build
 - 一般 GitHub 文章請優先從 `post-template.md` 或 `github-tech-note-template.md` 開始。
 - Blogger primary 文章（書評 / 雜誌 / 下載）仍應使用 `blogger-book-review-template.md` / `blogger-magazine-review-template.md` / `blogger-download-template.md`。
 
+**Blogger primary 範本 scaffold parity 紀錄**
+
+`blogger-magazine-review-template.md` 於 2026-05-26 commit `007875d`（`refactor(templates): add top-level scaffold to magazine template`）補齊與 `blogger-book-review-template.md` 對齊之 top-level scaffold 欄位（per am-12 read-only audit DR-1 / am-13 commit-push）：
+
+- 新增：`titleEn` / `searchDescription` / `cover` / `coverAlt` / `canonical: "auto"`
+- 新增 `blocks:` 區塊（`toc` / `adsenseTop` / `adsenseMiddle` / `adsenseBottom` / `hashtags` / `socialFollow` / `relatedPosts` / `sidebar`）
+- magazine-specific 欄位仍保留：`book.mediaType: "magazine"` / `book.issue` / `book.issn` / `authors[].role: "editor"`
+- 未加入 book-only 欄位：`isbn` / `volume` / `volumeLabel`
+- 未加入 `promotion.facebook` 或 `.fb.md` sidecar metadata（FB 推廣資料屬 sidecar 範疇，per `docs/fb-sidecar-schema.md`）
+
+此修正為 template-only，不代表 build / deploy / Blogger repost / GA4 validation 已發生。
+
 ### 5.1 GitHub Pages 文章
 
 1. 複製 `content/templates/{post-template,github-tech-note-template}.md` 至 `content/github/posts/{YYYYMMDD-slug}.md`
