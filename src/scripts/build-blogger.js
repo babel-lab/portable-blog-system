@@ -67,11 +67,33 @@ function placeholderHtml(post) {
 //   - 非 GitHub cross-link / 同站連結 / 非 object item / 缺 url 之 item 維持原樣
 //   - 既有 utm_* 套用策略 A：跳過 UTM 注入但仍套 target=_blank + rel merge（per applyCrossSiteUtm）
 //   - 本批暫不串接 blogger-post-full.ejs；template 仍讀 post.relatedLinks / post.otherLinks raw（24c 接線）
+// Phase 20260527-am-2 step-4：sourceKey → registry.displayLabel 解析；fallback 至 item.platform（mirror build-github.js）
+function buildSourcesByKey(settings) {
+  const map = new Map();
+  const sources = settings && settings.linkSources && settings.linkSources.sources;
+  if (!Array.isArray(sources)) return map;
+  for (const s of sources) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
+    if (s.isActive === false) continue;
+    if (typeof s.sourceKey !== 'string' || s.sourceKey === '') continue;
+    if (typeof s.displayLabel !== 'string' || s.displayLabel === '') continue;
+    map.set(s.sourceKey, s.displayLabel);
+  }
+  return map;
+}
+
+function resolveSourceLabel(item, sourcesByKey) {
+  if (!item || typeof item.sourceKey !== 'string' || item.sourceKey === '') return null;
+  return sourcesByKey.has(item.sourceKey) ? sourcesByKey.get(item.sourceKey) : null;
+}
+
 function deriveRenderedCrossLinks(rawLinks, settings, slot) {
   const arr = Array.isArray(rawLinks) ? rawLinks : [];
+  const sourcesByKey = buildSourcesByKey(settings);
   return arr.map((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
     if (typeof item.url !== 'string' || item.url.trim() === '') return item;
+    const resolvedLabel = resolveSourceLabel(item, sourcesByKey);
     const xs = applyCrossSiteUtm({
       url: item.url,
       settings,
@@ -79,8 +101,12 @@ function deriveRenderedCrossLinks(rawLinks, settings, slot) {
       existingRel: typeof item.rel === 'string' ? item.rel : '',
       direction: 'to_github',
     });
-    if (xs.target === null) return item; // 非 GitHub cross-link：不動
-    return { ...item, url: xs.url, target: xs.target, rel: xs.rel };
+    if (xs.target === null) {
+      return resolvedLabel === null ? item : { ...item, resolvedLabel };
+    }
+    const base = { ...item, url: xs.url, target: xs.target, rel: xs.rel };
+    if (resolvedLabel !== null) base.resolvedLabel = resolvedLabel;
+    return base;
   });
 }
 

@@ -390,19 +390,48 @@ function buildSeoForTagList({ settings }) {
 //   - 對 Blogger cross-link 連結注入 UTM + 設 target=_blank + 合併 rel（per ga4-url-builder.applyCrossSiteUtm）
 //   - 非 Blogger 連結維持原樣（item.target / item.rel 為 null；EJS template 走 fallback 既有邏輯）
 //   - 非 object / 非 string url 之 item 維持原樣（EJS render-time filter 會 skip）
+// Phase 20260527-am-2 step-4：sourceKey → registry.displayLabel 解析；fallback 至 item.platform。
+//   - 只在 sourceKey 命中 active source 時 attach resolvedLabel；其餘 item 不增欄位
+//   - 既有 ready / published posts 無 sourceKey → 全走 fallback → 輸出 byte-identical-modulo-builtAt
+function buildSourcesByKey(settings) {
+  const map = new Map();
+  const sources = settings && settings.linkSources && settings.linkSources.sources;
+  if (!Array.isArray(sources)) return map;
+  for (const s of sources) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
+    if (s.isActive === false) continue;
+    if (typeof s.sourceKey !== 'string' || s.sourceKey === '') continue;
+    if (typeof s.displayLabel !== 'string' || s.displayLabel === '') continue;
+    map.set(s.sourceKey, s.displayLabel);
+  }
+  return map;
+}
+
+function resolveSourceLabel(item, sourcesByKey) {
+  if (!item || typeof item.sourceKey !== 'string' || item.sourceKey === '') return null;
+  return sourcesByKey.has(item.sourceKey) ? sourcesByKey.get(item.sourceKey) : null;
+}
+
 function deriveRenderedCrossLinks(rawLinks, settings, slot) {
   const arr = Array.isArray(rawLinks) ? rawLinks : [];
+  const sourcesByKey = buildSourcesByKey(settings);
   return arr.map((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
     if (typeof item.url !== 'string' || item.url.trim() === '') return item;
+    const resolvedLabel = resolveSourceLabel(item, sourcesByKey);
     const xs = applyCrossSiteUtm({
       url: item.url,
       settings,
       slot,
       existingRel: typeof item.rel === 'string' ? item.rel : '',
     });
-    if (xs.target === null) return item; // 非 Blogger cross-link：不動
-    return { ...item, url: xs.url, target: xs.target, rel: xs.rel };
+    if (xs.target === null) {
+      // 非 Blogger cross-link：保留 item 結構；僅在 sourceKey 命中時 attach resolvedLabel
+      return resolvedLabel === null ? item : { ...item, resolvedLabel };
+    }
+    const base = { ...item, url: xs.url, target: xs.target, rel: xs.rel };
+    if (resolvedLabel !== null) base.resolvedLabel = resolvedLabel;
+    return base;
   });
 }
 

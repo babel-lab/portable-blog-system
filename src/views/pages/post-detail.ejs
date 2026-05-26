@@ -164,7 +164,10 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
       <ul class="lab-related-links__list">
         <% renderableRelated.forEach(function(item) {
           const isInternal = item.kind === 'internal';
-          const platform = (typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '';
+          // Phase 20260527-am-2 step-4：sourceKey → registry.displayLabel；fallback 至 item.platform
+          const platform = (typeof item.resolvedLabel === 'string' && item.resolvedLabel.trim() !== '')
+            ? item.resolvedLabel.trim()
+            : ((typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '');
           const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
           const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
           const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
@@ -201,7 +204,10 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
       <ul class="lab-other-links__list">
         <% renderableOther.forEach(function(item) {
           const isInternal = item.kind === 'internal';
-          const platform = (typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '';
+          // Phase 20260527-am-2 step-4：sourceKey → registry.displayLabel；fallback 至 item.platform
+          const platform = (typeof item.resolvedLabel === 'string' && item.resolvedLabel.trim() !== '')
+            ? item.resolvedLabel.trim()
+            : ((typeof item.platform === 'string' && item.platform.trim() !== '') ? item.platform.trim() : '');
           const hasDesc = typeof item.description === 'string' && item.description.trim() !== '';
           const finalTarget = (typeof item.target === 'string' && item.target !== '') ? item.target : (isInternal ? null : '_blank');
           const finalRel = (typeof item.rel === 'string' && item.rel !== '') ? item.rel : (isInternal ? null : 'nofollow noopener');
