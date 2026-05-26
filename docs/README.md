@@ -202,11 +202,11 @@ npm run check:images
 
 ## §7 最近一次穩定 checkpoint
 
-（更新時點：2026-05-26；am-17 docs-only checkpoint refresh；本 phase 為 docs-only baseline sync — 未跑 build / validate / deploy / Blogger repost / GA4 validation。下方「5/21 重點摘要 / 解除 deferred items / 新增 docs」起之區塊為**歷史紀錄保留**；非當前快照；請以本節 7.1 為當前狀態）
+（更新時點：2026-05-26；pm-11 docs-only checkpoint refresh；本 phase 為 docs-only baseline sync — 未跑 build / validate / deploy / Blogger repost / GA4 validation。下方「5/21 重點摘要 / 解除 deferred items / 新增 docs」起之區塊為**歷史紀錄保留**；非當前快照；請以本節 7.1 為當前狀態）
 
 ### 7.1 當前 checkpoint（2026-05-26）
 
-- source HEAD: `7f18266 docs(project): refresh PROJECT_TREE.txt against current tracked files`（5/26 am 多 phase 線性堆疊：`863d7e8` reverse-utm fixture scan → `e34b002` roadmap align → `d4fd450` / `1c2a346` / `007875d` template refactor 三連 → `e295af7` phase-1 guide note → `7f18266` PROJECT_TREE refresh；皆 docs-only / template-only / listing-only；無 source code / build / deploy 變動）
+- source HEAD: `726bb3b refactor(templates): improve sibling markdown body scaffolds`（5/26 多 phase 線性堆疊：`863d7e8` reverse-utm fixture scan → `e34b002` roadmap align → `d4fd450` / `1c2a346` / `007875d` template refactor 三連 → `e295af7` phase-1 guide note → `7f18266` PROJECT_TREE refresh → `6f20cf8` README §7 baseline refresh → `3191bea` template body scaffold cleanup（blogger book / magazine / download 三檔）→ `726bb3b` sibling template body scaffold cleanup（post / github-tech-note / blogger-summary 三檔）；皆 docs-only / template-only / listing-only；無 source code / build / deploy 變動）
 - branch: `main` / tracking `origin/main` / 與 remote 同步
 - working tree: clean
 - deploy repo HEAD：**本 phase 未 deploy**；最近一次已知 deploy 為 `960f234`（2026-05-24；`deploy: update ga4 link_type and hashtag wrap`；per `docs/phase-1-user-operation-guide.md` §2 / §7）；實際 deploy repo HEAD 仍以本機 deploy repo 檢查為準
@@ -214,7 +214,7 @@ npm run check:images
 - GA4 status：✅ production live（measurementId `G-C77SMPF8VD`；2026-05-21 起）；**本 phase 未做 GA4 validation**
 - 🟡 Reverse UTM Blogger → GitHub：**source landed but dormant**（pm-24a `7e1d356` + pm-24b `e2309e9` + pm-24c `7c769fe`；2026-05-23 push origin/main；尚未 deploy；Blogger 後台尚未重貼；live but dormant）
 - 🔴 pm-26 deploy gate：仍 **BLOCKED by no positive GitHub cross-link fixture**（per `docs/20260526-reverse-utm-positive-fixture-scan-report.md` §7 + `docs/reverse-utm-fixture-plan.md` §6 + `docs/20260525-reverse-utm-pm26-preflight-readiness-checklist.md` §D.1-3）
-- 5/26 am phase 屬 docs / template drift cleanup（am-12 ~ am-17）；無 source / build / deploy / Blogger / GA4 觸動
+- 5/26 am + pm phase 屬 docs / template drift cleanup（am-12 ~ am-17 + pm-1 ~ pm-11）；本批 template body scaffold cleanup 無 build / deploy / Blogger repost / GA4 validation；6 個 template body scaffold drift 已由 `3191bea` + `726bb3b` 收斂
 
 ### 7.2 歷史紀錄（2026-05-22 之前快照保留）
 
