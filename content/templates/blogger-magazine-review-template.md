@@ -4,6 +4,7 @@ site: "blogger"
 contentKind: "book-review"
 primaryPlatform: "blogger"
 title: "{雜誌名}{期別}讀後筆記"
+titleEn: ""
 slug: "{magazine-slug-yyyy-mm}"
 date: "{YYYY-MM-DD}"
 updated: "{YYYY-MM-DD}"
@@ -11,12 +12,25 @@ author: "Dean"
 category: "book-review"
 tags: ["magazine"]
 description: "{雜誌特輯讀後筆記摘要}"
+searchDescription: "{搜尋說明；含雜誌名 / 期別 / 核心關鍵字}"
+cover: ""
+coverAlt: ""
 status: "draft"
 draft: true
+canonical: "auto"
 publishTargets:
   blogger:
     enabled: true
     mode: "full"
+blocks:
+  toc: false
+  adsenseTop: true
+  adsenseMiddle: false
+  adsenseBottom: true
+  hashtags: true
+  socialFollow: true
+  relatedPosts: true
+  sidebar: true
 book:
   mediaType: "magazine"
   title: ""
