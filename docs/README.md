@@ -200,21 +200,37 @@ npm run check:images
 
 ---
 
-## §7 今日穩定 baseline
+## §7 最近一次穩定 checkpoint
 
-（更新時點：2026-05-22；day-1 docs-cleanup-a 後快照；本批屬 5/22 起點之 docs-only drift cleanup）
+（更新時點：2026-05-26；am-17 docs-only checkpoint refresh；本 phase 為 docs-only baseline sync — 未跑 build / validate / deploy / Blogger repost / GA4 validation。下方「5/21 重點摘要 / 解除 deferred items / 新增 docs」起之區塊為**歷史紀錄保留**；非當前快照；請以本節 7.1 為當前狀態）
+
+### 7.1 當前 checkpoint（2026-05-26）
+
+- source HEAD: `7f18266 docs(project): refresh PROJECT_TREE.txt against current tracked files`（5/26 am 多 phase 線性堆疊：`863d7e8` reverse-utm fixture scan → `e34b002` roadmap align → `d4fd450` / `1c2a346` / `007875d` template refactor 三連 → `e295af7` phase-1 guide note → `7f18266` PROJECT_TREE refresh；皆 docs-only / template-only / listing-only；無 source code / build / deploy 變動）
+- branch: `main` / tracking `origin/main` / 與 remote 同步
+- working tree: clean
+- deploy repo HEAD：**本 phase 未 deploy**；最近一次已知 deploy 為 `960f234`（2026-05-24；`deploy: update ga4 link_type and hashtag wrap`；per `docs/phase-1-user-operation-guide.md` §2 / §7）；實際 deploy repo HEAD 仍以本機 deploy repo 檢查為準
+- validate baseline：**本 phase 未重跑**；最近一次已知 baseline 為 `0 error / 39 warning / 34 post(s)`（per `docs/phase-1-user-operation-guide.md` §6.1，2026-05-25；baseline 隨 fixture / ready post 自然漂移）
+- GA4 status：✅ production live（measurementId `G-C77SMPF8VD`；2026-05-21 起）；**本 phase 未做 GA4 validation**
+- 🟡 Reverse UTM Blogger → GitHub：**source landed but dormant**（pm-24a `7e1d356` + pm-24b `e2309e9` + pm-24c `7c769fe`；2026-05-23 push origin/main；尚未 deploy；Blogger 後台尚未重貼；live but dormant）
+- 🔴 pm-26 deploy gate：仍 **BLOCKED by no positive GitHub cross-link fixture**（per `docs/20260526-reverse-utm-positive-fixture-scan-report.md` §7 + `docs/reverse-utm-fixture-plan.md` §6 + `docs/20260525-reverse-utm-pm26-preflight-readiness-checklist.md` §D.1-3）
+- 5/26 am phase 屬 docs / template drift cleanup（am-12 ~ am-17）；無 source / build / deploy / Blogger / GA4 觸動
+
+### 7.2 歷史紀錄（2026-05-22 之前快照保留）
+
+（以下為原 §7 內容；屬 5/22 day-1-docs-cleanup-a 後當時快照；保留為歷史 trail；**非當前狀態**。當前狀態以 §7.1 為準）
 
 - HEAD: `6593e4c docs(project): add custom domain root files safety strategy` （5/21 夜 custom-domain-root-files-safety-a 已落地；其後 pm-66 EOD §18 commit `f202e51` 已先在 5/21 末段落地；5/22 day-1 docs-cleanup-a 為本批；本 §7 自身落後 1 commit 為既知遞迴）
 - branch: `main` / tracking `origin/main` / 與 remote 同步
 - working tree: clean
-- deploy repo HEAD: `f32f7d3 deploy: 09b9a67 snapshot (GA4 enabled)`（**今日 2 個 deploy**：pm-6 `06e26ae`（SEO noindex + DS-3 CSS + admin overview polish）+ **pm-45 `f32f7d3`**（**GA4 enabled with measurementId G-C77SMPF8VD**）；皆已 push `origin/gh-pages`；deploy repo 自 pm-45 起未動；後續 commits 皆確認不需 deploy）
+- deploy repo HEAD: `f32f7d3 deploy: 09b9a67 snapshot (GA4 enabled)`（**5/21 2 個 deploy**：pm-6 `06e26ae`（SEO noindex + DS-3 CSS + admin overview polish）+ **pm-45 `f32f7d3`**（**GA4 enabled with measurementId G-C77SMPF8VD**）；皆已 push `origin/gh-pages`；deploy repo 自 pm-45 起未動；後續 commits 皆確認不需 deploy；**註**：5/24 deploy `960f234` 為後續事件；當前最新 deploy HEAD 請見 §7.1）
 - validate baseline: `0 error(s) / 39 warning(s) on 34 post(s)`（pm-34 加 `fb-post-url-missing` rule + negative fixture；+1 warning 變動合理）
 - dist/sitemap.xml: 14 url entries（mid-5 / pm-11 / pm-20 / pm-43 build 確認；pm-6 + pm-45 deploy 已上線）
 - dist/.gitkeep: **已從 source repo 移除**（pm-20 commit `3917526` Option A.1；`.gitignore` 對應 `!dist/.gitkeep` 一行同步移除；build 後 drift 從根源消除；其他 3 個 `dist-*/.gitkeep` 保留）
 - **GA4 status**：✅ **production live**（measurementId `G-C77SMPF8VD`；Blogger + GitHub Pages 共用；future custom domain 沿用；user 於 pm-46 手動驗收 Realtime 通過）
 - 5/21 commits 總計 **39 source + 2 deploy**（含 pm-66 EOD §18 commit `f202e51` + 5/21 夜 custom-domain-root-files-safety-a commit `6593e4c`；5/22 day-1-docs-cleanup-a 為新一日之起點）
-- 今日 commits 純線性堆疊；無 amend / rebase / force；source main 已 sync `origin/main`；deploy gh-pages 已 sync `origin/gh-pages`
-- 今日重點摘要：
+- 5/21 commits 純線性堆疊；無 amend / rebase / force；source main 已 sync `origin/main`；deploy gh-pages 已 sync `origin/gh-pages`
+- 5/21 重點摘要：
   - Admin overview polish（am-2 ~ am-7：C-1 README baseline / C-4 audit / S-1 empty states / S-4 tooltips / S-2 linkify / S-5 docs sync）
   - C-3 Admin-only fbPublished P3 rule（mid-1 ~ mid-3；commits `edbf6d0` + `022d8bd`）
   - Dev route 404 fix（mid-4-a/b/c；commit `7c9f7ea` + verification doc）
