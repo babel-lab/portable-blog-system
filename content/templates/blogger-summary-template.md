@@ -45,5 +45,28 @@ relatedLinks: []
 otherLinks: []
 ---
 
-這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。
+## Blogger 摘要開場
+
+{1–2 段開場文字；點出 GitHub 全文之主題、適合誰讀、為什麼值得看}
+
+## 重點摘要
+
+{以條列呈現全文最重要的 3–5 個重點；不寫完整論述；保留懸念}
+
+## 為什麼值得看全文
+
+{說明完整論述、程式碼範例、實作細節等 Blogger 摘要無法承載之內容只在 GitHub 全文展開；引發前往閱讀之動機}
+
+## GitHub 全文連結提示
+
+{此區以文字提示讀者前往 GitHub 全文，例如「完整內容請見下方相關連結之 GitHub 文章」。**不要在 body 寫死 GitHub URL**；正式 URL 由 build pipeline 依 frontmatter `publishTargets.github` / `canonical` 自動產生並注入 summary CTA 區塊。}
+
+## 延伸閱讀
+
+{本站其他相關文章；正式 URL 待目標文章發布後於 frontmatter `relatedLinks` 回填}
+
+## Hashtags 提示
+
+{frontmatter `tags` 已含主要標籤，於 Blogger render 時自動產生 hashtag 區；本區可作者手動補充建議搭配之關鍵字或主題提示，不直接出現 `#` 字元以免與 Blogger 自動 hashtag 區重疊}
+
 
