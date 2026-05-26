@@ -56,15 +56,6 @@ affiliate:
     top: true
     bottom: true
   links: []
-promotion:
-  facebook:
-    enabled: false
-    page: "fan1"
-    title: ""
-    message: ""
-    target: "auto"
-    hashtags: []
-    note: ""
 relatedLinks:
   - kind: internal
     platform: "blogger"
