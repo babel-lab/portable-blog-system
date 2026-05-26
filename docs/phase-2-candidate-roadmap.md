@@ -171,6 +171,46 @@
 - 建議拆 3 子批：GitHub-only / Blogger-only / 共用邏輯
 - 風險：🟡 中（演算法設計 + 兩端 render 對齊）
 
+### 3.8 Link source registry / related-links source labels
+
+- **狀態：🟢 design-only landed；無 consumer**
+- 對應：
+  - `docs/20260526-related-links-source-label-admin-design.md`（night-1 docs-only / design-only 設計建議；commit `fc7ac8a`）
+  - `docs/related-links-schema.md` §11（addendum；本批同步落地）
+  - night-3 read-only implementation-impact audit（與既有 canonical schema 無衝突；新欄位皆為 additive）
+
+#### 背景
+
+- night-1 已完成 source label / `sourceKey` / `displayLabel` / Admin 可管理 之設計建議
+- night-3 read-only audit 確認設計與既有 canonical schema 完全不衝突；既有 8 欄位 `kind` / `platform` / `title` / `url` / `description` / `order` / `target` / `rel` 不變
+- 當前 repo **無** `content/settings/link-sources.json`；**無** `sourceKey` 寫入；**無** 任何 consumer（renderer / GA4 / Admin / validate 皆未感知）
+
+#### 範圍（建議拆 7 子批；逐批啟動）
+
+1. **Step 1：docs-only roadmap / schema addendum**（本批；roadmap §3.8 + schema §11）
+2. **Step 2：settings-only** — 新增 `content/settings/link-sources.json` 初版 registry（純 additive；無 consumer；零 build / dist 影響）
+3. **Step 3：template-only** — 5 個 `content/templates/*.md` 之 `relatedLinks` / `otherLinks` sample 補入 `sourceKey` 範例行（templates 不被 `build:*` 掃描）
+4. **Step 4：renderer** — 兩端 EJS 引入 fallback chain `labelOverride > registry.displayLabel > platform > kind`；無 `sourceKey` 時 fallback 至既有 `platform` 字串（backward compatible）
+5. **Step 5：GA4** — anchor 加 `data-ga4-param-link_source_key`；`ga4-link-tracking-spec.md` 同步加一行；屬 production dimension 變動，需 preflight
+6. **Step 6：Admin selector** — 撰寫文章時下拉選擇 `sourceKey`；屬 Admin write 系列；需 atomic write
+7. **Step 7：validate rules** — 新增 warning：`source-key-not-found` / `source-inactive`；mirror 既有 4 條 `related-links-*` warning-only pattern
+
+#### 邊界
+
+- 不因本路線而啟動 build / deploy / Blogger repost / GA4 validation / fixture creation / npm install
+- **reverse UTM remains landed but dormant**（per §3.3；本路線與 reverse UTM 屬兩條獨立軌；不互相觸發）
+- **pm-26 deploy gate remains BLOCKED**（no positive GitHub cross-link fixture；per §3.3 + `docs/20260526-reverse-utm-positive-fixture-scan-report.md`）
+- 既有 `kind` / `platform` / GA4 `link_type` 兩軸命名（per `docs/related-links-schema.md` §7.4）不變
+
+#### 風險
+
+- 🟢 step 1-3：極低（純 docs / settings / template additive；無 consumer 即無 dist 影響）
+- 🟡 step 4-7：中（renderer 須 byte-identical-modulo-builtAt 驗證；GA4 prod dimension 須 preflight；Admin write 須 atomic）
+
+#### 推薦
+
+先 step 1（本批）→ step 2 → step 3；後續 step 4+ 須 user 明示啟動，並各自走 pre-analysis / preflight。
+
 ---
 
 ## 4. ❌ 暫不建議做
@@ -307,6 +347,7 @@ Phase Z（永禁 / 二階段）
 - `docs/20260524-blogger-github-publishing-runbook.md`（operator entry runbook）
 - `docs/custom-domain-root-files-strategy.md`（custom domain 策略）
 - `docs/hashtag-slug-decision.md`（hashtag slug 決議）
+- `docs/20260526-related-links-source-label-admin-design.md`（link source registry / `sourceKey` / Admin 可管理之 docs-only / design-only 設計建議；對應 §3.8）
 
 ---
 

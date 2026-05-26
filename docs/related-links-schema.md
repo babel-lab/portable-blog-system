@@ -636,6 +636,105 @@ per Phase 9-g-g-d source 落地（commit `1d56f8a`；兩端 `src/scripts/build-g
 ### 10.5 跨 Phase 路線
 
 - `docs/future-roadmap.md`（Phase 9-g 系列進度）
+- `docs/phase-2-candidate-roadmap.md` §3.8（link source registry roadmap step 1-7；對應 §11.5）
+- `docs/20260526-related-links-source-label-admin-design.md`（night-1 source label / `sourceKey` 設計建議；對應 §11）
+
+---
+
+## §11 Future Addendum: Source Registry / sourceKey
+
+本節為**未來擴充**之 addendum；**本階段不落地**。詳細設計建議見 `docs/20260526-related-links-source-label-admin-design.md`（night-1 docs-only / design-only 文件）；落地 roadmap 見 `docs/phase-2-candidate-roadmap.md` §3.8。
+
+night-3 read-only implementation-impact audit 已確認本 addendum 與 §3.2 既有 canonical schema **完全不衝突**；新欄位皆為 additive。
+
+### 11.1 現行 canonical schema 維持不變
+
+§3.2 之 8 個欄位仍為 canonical schema，**不**因本 addendum 而變動：
+
+- `kind`（必填；`internal` / `external`）
+- `platform`（必填；自由字串）
+- `title`（必填）
+- `url`（必填）
+- `description`（選填）
+- `order`（選填）
+- `target`（選填；build / render 自動套；per §4.1）
+- `rel`（選填；build / render 自動套；per §4.1）
+
+`kind` 與 GA4 `link_type` 之兩軸命名（per §7.4）亦不因本 addendum 變動。
+
+### 11.2 未來建議新增 optional `sourceKey`
+
+未來可於每筆 entry **additive** 加入 optional `sourceKey` 欄位：
+
+| 欄位 | 型別 | 必填 | 說明 |
+|---|---|---|---|
+| `sourceKey` | string | 否 | machine-readable key；對應未來 source registry 之 entry（如 `youtube` / `taipei-library` / `bagel-books`）|
+
+#### 11.2.1 sourceKey 與 displayLabel 之關係
+
+- `sourceKey`：machine-readable key；穩定不變；不直接顯示
+- `displayLabel`：human-readable 顯示文字；來自**未來** registry（per §11.3）；可隨品牌更名 / 翻譯調整變動
+- 兩者分離理由：避免顯示文字變動污染 GA4 dimension 之穩定性（per night-1 設計 §6.2）
+
+#### 11.2.2 顯示 fallback chain（建議）
+
+從高優先到低優先：
+
+1. `labelOverride`（若 entry 有此選填欄位且非空）
+2. registry lookup by `sourceKey`（若 entry 有 `sourceKey` 且 registry 有對應 entry 且 `isActive: true`）→ 使用 `registry.displayLabel`
+3. 既有 `platform` 字串（per §3.4）
+4. `kind` fallback（`[BLOG]` / `[GITHUB]` 等平台識別）
+
+#### 11.2.3 backward compatible
+
+- 無 `sourceKey` 時：**fallback 至既有 `platform` 字串**（per §3.4 渲染前綴 `[{platform}]`）；既有 ready posts / templates 之 frontmatter 完全不需改動
+- 既有 4 條 validate warning（per §3.3）不變
+- 既有 reverse UTM 邏輯（per §4.3）不變
+- 既有 Blogger / GitHub render markup（per §8）對無 `sourceKey` 之文章保持 byte-identical-modulo-builtAt
+
+### 11.3 未來 source registry 建議位置
+
+```text
+content/settings/link-sources.json
+```
+
+理由（與既有 settings 慣例對齊）：
+
+- 與 `categories.json` / `tags.json` / `link-rules.json` 同層級
+- 屬「**內容相關**之集中設定」（per `CLAUDE.md` §3.2 之 settings 列表）
+- `src/settings/` 在 repo 內**不存在**之既有路徑
+
+每筆 source entry 之建議 schema 詳見 `docs/20260526-related-links-source-label-admin-design.md` §3.2.1 / §3.2.2。
+
+### 11.4 本階段不落地（Non-goals）
+
+本 addendum 為 **roadmap 文件**；本階段（docs-only batch）**明確不做**：
+
+- ❌ 不新增 `content/settings/link-sources.json`
+- ❌ 不修改 `content/templates/*.md`
+- ❌ 不修改 `src/views/*.ejs` / `src/scripts/*.js` 之 renderer
+- ❌ 不修改 GA4 event params / `docs/ga4-link-tracking-spec.md`
+- ❌ 不修改 `src/scripts/validate-content.js` 之 validate rules
+- ❌ 不修改 `content/settings/categories.json`（如未來 night-1 §5.4 之 `channelLabel` 擴充屬另一批）
+- ❌ 不 build / 不 deploy / 不 Blogger repost / 不 GA4 validation / 不建立 fixture / 不 npm install
+- ❌ 不解除 reverse UTM dormant 狀態；reverse UTM remains landed but dormant
+- ❌ 不解除 pm-26 deploy gate；deploy gate remains BLOCKED on no positive GitHub cross-link fixture
+
+### 11.5 後續實作子批（roadmap）
+
+詳見 `docs/phase-2-candidate-roadmap.md` §3.8。建議 7 子批順序：
+
+```text
+step 1 ✅ docs-only roadmap / schema addendum（本批）
+step 2    settings-only：新增 link-sources.json
+step 3    template-only：sample 補入 sourceKey
+step 4    renderer：fallback chain（內含 backward compat 驗證）
+step 5    GA4：link_source_key event param
+step 6    Admin selector
+step 7    validate rules：source-key-not-found / source-inactive
+```
+
+每一子批屬獨立可 ship 之最小單元；step 4+ 須 user 明示啟動，並各自走 pre-analysis / preflight。
 
 ---
 
