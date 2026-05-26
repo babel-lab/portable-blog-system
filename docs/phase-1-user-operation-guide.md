@@ -151,6 +151,31 @@ Admin overview（`http://localhost:5173/admin/`；**dev-mode-only**；prod build
 
 此修正為 template-only，不代表 build / deploy / Blogger repost / GA4 validation 已發生。
 
+**2026-05-26 全 6 個 template body scaffold cleanup 紀錄**
+
+於 2026-05-26 落地之 commits `3191bea` + `726bb3b` 完成 6 個 template 之 markdown body scaffold cleanup（per pm-1 ~ pm-9 audit → write → push → acceptance 雙循環）：
+
+- `3191bea refactor(templates): improve markdown body scaffolds`：3 個 Blogger primary templates 完成 body scaffold cleanup
+  - `blogger-book-review-template.md`：7 段 H2 書評 scaffold（前言/這本書適合誰、書籍基本印象、重點摘記、我的閱讀心得、可延伸思考、結語、Hashtags 或內部連結提示）
+  - `blogger-magazine-review-template.md`：6 段 H2 雜誌/期刊 scaffold（前言/本期主題、本期重點、值得注意的單元或文章、我的閱讀觀察、適合讀者、結語）
+  - `blogger-download-template.md`：7 段 H2 下載文 scaffold（工具/教材簡介、適合使用對象、內容包含、使用方式、下載連結區、注意事項、延伸閱讀或相關資源；順便清除舊 Phase 0 initialization stub）
+- `726bb3b refactor(templates): improve sibling markdown body scaffolds`：3 個 sibling templates 完成 body scaffold cleanup
+  - `post-template.md`：6 段 H2 通用文章 scaffold（前言、主題重點、內容整理、我的觀察、延伸閱讀、結語）
+  - `github-tech-note-template.md`：7 段 H2 技術筆記 scaffold（背景、環境、問題或目標、實作步驟、注意事項、延伸閱讀、結語）
+  - `blogger-summary-template.md`：6 段 H2 GitHub 全文 + Blogger 摘要導流 scaffold（Blogger 摘要開場、重點摘要、為什麼值得看全文、GitHub 全文連結提示、延伸閱讀、Hashtags 提示）
+
+兩批 commits 之共同性質：
+
+- **template-only**：僅修改 `content/templates/*.md`，未動 `src/` / `posts/` / `dist/` / settings
+- **body-only**：僅修改 closing `---` 之後的 markdown body 區塊；frontmatter / schema **byte-identical**
+- 完整移除舊 Phase 0 initialization stub（`這是一篇初始化範例文章。Phase 1 會建立 Markdown 讀取與 frontmatter 解析。`）
+- 未引入 `promotion.facebook` / `.fb.md` sidecar fields / `fbPostUrl` / `fbPostedAt` / `fbPostId` / `fbCampaign` / `finalUrl`；未 cross-pollinate book/magazine-specific 欄位
+- **無 build / deploy / Blogger repost / GA4 validation**
+
+特別說明：`blogger-summary-template.md` 已強化為 **GitHub 全文 + Blogger 摘要導流**用途；body 內**不寫死 GitHub / Blogger URL**（正式 URL 由 build pipeline 依 `publishTargets.github` / `canonical` 自動產生並注入 summary CTA 區塊）；亦**不混入 GA4 / UTM / FB sidecar 欄位**至 frontmatter 或 body。
+
+此修正為 template-only，不代表 build / deploy / Blogger repost / GA4 validation 已發生。
+
 ### 5.1 GitHub Pages 文章
 
 1. 複製 `content/templates/{post-template,github-tech-note-template}.md` 至 `content/github/posts/{YYYYMMDD-slug}.md`
