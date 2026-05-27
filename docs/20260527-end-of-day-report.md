@@ -162,4 +162,125 @@ npm run validate:content
 
 ---
 
+## 11. Afternoon checkpoint — sourceKey Step 7-d landing (pm-12 ~ pm-15)
+
+本節為 2026-05-27 下午 sourceKey 系列之 EOD 補述；屬 docs-only append-only addendum；不重寫既有 §1-§10 內容（為 pm-4 frozen snapshot）。
+
+### A. 本次 checkpoint 範圍
+
+- pm-12 read-only next-step selection（completed）
+- pm-13 read-only preanalysis（Step 7-d 設計確認）
+- pm-14 Step 7-d 實作 + commit + push
+- pm-15 acceptance crosscheck 已完成且全綠
+- pm-16 本 checkpoint 為 docs-only / append-only
+
+### B. 最新 baseline（pm-14 Step 7-d landing 之後；pm-16 EOD commit 之前）
+
+- HEAD = origin/main = `702e5dbd2dcbf06ae6a5159038f5d282d3e29ad3`
+- short = `702e5db`
+- working tree clean
+- ahead / behind = `0 / 0`
+- `npm run validate:content` = `0 error(s) / 42 warning(s) on 37 post(s)`
+
+### C. pm-14 commit 摘要
+
+- commit: `702e5dbd2dcbf06ae6a5159038f5d282d3e29ad3` / short `702e5db`
+- message: `feat(validate): warn on invalid sourceKey values`
+- date: 2026-05-27 15:25 +0800
+- scope: exactly 5 files
+  1. `src/scripts/validate-content.js`
+  2. `content/validation-fixtures/blogger/posts/_test-related-links-source-key-invalid-type.md`
+  3. `content/validation-fixtures/blogger/posts/_test-related-links-source-key-empty.md`
+  4. `docs/related-links-schema.md`
+  5. `docs/phase-2-candidate-roadmap.md`
+- validate baseline drift: `0/40/35` → `0/42/37`（+2 warnings / +2 posts；mirror 9-g-c-c fixture additive pattern；非 regression）
+
+### D. Step 7-d 功能摘要
+
+新增 2 條 warning rules（且既有 not-found 改寫為 if / else if / else if 互斥結構，行為不變）：
+
+- `related-links-source-key-invalid-type` — `entry.sourceKey` 存在且 `typeof !== 'string'`（含 number / boolean / null / object / array 五類）
+- `related-links-source-key-empty` — `entry.sourceKey` 為 string 且 `trim() === ''`（含 `""` / 純空白）
+- `related-links-source-key-not-found` — non-empty trimmed string 不在 active registry（既有；行為不變）
+
+互斥結構（per `src/scripts/validate-content.js:212-238`）：
+
+```
+if (entry.sourceKey !== undefined) {
+  if (typeof !== 'string')         → invalid-type
+  else if (trim() === '')          → empty
+  else if (not in activeSourceKeys) → not-found
+}
+```
+
+- `undefined` 不觸發任一條（保留 optional 欄位語意）
+- 同 entry 之 sourceKey 最多觸發 1 條
+- 既有 EJS render-time gate（`typeof === 'string' && trim() !== ''`，per `src/views/pages/post-detail.ejs:180/220`）對 GA4 dimension 之 self-protection 不變
+
+### E. pm-15 acceptance 摘要
+
+- §A commit scope exact 5 files ✅
+- §B validate-content.js acceptance passed ✅（三條互斥邏輯確認；undefined skip；null / number / boolean / object / array 全觸發 invalid-type；empty / whitespace-only 觸發 empty；既有 not-found 行為未破壞）
+- §C fixture acceptance passed ✅（位置 `content/validation-fixtures/blogger/posts/` / 寫法 `sourceKey: 123` + `sourceKey: ""` / 不影響 ready posts）
+- §D docs acceptance passed ✅（schema §3.3 table 補 #5/#6/#7 + §11.5 step 7 marker / roadmap §3.8 step 7 marker；唯 phase-2 roadmap 用 phase name `Phase 20260527-pm-14` 而非 literal `702e5db` 屬 🟡 partial → 本 EOD checkpoint 即補上 literal `702e5db` 紀錄）
+- §E 禁區 acceptance passed ✅（16+ 禁區檔案皆未動）
+- pm-15 期間：no source / Blogger / Admin / link-sources / templates / formal content posts 變更；no build / deploy / Blogger repost / GA4 validation / npm install
+
+### F. 現在 sourceKey roadmap 狀態
+
+| Step | 狀態 | landed commit / 阻擋 |
+|---|---|---|
+| Step 1 docs roadmap / schema addendum | ✅ landed | `83f8c1b` |
+| Step 2 `link-sources.json` 初版 registry（8 active sources） | ✅ landed | `c658e1b` |
+| Step 3 templates sourceKey samples（3 Blogger templates） | ✅ landed | `089b157` |
+| Step 4 renderer fallback chain（兩端 EJS + `deriveRenderedCrossLinks`） | ✅ landed | `d1f1224` |
+| Step 5 GA4 `link_source_key` source | ✅ landed | `310062d` |
+| Step 5 docs sync（4 docs） | ✅ landed | `1707881` |
+| Step 7 `source-key-not-found` | ✅ landed | `9ce7e8a` |
+| Step 7-d `source-key-invalid-type` | ✅ landed | `702e5db` |
+| Step 7-d `source-key-empty` | ✅ landed | `702e5db` |
+| Step 7-c `source-inactive` | ⏭ not started | — |
+| Step 6 Admin selector | ⏭ not started | — |
+
+### G. 仍未做 / blocked
+
+- **Step 7-c source-inactive warning** — 原因：目前 `content/settings/link-sources.json` 8/8 sources 全 `isActive: true`；無 inactive source 可自然實測；若實作需動 registry semantic（將某 source 設 `isActive: false`）或繞道
+- **Step 6 Admin selector** — 原因：Admin write infra 未就位（`src/scripts/save-admin-posts.js` 不存在；當前 Admin 僅 read-only display 顯示 relatedLinks / otherLinks count，per `src/views/admin/index.ejs:590-595`）；依賴 FB-P5-c / Admin-2-b-2 atomic write 系列；屬大批工程
+- **GA4 validation** — not done（屬 deploy 後 user 手動於 GA4 DebugView 驗收 `click_related_link` / `click_other_link` event 之 `link_source_key` param）
+- **build / deploy** — not done（本日無 `npm run build` / 無 gh-pages 操作；source 已 push origin/main，等下次自然 deploy）
+- **Blogger repost** — not done / N/A（Blogger render 端完全未動，無重貼需求）
+- **reverse UTM** — remains landed-but-dormant（pm-24a/b/c at 2026-05-23；未 deploy；未重貼 Blogger）
+- **pm-26 deploy gate** — remains BLOCKED on no positive GitHub cross-link fixture（per `docs/20260526-reverse-utm-positive-fixture-scan-report.md`）
+
+### H. 下一 session cold-start 建議
+
+下一 session 第一動作（read-only baseline verification）：
+
+```bash
+pwd                                    # → /d/github/blog-new/portable-blog-system
+git rev-parse HEAD                     # → 應為本 pm-16 EOD commit hash（pm-14 之上 +1 docs-only commit）
+git rev-parse origin/main              # → 同 HEAD
+git rev-list --left-right --count HEAD...origin/main  # → 0	0
+git status --short --branch            # → ## main...origin/main（無 modified / untracked）
+npm run validate:content               # → 0 error(s) / 42 warning(s) on 37 post(s)
+```
+
+substantive feature baseline 參照：
+
+- pm-14 Step 7-d source landing commit = `702e5db`（feature ship 之 substantive commit）
+- pm-16 EOD checkpoint commit = （本 commit；pm-14 之上 +1 docs-only commit；非 substantive 變動）
+- reverse UTM dormant
+- pm-26 deploy gate blocked
+
+若 baseline 與上表不符 → 立即停止並回報；不自行修正。
+
+### I. 下一步候選（記錄；不執行）
+
+1. **Final Idle Freeze** — 收尾今日工作；最保守路徑；今日累計 10 commits across pm-4 ~ pm-16
+2. **Step 7-c source-inactive warning preanalysis**（read-only） — 盤點 inactive warning 設計；但 audit 結論於 pm-11 / pm-13 已部分展開
+3. **Step 6 Admin selector preflight**（read-only） — 屬大批前置；依賴 Admin write infra 未就位
+4. **future docs sync only if needed** — 若發現 drift 再 sync
+
+---
+
 （本文件結束）
