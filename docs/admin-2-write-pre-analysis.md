@@ -758,7 +758,7 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 | **0** | **Read-only acceptance cross-check**（如本 phase 之 am-14 read-only preflight）| read-only；docs only | 確認 Admin 現況 + Admin write infra 缺什麼 + Step 6 blockers | ✅ done（Phase 20260527-am-14）|
 | **1** | **Docs sync / roadmap update**（如本 phase 之 am-15）| docs-only | 把 Admin write infra design refinement append 至 admin-2-write-pre-analysis.md；同步 phase-2-candidate-roadmap / future-roadmap | 🔄 in-progress（本 phase）|
 | 2 | **Safe write helper source implementation**（純 source；無 Admin UI 寫入；CLI testable）| source；新增 `src/scripts/safe-write.js` / `git-status-check.js` / `admin-write-whitelist.js` / `admin-field-validators.js` / `active-source-keys.js`（per §15.D） | helper unit-testable；新增 npm script `safe-write:test`；validate baseline 不退步 | ✅ landed `5bcdd02` (2026-05-27) — see §15.G.1 |
-| 3 | **First dry-run-only UI enhancement**（依賴 phase 2；新增 Admin Apply button 但**不**綁實際 write）| source；index.ejs Apply button visible but **disabled with explanatory tooltip**；client-side validation preview | UX 流程 verify；無 fs.write | ⏸ pending |
+| 3 | **First dry-run-only UI enhancement**（依賴 phase 2；新增 Admin Apply button 但**不**綁實際 write）| source；index.ejs Apply button visible but **disabled with explanatory tooltip**；server-side validation preview（scheme A 方案 A：EJS 注入） | UX 流程 verify；無 fs.write | ✅ landed `efd3ac5` (2026-05-27) — see §15.G.2 |
 | 4 | **Vite dev middleware for Admin POST endpoint**（讓 browser POST 至 Node fs；dev-only）| source；vite.config.js custom middleware；新 npm script `dev:admin`（保留既有 `dev` 不變）| middleware spec verify；Admin UI 仍 read-only；endpoint 暫接 echo / dry-run | ⏸ pending |
 | 5 | **First real write behind explicit Apply: SEO fields**（依賴 phases 2-4；per §9.1 Admin-2-b-2 + §15.E.1 ranked #1）| source；`.md` description / searchDescription write；single-file atomic | git diff verify；validate baseline 不退步；rollback flow 演練 | ⏸ pending |
 | 6 | Admin-2-b-3：FB sidecar write | source；per §9.1 | per §11 stop point 5 | ⏸ pending |
@@ -814,6 +814,65 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 - ✅ reverse UTM remains landed but dormant；pm-26 deploy gate remains blocked by no positive GitHub cross-link fixture
 
 **下一個建議 phase**：§15.G phase 3（First dry-run-only UI enhancement）—— 屬源碼變更；本 docs sync 不啟動。
+
+#### 15.G.2 Phase 3 Landing Details（2026-05-27 night-9）
+
+**Phase 名稱**：
+- `20260527-night-8-admin-write-phase-3b-dry-run-ui-preflight-readonly-a`（read-only preflight）
+- `20260527-night-9-admin-write-phase-3b-dry-run-ui-implementation-source-a`（source）
+- `20260527-night-9-admin-write-phase-3b-dry-run-ui-implementation-commit-push-a`（commit + push）
+- `20260527-night-10-admin-write-phase-3b-dry-run-ui-acceptance-crosscheck-readonly-a`（read-only acceptance）
+
+**Landed commit**：
+- full：`efd3ac5dc5689f392651fe5c3353e7d745dd4bd2`
+- short：`efd3ac5`
+- message：`feat(admin): add dry-run write readiness UI`
+
+**Commit scope**（2 files; 116 insertions(+), 0 deletions(-)）：
+
+| File | LOC | 用途 |
+|---|---|---|
+| `src/scripts/load-admin-posts.js` | +42 | import 5 reusable validators（`validateDescription` / `validateSearchDescription` / `validateTitleEn` / `validateCoverAlt` / `validateRelatedLinkUrl`）from `admin-field-validators.js`；於 `toAdminView` 內 server-side pre-compute `seoValidation = { description, searchDescription, titleEn, coverAlt }` + 保守 `fbValidation = { title, titleEn, postUrl, note }`（4 / 12 fields；其餘 8 fields 待 future phase）；append 至 return object；**未** import `safe-write.js`；**未**新增 fs/promises write 用途 |
+| `src/views/admin/index.ejs` | +74 | 新增 3 個 CSS class（`.apply-disabled` / `.validator-badge.ok|error` / `.readiness-checklist` 含 `.ph-done|current|pending`）；SEO dry-run section 加 server-side validator preview（4 fields badges）+ disabled Apply button（`disabled` + `aria-disabled="true"` + tooltip "Phase 3 dry-run only — actual write path is not enabled. Phase 5 才會啟用實際寫入。"）；FB sidecar dry-run section 加保守 4 / 12 fields validator preview + disabled Apply FB button；新增 Future write readiness checklist `.detail-section`（5-row list：Phase 2 ✅ / Phase 3 🔄 / Phase 4 ⏸ / Phase 5 ⏸ / Step 6 ⏸）；**未**綁 click handler；**未**新增 fetch / POST / PUT / XMLHttpRequest / safeWrite caller |
+
+**Implementation scheme**：
+
+採 night-8 preflight 推薦之**方案 A：server-side pre-compute / EJS 注入 validation 結果**：
+
+- ✅ 直接重用 Phase 2 之 `admin-field-validators.js` ESM module；無 client-side validator drift 風險
+- ✅ 最少 source change（2 files；116 LOC）；不動 `build-github.js` / `vite.config.js` / `package.json`
+- ✅ 與 Phase 5 之 actual write 路徑自然銜接（server 端 validator 已是寫入時必經之 validators[] 參數）
+- ✅ 不擴張 EJS render context（`build-github.js:670-673` 之 `{ posts, builtAt }` 不變；LIMITS 常數本 phase 不暴露至 EJS）
+- ✅ error code 本身已能傳達 max 違規（e.g. `description-too-long`）；length counter 留至 future phase
+
+**Acceptance verification**（per `20260527-night-10` read-only cross-check）：
+
+- ✅ HEAD `efd3ac5` == origin/main；ahead / behind 0/0；working tree clean
+- ✅ `safe-write:test`：71 pass / 0 fail
+- ✅ `validate:content`：0 errors / 42 warnings / 37 posts（與 night-2 之 phase 2 landing baseline 一致）
+- ✅ commit subject 完整為 `feat(admin): add dry-run write readiness UI`（無 truncation；先前疑慮屬 terminal output 顯示問題）
+- ✅ commit scope 僅 2 files；對齊允許清單
+- ✅ Write-path grep gate 通過：`fetch( / XMLHttpRequest / POST / PUT` 0 命中；`fs.writeFile / fs.rename / safeWrite / writeFile` 唯一命中為 `src/views/admin/index.ejs:719` EJS `<%# %>` server-side-only 註解之**負向**聲明「無 safeWrite caller 可觸發」，屬 documentation false positive
+- ✅ UI acceptance 全 PASS：SEO + FB 各一 disabled Apply button + validator preview；readiness checklist 5-row 完整
+
+**保留限制**（landing 後仍維持）：
+
+- ❌ Admin actual write path **仍未啟用**（disabled Apply buttons 屬視覺 shell；無 click handler 綁定；DOM 上無 fetch / fs / safeWrite caller）
+- ❌ **無** safeWrite runtime caller（Phase 2 helper 仍未被 Admin UI / loader 呼叫）
+- ❌ **無** fs.writeFile / fs.rename / writeFile runtime caller
+- ❌ **無** fetch / POST / PUT / XMLHttpRequest
+- ❌ **未**新增 Vite dev middleware / HTTP POST handler（留待 phase 4）
+- ❌ **未**修改 content / settings / templates / validation-fixtures / dist / dist-blogger / gh-pages
+- ❌ **未**修改 package.json / package-lock.json / vite.config.js / safe-write helpers（5 helpers + 1 self-test 未動）
+- ❌ **未**做 build / deploy / Blogger repost / GA4 validation
+- ❌ **未**新增 fixture
+- ✅ `validate:content` baseline 維持 `0 errors / 42 warnings / 37 posts`
+- ✅ `safe-write:test` = `71 pass / 0 fail`
+- ✅ Step 6 sourceKey selector remains blocked by phases 4-9（per 既有 §15.F 12 條 prerequisites）
+- ✅ Step 7-c source-inactive warning remains future（等真實 inactive source 出現）
+- ✅ reverse UTM remains landed but dormant；pm-26 deploy gate remains blocked by no positive GitHub cross-link fixture
+
+**下一個建議 phase**：§15.G phase 4（Vite dev middleware for Admin POST endpoint）—— 屬源碼變更；屬解開 browser → Node fs 通道之關鍵步驟；本 phase 3 landing 不啟動 phase 4。
 
 ### 15.H Boundary Reaffirmation
 

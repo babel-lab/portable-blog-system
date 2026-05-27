@@ -298,6 +298,30 @@ Phase 5 啟動 actual write 前，必須先有：
 | 屬性 | source；無 fs.write；無 fetch；無 server endpoint |
 | 風險 | 🟢 低 |
 | 預估 LOC | ~100-200（EJS + 可選 loader server-side validator pre-compute）|
+| 實際 LOC | **116 insertions** / 0 deletions（與預估區間吻合）|
+| Status | ✅ **landed** `efd3ac5` (2026-05-27 night-9) |
+
+#### 7.2.1 Phase 3b Landing summary（2026-05-27 night-8 ~ night-10）
+
+per `docs/admin-2-write-pre-analysis.md` §15.G.2：
+
+- **Landed commit**：`efd3ac5dc5689f392651fe5c3353e7d745dd4bd2`（short `efd3ac5`）
+- **Commit message**：`feat(admin): add dry-run write readiness UI`
+- **Actual changed files**：**2**
+  - `src/scripts/load-admin-posts.js`（+42）：import 5 validators + 於 `toAdminView` 內 pre-compute `seoValidation` + `fbValidation`；append 至 return object
+  - `src/views/admin/index.ejs`（+74）：3 個新 CSS class + SEO disabled Apply + FB disabled Apply + 2 處 validator preview + readiness checklist `<ul>`
+- **Actual insertions**：**116**（與 §7.2 預估 100-200 區間吻合）
+- **Implementation scheme**：採方案 A（per §6.2）：server-side pre-compute / EJS 注入 validation 結果；不擴張 `build-github.js` render context；無 client-side validator drift 風險
+- **Acceptance**：night-10 read-only cross-check 全 PASS
+  - HEAD `efd3ac5` == origin/main；ahead / behind 0/0；working tree clean
+  - `safe-write:test`：71 pass / 0 fail
+  - `validate:content`：0 errors / 42 warnings / 37 posts
+  - commit subject 完整為 `feat(admin): add dry-run write readiness UI`（無 truncation；先前疑慮屬 terminal 顯示）
+- **Write-path gate**：通過
+  - `fetch( / XMLHttpRequest / POST / PUT` → **0 命中**
+  - `fs.writeFile / fs.rename / safeWrite / writeFile` → 唯一命中為 `src/views/admin/index.ejs:719` 之 EJS `<%# %>` server-side-only 註解之**負向**聲明「無 safeWrite caller 可觸發」；屬 documentation false positive；無 runtime / event handler / import 命中
+- **保留邊界**：actual write path 仍未啟用；無 safeWrite runtime caller；無 fs.writeFile / fs.rename / writeFile runtime caller；無 content / settings / templates / fixtures / dist / dist-blogger / gh-pages 變更；無 build / deploy / Blogger repost / GA4 validation
+- **下一 phase 候選**：§7.4 Phase 4（Vite dev middleware preanalysis；docs-only）
 
 ### 7.3 Phase 3c：acceptance cross-check
 

@@ -490,4 +490,96 @@ am-16 commit + push 完成後進入 **Final Idle Freeze**：
 
 ---
 
+## 14. Night-8~Night-10 Admin Write Phase 3b Dry-run UI Checkpoint
+
+本節為 2026-05-27 晚間第三輪追加（Phase 20260527-night-11）；記錄 night-8 / night-9 / night-10 三個連續 phases，承接 §13 之 Phase 2 helper landing 後啟動 §15.G phase 3。本節**追加**至既有 EOD report；§1-§13 不刪改。
+
+### A. Phase 名稱
+
+| Phase | 屬性 | 結果 |
+|---|---|---|
+| `20260527-night-8-admin-write-phase-3b-dry-run-ui-preflight-readonly-a` | read-only preflight | 盤點 + 推薦方案 A（server-side pre-compute / EJS 注入）；最小修改範圍建議 95-165 LOC |
+| `20260527-night-9-admin-write-phase-3b-dry-run-ui-implementation-source-a` | source（2 files；116 insertions） | seoValidation + fbValidation pre-compute；SEO + FB disabled Apply；readiness checklist |
+| `20260527-night-9-admin-write-phase-3b-dry-run-ui-implementation-commit-push-a` | commit + push | landed `efd3ac5` → origin/main |
+| `20260527-night-10-admin-write-phase-3b-dry-run-ui-acceptance-crosscheck-readonly-a` | read-only acceptance | 7 大驗收項全 PASS；baseline 0 drift |
+| `20260527-night-11-admin-write-phase-3b-docs-sync-docs-only-a` | docs-only（本 phase）| sync §15.G phase 3 marker + §15.G.2 landing details + preanalysis §7.2.1 + EOD §14 append |
+
+### B. Landed commit
+
+- full：`efd3ac5dc5689f392651fe5c3353e7d745dd4bd2`
+- short：`efd3ac5`
+- message：`feat(admin): add dry-run write readiness UI`
+- date：2026-05-27 22:17:06 +0800
+
+### C. Commit scope（2 files; 116 insertions(+), 0 deletions(-)）
+
+- `src/scripts/load-admin-posts.js`（+42）：import 5 reusable validators 從 `admin-field-validators.js`（`validateDescription` / `validateSearchDescription` / `validateTitleEn` / `validateCoverAlt` / `validateRelatedLinkUrl`）；於 `toAdminView` 內 server-side pre-compute `seoValidation` + 保守 `fbValidation`；append 至 return object
+- `src/views/admin/index.ejs`（+74）：3 個新 CSS class（`.apply-disabled` / `.validator-badge` / `.readiness-checklist`）+ SEO dry-run section validator preview + SEO disabled Apply button + FB dry-run section validator preview + FB disabled Apply FB button + 新增 Future write readiness checklist `.detail-section`
+
+### D. Implementation summary
+
+- **Scheme adopted**：方案 A（server-side pre-compute / EJS injection）；per night-8 preflight 推薦
+- **`seoValidation`**：4 fields — description / searchDescription / titleEn / coverAlt；直接重用 Phase 2 之 `admin-field-validators.js`
+- **`fbValidation`**：保守 4 / 12 fields — title / titleEn / postUrl / note；其餘 8 fields（enabled / status / postedAt / postId / campaign / audience / hashtags / imageUrl）待 future phase 引入 FB-專用 validator
+- **SEO disabled Apply button**：`disabled` + `aria-disabled="true"` + tooltip "Phase 3 dry-run only — actual write path is not enabled. Phase 5 才會啟用實際寫入。"；無 click handler
+- **FB disabled Apply button**：同 pattern；tooltip 指向 FB-P5-c phase
+- **Validator preview**：per-field badge（ok / error code）；採既有 .b-ok / .b-missing tone；server-side rendered
+- **Future write readiness checklist**：5-row list — Phase 2 ✅ landed `5bcdd02` / Phase 3 🔄 current / Phase 4 ⏸ not started / Phase 5 ⏸ not enabled / Step 6 sourceKey ⏸ blocked
+- **不擴張** `build-github.js` render context（`{ posts, builtAt }` 不變；LIMITS 常數本 phase 不暴露至 EJS）
+
+### E. Acceptance summary
+
+| 項目 | 值 |
+|---|---|
+| safe-write:test | `71 pass / 0 fail` |
+| validate:content | `0 errors / 42 warnings / 37 posts` |
+| HEAD at acceptance | `efd3ac5dc5689f392651fe5c3353e7d745dd4bd2` (`efd3ac5`) |
+| origin/main at acceptance | 同 HEAD |
+| ahead / behind | `0 / 0` |
+| working tree | clean |
+| Write-path gate | passed（唯一 `safeWrite` 命中為 EJS `<%# %>` server-side-only 註解之**負向**聲明，屬 documentation false positive） |
+| commit subject 完整性 | `feat(admin): add dry-run write readiness UI`（無 truncation；先前疑慮屬 terminal 顯示） |
+
+### F. Boundary summary（night-8 / night-9 / night-10 / night-11 全程）
+
+- ❌ no actual write path（disabled Apply buttons 屬視覺 shell；無 click handler）
+- ❌ no safeWrite runtime caller（Phase 2 helper 仍未被 Admin UI / loader 呼叫）
+- ❌ no fs.writeFile / fs.rename / writeFile runtime caller
+- ❌ no fetch / POST / PUT / XMLHttpRequest
+- ❌ no Vite dev middleware / HTTP POST handler 新增
+- ❌ no content posts change（`content/{github,blogger}/posts/**` 0 changes）
+- ❌ no settings / templates / validation-fixtures change
+- ❌ no dist / dist-blogger / gh-pages change
+- ❌ no package.json / package-lock.json change
+- ❌ no safe-write helpers change（5 helpers + 1 self-test 未動）
+- ❌ no vite.config.js change
+- ❌ no npm install / no new dependency
+- ❌ no build / no deploy
+- ❌ no Blogger repost
+- ❌ no GA4 validation
+- ❌ no fixture creation
+- ❌ no force-push / amend / rebase / fetch / pull / checkout / reset / stash
+
+### G. Carried-forward status（state at night-11 EOD）
+
+- ✅ **Admin Write Infra Phase 2** — landed `5bcdd02`（helper 基礎設施）
+- ✅ **Admin Write Infra Phase 3** — landed `efd3ac5`（dry-run-only UI；server-side validator preview + disabled Apply + readiness checklist）
+- ⏸ **Admin actual write path** — still not enabled；no enabled Apply button；no Vite dev middleware；no HTTP POST handler
+- ⏸ **§15.G Phase 4**（Vite dev middleware / write route preanalysis）— not started
+- ⏸ **§15.G Phase 5**（actual write path；SEO fields 將為首個 enabled write）— not enabled
+- ⏸ **Step 6 sourceKey Admin selector** — still blocked by future Admin write / UI phases（per §15.F 12 條 prerequisites；hard-blockers #1 / #2 / #8 / #10 部分由 phase 2 + phase 3 解除，但仍需 phase 4-9 完整通過）
+- ⏸ **Step 7-c source-inactive warning** — still future；wait for real inactive source
+- 💤 **reverse UTM** — source landed but dormant；commit chain `7e1d356` / `e2309e9` / `7c769fe`（pm-24a/b/c；2026-05-23）；尚未 deploy / 尚未碰 gh-pages / Blogger 尚未重貼
+- ⏸ **pm-26 deploy gate** — remains blocked by no positive GitHub cross-link fixture（per `docs/reverse-utm-fixture-plan.md` §3-§6）
+
+### H. Next Phase 候選
+
+- **A. Phase 4 preanalysis**（docs-only）：盤點 Vite dev middleware shape / auth / origin check / dev-mode-only gate；屬 §15.G phase 4 之啟動前置
+- **B. Final Idle Freeze**：今晚 hard stop；明日 cold-start 再決定 phase 4 啟動時點
+- **C. Manual browser verification doc**：撰寫 user 在 `npm run dev` 下手動驗收 Admin UI 之步驟清單；屬補充文件
+
+→ 預設推薦：B（Final Idle Freeze），因今晚已完成 phase 3 全鏈（preflight / source / commit-push / acceptance / docs-sync）；phase 4 屬獨立決策時點，宜 fresh session 啟動。
+
+---
+
 （本文件結束）
