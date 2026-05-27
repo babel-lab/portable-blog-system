@@ -283,4 +283,131 @@ substantive feature baseline 參照：
 
 ---
 
+## 12. AM-13～AM-15 Admin Write Infra Checkpoint
+
+本節為 2026-05-27 晚間追加（Phase 20260527-am-16）；記錄 pm-16 之後同日繼續執行之 3 個 read-only / docs-only phases。本節**追加**至既有 EOD report；§1-§11 不刪改。
+
+### A. am-13 — sourceKey baseline reconciliation read-only
+
+**Phase 名稱**：`20260527-am-13-sourceKey-baseline-reconciliation-readonly-a`
+
+**Trigger**：am-12 phase prompt 使用過期 baseline `9ce7e8a`（落後實際 HEAD 4 commits），要求重做 Step 5（GA4 link_source_key emit）；am-12 baseline verify 即發現 mismatch，立即停止未動檔。
+
+**am-13 釐清結果**：
+
+| 期望 | 實際 |
+|---|---|
+| baseline `9ce7e8a` | 校正為 `d4db570d01c9a130eb91d7cf3d9f78b8165c8aae` |
+| Step 5 待做 | ✅ 已由 `310062d feat(ga4): add source key param to related link clicks` 完成（2026-05-27 14:25 +0800；touched `src/views/pages/post-detail.ejs` only +2/-2）|
+| docs sync 待做 | ✅ 已由 `1707881 docs(sourcekey): mark ga4 link source key as landed` 完成（touches 4 docs files：`click-tracking-governance.md` / `ga4-link-tracking-spec.md` / `phase-2-candidate-roadmap.md` / `related-links-schema.md`）|
+| Step 7-d 待做（且 prompt 註明「不做」）| ✅ 已由 `702e5db feat(validate): warn on invalid sourceKey values` 完成；prompt 不知此事 |
+| validate baseline `0/40/35` | 校正為 `0 errors / 42 warnings / 37 posts`（+2 fixtures from `702e5db`：empty + invalid-type）|
+
+**am-13 動作**：read-only inspection of `git show --stat 310062d / 1707881 / 702e5db / d4db570`；Grep 確認 `data-ga4-param-link_source_key` 出現於 `src/views/pages/post-detail.ejs:180` / `:220`；Grep 確認 `validate-content.js` 含 3 條互斥 sourceKey warning 規則（invalid-type / empty / not-found）。**無檔案變更**。
+
+### B. am-14 — Admin write infra preflight read-only
+
+**Phase 名稱**：`20260527-am-14-admin-write-infra-preflight-readonly-a`
+
+**Trigger**：am-13 確認 Step 5 / 7 / 7-d landed 後，sourceKey chain 唯一未做為 Step 6 Admin selector；其阻擋因素為 Admin write infra，需 read-only 盤點。
+
+**am-14 盤點結果**：
+
+- ✅ Admin 渲染模式：dev-mode-only（Plan B；prod build 跳過）；meta `noindex, nofollow`；不入 dist / sitemap / public nav
+- ✅ Admin 入口：`src/views/admin/index.ejs`（~1004 LOC）+ `src/scripts/load-admin-posts.js`（~298 LOC）
+- ✅ Read-side 能力豐富：post metadata 完整讀取 / Platform Routing derived / FB sidecar 13 欄位 read-only display / completeness flags / client-side filter / sort / search
+- ✅ Dry-run editors 存在：SEO dry-run viewer（4 fields；Phase Admin-2-b-1；commit `b676f26`）+ FB sidecar dry-run editor（12 fields；Phase 20260520-fb-p5-b）；均**純 client-side**；無 fs.write / 無 fetch / 無 XHR / 無 Apply button
+- ❌ **無** actual file-write path：Admin EJS / loader 0 命中 `fs.writeFile`；vite.config.js 無 custom middleware / 無 API routes
+- ❌ **無** reusable atomic write helper：唯一 temp+rename pattern 僅 inline 於 `src/scripts/backfill-published-url.js` line 366-369（CLI；non-Admin）
+- ❌ **無** pre-write 或 post-write validate hook
+- ❌ **無** git-status pre-write guard
+- ❌ **無** relatedLinks / otherLinks 編輯 UI：index.ejs line 590-591 只顯示 count（number）；`toAdminView` line 130-131 只 derive `.length`；array 內容未 expose 至 EJS
+- ⚠️ `linkSources` 未驗證可達 Admin context：grep 命中 `validate-content.js` / `build-blogger.js` / `build-github.js` / `load-settings.js`；**未**命中 `load-admin-posts.js` 或 `index.ejs`
+
+**am-14 結論**：Step 6 sourceKey selector 之 hard-blockers 為 (1) 無 fs.write path、(2) 無 atomic write helper、(3) 無 Vite dev middleware（讓 browser POST 至 Node fs）；不是 1-line patch；屬基礎設施類問題。**無檔案變更**。
+
+### C. am-15 — Admin write infra design docs-only
+
+**Phase 名稱**：`20260527-am-15-admin-write-infra-design-docs-only-a`
+
+**commit**：`f8a6fd51238de9301df353405480b71d9537e231`（short `f8a6fd5`）
+**message**：`docs(admin): design safe write infrastructure`
+**修改檔案**：`docs/admin-2-write-pre-analysis.md`（append-only +266 lines；既有 §1-§14 不刪改；新增 §15）
+
+**新增 §15 之 8 個 sub-sections**：
+
+| § | Content 摘要 |
+|---|---|
+| 15.A Current State | 17-row inventory table；反映 2026-05-27 baseline `d4db570` 之 Admin 現況（含 SEO / FB dry-run viewer landed；relatedLinks UI / write path / atomic helper / git guard / validate hook **未** landed）|
+| 15.B Non-goals | 8 條硬性界線（不做 production Admin / 不做 build / 不做 actual write 等）|
+| 15.C Safety Principles | 9 條核心原則（dry-run first / explicit Apply / clean tree / atomic temp+rename / no .bak / pre-write validate / post-write `validate:content` / one-transaction / never write dist）|
+| 15.D Proposed Architecture | 10 個高階元件 module shape（safe-write helper / git-status-check / frontmatter parse-stringify / write whitelist / pre-write validator / post-write runner / dry-run diff / git rollback / Admin UI flow / logging format）|
+| 15.E First Write Scope Recommendation | 6-row ranked candidate table；8 條 rationale 解釋為何 sourceKey selector **不**應該是第一個 write feature |
+| 15.F sourceKey Step 6 Prerequisites | 12-row prerequisite checklist（含 hard-block / medium / low grading）|
+| 15.G Recommended Phase Sequence | 11-phase 順序（phase 0 read-only acceptance → phase 1 docs sync → phase 2 safe write helper → phase 3 dry-run UI → phase 4 Vite middleware → phase 5 SEO write → phase 6-8 其他 write → phase 9 wrap → phase 10 sourceKey selector → phase X+ risky-editable）|
+| 15.H Boundary Reaffirmation | 明確聲明本 §15 不解除 Step 6 阻擋 |
+
+**am-15 邊界遵守**：
+- ✅ docs-only（單檔 append-only）
+- ❌ no source / no Admin implementation / no actual write path
+- ❌ no build / no deploy / no Blogger repost / no GA4 validation
+- ❌ no npm install / no content / no settings / no templates change
+- ❌ no reverse UTM fixture creation
+
+### D. Current Final Baseline（am-16 完成後）
+
+```
+repo:          D:\github\blog-new\portable-blog-system
+branch:        main tracking origin/main
+HEAD:          （本 am-16 commit；hash 於 commit 落地後填入）
+origin/main:   == HEAD
+ahead/behind:  0/0
+worktree:      clean
+validate:      0 errors / 42 warnings / 37 posts
+```
+
+am-16 後實際 hash 詳見 push 後驗證 + Final Report；am-16 為 docs-only EOD checkpoint commit（pm-16 之上累計 +2 docs-only commits：am-15 `f8a6fd5` + am-16）。
+
+### E. Current Status（state carried forward）
+
+- ✅ **Step 5**（GA4 link_source_key emit）— landed `310062d`；不重做
+- ✅ **Step 7**（sourceKey not-found warning）— landed `9ce7e8a`；不重做
+- ✅ **Step 7-d**（sourceKey invalid-type / empty warning）— landed `702e5db`；不重做
+- ⏸ **Step 6 Admin selector** — remains blocked by Admin write infra；sourceKey selector 應等 safe write infra proven 之後再做（per §15.G phase 10）
+- ⏸ **Step 7-c**（source-inactive warning preanalysis）— 仍未啟動；本日不做
+- 💤 **reverse UTM** — source landed but dormant；commit chain `7e1d356` / `e2309e9` / `7c769fe`（pm-24a/b/c；2026-05-23）；尚未 deploy；尚未碰 gh-pages；Blogger 尚未重貼；live dormant
+- ⏸ **pm-26 deploy gate** — remains blocked by no positive GitHub cross-link fixture（per `docs/reverse-utm-fixture-plan.md` §3-§6）
+
+### F. AM-13 ~ AM-16 Not Done（彙整）
+
+3 個 phases 跨越 am-13 / am-14 / am-15 / am-16（本節），全程：
+
+- ❌ no source change（no `src/**` / no `vite.config.js` / no `package.json`）
+- ❌ no Admin implementation（loader / EJS untouched throughout）
+- ❌ no actual write path（無 fs.writeFile / 無 fs.rename / 無 HTTP POST handler 建立）
+- ❌ no build / no deploy / no Blogger repost
+- ❌ no GA4 validation
+- ❌ no npm install
+- ❌ no content change / no settings change / no templates change
+- ❌ no validation-fixtures change
+- ❌ no reverse UTM fixture creation
+- ❌ no fetch / pull / checkout / reset / stash / rebase / amend / force-push
+
+am-13 / am-14 為純 read-only inspection（0 檔案變更）；am-15 為單檔 docs append-only（+266 lines）；am-16 為單檔 docs append-only（本節）。
+
+### G. Final Idle Freeze
+
+am-16 commit + push 完成後進入 **Final Idle Freeze**：
+
+- 不啟動下一個 phase
+- 不做 phase 2 safe-write helper 實作（屬 fresh session 範疇）
+- 不解除 Step 6 阻擋
+- 不解除 pm-26 阻擋
+- 不主動 sync 其他 docs（無 drift 發現）
+- 等待 user 下一個明示 trigger
+
+如 user 後續要繼續：建議 fresh session 啟動 §15.G phase 2（safe-write helper source implementation），對齊 §15.D 之 10 元件設計。
+
+---
+
 （本文件結束）
