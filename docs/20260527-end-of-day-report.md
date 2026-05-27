@@ -410,4 +410,84 @@ am-16 commit + push 完成後進入 **Final Idle Freeze**：
 
 ---
 
+## 13. Night-2 Admin Write Infra Safe Helper Checkpoint
+
+本節為 2026-05-27 晚間第二輪追加（Phase 20260527-night-4）；記錄 night-2 / night-3 / night-4 三個連續 phases。本節**追加**至既有 EOD report；§1-§12 不刪改。
+
+### A. Phase 名稱
+
+| Phase | 屬性 | 結果 |
+|---|---|---|
+| `20260527-night-2-admin-write-safe-helper-source-implementation-a` | source（5 helpers + 1 CLI self-test + npm script） | helper 全部實作完成；71/71 self-test pass |
+| `20260527-night-2-admin-write-safe-helper-source-implementation-commit-push-a` | commit + push | landed `5bcdd02` → origin/main |
+| `20260527-night-3-admin-write-safe-helper-acceptance-crosscheck-readonly-a` | read-only acceptance | 7 個 helper 驗收 PASS；baseline 0 drift |
+| `20260527-night-4-admin-write-night-2-docs-sync-docs-only-a` | docs-only（本 phase）| sync §15.G phase 2 marker + EOD §13 append |
+
+### B. Landed commit
+
+- full：`5bcdd026f4f6ee8420fbcff529d152f17ec43519`
+- short：`5bcdd02`
+- message：`feat(admin): add safe write infra helpers`
+- date：2026-05-27 21:00:20 +0800
+
+### C. Commit scope（7 files; 666 insertions(+), 1 deletion(-)）
+
+- `package.json`（新增 npm script `safe-write:test`；無新 dependency）
+- `src/scripts/active-source-keys.js`（active sourceKey Set helper；mirror `validate-content.js:131-142`）
+- `src/scripts/admin-write-whitelist.js`（`isWriteAllowed`；保守白名單；阻擋 traversal / dist / settings / pages / fixtures / package-lock）
+- `src/scripts/git-status-check.js`（spawn `git status --porcelain`；不修改 git 狀態；graceful timeout / spawn-error / nonzero）
+- `src/scripts/admin-field-validators.js`（per-field `{ ok, error? }`；SEO / FB sidecar / relatedLink kind / url / sourceKey 規則 mirror Phase 20260527-pm-14 三條互斥）
+- `src/scripts/safe-write.js`（atomic temp+rename；whitelist → git → validators → write；失敗清 `.tmp`；不 spawn git；不寫 log file；無 third-party dep）
+- `src/scripts/safe-write-test.js`（CLI self-test；71 assertions；OS temp dir only；`finally` 清理）
+
+### D. Acceptance summary
+
+| 項目 | 值 |
+|---|---|
+| safe-write:test | `71 pass / 0 fail` |
+| validate:content | `0 errors / 42 warnings / 37 posts` |
+| HEAD at acceptance | `5bcdd026f4f6ee8420fbcff529d152f17ec43519` (`5bcdd02`) |
+| origin/main at acceptance | 同 HEAD |
+| ahead / behind | `0 / 0` |
+| working tree | clean |
+
+### E. Boundary summary（night-2 / night-3 / night-4 全程）
+
+- ❌ no Admin UI change（`src/views/admin/index.ejs` / `load-admin-posts.js` 未動）
+- ❌ no production content change（`content/{github,blogger}/posts/**` 0 changes）
+- ❌ no settings / templates / validation-fixtures change
+- ❌ no dist / dist-blogger / gh-pages change
+- ❌ no npm install / no new dependency
+- ❌ no build / no deploy
+- ❌ no Blogger repost
+- ❌ no GA4 validation
+- ❌ no fixture creation
+- ❌ no force-push / amend / rebase / fetch / pull / checkout / reset / stash
+
+### F. Carried-forward status（state at night-4 EOD）
+
+- ✅ **Admin Write Infra Phase 2** — landed `5bcdd02`；helper 全部 unit-testable；71/71 self-test pass
+- ⏸ **Admin actual write path** — still not enabled；no Apply button；no Vite dev middleware；no HTTP POST handler
+- ⏸ **§15.G Phase 3**（First dry-run-only UI enhancement）— pending；需 fresh session 啟動
+- ⏸ **§15.G Phase 4**（Vite dev middleware for Admin POST endpoint）— pending
+- ⏸ **§15.G Phase 5**（First real write behind explicit Apply: SEO fields）— pending
+- ⏸ **Step 6 sourceKey Admin selector** — still blocked by Admin write / UI phases（per §15.F 12 條 prerequisites；hard-blockers #1 / #2 / #8 / #10 部分由 night-2 phase 2 解除，但仍需 phase 3-9 完整通過）
+- ⏸ **Step 7-c source-inactive warning** — still future；wait for real inactive source
+- 💤 **reverse UTM** — source landed but dormant；commit chain `7e1d356` / `e2309e9` / `7c769fe`（pm-24a/b/c；2026-05-23）；尚未 deploy / 尚未碰 gh-pages / Blogger 尚未重貼
+- ⏸ **pm-26 deploy gate** — remains blocked by no positive GitHub cross-link fixture（per `docs/reverse-utm-fixture-plan.md` §3-§6）
+
+### G. Night-4 Final Idle Freeze
+
+本 night-4 docs sync commit + push 完成後（commit hash 落地後填入）進入 **Night-4 Final Idle Freeze**：
+
+- 不啟動下一個 phase（§15.G phase 3 屬源碼變更；需 user 明示 trigger）
+- 不解除 Step 6 阻擋
+- 不解除 pm-26 阻擋
+- 不主動 sync 其他 docs（無 drift 發現）
+- 等待 user 下一個明示 trigger
+
+如 user 後續要繼續：建議 fresh session 啟動 §15.G phase 3（First dry-run-only UI enhancement），對齊 §15.D.7 + §15.D.9 設計（Apply button visible but disabled with explanatory tooltip + client-side validation preview）。
+
+---
+
 （本文件結束）

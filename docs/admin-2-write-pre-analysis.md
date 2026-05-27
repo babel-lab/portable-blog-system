@@ -757,7 +757,7 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 |---|---|---|---|---|
 | **0** | **Read-only acceptance cross-check**（如本 phase 之 am-14 read-only preflight）| read-only；docs only | 確認 Admin 現況 + Admin write infra 缺什麼 + Step 6 blockers | ✅ done（Phase 20260527-am-14）|
 | **1** | **Docs sync / roadmap update**（如本 phase 之 am-15）| docs-only | 把 Admin write infra design refinement append 至 admin-2-write-pre-analysis.md；同步 phase-2-candidate-roadmap / future-roadmap | 🔄 in-progress（本 phase）|
-| 2 | **Safe write helper source implementation**（純 source；無 Admin UI 寫入；CLI testable）| source；新增 `src/scripts/safe-write.js` / `git-status-check.js` / `admin-write-whitelist.js` / `admin-field-validators.js` / `active-source-keys.js`（per §15.D） | helper unit-testable；新增 npm script `safe-write:test`；validate baseline 不退步 | ⏸ pending |
+| 2 | **Safe write helper source implementation**（純 source；無 Admin UI 寫入；CLI testable）| source；新增 `src/scripts/safe-write.js` / `git-status-check.js` / `admin-write-whitelist.js` / `admin-field-validators.js` / `active-source-keys.js`（per §15.D） | helper unit-testable；新增 npm script `safe-write:test`；validate baseline 不退步 | ✅ landed `5bcdd02` (2026-05-27) — see §15.G.1 |
 | 3 | **First dry-run-only UI enhancement**（依賴 phase 2；新增 Admin Apply button 但**不**綁實際 write）| source；index.ejs Apply button visible but **disabled with explanatory tooltip**；client-side validation preview | UX 流程 verify；無 fs.write | ⏸ pending |
 | 4 | **Vite dev middleware for Admin POST endpoint**（讓 browser POST 至 Node fs；dev-only）| source；vite.config.js custom middleware；新 npm script `dev:admin`（保留既有 `dev` 不變）| middleware spec verify；Admin UI 仍 read-only；endpoint 暫接 echo / dry-run | ⏸ pending |
 | 5 | **First real write behind explicit Apply: SEO fields**（依賴 phases 2-4；per §9.1 Admin-2-b-2 + §15.E.1 ranked #1）| source；`.md` description / searchDescription write；single-file atomic | git diff verify；validate baseline 不退步；rollback flow 演練 | ⏸ pending |
@@ -769,6 +769,51 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 | X+ | Admin-2-c risky-editable（category / tags / status / publishTargets / contentKind）| source；per §7.6 | 每候選獨立 pre-analysis | ⏸ pending |
 
 → **sourceKey selector 必須在 phase 10**；不可插隊。最早可啟動時點為 phases 0-9 全部完成 + user 簽收。
+
+#### 15.G.1 Phase 2 Landing Details（2026-05-27 night-2）
+
+**Phase 名稱**：
+- `20260527-night-2-admin-write-safe-helper-source-implementation-a`（source）
+- `20260527-night-2-admin-write-safe-helper-source-implementation-commit-push-a`（commit + push）
+- `20260527-night-3-admin-write-safe-helper-acceptance-crosscheck-readonly-a`（read-only acceptance）
+
+**Landed commit**：
+- full：`5bcdd026f4f6ee8420fbcff529d152f17ec43519`
+- short：`5bcdd02`
+- message：`feat(admin): add safe write infra helpers`
+
+**Commit scope**（7 files; 666 insertions(+), 1 deletion(-)）：
+
+| File | LOC | 用途 |
+|---|---|---|
+| `package.json` | +2 / -1 | 新增 npm script `safe-write:test`；無新 dependency |
+| `src/scripts/active-source-keys.js` | 33 | `buildActiveSourceKeySet(settings)` / `loadActiveSourceKeySet(projectRoot)`；mirror `validate-content.js:131-142`；graceful 缺檔 / 壞 JSON → 空 Set（per §15.D + §15.F prereq #5） |
+| `src/scripts/admin-write-whitelist.js` | 72 | `isWriteAllowed(targetPath, projectRoot)`；只允許 `content/{github,blogger}/posts/*.{md,publish.json,fb.md}`；阻擋 `..` traversal / 相對路徑 / 跨 drive / dist / settings / pages / validation-fixtures / package-lock（per §15.D.4） |
+| `src/scripts/git-status-check.js` | 66 | `checkGitStatus({ cwd, timeoutMs })` spawn `git status --porcelain` → `{ ok, clean, dirtyFiles[], untracked[] }`；5 秒 timeout；4 條 graceful reason（`git-spawn-throw` / `git-spawn-error` / `git-timeout` / `git-exit-nonzero`）；不修改 git 狀態（per §15.D.2） |
+| `src/scripts/admin-field-validators.js` | 94 | `validateDescription` / `validateSearchDescription` / `validateTitleEn` / `validateCover` / `validateCoverAlt` / `validateRelatedLinkKind` / `validateRelatedLinkUrl` / `validateRelatedLinkSourceKey` + `LIMITS`；統一 `{ ok, error? }` return；sourceKey 規則 mirror Phase 20260527-pm-14 三條互斥（per §15.D.5） |
+| `src/scripts/safe-write.js` | 106 | `safeWrite({ targetPath, newContent, projectRoot, validators, gitStatus, enforceCleanGit })`；流程：whitelist → git-status check（caller-supplied）→ validators → tmp write → rename；失敗清 `.tmp`；不 spawn git；不寫 log file（per §15.D.1） |
+| `src/scripts/safe-write-test.js` | 293 | CLI self-test entry；71 assertions across 5 helpers；OS temp dir only（`fs.mkdtemp(os.tmpdir())`）；`finally { fs.rm(tmpRoot, recursive, force) }`；exit non-zero on any fail |
+
+**Acceptance verification**（per `20260527-night-3` read-only cross-check）：
+
+- ✅ HEAD `5bcdd02` == origin/main；ahead/behind 0/0；working tree clean
+- ✅ `safe-write:test`：71 pass / 0 fail
+- ✅ `validate:content`：0 errors / 42 warnings / 37 posts（與開工前一致）
+- ✅ 7 helper acceptance checklist 全部 PASS（atomic temp+rename / cleanup tmp / 不綁 Admin UI / 不寫 production content / 無 third-party dep / git-status 只檢查不修復 / 白名單保守 / validators 格式一致 / sourceKey 規則 mirror / graceful fallback / OS temp dir only）
+
+**保留限制**（landing 後仍維持）：
+
+- ❌ 未串接 Admin UI（`src/views/admin/index.ejs` / `load-admin-posts.js` 未動）
+- ❌ 未啟用實際 write path（無 Apply button；無 Vite dev middleware；無 HTTP POST handler）
+- ❌ 未修改 content / settings / templates / validation-fixtures / dist / dist-blogger / gh-pages
+- ❌ 未做 build / deploy / Blogger repost / GA4 validation
+- ❌ 未新增 fixture
+- ✅ `validate:content` baseline 維持 `0 errors / 42 warnings / 37 posts`
+- ✅ `safe-write:test` = `71 pass / 0 fail`
+- ✅ Step 6 sourceKey selector remains blocked by phase 3-9（per 既有 §15.F 12 條 prerequisites）
+- ✅ reverse UTM remains landed but dormant；pm-26 deploy gate remains blocked by no positive GitHub cross-link fixture
+
+**下一個建議 phase**：§15.G phase 3（First dry-run-only UI enhancement）—— 屬源碼變更；本 docs sync 不啟動。
 
 ### 15.H Boundary Reaffirmation
 
