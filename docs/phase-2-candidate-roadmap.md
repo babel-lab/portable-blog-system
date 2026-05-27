@@ -193,7 +193,7 @@
 4. **Step 4：renderer** ✅ **landed (commit d1f1224, 2026-05-27)** — 兩端 EJS 引入 fallback chain `labelOverride > registry.displayLabel > platform > kind`；無 `sourceKey` 時 fallback 至既有 `platform` 字串（backward compatible）
 5. **Step 5：GA4** ✅ **landed (commit 310062d, 2026-05-27)** — `src/views/pages/post-detail.ejs` relatedLinks / otherLinks anchors 加 `data-ga4-param-link_source_key`（conditional：only when `item.sourceKey` is non-empty trimmed string；no fallback to platform；無 empty-string output）；Blogger render 未動（既有無 `data-ga4-*` attrs）；runtime tracker / ga4-events / validate / Admin 皆未動；`ga4-link-tracking-spec.md` / `related-links-schema.md` §11.5 已同步
 6. **Step 6：Admin selector** — 撰寫文章時下拉選擇 `sourceKey`；屬 Admin write 系列；需 atomic write
-7. **Step 7：validate rules** — 新增 warning：`source-key-not-found` ✅ **landed (commit 9ce7e8a, 2026-05-27)** / `source-inactive` ⏭ not started；mirror 既有 4 條 `related-links-*` warning-only pattern
+7. **Step 7：validate rules** — 新增 warning：`source-key-not-found` ✅ **landed (commit 9ce7e8a, 2026-05-27)** / `source-key-invalid-type` ✅ **landed Phase 20260527-pm-14 (2026-05-27)** / `source-key-empty` ✅ **landed Phase 20260527-pm-14 (2026-05-27)** / `source-inactive` ⏭ not started；mirror 既有 4 條 `related-links-*` warning-only pattern；validate baseline drift `0/40/35` → `0/42/37`（+2/+2；pm-14 fixtures additive）
 
 #### 邊界
 

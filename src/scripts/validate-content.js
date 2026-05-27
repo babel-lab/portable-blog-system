@@ -200,17 +200,41 @@ function validateRelatedLinksField(fieldName, value, sourcePath, issues, activeS
     }
 
     // Phase 20260527-am-8 step-7：sourceKey 未命中 active registry → warning（warning-only）
-    //   - gate：isNonEmptyString（內部 trim 後非空）；undefined / 非 string / 空字串 / 純空白 → skip
     //   - non-empty trimmed string 但不在 activeSourceKeys → related-links-source-key-not-found
-    //   - 本批不檢查 inactive 專屬規則；不發 invalid-type / empty 專屬 warning（per Phase 20260527-am-7 §4.2）
-    //   - 與既有 4 條 related-links warning 規則彼此獨立；不互斥
-    if (isNonEmptyString(entry.sourceKey) && !activeSourceKeys.has(entry.sourceKey)) {
-      issues.push({
-        severity: 'warning',
-        type: 'related-links-source-key-not-found',
-        sourcePath,
-        value: `${fieldName}[${i}].sourceKey="${entry.sourceKey}" not found in link-sources registry`,
-      });
+    //   - 與既有 4 條 related-links warning 規則（not-array / missing-kind / kind-invalid / missing-url）彼此獨立
+    // Phase 20260527-pm-14 step-7-d：新增 invalid-type / empty sourceKey warning（互斥）
+    //   - 規則順序（mirror missing-kind / kind-invalid 既有互斥 pattern）：
+    //     1. sourceKey !== undefined 且 typeof !== 'string' → invalid-type
+    //     2. else if typeof === 'string' 且 trim() === '' → empty
+    //     3. else if non-empty string 但不在 activeSourceKeys → not-found（既有；行為不變）
+    //   - undefined 不觸發；保留 optional 欄位語意
+    //   - 三條規則互斥；同 entry 之 sourceKey 最多觸發 1 條，避免重複噪音
+    if (entry.sourceKey !== undefined) {
+      if (typeof entry.sourceKey !== 'string') {
+        const typeLabel = Array.isArray(entry.sourceKey)
+          ? 'array'
+          : (entry.sourceKey === null ? 'null' : typeof entry.sourceKey);
+        issues.push({
+          severity: 'warning',
+          type: 'related-links-source-key-invalid-type',
+          sourcePath,
+          value: `${fieldName}[${i}].sourceKey typeof=${typeLabel} (must be string)`,
+        });
+      } else if (entry.sourceKey.trim() === '') {
+        issues.push({
+          severity: 'warning',
+          type: 'related-links-source-key-empty',
+          sourcePath,
+          value: `${fieldName}[${i}].sourceKey is empty or whitespace-only`,
+        });
+      } else if (!activeSourceKeys.has(entry.sourceKey)) {
+        issues.push({
+          severity: 'warning',
+          type: 'related-links-source-key-not-found',
+          sourcePath,
+          value: `${fieldName}[${i}].sourceKey="${entry.sourceKey}" not found in link-sources registry`,
+        });
+      }
     }
   }
 }
