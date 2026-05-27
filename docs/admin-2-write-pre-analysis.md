@@ -519,4 +519,270 @@ Admin-2-b-1 為**安全 stepping stone**：
 
 ---
 
+## §15 2026-05-27 Snapshot：Admin Write Infra Design Refinement
+
+本節為 **Phase 20260527-am-15-admin-write-infra-design-docs-only-a** 之 docs-only 追加。屬本文件之**追加**（append-only）：§1–§14 既有設計**不刪改**；§15 補充自原文件落地（2026-05-15 前後）以來之**現況快照**、**首個寫入功能選擇之 rationale**、**sourceKey selector 之 prerequisites checklist**、與**更新後之 phase 順序**。
+
+對應上層 trigger：sourceKey Step 6 Admin selector 仍被 Admin write infra 擋住；Step 5 / 7 / 7-d 已落地（per `docs/related-links-schema.md` §11.5）；Phase 20260527-am-14 read-only preflight 已確認 Admin 無 actual file write path / 無 reusable atomic write helper / 無 pre-/post-write validate hook / 無 relatedLinks 編輯 UI。
+
+### 15.A Current State（2026-05-27）
+
+| 範疇 | 狀態 | 證據 / 來源 |
+|---|---|---|
+| Admin 渲染模式 | dev-mode-only（Plan B；prod build 跳過）| `src/views/admin/index.ejs` line 6 (`noindex, nofollow`) + line 12-14 banner；`src/scripts/build-github.js` predev only |
+| Admin loader | `src/scripts/load-admin-posts.js`（~298 LOC；glob `content/{github,blogger}/posts/*.md` 排除 `.fb.md`）| 既有檔；不寫入；不解析 .fb.md body |
+| Admin EJS | `src/views/admin/index.ejs`（~1004 LOC）| 既有檔；statically rendered；無 form submit / 無 fetch / 無 XHR |
+| SEO dry-run viewer | ✅ landed（Phase Admin-2-b-1；commit `b676f26`，2026-05-19）| 4 fields（description / searchDescription / titleEn / coverAlt）；client-side diff only；無 Apply button |
+| FB sidecar dry-run editor | ✅ landed（Phase 20260520-fb-p5-b）| 12 fields；client-side diff + simulated frontmatter；無 fs.write / 無 fetch |
+| FB Post read-only metadata 顯示 | ✅ landed（Phase 20260520-fb-p5-a + 20260520-c-1～c-4）| 13 個 FB 欄位 + badge derived；屬 read-only display |
+| Platform Routing read-only display | ✅ landed（Phase 20260521-pm-57 + pm-59）| canonicalTarget / platformUrl / gaHostname / githubStatus；屬 read-only derived |
+| Admin overview filters / sort / search | ✅ landed（多批；最新 Phase 20260523-pm-16 fbPostedAt sort）| client-side only |
+| relatedLinks / otherLinks 編輯 UI | ❌ **無**；index.ejs line 590-591 僅顯示 count（number）| `load-admin-posts.js` `toAdminView` line 130-131 只 derive `.length`；array 內容**未** expose 至 EJS |
+| Actual file-write path（任何 .md / .fb.md / .publish.json）| ❌ **無**任何 Admin write surface | grep `fs.writeFile|writeFile` on `src/scripts/load-admin-posts.js` / `src/views/admin/index.ejs` 皆 0 命中 |
+| Reusable atomic write helper | ❌ **無**模組化；唯一 pattern 在 `src/scripts/backfill-published-url.js` line 366-369（CLI；temp + rename inline） | — |
+| Pre-write inline schema validator | ❌ **無** | — |
+| Post-write `validate:content` hook | ❌ **無** | — |
+| git-status pre-write guard | ❌ **無** | — |
+| HTTP / IPC endpoint（讓 browser POST 至 Node fs）| ❌ **無**；`vite.config.js` 無 custom middleware / 無 API routes | — |
+| `linkSources` 載入至 Admin context | ⚠️ 未驗證；`load-admin-posts.js` 簽名為 `({ settings })`，但目前 `toAdminView` 未使用 `settings.linkSources` | grep `linkSources` 命中 `validate-content.js` / `build-blogger.js` / `build-github.js` / `load-settings.js`；**未**命中 `load-admin-posts.js` 或 `index.ejs` |
+| validate baseline | 0 errors / 42 warnings / 37 posts | `npm run validate:content`（2026-05-27 21:55）|
+| sourceKey chain landed steps | Steps 2 / 3 / 4 / 5 / 7 / 7-d + docs-sync ✅ | per `docs/related-links-schema.md` §11.5；commits `310062d` / `1707881` / `702e5db` 等 |
+| sourceKey Step 6 Admin selector | ❌ blocked by Admin write infra | 本節 §15.F 詳列 prerequisites |
+
+### 15.B Non-goals（本 phase 之硬性界線；不重複 §1.2）
+
+本 phase（20260527-am-15）為 **docs-only**；以下**不**做：
+
+- ❌ production Admin（線上化；登入；多 user）— per `docs/admin-local-boundary-pre-analysis.md` §3
+- ❌ build / deploy / Blogger repost / GA4 validation
+- ❌ reverse UTM positive fixture 建立
+- ❌ sourceKey selector 之 source code 實作
+- ❌ 真正檔案寫入（無 fs.writeFile / 無 fs.rename / 無 HTTP POST handler）
+- ❌ Admin source / loader / EJS / vite config 修改
+- ❌ content / settings / templates 修改
+- ❌ npm install / package.json 修改
+
+### 15.C Safety Principles（彙整）
+
+§6 / §8 已有完整策略；本節彙整為 **9 條核心原則**，供未來 implementer 對齊：
+
+1. **Dry-run first**：任何寫入功能之第一個 sub-batch 必為 dry-run viewer（無 fs.write；只算 diff）
+2. **Explicit Apply step**：實際寫入必須由 user 在看過 diff 後明示 click「Apply」；無 auto-write；無 implicit save-on-blur
+3. **Working tree must be clean before write**：寫入前 `git status` check；dirty 時拒絕或要求 user 明示確認
+4. **Atomic temp + rename**：per Strategy B；`{file}.tmp` → `fs.rename` → OS-level atomic；失敗即 unlink .tmp
+5. **No .bak strategy**：拒絕 Strategy C；依賴 `git status` / `git diff` / `git restore` 作為唯一回退機制
+6. **Pre-write validation**：per Strategy E；inline 驗證 field type / format / length / schema 後才 write
+7. **Post-write `npm run validate:content`**：per Strategy F；寫入後跑全 content scan；baseline 退步即 alert + 提示 rollback
+8. **One post / one sidecar / one transaction at a time**：禁 multi-file batch；禁 multi-post 同步；MVP 階段一次只動一檔
+9. **Never write generated dist files**：寫入白名單嚴格限制於 source content（`content/**/*.md` / `.publish.json` / `.fb.md`）；`dist/` / `.cache/` / `node_modules/` / `src/` / `docs/` / `.git/` 全禁；per §3 黑名單
+
+### 15.D Proposed Architecture（高階；不實作）
+
+§4 / §6 / §8 已涵蓋細節；本節為 **10 個必備元件之 high-level shape**，供未來 implementation phase 拆批參考：
+
+#### 15.D.1 reusable safe write helper
+
+- 模組位置（提議）：`src/scripts/safe-write.js`
+- 接口（提議）：
+  ```js
+  // 純 Node；無 third-party dep；ESM
+  export async function safeWrite({
+    targetPath,       // absolute path; must pass whitelist
+    newContent,       // string; UTF-8
+    validators,       // array of (content) => { ok, errors[] }
+    onPreWriteGitCheck, // optional; default 'enforce-clean'
+  }) {
+    // 1. whitelist check（§15.D.4）
+    // 2. git status check（§15.D.2）
+    // 3. validators forEach（§15.D.5）
+    // 4. writeFile(tmpPath) → rename(targetPath) → cleanup on failure
+    // 5. return { ok, writtenPath, validateBaselineDelta? }
+  }
+  ```
+- 不 spawn git；git status check 由 caller 傳入結果（避免 helper 與 git 緊耦合）
+
+#### 15.D.2 git clean guard
+
+- 模組位置（提議）：`src/scripts/git-status-check.js`
+- 功能：spawn `git status --porcelain` → parse → return `{ clean, dirtyFiles: [], untracked: [] }`
+- Admin 寫入前 UI 端：呼叫此 helper → display dirty 清單 → user 必須 confirm 或 cancel
+- **不**自動 stash / reset / restore
+
+#### 15.D.3 frontmatter parse / stringify flow
+
+- 寫入 `.md` / `.fb.md` 時：
+  - 用 `gray-matter` parse 原檔 → 拿 `{ data, content }`
+  - 更新 `data` 之指定欄位 → stringify 回 `'---\n' + yaml.dump(data) + '---\n' + content`
+  - **保留** body content bit-exact（per `fb-sidecar-write-safety.md` §4 frontmatter preservation）
+  - YAML emitter 選擇：`gray-matter` 內建 `js-yaml`；採用既有 dependency；不引新 lib
+- 寫入 `.publish.json` 時：
+  - `JSON.parse` → mutate → `JSON.stringify(obj, null, 2) + '\n'`
+  - 保留尾隨 newline；保留 2-space indent；對齊既有檔案格式
+
+#### 15.D.4 write target whitelist
+
+- 模組位置（提議）：`src/scripts/admin-write-whitelist.js`
+- 規則（hard-coded）：
+  - ✅ 允許：`content/github/posts/*.md` / `*.publish.json` / `*.fb.md`
+  - ✅ 允許：`content/blogger/posts/*.md` / `*.publish.json` / `*.fb.md`
+  - ❌ 禁止：所有其他路徑（含 `content/settings/**` / `content/validation-fixtures/**` / `content/{github,blogger}/pages/**`）
+  - ❌ 禁止：symlink / UNC / network path / `..` traversal
+- Helper：`isWriteAllowed(absPath) => boolean`；以**字串比對 + path.resolve**雙層；不接受 client-supplied path（per `fb-sidecar-write-safety.md` §2.3）
+
+#### 15.D.5 pre-write field validator
+
+- 模組位置（提議）：`src/scripts/admin-field-validators.js`
+- per-field type / format check（範例）：
+  - `description`: string；length ≤ 1000；無 control chars
+  - `searchDescription`: string；length ≤ 500
+  - `titleEn`: string；length ≤ 200；optional
+  - `cover` / `coverAlt`: string
+  - `relatedLinks[].sourceKey`: string；trim 後非空；在 `activeSourceKeys` set 內（per `validate-content.js` line 137-138 之 builder）
+  - `relatedLinks[].url`: string；非空
+  - `relatedLinks[].kind`: enum `'internal' | 'external'`
+- 失敗 → return `{ ok: false, errors: [{ field, message }] }`；不寫入
+
+#### 15.D.6 post-write `validate:content` runner
+
+- spawn `node src/scripts/validate-content.js` as child process
+- capture stdout 之 final summary line（`X error(s) / Y warning(s) on Z post(s)`）
+- 比對寫入前 baseline；warning count 增加 → alert + 顯示 rollback button
+- 預估耗時：~1-2 sec for 37 posts；可 background spawn
+
+#### 15.D.7 dry-run diff generator
+
+- Admin UI 端純 client-side（沿用 SEO / FB dry-run viewer pattern）：
+  - 取 oldValue（dataset.current）+ newValue（form input）
+  - per-field 比對 → 標 `changed / unchanged / unchanged-empty`
+  - 顯示 side-by-side diff table
+- **不**計算完整 file diff（避免在 browser 引入 diff lib）；只 per-field
+
+#### 15.D.8 rollback strategy using git
+
+- 寫入後 UI 顯示 `Rollback last write` button（或顯示 manual command 不 spawn git）
+- 預設**不**自動 spawn git；改顯示：
+  ```
+  ⚠️ 寫入完成。若需 rollback：
+    cd <repo>
+    git restore content/.../{slug}.md
+  ```
+- per §8.7 narrow 例外：若 user 啟用「auto-rollback on validate baseline 退步」option，才 spawn `git restore`；預設關閉
+
+#### 15.D.9 Admin UI apply flow
+
+```
+作者於 Admin → click "Edit" on a field (per existing SEO / FB dry-run pattern)
+   ↓
+form 顯示 current value
+   ↓
+作者修改 → 按 "Preview Diff"
+   ↓
+client-side diff render（per §15.D.7）
+   ↓
+inline validation render（per §15.D.5；失敗即停）
+   ↓
+作者按 "Apply Changes"
+   ↓
+[POST 至 Vite dev middleware；或直接 fs（如改採 Node-based dev runner）]
+   ↓
+git-status-check（per §15.D.2）；dirty 時要求 confirm
+   ↓
+safe-write helper（per §15.D.1）：whitelist → temp → rename
+   ↓
+post-write validate（per §15.D.6）：baseline delta
+   ↓
+UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
+```
+
+#### 15.D.10 logging / final report format
+
+- 寫入每次 produce 一個 console log line + UI status row：
+  ```
+  [admin-write] 2026-MM-DD HH:mm:ss path=<rel> field=<name> old=<...> new=<...> validate-delta=<+0|+N> ok=true
+  ```
+- 不寫入 log file（避免新增 source 檔案）；只 console + UI；user 若要 archive 自行重導
+
+### 15.E First Write Scope Recommendation
+
+#### 15.E.1 候選排序（最小 → 最大風險）
+
+| 排名 | 候選 | 影響檔案 | 影響欄位數 | 跨檔影響 | downstream | 推薦時序 |
+|---|---|---|---|---|---|---|
+| 1 | **SEO fields write**（description / searchDescription）| 1 個 `.md` | 2 | ❌ 無 | SEO meta / OG description；不影響 routing / build scope / lifecycle | ✅ **第一個寫入** |
+| 2 | FB sidecar write（`enabled` / `hashtags` / body）| 1 個 `.fb.md` | 3 | ❌ 無 | dist-promotion txt 產出；不影響主文章 | ✅ 第二 |
+| 3 | titleEn / cover / coverAlt / updated | 1 個 `.md` | 4 | ❌ 無 | sitemap lastmod；SEO；無 routing | ✅ 第三 |
+| 4 | blocks.* boolean toggles | 1 個 `.md` | N 個 boolean | ❌ 無 | post-detail render；無 routing | ✅ 第四 |
+| 5 | relatedLinks / otherLinks 編輯（含 sourceKey selector）| 1 個 `.md` | per-item array | ⚠️ 中 | UTM 自動處理 / GA4 click tracking / sourceKey registry | ⏸ 第五；本批 MVP 完成後評估 |
+| 6 | publishedUrl / `.publish.json` write | 1 個 `.publish.json` | publish bundle | 🔴 高 | canonical / FB UTM / sitemap | ❌ **不採**（已有 `npm run backfill:url` CLI helper；per §4.3）|
+
+#### 15.E.2 為什麼 sourceKey selector **不**應該是第一個 write feature
+
+明確 8 條 rationale：
+
+1. **影響 array of object，非單一 scalar**：sourceKey 屬 `relatedLinks[i].sourceKey`；per-item 寫入需處理 array index + per-item validation；複雜度高於 SEO 之單一 string 寫入。
+2. **依賴未實作之 array exposure**：`load-admin-posts.js` `toAdminView` 目前只 derive `.length`；array 內容**未** expose 至 EJS。Step 6 之前必須先補此 exposure；屬獨立 source change。
+3. **依賴未實作之 linkSources 載入**：Admin 目前無 `linkSources` 上下文；需先把 `settings.linkSources` 通過 loader 傳入 EJS；屬獨立 source change。
+4. **依賴未實作之 active sourceKey filter**：`<select>` options 必須只列 `isActive !== false` 之 sourceKey；需 import / mirror `validate-content.js` line 137-138 之 `activeSourceKeys` builder；屬獨立 source change。
+5. **per-item editor row UI 不存在**：relatedLinks section 目前 0 editable affordances；需新建一整套 per-item 編輯 UI（toggle / form / diff / cancel；mirror SEO / FB dry-run pattern 但 per-array-item-indexed）。
+6. **downstream 影響範圍廣**：sourceKey 影響 GA4 click tracking 之 `link_source_key` 參數 + 未來 UTM 自動處理（per `docs/click-tracking-governance.md` / `docs/ga4-link-tracking-spec.md`）；改錯破壞 production GA4 data。SEO description 改錯只影響顯示，無 downstream。
+7. **validation 已 ready 但 UI 未 ready**：Step 7 / 7-d（not-found / invalid-type / empty）warning 已落地於 `validate-content.js`；post-write validate 會 catch 錯誤，但若 UI 已寫入錯誤值，user 仍需手動 rollback。SEO write 之失敗 surface 更小。
+8. **「最小 write 學習成本」原則**：首個 write feature 應驗證 atomic write helper / git guard / pre-write validator / post-write hook 等**基礎設施**；用最低 schema 複雜度（單一 string）。array of object + registry lookup + active filter 不適合作為基礎設施驗證載體。
+
+→ **結論**：sourceKey selector 必須等基礎設施（per §15.G phase 3）驗證穩定 + SEO write（§15.G phase 5）跑通後，才進入規劃。
+
+### 15.F sourceKey Step 6 Prerequisites（必要前置清單）
+
+| # | Prerequisite | 屬性 | 阻擋等級 |
+|---|---|---|---|
+| 1 | **Admin write infra 基礎建立**（safe-write helper / git guard / atomic temp+rename / pre-write validator / post-write validate）| source change；多檔；含新 helper 模組 | 🔴 hard-block |
+| 2 | **Vite dev middleware 或替代 server**（讓 browser POST 至 Node fs）| source change；vite.config.js 或新增 dev server | 🔴 hard-block |
+| 3 | **`linkSources` 通過 loader 傳入 Admin EJS**（caller 在 `build-github.js` Admin emit 處補一行；`load-admin-posts.js` `toAdminView` 接受並 attach `linkSources`）| source change；單檔；~5 LOC | 🟡 medium |
+| 4 | **expose `relatedLinks` / `otherLinks` arrays at Admin view object**（`toAdminView` 額外 return；保留既有 `relatedLinksCount` / `otherLinksCount` 不刪）| source change；單檔；~10 LOC | 🟡 medium |
+| 5 | **active sourceKey options builder shared**（抽 `validate-content.js` line 137-138 之 `activeSourceKeys` builder 至共用 helper `src/scripts/active-source-keys.js`；validate / build-github / build-blogger / Admin 共用）| source change；refactor；多 caller | 🟡 medium |
+| 6 | **per-link editor row UI shell**（index.ejs detail panel 新增 relatedLinks per-item 編輯區；toggle / form / diff / cancel；mirror FB dry-run pattern）| source change；EJS；~200-300 LOC | 🟡 medium |
+| 7 | **dry-run diff generator extended for array fields**（per-item field-level diff；mirror FB dry-run 之 `splitNorm` array 處理）| source change；EJS / JS；~50 LOC | 🟢 low |
+| 8 | **safe write path for `.md` frontmatter relatedLinks[] mutation**（path: `relatedLinks[i].sourceKey`；safe-write helper 必須支援 array index mutation）| 依賴 #1；§15.D.3 frontmatter parse / stringify flow 需支援 array 寫回 | 🔴 hard-block（依賴 #1）|
+| 9 | **pre-write `sourceKey` validators** active set / type / empty check（type / empty / not-found；mirror `validate-content.js` line 212-237 之三條互斥規則）| source change；依賴 #5；~30 LOC | 🟢 low |
+| 10 | **post-write `validate:content` baseline 比對**（hook per §15.D.6；catch 任何下游 warning 退步）| 依賴 #1；屬基礎設施 | 🔴 hard-block（依賴 #1）|
+| 11 | **sourceKey selector option list 排序**（per `link-sources.json` 之 `sortOrder` 欄位；Admin UI display order；UX nice-to-have）| source change；EJS；~5 LOC | 🟢 low |
+| 12 | **rollback UX for relatedLinks edit failure**（per §15.D.8）| 依賴 #1；UI banner | 🟡 medium |
+
+**結論**：12 條 prerequisites 中 hard-blockers 為 #1 / #2 / #8 / #10；其中 #1 + #2 為基礎設施類，必須先落地。#3–#7 + #9 + #11 + #12 為 Step 6 自身 scope 之 sub-batches；可在 #1 + #2 完成後拆批執行。
+
+### 15.G Recommended Phase Sequence（重排版）
+
+§9.1 之 5 sub-batches 仍有效，但本節**前置 + 後置**補充 phase 0 / phase 1 / phase X+：
+
+| Phase 序 | Phase 名稱 | 屬性 | 驗收門 | Status |
+|---|---|---|---|---|
+| **0** | **Read-only acceptance cross-check**（如本 phase 之 am-14 read-only preflight）| read-only；docs only | 確認 Admin 現況 + Admin write infra 缺什麼 + Step 6 blockers | ✅ done（Phase 20260527-am-14）|
+| **1** | **Docs sync / roadmap update**（如本 phase 之 am-15）| docs-only | 把 Admin write infra design refinement append 至 admin-2-write-pre-analysis.md；同步 phase-2-candidate-roadmap / future-roadmap | 🔄 in-progress（本 phase）|
+| 2 | **Safe write helper source implementation**（純 source；無 Admin UI 寫入；CLI testable）| source；新增 `src/scripts/safe-write.js` / `git-status-check.js` / `admin-write-whitelist.js` / `admin-field-validators.js` / `active-source-keys.js`（per §15.D） | helper unit-testable；新增 npm script `safe-write:test`；validate baseline 不退步 | ⏸ pending |
+| 3 | **First dry-run-only UI enhancement**（依賴 phase 2；新增 Admin Apply button 但**不**綁實際 write）| source；index.ejs Apply button visible but **disabled with explanatory tooltip**；client-side validation preview | UX 流程 verify；無 fs.write | ⏸ pending |
+| 4 | **Vite dev middleware for Admin POST endpoint**（讓 browser POST 至 Node fs；dev-only）| source；vite.config.js custom middleware；新 npm script `dev:admin`（保留既有 `dev` 不變）| middleware spec verify；Admin UI 仍 read-only；endpoint 暫接 echo / dry-run | ⏸ pending |
+| 5 | **First real write behind explicit Apply: SEO fields**（依賴 phases 2-4；per §9.1 Admin-2-b-2 + §15.E.1 ranked #1）| source；`.md` description / searchDescription write；single-file atomic | git diff verify；validate baseline 不退步；rollback flow 演練 | ⏸ pending |
+| 6 | Admin-2-b-3：FB sidecar write | source；per §9.1 | per §11 stop point 5 | ⏸ pending |
+| 7 | Admin-2-b-4：titleEn / cover / coverAlt / updated write | source；per §9.1 | per §11 stop point 6 | ⏸ pending |
+| 8 | Admin-2-b-5：blocks.* boolean toggles write | source；per §9.1 | per §11 stop point 7 | ⏸ pending |
+| 9 | **Admin-2-b wrap**：completion report；驗證 5 個 write surfaces 全部穩定運作 ≥ N days；validate baseline 健康；user 確認可進 Admin-2-c | docs | user 簽收 | ⏸ pending |
+| **10** | **sourceKey Step 6 Admin selector**（依賴 phase 9 wrap；per §15.F prerequisites）| source；relatedLinks / otherLinks per-item editor + sourceKey `<select>` + per-item dry-run + write | per §15.F 12 條 prerequisites；validate baseline 不退步；live GA4 verify | ⏸ pending；blocked by phases 0-9 |
+| X+ | Admin-2-c risky-editable（category / tags / status / publishTargets / contentKind）| source；per §7.6 | 每候選獨立 pre-analysis | ⏸ pending |
+
+→ **sourceKey selector 必須在 phase 10**；不可插隊。最早可啟動時點為 phases 0-9 全部完成 + user 簽收。
+
+### 15.H Boundary Reaffirmation
+
+本 §15 補充段：
+
+- ✅ **僅 docs**（append 至既有 admin-2-write-pre-analysis.md §15）；不新增其他 doc 檔案
+- ✅ **不**修改 src / content / settings / templates / vite.config / package.json / dist
+- ✅ **不**啟動 phase 2 之 safe-write helper 實作
+- ✅ **不**新增 npm dependency / package script
+- ✅ **不**改變 §1–§14 既有設計（包含 §6 之 B+D+E+F 策略 / §7 之 Admin-2-b sub-batches）
+- ✅ §15.A 之 current state 反映 2026-05-27 baseline（HEAD `d4db570`；validate 0/42/37）
+- ✅ §15.G phase 0 + 1 補的是 docs-sync gate；不取代既有 §9 之 implementation sub-batches
+- ✅ Step 6 sourceKey selector remains blocked by Admin write infra（phases 2-9）；本 §15 不解除阻擋
+
+---
+
 （本文件結束）
