@@ -9,6 +9,21 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import fg from 'fast-glob';
 import matter from 'gray-matter';
+// Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI（per docs/20260527-admin-write-phase-3-dry-run-ui-preanalysis.md §6.2 方案 A）
+//   - server-side pre-compute SEO + FB sidecar 之 validation 結果
+//   - 直接重用 Phase 2 之 admin-field-validators.js（同個 ESM module；避免 client-side drift）
+//   - 結果以 { ok, error? } 形式 attach 至 toAdminView return；render 端純 display
+//   - 不寫入任何檔案；不呼叫 safe-write；不接 actual write path
+//   - LIMITS 常數本 phase 不暴露至 EJS（build-github.js 之 render context 只含 { posts, builtAt }；
+//     不擴張 render context 即可避免 build-github.js 動到 admin allow-list 外）
+//     error code（e.g. 'description-too-long'）本身已能傳達 max 違規；length counter 留待 future phase
+import {
+  validateDescription,
+  validateSearchDescription,
+  validateTitleEn,
+  validateCoverAlt,
+  validateRelatedLinkUrl,
+} from './admin-field-validators.js';
 
 const SITES = ['github', 'blogger'];
 
@@ -187,6 +202,28 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   if (!fb.exists) missingFields.push('.fb.md sidecar');
   if (fbPublishedMissing) missingFields.push('fbPostUrl');
 
+  // Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI（per docs/20260527-admin-write-phase-3-dry-run-ui-preanalysis.md §4.5 + §6.1）
+  //   - SEO 4 fields：直接重用 Phase 2 validator；render 端純 display ok / error
+  //   - FB sidecar：保守處理；只跑欄位定義明確 + Phase 2 已有 validator 之 4 個 string 欄位
+  //     （fbPostUrl / fbNote 採 validateRelatedLinkUrl / validateDescription 之 generic shape；
+  //      semantic mismatch 風險低；FB-專用 validator 留待 future phase）
+  //   - 其餘 fb 8 欄位（enabled / status / postedAt / postId / campaign / audience / hashtags / imageUrl）
+  //     本 phase 不接 validator；render 端顯示 "Phase 3 preview only" 提示
+  const seoValidation = {
+    description: validateDescription(description),
+    searchDescription: validateSearchDescription(searchDescription),
+    titleEn: validateTitleEn(titleEn),
+    coverAlt: validateCoverAlt(coverAlt),
+  };
+  const fbValidation = {
+    title: validateTitleEn(typeof fb.title === 'string' ? fb.title : ''),
+    titleEn: validateTitleEn(typeof fb.titleEn === 'string' ? fb.titleEn : ''),
+    postUrl: typeof fb.postUrl === 'string' && fb.postUrl !== ''
+      ? validateRelatedLinkUrl(fb.postUrl)
+      : { ok: true },
+    note: validateDescription(typeof fb.note === 'string' ? fb.note : ''),
+  };
+
   // Phase 20260521-pm-57: Admin platform routing read-only derived 欄位
   //   per docs/admin-platform-routing-extension-plan.md §3.1 之 B1 cheap derived
   //   - canonicalTarget / platformUrl / gaHostname / githubStatus
@@ -264,6 +301,11 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     otherLinksCount,
     completeness,
     missingFields,
+    // Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
+    //   - server-side pre-computed validation 結果；render 端純 display
+    //   - 不啟用 actual write path；本 phase 僅 preview
+    seoValidation,
+    fbValidation,
   };
 }
 

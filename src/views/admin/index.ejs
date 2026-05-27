@@ -67,6 +67,21 @@
   .dry-run-result .status-unchanged { color: #155724; }
   .dry-run-result .status-empty { color: #999; font-style: italic; }
   .dry-run-old-value, .dry-run-new-value { max-width: 16rem; word-break: break-word; white-space: pre-wrap; }
+  /* Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI（per docs/20260527-admin-write-phase-3-dry-run-ui-preanalysis.md §6.1）
+     - .apply-disabled：永遠 disabled 之 Apply button 視覺；cursor not-allowed + 灰底；hover 不變色（不引導點擊）
+     - .validator-badge：per-field validation result 小 badge；ok / error 兩種顏色
+     - .readiness-checklist：4-row 列表；每 row 顯示 phase status + 描述；不引導點擊任何 button */
+  .apply-disabled { background: #ccc; color: #666; border: 1px solid #999; cursor: not-allowed; opacity: 0.6; padding: 0.35rem 0.75rem; border-radius: 3px; font-size: 0.85em; font-weight: 600; margin-top: 0.5rem; }
+  .apply-disabled:hover { background: #ccc; opacity: 0.6; }
+  .validator-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.78em; font-weight: 600; margin: 1px 2px 1px 0; line-height: 1.6; white-space: nowrap; }
+  .validator-badge.ok { background: #d4edda; color: #155724; }
+  .validator-badge.error { background: #f8d7da; color: #721c24; }
+  .readiness-checklist { background: #fff; border: 1px solid #ddd; padding: 0.5rem 0.75rem; border-radius: 3px; font-size: 0.85em; }
+  .readiness-checklist ul { margin: 0.25rem 0 0; padding-left: 1.25rem; }
+  .readiness-checklist li { margin: 0.15rem 0; }
+  .readiness-checklist .ph-done { color: #155724; }
+  .readiness-checklist .ph-current { color: #856404; font-weight: 600; }
+  .readiness-checklist .ph-pending { color: #999; }
 </style>
 </head>
 <body>
@@ -551,6 +566,19 @@
             <h3 style="color: #2c5282; border-bottom: 1px solid #c5d6e8;">FB Sidecar Dry-run Editor</h3>
             <p style="background: #d6e4f5; border: 1px solid #6c8ebf; padding: 0.4rem 0.6rem; border-radius: 3px; margin: 0.25rem 0; font-weight: 600; color: #2c5282; font-size: 0.85em;">⚠️ Dry-run only. No file will be written. 這只是 dry-run 預覽，不會寫入任何 .fb.md 檔案。需要的話請手動複製結果。</p>
             <p style="font-size: 0.82em; color: #555; margin: 0.25rem 0 0.5rem;">支援 12 個欄位（enabled / status / postUrl / postedAt / postId / campaign / audience / title / titleEn / hashtags / imageUrl / note）；read-only preview；無 form submit / 無 fs API / 無 fetch。實際寫入留待 FB-P5-c phase；當前請手動編輯 .fb.md。</p>
+            <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
+                - 保守 validator preview；只跑 title / titleEn / postUrl / note 4 個 string 欄位
+                - 其餘 8 欄位 留待 future phase 引入 FB-專用 validator
+                - postUrl 採 generic URL validator（validateRelatedLinkUrl）；semantic mismatch 風險低 -%>
+            <div style="margin: 0.25rem 0 0.5rem;">
+              <strong style="font-size: 0.82em; color: #555;">Validator preview（current values；4 / 12 fields）：</strong>
+              <% ['title','titleEn','postUrl','note'].forEach(function(fname) {
+                var v = (p.fbValidation && p.fbValidation[fname]) || { ok: true };
+              %>
+                <span class="validator-badge <%= v.ok ? 'ok' : 'error' %>" title="server-side pre-compute；per Phase 3 pre-analysis §4.5；其餘 8 欄位待 future phase"><%= fname %>: <%= v.ok ? 'ok' : v.error %></span>
+              <% }); %>
+              <br><span style="font-size: 0.78em; color: #999;">Phase 3 preview only; field validation will expand in later phase（enabled / status / postedAt / postId / campaign / audience / hashtags / imageUrl 待 FB-專用 validator 引入）</span>
+            </div>
             <button type="button" class="fb-dry-run-toggle" style="padding: 0.35rem 0.75rem; border: 1px solid #999; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600;">Edit FB Metadata</button>
             <button type="button" class="fb-dry-run-cancel" hidden style="padding: 0.35rem 0.75rem; border: 1px solid #999; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; margin-left: 0.5rem;">Cancel FB Edit</button>
             <div class="fb-dry-run-form" hidden style="margin-top: 0.5rem;">
@@ -581,6 +609,14 @@
                 <details style="margin-top: 0.5rem;"><summary style="cursor: pointer; color: #2c5282; font-size: 0.82em;">Show simulated frontmatter (after)</summary><pre class="fb-dry-run-after" style="background: #fff; border: 1px solid #c5d6e8; padding: 0.4rem; margin-top: 0.25rem; font-size: 0.78em; overflow-x: auto; white-space: pre-wrap;"></pre></details>
                 <p style="background: #d6e4f5; border: 1px solid #6c8ebf; padding: 0.4rem 0.6rem; border-radius: 3px; margin-top: 0.5rem; font-weight: 600; color: #2c5282; font-size: 0.85em;">⚠️ Dry-run only. No file will be written. 若需實際寫入：等 FB-P5-c phase 落地；當前請手動編輯 <code>.fb.md</code> 後重 build。</p>
               </div>
+              <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
+                  - disabled Apply button；無 click handler；aria-disabled；明確 title tooltip
+                  - 與 SEO Apply button 共用 .apply-disabled style
+                  - actual write 由 Phase 5 啟用 -%>
+              <button type="button" class="apply-disabled" disabled aria-disabled="true"
+                      title="Phase 3 dry-run only — actual write path is not enabled. FB sidecar 寫入待 FB-P5-c phase。">
+                Apply FB (disabled — Phase 3 dry-run only)
+              </button>
             </div>
           </div>
 
@@ -626,6 +662,18 @@
             <h3>Dry-run edit (no write)</h3>
             <p class="dry-run-warning">⚠️ Dry-run only. No file will be written. 此功能僅計算 + 顯示變更差異；任何實際寫入請以 VS Code + git workflow 處理。</p>
             <p style="font-size: 0.82em; color: #555; margin: 0.25rem 0 0.5rem;">支援欄位（per <code>docs/admin-2-write-pre-analysis.md</code> §4.1 safe editable subset）：description / searchDescription / titleEn / coverAlt</p>
+            <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
+                - server-side validator preview（per Phase 3 pre-analysis §6.1）
+                - 直接讀 p.seoValidation 之 4 個 { ok, error? } 結果；render 純 display
+                - 失敗時顯示 error code；成功顯示 "ok" -%>
+            <div style="margin: 0.25rem 0 0.5rem;">
+              <strong style="font-size: 0.82em; color: #555;">Validator preview（current values）：</strong>
+              <% ['description','searchDescription','titleEn','coverAlt'].forEach(function(fname) {
+                var v = (p.seoValidation && p.seoValidation[fname]) || { ok: true };
+              %>
+                <span class="validator-badge <%= v.ok ? 'ok' : 'error' %>" title="server-side pre-compute；per docs/20260527-admin-write-phase-3-dry-run-ui-preanalysis.md §6.1"><%= fname %>: <%= v.ok ? 'ok' : v.error %></span>
+              <% }); %>
+            </div>
             <button type="button" class="dry-run-toggle">Start Edit</button>
             <div class="dry-run-form" hidden>
               <table>
@@ -666,6 +714,32 @@
                 </table>
                 <p class="dry-run-warning" style="margin-top: 0.5rem;">⚠️ Dry-run only. No file will be written. 若要實際寫入：VS Code 編輯 source 檔 + <code>git diff</code> + <code>git commit</code>。</p>
               </div>
+              <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
+                  - disabled Apply button；無 click handler；aria-disabled；明確 title tooltip
+                  - 即使有人移除 disabled，亦無 fetch / fs / safeWrite caller 可觸發
+                  - 此 button 屬視覺 shell；actual write 由 Phase 5 啟用 -%>
+              <button type="button" class="apply-disabled" disabled aria-disabled="true"
+                      title="Phase 3 dry-run only — actual write path is not enabled. Phase 5 才會啟用實際寫入。">
+                Apply (disabled — Phase 3 dry-run only)
+              </button>
+            </div>
+          </div>
+
+          <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
+              - Future write readiness checklist；per Phase 3 pre-analysis §4.4
+              - 顯示 Phase 2 ✅ / Phase 3 🔄 / Phase 4 ⏸ / Phase 5 ⏸ / Step 6 sourceKey ⏸
+              - 不引導 user 點任何 button；純 visibility stub
+              - 全 post 共用同樣文字；server-side render 至每篇 detail panel -%>
+          <div class="detail-section">
+            <h3>Future write readiness checklist</h3>
+            <div class="readiness-checklist">
+              <ul>
+                <li class="ph-done">✅ Phase 2 safe-write helpers landed（<code>5bcdd02</code>；71/71 self-test pass）</li>
+                <li class="ph-current">🔄 Phase 3 dry-run UI（current phase；validator preview + disabled Apply button）</li>
+                <li class="ph-pending">⏸ Phase 4 Vite dev middleware / write route preanalysis（not started）</li>
+                <li class="ph-pending">⏸ Phase 5 actual write path（not enabled；SEO fields 將為首個 enabled write）</li>
+                <li class="ph-pending">⏸ Step 6 sourceKey Admin selector（blocked by future Admin write / UI phases；per <code>docs/admin-2-write-pre-analysis.md</code> §15.F prerequisites）</li>
+              </ul>
             </div>
           </div>
 
