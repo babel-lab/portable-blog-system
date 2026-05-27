@@ -27,7 +27,8 @@
     "report:book": "node src/scripts/report-book.js",
     "check:links": "node src/scripts/check-broken-links.js",
     "check:images": "node src/scripts/check-image-links.js",
-    "smoke:reverse-utm": "node src/scripts/smoke-reverse-utm.js"
+    "smoke:reverse-utm": "node src/scripts/smoke-reverse-utm.js",
+    "safe-write:test": "node src/scripts/safe-write-test.js"
   },
   "dependencies": {
     "@vitejs/plugin-basic-ssl": "latest",
