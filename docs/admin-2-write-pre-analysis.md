@@ -759,8 +759,15 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 | **1** | **Docs sync / roadmap update**（如本 phase 之 am-15）| docs-only | 把 Admin write infra design refinement append 至 admin-2-write-pre-analysis.md；同步 phase-2-candidate-roadmap / future-roadmap | 🔄 in-progress（本 phase）|
 | 2 | **Safe write helper source implementation**（純 source；無 Admin UI 寫入；CLI testable）| source；新增 `src/scripts/safe-write.js` / `git-status-check.js` / `admin-write-whitelist.js` / `admin-field-validators.js` / `active-source-keys.js`（per §15.D） | helper unit-testable；新增 npm script `safe-write:test`；validate baseline 不退步 | ✅ landed `5bcdd02` (2026-05-27) — see §15.G.1 |
 | 3 | **First dry-run-only UI enhancement**（依賴 phase 2；新增 Admin Apply button 但**不**綁實際 write）| source；index.ejs Apply button visible but **disabled with explanatory tooltip**；server-side validation preview（scheme A 方案 A：EJS 注入） | UX 流程 verify；無 fs.write | ✅ landed `efd3ac5` (2026-05-27) — see §15.G.2 |
-| 4 | **Vite dev middleware for Admin POST endpoint**（讓 browser POST 至 Node fs；dev-only）| source；vite.config.js custom middleware；新 npm script `dev:admin`（保留既有 `dev` 不變）| middleware spec verify；Admin UI 仍 read-only；endpoint 暫接 echo / dry-run | ⏸ pending |
-| 5 | **First real write behind explicit Apply: SEO fields**（依賴 phases 2-4；per §9.1 Admin-2-b-2 + §15.E.1 ranked #1）| source；`.md` description / searchDescription write；single-file atomic | git diff verify；validate baseline 不退步；rollback flow 演練 | ⏸ pending |
+| 4 | **Vite dev middleware for Admin POST endpoint**（讓 browser POST 至 Node fs；dev-only）| source；vite.config.js custom middleware；新 npm script `dev:admin`（保留既有 `dev` 不變）| middleware spec verify；Admin UI 仍 read-only；endpoint 暫接 echo / dry-run | ⏸ pending — phase 4a docs ✅ landed `c8b7d74`；source impl 延後（see §15.G.3）|
+| **4a** | **Vite middleware preanalysis docs-only**（split from phase 4；先設計 middleware shape / dev-only gate / CSRF / origin / payload schema；不實作）| docs-only；新增 `docs/20260528-admin-write-phase-4-middleware-preanalysis.md`（1 file）| 21 章節 + boundary gates 驗收；baseline 不變 | ✅ landed `c8b7d74` (2026-05-27 night-12) |
+| **4b** | **Middleware preanalysis acceptance cross-check**（read-only verify Phase 4a `c8b7d74` docs；docs sync at §15.G）| read-only；no commit | baseline 不變；boundary 保留；schema / status code 一致性通過；19 章節驗收；無 source / content / package / vite config 變動 | ✅ done (Phase 20260528-admin-write-phase-4b-middleware-preanalysis-acceptance-crosscheck-readonly-a；read-only；accepted `c8b7d74`) — no commit |
+| **4.5a** | **CLI write driver preanalysis docs-only**（Phase 4a §15.3 candidate A 展開；docs 設計 CLI 作為 middleware 前低風險過渡層；不實作）| docs-only；新增 `docs/20260528-admin-write-phase-4p5-cli-driver-preanalysis.md`（1 file；1424 lines）| 21 章節 + payload / exit code / allowed write scope 一致性 + boundary gates 驗收；baseline 不變 | ✅ landed `32f8951` (2026-05-27 night-13) — see §15.G.3 |
+| **4.5b** | **CLI driver preanalysis acceptance cross-check**（read-only verify Phase 4.5a docs；docs sync at §15.G）| read-only；no commit（acceptance）→ optional docs-sync commit at §15.G.3 | 21 章節驗收；schema / exit code / allowed write scope 一致性；無檔案變動 | ✅ done (Phase 20260527-night-14 read-only) — no commit |
+| **4.5c** | **CLI source implementation dry-run only**（首個 safeWrite production caller；只支援 dry-run；不接 `--apply`；不啟用 real write）| source；新增 `src/scripts/admin-write-cli.js` + `package.json` 加 npm script `admin:write` | helper unit-testable；對 ≥3 篇 production `.md`（含 nested object）dry-run 通過；無 production content mutate；validate baseline 不退步 | ⏸ pending；requires explicit user approval |
+| **4.5d** | **CLI dry-run acceptance**（驗 YAML emitter 對 nested object 副作用；驗 wouldWriteBytes 對齊預期）| source / verify；無 real write | wouldWriteBytes 與 expected 對齊；無 unintended frontmatter normalize | ⏸ pending |
+| **4.5e** | **CLI real write gate**（首篇 production SEO description / searchDescription 寫入 draft / ready 文章；user 明確 `--apply`；首次 production content mutate）| source；CLI 解開 `--apply`；首次 safeWrite production write | git diff 驗目標 field only；validate baseline 不退步；user 手動 review + commit + push；無 auto rollback | ⏸ pending；requires explicit user approval |
+| 5 | **First real write behind explicit Apply: SEO fields**（依賴 phases 2-4；per §9.1 Admin-2-b-2 + §15.E.1 ranked #1）| source；`.md` description / searchDescription write；single-file atomic | git diff verify；validate baseline 不退步；rollback flow 演練 | ⏸ pending — CLI path (4.5e) 為當下推薦首選；middleware path 延後（per §15.G.3） |
 | 6 | Admin-2-b-3：FB sidecar write | source；per §9.1 | per §11 stop point 5 | ⏸ pending |
 | 7 | Admin-2-b-4：titleEn / cover / coverAlt / updated write | source；per §9.1 | per §11 stop point 6 | ⏸ pending |
 | 8 | Admin-2-b-5：blocks.* boolean toggles write | source；per §9.1 | per §11 stop point 7 | ⏸ pending |
@@ -873,6 +880,67 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 - ✅ reverse UTM remains landed but dormant；pm-26 deploy gate remains blocked by no positive GitHub cross-link fixture
 
 **下一個建議 phase**：§15.G phase 4（Vite dev middleware for Admin POST endpoint）—— 屬源碼變更；屬解開 browser → Node fs 通道之關鍵步驟；本 phase 3 landing 不啟動 phase 4。
+
+#### 15.G.3 Phase 4.5a Landing Details（2026-05-27 night-13；含 Phase 4a carried-in）
+
+**Phase 名稱**：
+
+- `20260527-night-12-admin-write-phase-4-middleware-preanalysis-docs-only-a`（Phase 4a docs preanalysis；Phase 4 middleware design 之 prerequisite；Phase 4.5a §15.3 candidate A 之上游）
+- `20260527-night-13-admin-write-phase-4p5-cli-driver-preanalysis-docs-only-a`（Phase 4.5a；本 landing）
+- `20260527-night-14-admin-write-phase-4p5-cli-driver-preanalysis-acceptance-crosscheck-readonly-a`（Phase 4.5b read-only acceptance；no commit）
+- `20260527-night-15-admin-write-phase-4p5-docs-sync-admin-preanalysis-docs-only-a`（本 §15.G.3 docs sync；docs-only）
+
+**Landed commits**：
+
+| Phase | full | short | message |
+|---|---|---|---|
+| Phase 4a docs | `c8b7d74d8a3d4721bf2583a8086cbcc1322fcba4` | `c8b7d74` | `docs(admin): plan phase 4 vite write middleware` |
+| Phase 4.5a docs | `32f895109ab8eb1ce0e03831c920d504357255f5` | `32f8951` | `docs(admin): plan phase 4.5 cli write driver` |
+
+**Commit scope of Phase 4.5a**（1 file; 1424 insertions(+), 0 deletions(-)）：
+
+| File | Lines | 用途 |
+|---|---|---|
+| `docs/20260528-admin-write-phase-4p5-cli-driver-preanalysis.md` | +1424 | 21 章節 docs-only preanalysis：Phase metadata / baseline summary / why CLI exists / design overview / command proposal (3 candidates A flags / B payload file / C stdin；推薦首批 B) / payload schema (mirror Phase 4a §5；CLI 無 csrfToken) / allowed write scope (mirror Phase 4a §6；初期 `content/{github,blogger}/posts/*.md` + draft/ready + description / searchDescription) / safeWrite reuse design / atomic write flow / dry-run mode (default `dryRun: true`) / real-write gate (9 gates) / pre-/post-write validation / 10 exit codes (mirror Phase 4a HTTP status；CLI exit ↔ HTTP status 1-to-1) / rollback design (manual `git restore`；不自動) / Admin UI relationship (不啟用 Apply；不新增 fetch / XHR；future CLI command preview) / 11 security risks (shell escaping / long text / accidental overwrite / wrong file target / path traversal / arbitrary field / bulk write / published content / race condition / payload leakage / regression) / candidate comparison (A docs-only / B CLI source / C middleware source / D dry-run only) / recommended sequence (4a → 4b → 4.5a → 4.5b → 4.5c → 4.5d → 4.5e) / explicit non-goals / acceptance checklist / boundary reaffirmation |
+
+**Acceptance verification**（per `20260527-night-14` read-only cross-check；no commit；docs sync recorded by `20260527-night-15` 本 §15.G.3）：
+
+- ✅ HEAD `32f8951` == origin/main；ahead/behind 0/0；working tree clean
+- ✅ `safe-write:test`：71 pass / 0 fail（與 Phase 2 landing `5bcdd02` baseline 一致）
+- ✅ `validate:content`：0 errors / 42 warnings / 37 posts（與 Phase 2 / Phase 3 / Phase 4a landing baseline 一致）
+- ✅ 21 章節全部命中（§1 metadata / §2 baseline / §3 why CLI / §4 design overview / §5 command proposal / §6 payload schema / §7 allowed write scope / §8 safeWrite reuse / §9 atomic flow / §10 dry-run / §11 real-write gate / §12 pre-/post-write validation / §13 exit codes / §14 rollback / §15 Admin UI / §16 security / §17 candidate comparison / §18 sequence / §19 non-goals / §20 acceptance / §21 boundary）
+- ✅ payload schema 與 Phase 4a middleware payload 同形（targetRel / field / newValue / expectedOldValue / dryRun；CLI 無 csrfToken）
+- ✅ exit code 與 Phase 4a HTTP status 1-to-1 mapping（exit 0/1/2/3/4/5/6/7/8/9 ↔ 200/500/400/400/403/409/409/422/500/200+regression）
+- ✅ allowed write scope 保守：只允 `content/{github,blogger}/posts/*.md` + draft/ready status + description / searchDescription field；禁 published / `.publish.json` / `.fb.md` / relatedLinks / book.* / download.* / category / tags / status / publishTargets / slug / title / titleEn / settings / templates / validation-fixtures / pages / dist / src / package / vite config / gh-pages / .cache / node_modules
+- ✅ non-goals 全部命中：不實作 CLI / 不修改 package.json / 不新增 npm script / 不實作 middleware / 不啟用 Apply / 不新增 fetch / XHR / click handler / 不打開 browser → Node fs 通道 / 不新增 safeWrite production caller / 不做 content write / 不解除 pm-26 deploy gate / 不建立 reverse UTM fixture
+- ✅ commit scope 只有 1 個 docs file；無 src / content / settings / templates / fixtures / dist / package / vite config 變動
+
+**保留限制**（Phase 4.5a landing 後仍維持）：
+
+- ❌ **無** CLI source（`src/scripts/admin-write-cli.js` 不存在；待 Phase 4.5c；requires explicit user approval）
+- ❌ **無** `admin:write` npm script（待 Phase 4.5c）
+- ❌ **無** middleware source（`vite.config.js` 無 `configureServer`；待 Phase 5；本 §15.G.3 建議延後至 4.5e 完成後再評估）
+- ❌ **無** Admin UI Apply button enable（Phase 3b 之 disabled 狀態 100% 保留；DOM 上 `fetch(` / `XMLHttpRequest` / `addEventListener('click', ...)` 對 `.apply-disabled` 命中 = 0）
+- ❌ **無** safeWrite runtime production caller（Phase 2 helper 仍未被 production caller 呼叫；唯一 caller 為 `safe-write-test.js` self-test）
+- ❌ **無** production content mutate（無 `fs.writeFile` / `fs.rename` 對 `content/**/*.md` / `.publish.json` / `.fb.md`）
+- ❌ **未**修改 src / content / settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js
+- ❌ **未**做 build / deploy / Blogger repost / GA4 validation
+- ❌ **未**新增 fixture
+- ✅ `validate:content` baseline 維持 `0 errors / 42 warnings / 37 posts`
+- ✅ `safe-write:test` = `71 pass / 0 fail`
+- ✅ Step 6 sourceKey selector remains blocked by phases 4-9（per 既有 §15.F 12 條 prerequisites）
+- ✅ reverse UTM remains landed but dormant；pm-26 deploy gate remains blocked by no positive GitHub cross-link fixture
+
+**下一階段狀態**（per Phase 4.5a §18 recommended sequence）：
+
+- **Phase 4.5c**（CLI source implementation dry-run only）：⏸ **not started**；requires explicit user approval；source 階段；首個 safeWrite production caller 但只支援 dry-run（不接 `--apply`）；新增 `src/scripts/admin-write-cli.js` + `package.json` 加 `admin:write` script
+- **Phase 4.5d**（CLI dry-run acceptance）：⏸ not started；驗 YAML emitter 對 nested object 副作用；無 real write
+- **Phase 4.5e**（first real content write gate via CLI）：⏸ **not started**；requires explicit user approval；首次 production SEO description / searchDescription 寫入 draft / ready 文章；per Phase 4.5a §11 之 9-gate
+- **Phase 5**（middleware source implementation；§15.G phase 4 列）：⏸ **not recommended yet / deferred**；per Phase 4.5a §18.3 user 可選擇延後至 CLI path 完成後再評估；CLI path 與 middleware path 功能等價，user 可選擇任一條或並行
+- **pm-26 deploy gate**：remains **blocked** by no positive GitHub cross-link fixture（per CLAUDE.md §16.4）
+- **reverse UTM source landing**：remains **dormant**（source landed at pm-24a/b/c `7e1d356` / `e2309e9` / `7c769fe`；Blogger 後台未重貼；GA4 Realtime 未驗收；live 狀態 dormant）
+
+**下一個建議 phase**：§15.G phase 4.5c（CLI source implementation dry-run only）—— 屬源碼變更；需獨立 user 簽收；本 docs sync 不啟動。Phase 4b acceptance cross-check 已 ✅ done（read-only；no commit；accepted Phase 4a `c8b7d74` docs）。
 
 ### 15.H Boundary Reaffirmation
 
