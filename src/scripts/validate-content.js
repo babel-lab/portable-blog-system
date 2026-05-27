@@ -123,6 +123,24 @@ function hasAnyAuthorName(authorEntry) {
   );
 }
 
+// Phase 20260527-am-8 step-7：active sourceKey 清單（per docs/related-links-schema.md §11.5 step 7）
+//   - 從 settings.linkSources.sources 取出 isActive !== false 之 sourceKey 字串
+//   - mirror src/scripts/build-github.js buildSourcesByKey 之 isActive 過濾語義；本批不要求 displayLabel 存在
+//   - 本批不處理 inactive 專屬規則：inactive source 不在此清單；entry 使用 inactive key 會由 not-found 視角捕捉
+//     （per Phase 20260527-am-7 preanalysis §5.1 C.2 + Phase 20260527-am-8 spec 第 4 點選擇）
+function buildActiveSourceKeySet(settings) {
+  const set = new Set();
+  const sources = settings && settings.linkSources && settings.linkSources.sources;
+  if (!Array.isArray(sources)) return set;
+  for (const s of sources) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
+    if (s.isActive === false) continue;
+    if (typeof s.sourceKey !== 'string' || s.sourceKey === '') continue;
+    set.add(s.sourceKey);
+  }
+  return set;
+}
+
 // Phase 9-g-c-c：relatedLinks / otherLinks 結構檢查 helper（warning-only；4 條 critical 規則）
 //   - fieldName: 'relatedLinks' | 'otherLinks'（用於 warning value 前綴；mirror book.authors[${i}] 之 既有 pattern）
 //   - value: post[fieldName]
@@ -133,7 +151,10 @@ function hasAnyAuthorName(authorEntry) {
 //   - missing-kind 與 kind-invalid **互斥**：empty string / undefined 算 missing-kind；其他非合法值算 kind-invalid
 //     （避免同一 entry 重複噪音；per Phase 9-g-c-c-a §7 之表格）
 //   - relatedLinks 與 otherLinks 共用同一 helper（schema 完全相同 per docs §3.1）
-function validateRelatedLinksField(fieldName, value, sourcePath, issues) {
+// Phase 20260527-am-8 step-7：新增第 5 條 warning related-links-source-key-not-found
+//   - 加上 activeSourceKeys 參數（Set<string>）；undefined-safe（caller 必傳；helper 內預期已建構）
+//   - 不改既有 4 條 warning 之觸發條件與 value 格式
+function validateRelatedLinksField(fieldName, value, sourcePath, issues, activeSourceKeys) {
   if (value === undefined) return;
   if (!Array.isArray(value)) {
     issues.push({
@@ -177,6 +198,20 @@ function validateRelatedLinksField(fieldName, value, sourcePath, issues) {
         value: `${fieldName}[${i}] url missing or empty`,
       });
     }
+
+    // Phase 20260527-am-8 step-7：sourceKey 未命中 active registry → warning（warning-only）
+    //   - gate：isNonEmptyString（內部 trim 後非空）；undefined / 非 string / 空字串 / 純空白 → skip
+    //   - non-empty trimmed string 但不在 activeSourceKeys → related-links-source-key-not-found
+    //   - 本批不檢查 inactive 專屬規則；不發 invalid-type / empty 專屬 warning（per Phase 20260527-am-7 §4.2）
+    //   - 與既有 4 條 related-links warning 規則彼此獨立；不互斥
+    if (isNonEmptyString(entry.sourceKey) && !activeSourceKeys.has(entry.sourceKey)) {
+      issues.push({
+        severity: 'warning',
+        type: 'related-links-source-key-not-found',
+        sourcePath,
+        value: `${fieldName}[${i}].sourceKey="${entry.sourceKey}" not found in link-sources registry`,
+      });
+    }
   }
 }
 
@@ -212,6 +247,10 @@ function severityForFbPlaceholder(status, placeholderName, reason, target, prima
 
 export function validateContent({ posts, settings }) {
   const issues = [];
+
+  // Phase 20260527-am-8 step-7：active sourceKey 清單（一次建構；passed-down 至 validateRelatedLinksField）
+  //   - per docs/related-links-schema.md §11.5 step 7（warning-only；本批僅 not-found）
+  const activeSourceKeys = buildActiveSourceKeySet(settings);
 
   const categoryById = new Map();
   const categoryBySlug = new Map();
@@ -667,8 +706,8 @@ export function validateContent({ posts, settings }) {
       //   - undefined / 空 array 合法；non-array → related-links-not-array；entry 非 plain object → skip 該 entry
       //   - missing-kind 與 kind-invalid 互斥（避免同 entry 重複噪音）
       //   - per docs/related-links-schema.md §3.3 / §4.1 / §9.1
-      validateRelatedLinksField('relatedLinks', post.relatedLinks, sourcePath, issues);
-      validateRelatedLinksField('otherLinks', post.otherLinks, sourcePath, issues);
+      validateRelatedLinksField('relatedLinks', post.relatedLinks, sourcePath, issues, activeSourceKeys);
+      validateRelatedLinksField('otherLinks', post.otherLinks, sourcePath, issues, activeSourceKeys);
     }
 
     if (post.category) {
