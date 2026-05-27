@@ -726,8 +726,8 @@ content/settings/link-sources.json
 
 ```text
 step 1 ✅ docs-only roadmap / schema addendum（本批）
-step 2    settings-only：新增 link-sources.json
-step 3    template-only：sample 補入 sourceKey
+step 2 ✅ settings-only：新增 link-sources.json — landed commit c658e1b (2026-05-27)
+step 3 ✅ template-only：sample 補入 sourceKey — landed commit 089b157 (2026-05-27)
 step 4 ✅ renderer：fallback chain（內含 backward compat 驗證）— landed commit d1f1224 (2026-05-27)
 step 5    GA4：link_source_key event param
 step 6    Admin selector
