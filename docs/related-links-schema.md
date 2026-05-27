@@ -728,10 +728,10 @@ content/settings/link-sources.json
 step 1 ✅ docs-only roadmap / schema addendum（本批）
 step 2    settings-only：新增 link-sources.json
 step 3    template-only：sample 補入 sourceKey
-step 4    renderer：fallback chain（內含 backward compat 驗證）
+step 4 ✅ renderer：fallback chain（內含 backward compat 驗證）— landed commit d1f1224 (2026-05-27)
 step 5    GA4：link_source_key event param
 step 6    Admin selector
-step 7    validate rules：source-key-not-found / source-inactive
+step 7    validate rules：source-key-not-found ✅ landed commit 9ce7e8a (2026-05-27) / source-inactive
 ```
 
 每一子批屬獨立可 ship 之最小單元；step 4+ 須 user 明示啟動，並各自走 pre-analysis / preflight。

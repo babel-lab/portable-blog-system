@@ -190,10 +190,10 @@
 1. **Step 1：docs-only roadmap / schema addendum**（本批；roadmap §3.8 + schema §11）
 2. **Step 2：settings-only** — 新增 `content/settings/link-sources.json` 初版 registry（純 additive；無 consumer；零 build / dist 影響）
 3. **Step 3：template-only** — 5 個 `content/templates/*.md` 之 `relatedLinks` / `otherLinks` sample 補入 `sourceKey` 範例行（templates 不被 `build:*` 掃描）
-4. **Step 4：renderer** — 兩端 EJS 引入 fallback chain `labelOverride > registry.displayLabel > platform > kind`；無 `sourceKey` 時 fallback 至既有 `platform` 字串（backward compatible）
+4. **Step 4：renderer** ✅ **landed (commit d1f1224, 2026-05-27)** — 兩端 EJS 引入 fallback chain `labelOverride > registry.displayLabel > platform > kind`；無 `sourceKey` 時 fallback 至既有 `platform` 字串（backward compatible）
 5. **Step 5：GA4** — anchor 加 `data-ga4-param-link_source_key`；`ga4-link-tracking-spec.md` 同步加一行；屬 production dimension 變動，需 preflight
 6. **Step 6：Admin selector** — 撰寫文章時下拉選擇 `sourceKey`；屬 Admin write 系列；需 atomic write
-7. **Step 7：validate rules** — 新增 warning：`source-key-not-found` / `source-inactive`；mirror 既有 4 條 `related-links-*` warning-only pattern
+7. **Step 7：validate rules** — 新增 warning：`source-key-not-found` ✅ **landed (commit 9ce7e8a, 2026-05-27)** / `source-inactive` ⏭ not started；mirror 既有 4 條 `related-links-*` warning-only pattern
 
 #### 邊界
 
