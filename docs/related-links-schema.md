@@ -729,7 +729,12 @@ step 1 ✅ docs-only roadmap / schema addendum（本批）
 step 2 ✅ settings-only：新增 link-sources.json — landed commit c658e1b (2026-05-27)
 step 3 ✅ template-only：sample 補入 sourceKey — landed commit 089b157 (2026-05-27)
 step 4 ✅ renderer：fallback chain（內含 backward compat 驗證）— landed commit d1f1224 (2026-05-27)
-step 5    GA4：link_source_key event param
+step 5 ✅ GA4：link_source_key event param — landed commit 310062d (2026-05-27)
+       - scope：`src/views/pages/post-detail.ejs` relatedLinks / otherLinks anchors（GitHub post detail only）
+       - behavior：只在 `item.sourceKey` 為非空 trimmed string 時 emit `data-ga4-param-link_source_key`
+       - no fallback to platform；no empty-string output
+       - Blogger render（`blogger-post-full.ejs`）unchanged（既有無 `data-ga4-*` attrs）
+       - runtime `link-tracker.js` / `ga4-events.js` 未動（全域 attr scanner 自動 propagate）
 step 6    Admin selector
 step 7    validate rules：source-key-not-found ✅ landed commit 9ce7e8a (2026-05-27) / source-inactive
 ```

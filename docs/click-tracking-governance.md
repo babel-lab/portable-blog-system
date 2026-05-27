@@ -233,6 +233,7 @@
 | `campaign` | 活動 / 文章 campaign | `book_review_<slug>` |
 | `content_group` | 文章類型（content grouping）| `tech-note` / `book-review` |
 | `outbound` | 是否離站 | `true` / `false` |
+| `link_source_key` | source registry machine-stable key（per `related-links-schema.md` §11.5）；relatedLinks / otherLinks anchors 限定；conditional emit | `youtube` / `taipei-library` / `bagel-books` |
 
 ---
 
@@ -256,6 +257,7 @@ EJS template 與 JS listener 之 contract，**對齊既有 `link-tracker.js` + `
 | `data-ga4-param-campaign` | campaign |
 | `data-ga4-param-content_group` | content group |
 | `data-ga4-param-outbound` | `true` / `false`（字串形式；helper 不轉型）|
+| `data-ga4-param-link_source_key` | `relatedLinks` / `otherLinks` entry 之 `sourceKey`（trimmed）；conditional：only when non-empty trimmed string；landed commit `310062d` |
 
 ⚠️ **命名變更紀錄**：本治理 doc 首版（commit `aabc082`）採扁平 `data-ga4-<key>`（如 `data-ga4-platform` / `data-ga4-source-platform`）；本批 reconcile 對齊既有 helper / listener 採用之 `data-ga4-param-<key>` 前綴 + snake_case key（如 `data-ga4-param-platform` / `data-ga4-param-source_platform`）。**`data-ga4-event` 不變**（仍為扁平；listener anchor）。
 

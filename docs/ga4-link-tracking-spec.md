@@ -276,6 +276,7 @@ click_affiliate_cta
 | `affiliate_slot` | per §3.7（`top` / `bottom`）|
 | `hashtag` | per §3.3（hashtag 文字 / slug）|
 | `series_id` / `series_no` | 系列文章；optional |
+| `link_source_key` | source registry machine-stable key（per `related-links-schema.md` §11.5）；relatedLinks / otherLinks anchors 限定；**conditional**：只在 `item.sourceKey` 為非空 trimmed string 時 emit；無 fallback；landed commit `310062d` (2026-05-27) |
 
 ### 4.4 Cross-ref
 
@@ -649,6 +650,7 @@ per `ad-affiliate-schema-proposal.md` §4 + §6.2-§6.4 + 本 spec 補強：
 | [ ] 2 | 點擊該 anchor |
 | [ ] 3 | DebugView 1-3 秒內看到 `click_related_link` event |
 | [ ] 4 | event params 全收（post_slug / link_label / link_type / link_url / placement / outbound）|
+| [ ] 5 | （optional；only when frontmatter entry has non-empty `sourceKey`）attrs 含 `data-ga4-param-link_source_key="<sourceKey>"`；entry **無** `sourceKey` 時 attr **應省略**（不可出現空字串 attr）|
 
 #### 12.2.3 點 other link
 
