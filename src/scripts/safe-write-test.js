@@ -25,6 +25,7 @@ import { safeWrite } from './safe-write.js';
 import { checkGitStatus } from './git-status-check.js';
 import { buildActiveSourceKeySet, loadActiveSourceKeySet } from './active-source-keys.js';
 import * as fv from './admin-field-validators.js';
+import { runCli } from './admin-write-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -276,6 +277,210 @@ async function main() {
   } finally {
     await fs.rm(tmpRoot, { recursive: true, force: true });
     process.stdout.write('  cleanup: temp dir removed\n');
+  }
+
+  // ── 6. admin-write-cli (dry-run only; phase 4.5c) ────────────────────
+  process.stdout.write('\n[admin-write-cli]\n');
+  const cliTmp = await fs.mkdtemp(path.join(os.tmpdir(), 'admin-write-cli-test-'));
+  process.stdout.write(`  cliTmp=${cliTmp}\n`);
+
+  try {
+    const postsDir = path.join(cliTmp, 'content', 'blogger', 'posts');
+    await fs.mkdir(postsDir, { recursive: true });
+    const postPath = path.join(postsDir, 'fixture-post.md');
+    const postContent = [
+      '---',
+      'id: "20260528-fixture-post"',
+      'site: "blogger"',
+      'title: "Fixture"',
+      'slug: "fixture-post"',
+      'date: "2026-05-28"',
+      'description: "old SEO description"',
+      'searchDescription: "old SEO search"',
+      'status: "draft"',
+      '---',
+      '',
+      'body content here',
+      '',
+    ].join('\n');
+    await fs.writeFile(postPath, postContent, 'utf-8');
+
+    const publishedPath = path.join(postsDir, 'published-post.md');
+    await fs.writeFile(publishedPath, [
+      '---',
+      'id: "20260528-published-post"',
+      'site: "blogger"',
+      'title: "Published"',
+      'description: "live description"',
+      'status: "published"',
+      '---',
+      'body',
+      '',
+    ].join('\n'), 'utf-8');
+
+    const payloadPath = path.join(cliTmp, 'payload.json');
+    const writePayload = async (obj) => {
+      await fs.writeFile(payloadPath, JSON.stringify(obj), 'utf-8');
+    };
+    const validPayload = () => ({
+      targetRel: 'content/blogger/posts/fixture-post.md',
+      field: 'description',
+      newValue: 'new SEO description from CLI',
+      expectedOldValue: 'old SEO description',
+      dryRun: true,
+    });
+
+    // missing --payload
+    const r0 = await runCli({ argv: [], projectRoot: cliTmp });
+    assert('CLI rejects when --payload missing', r0.exit === 2 && r0.stdoutJson.ok === false);
+
+    // unknown arg
+    const rUnknown = await runCli({ argv: ['--frobnicate'], projectRoot: cliTmp });
+    assert('CLI rejects unknown arg', rUnknown.exit === 2);
+
+    // --apply flag rejected (4.5c gate)
+    await writePayload(validPayload());
+    const rApply = await runCli({ argv: [`--payload=${payloadPath}`, '--apply'], projectRoot: cliTmp });
+    assert('CLI rejects --apply flag', rApply.exit === 2 && rApply.stdoutJson.reason === 'apply-not-supported-in-phase-4p5c');
+
+    // payload file not found
+    const rMissingFile = await runCli({ argv: [`--payload=${path.join(cliTmp, 'nope.json')}`], projectRoot: cliTmp });
+    assert('CLI rejects missing payload file', rMissingFile.exit === 2 && rMissingFile.stdoutJson.reason === 'payload-file-not-readable');
+
+    // invalid JSON
+    await fs.writeFile(payloadPath, '{not json', 'utf-8');
+    const rBadJson = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects invalid JSON', rBadJson.exit === 3 && rBadJson.stdoutJson.reason === 'invalid-payload');
+
+    // payload is array
+    await fs.writeFile(payloadPath, '[]', 'utf-8');
+    const rArr = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects array payload', rArr.exit === 3);
+
+    // missing required fields
+    await writePayload({ targetRel: 'content/blogger/posts/fixture-post.md' });
+    const rMissing = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects missing required fields', rMissing.exit === 3 && Array.isArray(rMissing.stdoutJson.detail.missing));
+
+    // field not in allowlist
+    await writePayload({ ...validPayload(), field: 'title' });
+    const rField = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects field not in allowlist', rField.exit === 3 && rField.stdoutJson.detail.error === 'field-not-in-allowlist');
+
+    // dryRun not boolean
+    await writePayload({ ...validPayload(), dryRun: 'yes' });
+    const rDryType = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects non-boolean dryRun', rDryType.exit === 3);
+
+    // dryRun:false rejected (4.5c gate)
+    await writePayload({ ...validPayload(), dryRun: false });
+    const rDryFalse = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects dryRun:false (phase 4.5c)', rDryFalse.exit === 2 && rDryFalse.stdoutJson.reason === 'apply-not-supported-in-phase-4p5c');
+
+    // reason + memo mutex
+    await writePayload({ ...validPayload(), reason: 'a', memo: 'b' });
+    const rMutex = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects reason+memo both set', rMutex.exit === 3);
+
+    // absolute targetRel
+    await writePayload({ ...validPayload(), targetRel: path.join(cliTmp, 'content', 'blogger', 'posts', 'fixture-post.md') });
+    const rAbs = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects absolute targetRel', rAbs.exit === 4 && rAbs.stdoutJson.reason === 'forbidden-target');
+
+    // .. traversal in targetRel
+    await writePayload({ ...validPayload(), targetRel: 'content/blogger/posts/../../../etc/passwd' });
+    const rDotDot = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects .. traversal in targetRel', rDotDot.exit === 4);
+
+    // forbidden prefix
+    await writePayload({ ...validPayload(), targetRel: 'content/settings/site.config.json' });
+    const rSettings = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects content/settings target', rSettings.exit === 4);
+
+    // forbidden kind (.publish.json not allowed in 4.5c even though whitelist accepts)
+    await fs.writeFile(path.join(postsDir, 'fixture-post.publish.json'), '{}', 'utf-8');
+    await writePayload({ ...validPayload(), targetRel: 'content/blogger/posts/fixture-post.publish.json' });
+    const rPubJson = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects non-post-md kind in 4.5c', rPubJson.exit === 4);
+
+    // file not found
+    await writePayload({ ...validPayload(), targetRel: 'content/blogger/posts/does-not-exist.md' });
+    const rNotFound = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI exits 8 when target file missing', rNotFound.exit === 8 && rNotFound.stdoutJson.reason === 'read-failed');
+
+    // status:published rejected
+    await writePayload({
+      ...validPayload(),
+      targetRel: 'content/blogger/posts/published-post.md',
+      expectedOldValue: 'live description',
+    });
+    const rPublished = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects published target', rPublished.exit === 7 && rPublished.stdoutJson.reason === 'target-status-not-allowed');
+
+    // expectedOldValue mismatch
+    await writePayload({ ...validPayload(), expectedOldValue: 'something else entirely' });
+    const rMismatch = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects expectedOldValue mismatch', rMismatch.exit === 6 && rMismatch.stdoutJson.reason === 'expected-old-value-mismatch');
+
+    // validator fail (too long)
+    await writePayload({ ...validPayload(), newValue: 'x'.repeat(1001) });
+    const rTooLong = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects too-long description', rTooLong.exit === 7 && rTooLong.stdoutJson.reason === 'validator-failed');
+
+    // validator fail (control char)
+    await writePayload({ ...validPayload(), newValue: 'has \x01 control char' });
+    const rCtrl = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects control char in newValue', rCtrl.exit === 7);
+
+    // newValue not string
+    await writePayload({ ...validPayload(), newValue: 123 });
+    const rNewType = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI rejects non-string newValue', rNewType.exit === 3);
+
+    // successful dry-run (description)
+    await writePayload(validPayload());
+    const rOk = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI dry-run success', rOk.exit === 0 && rOk.stdoutJson.ok === true);
+    assert('dry-run mode echoed', rOk.stdoutJson.mode === 'dry-run');
+    assert('dry-run target normalized', rOk.stdoutJson.target.replace(/\\/g, '/') === 'content/blogger/posts/fixture-post.md');
+    assert('dry-run reports diffSummary.changed=true', rOk.stdoutJson.diffSummary.changed === true);
+    assert('dry-run validator pass', rOk.stdoutJson.validators.description.ok === true);
+
+    // dry-run did NOT write
+    const afterContent = await fs.readFile(postPath, 'utf-8');
+    assert('dry-run does NOT mutate target file', afterContent === postContent);
+    assert('dry-run does NOT leave .tmp', (await existsPath(postPath + '.tmp')) === false);
+
+    // successful dry-run (searchDescription)
+    await writePayload({
+      ...validPayload(),
+      field: 'searchDescription',
+      newValue: 'new search desc',
+      expectedOldValue: 'old SEO search',
+    });
+    const rOkSearch = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI dry-run searchDescription success', rOkSearch.exit === 0 && rOkSearch.stdoutJson.field === 'searchDescription');
+
+    // no-op dry-run (newValue === expectedOldValue)
+    await writePayload({
+      ...validPayload(),
+      newValue: 'old SEO description',
+    });
+    const rNoop = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI dry-run no-op exits 0', rNoop.exit === 0);
+    assert('no-op reports changed=false', rNoop.stdoutJson.diffSummary.changed === false);
+
+    // reason is echoed
+    await writePayload({ ...validPayload(), reason: 'fix SEO over-length' });
+    const rReason = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
+    assert('CLI echoes reason in meta', rReason.exit === 0 && rReason.stdoutJson.meta.reason === 'fix SEO over-length');
+
+    // invalid projectRoot
+    const rNoRoot = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: '' });
+    assert('CLI rejects empty projectRoot', rNoRoot.exit === 1);
+  } finally {
+    await fs.rm(cliTmp, { recursive: true, force: true });
+    process.stdout.write('  cleanup: cli temp dir removed\n');
   }
 
   process.stdout.write(`\n[safe-write-test] ${pass} pass / ${fail} fail\n`);

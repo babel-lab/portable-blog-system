@@ -28,7 +28,8 @@
     "check:links": "node src/scripts/check-broken-links.js",
     "check:images": "node src/scripts/check-image-links.js",
     "smoke:reverse-utm": "node src/scripts/smoke-reverse-utm.js",
-    "safe-write:test": "node src/scripts/safe-write-test.js"
+    "safe-write:test": "node src/scripts/safe-write-test.js",
+    "admin:write": "node src/scripts/admin-write-cli.js"
   },
   "dependencies": {
     "@vitejs/plugin-basic-ssl": "latest",
