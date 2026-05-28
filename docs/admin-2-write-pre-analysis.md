@@ -1892,6 +1892,132 @@ Phase: `20260529-am-3-fourth-seo-write-zero-candidate-checkpoint-docs-only-a`
 - ❌ **無** pm-26 deploy gate 解除（per `docs/reverse-utm-fixture-plan.md` §6；remains BLOCKED on no positive GitHub cross-link fixture）
 - ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `merge` / `amend` / `force-push`
 
+#### 15.G.11 2026-05-29 AM patcher missing-key handling preanalysis checkpoint
+
+本 §15.G.11 為 docs-only checkpoint，紀錄前一 phase（`20260529-am-8-patcher-missing-key-handling-preanalysis-readonly-a`）之 patcher missing-key handling read-only preanalysis 結論。Preanalysis 之結論為 **不**支援通用 key insertion、**不**改 patcher 之 fail-closed 行為、**不**授權第四次 SEO real write；長期若需自動化補空欄位，**較保守路線為獨立新 CLI** 而非改既有 patcher write flow。本 §15.G.11 **不**啟動任何 source change、**不**啟動第四次 real write、**不**改 content、**不**解除任何 dormant 邊界。
+
+##### A. Phase identification
+
+| 項目 | 值 |
+|---|---|
+| Preanalysis phase | `20260529-am-8-patcher-missing-key-handling-preanalysis-readonly-a` |
+| Checkpoint phase（本批） | `20260529-am-9-patcher-missing-key-checkpoint-docsonly-a` |
+| Type | docs-only checkpoint（單檔 append at §15.G.11）|
+| 範圍 | 僅 `docs/admin-2-write-pre-analysis.md` 一檔 append 新 subsection §15.G.11 |
+| 不含 | source / content / settings / templates / package.json / dist / dist-blogger / dist-promotion / dist-reports / gh-pages |
+| 觸發來源 | user 依 §15.G.10 §I-3 / am-8 §G 推薦 path 之延續；本批為「結論固化」而非「方案選擇」|
+
+##### B. Baseline
+
+| 項目 | 值 |
+|---|---|
+| HEAD（本 §15.G.11 commit 前） | `144f667cacee4ac70ecb14bfd073950fb2d65fc2`（== §15.G.10 收尾後加上 2026-05-28 EOD report + 2026-05-29 link sources settings commits）|
+| origin/main | 同 HEAD |
+| ahead / behind | 0 / 0 |
+| working tree | clean |
+| safe-write:test | 209 pass / 0 fail |
+| validate:content | 0 error / 42 warning / 37 posts |
+| 前置 commit 之 subject | `chore(settings): update link sources consumer description` |
+
+##### C. Current patcher behavior（per `src/scripts/admin-frontmatter-patcher.js`）
+
+| 行為 | 對應 source 位置 | 結論 |
+|---|---|---|
+| missing key → fail-closed `target-key-not-found` | line 240 | ✅ 鎖定 |
+| duplicate top-level key → fail-closed `target-key-duplicated` | line 241 | ✅ 鎖定 |
+| top-level key only；dot-path（含 `seo.description`）reject `path-not-allowed` | line 38 / line 290 | ✅ 鎖定 |
+| Allowed keys（v 本批當下）：`description` / `searchDescription` 兩 key | line 33 | ✅ 鎖定 |
+| Inline scalar only；block scalar `\|` / `>` → `block-scalar-not-supported` | line 94–96 | ✅ 鎖定 |
+| Plain scalar 含 leading `-?:[]{},&*!%@\`` 或 inline `#` 註解 → reject | line 154 / line 158 | ✅ 鎖定 |
+| Byte-preserving：除目標行外所有 byte 保留；line count 不變 | line 257–260 + safe-write-test T2 assert | ✅ 鎖定 |
+| Dry-run 與 apply 兩路徑**均**在 mode-split 前跑 patcher（無分支可繞）| `admin-write-cli.js` line 410（mode-split 在 line 457 之後） | ✅ 鎖定 |
+| Test 覆蓋（safe-write-test.js T4b）：`'patcher T4b: missing key fail closed'` | safe-write-test.js line 358–364 | ✅ 鎖定 |
+
+##### D. Why missing-key support is risky
+
+| # | 風險 | 嚴重度 | 重點 |
+|---|---|---|---|
+| 1 | YAML ordering drift | 🔴 高 | 無 anchor 規則就無確定插入位置；作者習慣 `description → searchDescription` / `cover → coverAlt` 之順序屬語意 |
+| 2 | Blank-line grouping drift | 🟡 中 | `20260525-draft-book-review.md` 等檔之 frontmatter 用空白行分組 SEO / 發布 / 狀態 / publishTargets / blocks 等；naive insert 破壞分組 |
+| 3 | Quote style drift | 🟡 中 | 新插入行該用 single / double / plain 無「原 style」可參考；跨檔不一致 |
+| 4 | Duplicate key risk | 🔴 高 | 若 `book.searchDescription` 已巢狀存在或作者已 commented-out 補 key，naive insert 將造成 corruption；事後 detect 已太遲 |
+| 5 | Nested key / dotted path ambiguity | 🟡 中 | 必須沿用 patcher line 230–238「行首即 key」之 anchor-only 規則，否則 regress |
+| 6 | `expectedOldValue` ambiguity：missing key vs empty string | 🔴 高 | CLI line 367–369 目前把 `undefined` 視為 `""`；若 patcher 支援 insertion，作者無法在 payload 上區分 insert vs. update |
+| 7 | CLI step-order coupling | 🟡 中 | step 9 對 missing key 之語意（reject? accept-as-""? 新欄位 `expectInsertion: true`?）必須明確決定 |
+| 8 | Validation baseline drift | 🟡 中 | 新增 `searchDescription` 行可能解鎖未來新 validator path；baseline 0/42/37 一旦 land 須 re-pin |
+| 9 | Field allowlist bypass | 🟢 低 | 只要 `isAllowedPath` 與 CLI `ALLOWED_FIELDS` 不解鎖，insertion 仍受約束 |
+| 10 | frontmatter delimiter 解析 | 🟢 低 | 既有 `findFrontmatterRange` 已可定位；屬實作細節非結構性風險 |
+| 11 | published / ready status gate 繞過 | 🟢 低 | CLI step 8 在 patcher 之前；status set 不因 insertion 改變 |
+
+##### E. Design options comparison summary
+
+| Option | 內容 | source change | 解第四次 SEO blocker | 改 governance | 推薦 |
+|---|---|---|---|---|---|
+| **A** | 保持現狀 fail-closed | 0 LOC | ❌ 不解；須等 I-1 自然觸發 | ❌ 不變 | 🟡 短期 default |
+| **B** | user 手動補 key 行（VS Code），再用既有 CLI 寫 value | 0 LOC（屬 content edit；per CLAUDE.md §1 / §27 既有許可）| ✅ 解（per §15.G.10 §I-2）| ❌ 不變 | 🟢 **短期最推薦** |
+| **C** | 窄 patcher insertion（top-level SEO；anchor required；新 `expectInsertion` payload 欄位）| ~110–200 LOC + tests；T4b 語意須調整 | ✅ 解 | ✅ 變（Phase 4.5e 邊界重畫）| 🟡 中長期 unblocker 但風險面大 |
+| **D** | 通用 key insertion | scope 比 C 更大 | ✅ 解 | ✅ 變（更多）| ❌ **明確不推薦**：風險面最大、governance 損失與短期收益不成比例 |
+| **E** | 獨立 `add-empty-seo-field` CLI（新 npm script；不動既有 patcher）| ~120–180 LOC + tests + npm script；既有 patcher 與 209 tests 全保留 | ✅ 解（兩段：先 add-empty 後 normal write）| ✅ 變但解耦（新增 1 write 表面而非改 4.5e gate）| 🟢 **中長期最乾淨方案** |
+
+##### F. Recommended conservative path
+
+1. **短期**：keep current patcher behavior；不改 `src/scripts/admin-frontmatter-patcher.js`、`src/scripts/admin-write-cli.js`、`src/scripts/safe-write-test.js` 任一檔。
+2. **本批**：先固化分析至 docs（即本 §15.G.11）；不做 source change。
+3. **若未來需要自動化**：偏好 Option E（獨立 `add-empty-seo-field` CLI），不偏好 Option C（改現有 patcher 語意）；理由：解耦既有 Phase 4.5e gate；既有 209 tests 保持原狀；write flow 分兩段獨立可審。
+4. **若 source 真要落地**：必為**獨立 phase**，含獨立 pre-analysis → source prototype → dry-run-only acceptance → docs sync 四段；本 §15.G.11 **不**啟動其中任一段。
+5. **Fourth SEO real write**：仍 unauthorized；本 §15.G.11 **不**解除 §15.G.10 §I 之三條 future trigger conditions 之 gate；任一條件成立後皆須**獨立 phase + per-phase user explicit approval**。
+
+##### G. Governance notes
+
+| 項目 | 狀態 |
+|---|---|
+| 本 §15.G.11 docs checkpoint 性質 | ❌ **不**等同 source change approval |
+| 本 §15.G.11 docs checkpoint 性質 | ❌ **不**等同 content write approval |
+| 本 §15.G.11 docs checkpoint 性質 | ❌ **不**等同 fourth SEO real write approval |
+| Future real write 啟動條件 | 須**獨立 explicit user approval**；必須**明列**：target file / field / expectedOldValue / newValue 四項全部（per §15.G.10 §J）|
+| 前三次 real write approval scope | 各**僅授權該一次**；不延伸至第四次（per §15.G.7 §E / §15.G.8 §E / §15.G.9 §E）|
+| Admin Apply UI | 仍 disabled（per `src/views/admin/index.ejs` line 616-619 / 721-724）|
+| Middleware write route | 仍 not started（`vite.config.js` 無 `configureServer`）|
+| Reverse UTM | 仍 landed but dormant（per `CLAUDE.md` §16.4；pm-24a/b/c source landed；pm-26 deploy 未啟動）|
+| pm-26 deploy gate | 仍 BLOCKED（per `docs/reverse-utm-fixture-plan.md` §6；no positive GitHub cross-link fixture）|
+| CLI `--apply` + `dryRun:false` 雙鎖 | 仍為「有條件接受」（per §15.G.7 §A）；不等同 production approval |
+| Pre-analysis 與 docs-only checkpoint 之 scope | **均不**等同 write approval；本 §15.G.11 與前置 am-8 之 preanalysis 結論皆不可作為 future write 之預授權 |
+
+##### H. Suggested future phases
+
+| 序 | 性質 | 內容 | 是否本 §15.G.11 啟動 |
+|---|---|---|---|
+| H-1 | optional | 進一步 source preanalysis continuation（評估 Option E 之 anchor 規則 / quote style policy / blank-line group 探測 / duplicate detection）| ❌ 不啟動 |
+| H-2 | optional | `add-empty-seo-field` CLI prototype source 落地（dry-run-only；新 tests）| ❌ 不啟動 |
+| H-3 | optional | Acceptance read-only（跑 prototype dry-run 對 `20260504-sample-book-review.md`；不寫入；驗 209/0 與 0/42/37 baseline 維持）| ❌ 不啟動 |
+| H-4 | optional | docs sync（記錄 landed checkpoint）| ❌ 不啟動 |
+| H-5 | required if H-1–H-4 完成 | 獨立 fourth SEO dry-run + apply phase；user 須**明列** target / field / expectedOldValue / newValue 四項 | ❌ 不啟動 |
+| H-6 | alternative | user 於 VS Code 手動補 `searchDescription: ""` 至 `20260504-sample-book-review.md`（per §15.G.10 §I-2）後 commit → 獨立 dry-run + apply phase | ❌ 不啟動 |
+
+本 §15.G.11 **不**選擇任一未來 phase；亦**不**催促 user 啟動 H-1 / H-6 等。
+
+##### I. Phase Boundary
+
+本 §15.G.11 docs-only checkpoint phase（`20260529-am-9-...-a`）**僅**：
+
+- ✅ append §15.G.11 至 `docs/admin-2-write-pre-analysis.md`（本檔；單一 docs 變動）
+- ✅ 紀錄 `20260529-am-8` preanalysis 之結論：current behavior / risks / options / recommendation / governance / future
+- ✅ 重申 governance：本 docs checkpoint 不等同任何 source / write approval；fourth SEO write 仍 unauthorized
+
+本 §15.G.11 docs-only checkpoint phase **不做**：
+
+- ❌ **無** content posts 修改
+- ❌ **無** source 修改（含 `src/scripts/admin-frontmatter-patcher.js` / `src/scripts/admin-write-cli.js` / `src/scripts/safe-write-test.js` / `src/views/admin/index.ejs` 等）
+- ❌ **無** settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js 變動
+- ❌ **無** CLI dry-run / apply 執行（含 payload 建立 / 加載）
+- ❌ **無** 第四次 real write
+- ❌ **無** Admin Apply UI 啟用
+- ❌ **無** middleware write route 新增
+- ❌ **無** `npm install` / build / deploy / Blogger repost / GA4 validation / fixture creation
+- ❌ **無** reverse UTM dormant 狀態解除（per `CLAUDE.md` §16.4；remains landed but dormant）
+- ❌ **無** pm-26 deploy gate 解除（per `docs/reverse-utm-fixture-plan.md` §6；remains BLOCKED）
+- ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `merge` / `amend` / `force-push`
+
 ### 15.H Boundary Reaffirmation
 
 本 §15 補充段：
