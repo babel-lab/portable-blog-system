@@ -1,19 +1,36 @@
-// Phase 20260528-am-1 Admin Write Infra §15.G phase 4.5c
-//   - CLI write driver — dry-run ONLY
-//   - 4.5c gate: real write (--apply / dryRun:false) is FAIL-SAFE rejected;
-//     real-write path opens in phase 4.5e, not here.
-//   - Accepts JSON payload via --payload=<file> (Candidate B per preanalysis §5.5).
-//   - Loads file → parses → validates shape → reads target post → checks status /
-//     expectedOldValue → runs field validator → emits dry-run JSON + stderr trace.
-//   - Never calls fs.writeFile / fs.rename / safeWrite (no real write surface).
-//   - Exit codes follow preanalysis §13.1.
+// Phase 20260528-pm-8 Admin Write Infra §15.G phase 4.5e real-write gate
+//   - CLI write driver — gated real-write path
+//   - Mode determination (after argv + payload shape validated):
+//     - --apply flag AND payload.dryRun === false  → real-write path (safeWrite)
+//     - --apply alone (dryRun !== false)           → reject 'apply-requires-dryRun-false'
+//     - dryRun:false alone (no --apply)            → reject 'dryRun-false-requires-apply'
+//     - neither set (dryRun:true, no --apply)      → dry-run path (no fs write)
+//   - Real-write extra gates (beyond dry-run):
+//     - status set narrowed to {'draft'} (ready/published/missing all rejected)
+//     - re-checks whitelist immediately before fs write (TOCTOU defense)
+//     - delegates fs write to safeWrite (atomic tmp+rename; enforceCleanGit:true)
+//     - patcher.changed === false  → skip fs write; return written:false (no-op)
+//     - patcher.ok === false       → no fs write; surfaces error
+//   - Dry-run behavior preserved verbatim (no regressions).
+//   - Output (both modes) carries: target / site / kind / field / status /
+//     diffSummary / bytesDelta / changed / written.
+//   - Exit codes (additive over 4.5c):
+//     0  success (dry-run OR real-write OR no-op apply)
+//     1  invalid projectRoot / fatal
+//     2  invalid args / mode-combo rejection
+//     3  invalid payload shape
+//     4  forbidden target (whitelist / traversal / kind / pre-write recheck)
+//     6  expectedOldValue mismatch
+//     7  status / validator failure
+//     8  read / frontmatter / patcher / git-status / safeWrite I/O failure
 //
 // Module shape:
-//   - export async function runCli({ argv, projectRoot })
+//   - export async function runCli({ argv, projectRoot, __testOverrides? })
 //       → { exit: number, stdoutJson: object, stderrLines: string[] }
-//   - When invoked as the main script, the runner serialises stdoutJson + writes
-//     stderrLines, then process.exit(exit). Tests import runCli directly so they
-//     can assert without process.exit.
+//   - __testOverrides.gitStatusFn — internal-test hook to inject gitStatus result
+//     without spawning real `git status`; ignored unless a function. Production
+//     CLI entry (process.argv) never passes this; the field is only consumed by
+//     `safe-write-test.js` to keep tests hermetic.
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -27,9 +44,12 @@ import {
   LIMITS,
 } from './admin-field-validators.js';
 import { patchFrontmatter } from './admin-frontmatter-patcher.js';
+import { safeWrite } from './safe-write.js';
+import { checkGitStatus } from './git-status-check.js';
 
 const ALLOWED_FIELDS = new Set(['description', 'searchDescription']);
-const ALLOWED_STATUSES = new Set(['draft', 'ready']);
+const ALLOWED_STATUSES_DRY = new Set(['draft', 'ready']);
+const ALLOWED_STATUSES_WRITE = new Set(['draft']);
 
 function parseArgv(argv) {
   let payloadPath = null;
@@ -152,7 +172,7 @@ function buildResult({ exit, stdoutJson, stderrLines }) {
   return { exit, stdoutJson, stderrLines };
 }
 
-export async function runCli({ argv, projectRoot } = {}) {
+export async function runCli({ argv, projectRoot, __testOverrides } = {}) {
   const stderrLines = [];
   const log = (line) => stderrLines.push(`[admin-write] ${line}`);
 
@@ -171,20 +191,6 @@ export async function runCli({ argv, projectRoot } = {}) {
     return buildResult({
       exit: 2,
       stdoutJson: { ok: false, reason: 'invalid-args', detail: argvParsed.error },
-      stderrLines,
-    });
-  }
-
-  // 4.5c gate: --apply is rejected outright (phase 4.5e enables it).
-  if (argvParsed.applyFlag) {
-    log('--apply rejected: phase 4.5c is dry-run only');
-    return buildResult({
-      exit: 2,
-      stdoutJson: {
-        ok: false,
-        reason: 'apply-not-supported-in-phase-4p5c',
-        detail: 'CLI is dry-run only. Real write opens in phase 4.5e.',
-      },
       stderrLines,
     });
   }
@@ -237,19 +243,33 @@ export async function runCli({ argv, projectRoot } = {}) {
   }
   log(`payload shape OK (field=${payload.field}, dryRun=${payload.dryRun})`);
 
-  // 4.5c gate: dryRun:false is rejected.
-  if (payload.dryRun === false) {
-    log('payload.dryRun=false rejected: phase 4.5c is dry-run only');
+  // 3.5. Mode determination (--apply ↔ dryRun:false must be paired)
+  const wantsRealWrite = argvParsed.applyFlag === true && payload.dryRun === false;
+  if (argvParsed.applyFlag === true && payload.dryRun !== false) {
+    log('--apply rejected: must be paired with payload.dryRun:false');
     return buildResult({
       exit: 2,
       stdoutJson: {
         ok: false,
-        reason: 'apply-not-supported-in-phase-4p5c',
-        detail: 'payload.dryRun must be true. Real write opens in phase 4.5e.',
+        reason: 'apply-requires-dryRun-false',
+        detail: '--apply must be paired with payload.dryRun:false; refusing to write.',
       },
       stderrLines,
     });
   }
+  if (payload.dryRun === false && argvParsed.applyFlag !== true) {
+    log('payload.dryRun:false rejected: must be paired with --apply flag');
+    return buildResult({
+      exit: 2,
+      stdoutJson: {
+        ok: false,
+        reason: 'dryRun-false-requires-apply',
+        detail: 'payload.dryRun:false must be paired with --apply flag; refusing to write.',
+      },
+      stderrLines,
+    });
+  }
+  log(`mode = ${wantsRealWrite ? 'apply (real-write)' : 'dry-run'}`);
 
   // 4. targetRel sanity
   const trCheck = validateTargetRel(payload.targetRel);
@@ -278,7 +298,7 @@ export async function runCli({ argv, projectRoot } = {}) {
       stderrLines,
     });
   }
-  // 4.5c only accepts .md posts.
+  // CLI only accepts .md posts (both dry-run and real-write modes).
   if (wl.kind !== 'post-md') {
     log(`forbidden target kind: ${wl.kind}`);
     return buildResult({
@@ -286,7 +306,7 @@ export async function runCli({ argv, projectRoot } = {}) {
       stdoutJson: {
         ok: false,
         reason: 'forbidden-target',
-        detail: 'phase-4p5c-only-allows-post-md',
+        detail: 'cli-only-allows-post-md',
         kind: wl.kind,
       },
       stderrLines,
@@ -322,22 +342,26 @@ export async function runCli({ argv, projectRoot } = {}) {
   const currentFm = parsed.data || {};
   const currentBody = parsed.content;
 
-  // 8. status gate (draft / ready only)
+  // 8. status gate
+  //   - dry-run accepts {'draft', 'ready'}
+  //   - real-write narrows to {'draft'} (per 4.5e gate condition 5/16)
+  const statusSet = wantsRealWrite ? ALLOWED_STATUSES_WRITE : ALLOWED_STATUSES_DRY;
   const actualStatus = currentFm.status;
-  if (!ALLOWED_STATUSES.has(actualStatus)) {
-    log(`status not allowed: actual=${actualStatus}`);
+  if (!statusSet.has(actualStatus)) {
+    log(`status not allowed: actual=${actualStatus} (mode=${wantsRealWrite ? 'apply' : 'dry-run'})`);
     return buildResult({
       exit: 7,
       stdoutJson: {
         ok: false,
         reason: 'target-status-not-allowed',
         actualStatus: typeof actualStatus === 'string' ? actualStatus : null,
-        allowed: ['draft', 'ready'],
+        allowed: Array.from(statusSet),
+        mode: wantsRealWrite ? 'apply' : 'dry-run',
       },
       stderrLines,
     });
   }
-  log(`status check OK (status=${actualStatus})`);
+  log(`status check OK (status=${actualStatus}, mode=${wantsRealWrite ? 'apply' : 'dry-run'})`);
 
   // 9. expectedOldValue check
   const actualOld = currentFm[payload.field];
@@ -409,33 +433,141 @@ export async function runCli({ argv, projectRoot } = {}) {
   if (typeof payload.reason === 'string') meta.reason = payload.reason;
   if (typeof payload.memo === 'string') meta.memo = payload.memo;
 
-  log(`mode = dry-run (no fs write)`);
-  log(`diff: ${currentBytes} → ${wouldWriteBytes} bytes (${wouldWriteBytes - currentBytes >= 0 ? '+' : ''}${wouldWriteBytes - currentBytes})`);
-  log(`PASS — phase 4.5c is dry-run only; no real write opens here`);
+  const baseOutput = {
+    target: wl.normalizedRel,
+    site: wl.site,
+    kind: wl.kind,
+    field: payload.field,
+    currentBytes,
+    wouldWriteBytes,
+    bytesDelta: wouldWriteBytes - currentBytes,
+    diffSummary: {
+      field: payload.field,
+      oldLen: payload.expectedOldValue.length,
+      newLen: payload.newValue.length,
+      changed: fieldChanged,
+      bytesChanged,
+    },
+    validators: { [payload.field]: { ok: true } },
+    status: actualStatus,
+    meta,
+  };
+
+  // ── Dry-run path ─────────────────────────────────────────────────────
+  if (!wantsRealWrite) {
+    log(`mode = dry-run (no fs write)`);
+    log(`diff: ${currentBytes} → ${wouldWriteBytes} bytes (${wouldWriteBytes - currentBytes >= 0 ? '+' : ''}${wouldWriteBytes - currentBytes})`);
+    log(`PASS — dry-run only; no fs write performed`);
+
+    return buildResult({
+      exit: 0,
+      stdoutJson: {
+        ok: true,
+        mode: 'dry-run',
+        phase: '4.5e-dry-run',
+        written: false,
+        changed: bytesChanged,
+        ...baseOutput,
+      },
+      stderrLines,
+    });
+  }
+
+  // ── Real-write path (--apply + dryRun:false) ─────────────────────────
+  //   Per 4.5e gate condition 8: patcher.changed === false → no fs write.
+  if (!bytesChanged) {
+    log('apply requested but patcher reports no bytes change — skipping fs write');
+    return buildResult({
+      exit: 0,
+      stdoutJson: {
+        ok: true,
+        mode: 'apply',
+        phase: '4.5e-real-write',
+        written: false,
+        changed: false,
+        skipped: 'no-op',
+        ...baseOutput,
+      },
+      stderrLines,
+    });
+  }
+
+  // Per 4.5e gate condition 9: TOCTOU defense — re-check whitelist immediately
+  // before fs write. Path resolution / kind could differ from initial check if
+  // the filesystem changed underneath us between the read and the write.
+  const wl2 = isWriteAllowed(targetAbs, projectRoot);
+  if (!wl2.ok || wl2.kind !== 'post-md') {
+    log('pre-write whitelist re-check failed');
+    return buildResult({
+      exit: 4,
+      stdoutJson: {
+        ok: false,
+        reason: 'forbidden-target',
+        detail: wl2.ok ? 'pre-write-kind-mismatch' : wl2.reason,
+        stage: 'pre-write-recheck',
+      },
+      stderrLines,
+    });
+  }
+
+  // gitStatus check (injectable for hermetic tests via __testOverrides.gitStatusFn).
+  const gitStatusFn =
+    __testOverrides && typeof __testOverrides.gitStatusFn === 'function'
+      ? __testOverrides.gitStatusFn
+      : checkGitStatus;
+  let gitStatus;
+  try {
+    gitStatus = await gitStatusFn({ cwd: projectRoot });
+  } catch (err) {
+    log(`gitStatus probe threw: ${err.message}`);
+    return buildResult({
+      exit: 8,
+      stdoutJson: { ok: false, reason: 'git-status-failed', detail: err.message },
+      stderrLines,
+    });
+  }
+
+  // Atomic write via safeWrite (whitelist + git-clean + tmp+rename).
+  // Field-level validation already ran at step 10; no additional validators here.
+  const wr = await safeWrite({
+    targetPath: targetAbs,
+    newContent,
+    projectRoot,
+    validators: [],
+    gitStatus,
+    enforceCleanGit: true,
+  });
+
+  if (!wr.ok) {
+    log(`safeWrite failed: ${wr.reason}`);
+    const detail = {};
+    if (wr.detail) detail.detail = wr.detail;
+    if (Array.isArray(wr.dirtyFiles)) detail.dirtyFiles = wr.dirtyFiles;
+    if (Array.isArray(wr.untracked)) detail.untracked = wr.untracked;
+    if (Array.isArray(wr.errors)) detail.errors = wr.errors;
+    return buildResult({
+      exit: 8,
+      stdoutJson: {
+        ok: false,
+        reason: 'safe-write-failed',
+        safeWriteReason: wr.reason,
+        ...detail,
+      },
+      stderrLines,
+    });
+  }
+
+  log(`APPLY WRITTEN: ${wl2.normalizedRel} (${currentBytes} → ${wouldWriteBytes} bytes, delta ${wouldWriteBytes - currentBytes >= 0 ? '+' : ''}${wouldWriteBytes - currentBytes})`);
 
   return buildResult({
     exit: 0,
     stdoutJson: {
       ok: true,
-      mode: 'dry-run',
-      phase: '4.5c',
-      target: wl.normalizedRel,
-      site: wl.site,
-      kind: wl.kind,
-      field: payload.field,
-      currentBytes,
-      wouldWriteBytes,
-      bytesDelta: wouldWriteBytes - currentBytes,
-      diffSummary: {
-        field: payload.field,
-        oldLen: payload.expectedOldValue.length,
-        newLen: payload.newValue.length,
-        changed: fieldChanged,
-        bytesChanged,
-      },
-      validators: { [payload.field]: { ok: true } },
-      status: actualStatus,
-      meta,
+      mode: 'apply',
+      phase: '4.5e-real-write',
+      written: true,
+      changed: true,
+      ...baseOutput,
     },
     stderrLines,
   });

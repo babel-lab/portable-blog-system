@@ -538,7 +538,7 @@ async function main() {
     }
   }
 
-  // ── 7. admin-write-cli (dry-run only; phase 4.5c + 4.5e-b patcher) ────
+  // ── 7. admin-write-cli (dry-run + 4.5e real-write gate + 4.5e-b patcher) ─
   process.stdout.write('\n[admin-write-cli]\n');
   const cliTmp = await fs.mkdtemp(path.join(os.tmpdir(), 'admin-write-cli-test-'));
   process.stdout.write(`  cliTmp=${cliTmp}\n`);
@@ -597,10 +597,11 @@ async function main() {
     const rUnknown = await runCli({ argv: ['--frobnicate'], projectRoot: cliTmp });
     assert('CLI rejects unknown arg', rUnknown.exit === 2);
 
-    // --apply flag rejected (4.5c gate)
+    // --apply alone (validPayload has dryRun:true) → must reject with combo-gate reason
     await writePayload(validPayload());
     const rApply = await runCli({ argv: [`--payload=${payloadPath}`, '--apply'], projectRoot: cliTmp });
-    assert('CLI rejects --apply flag', rApply.exit === 2 && rApply.stdoutJson.reason === 'apply-not-supported-in-phase-4p5c');
+    assert('CLI rejects --apply without dryRun:false',
+      rApply.exit === 2 && rApply.stdoutJson.reason === 'apply-requires-dryRun-false');
 
     // payload file not found
     const rMissingFile = await runCli({ argv: [`--payload=${path.join(cliTmp, 'nope.json')}`], projectRoot: cliTmp });
@@ -631,10 +632,11 @@ async function main() {
     const rDryType = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
     assert('CLI rejects non-boolean dryRun', rDryType.exit === 3);
 
-    // dryRun:false rejected (4.5c gate)
+    // dryRun:false alone (no --apply flag) → must reject with combo-gate reason
     await writePayload({ ...validPayload(), dryRun: false });
     const rDryFalse = await runCli({ argv: [`--payload=${payloadPath}`], projectRoot: cliTmp });
-    assert('CLI rejects dryRun:false (phase 4.5c)', rDryFalse.exit === 2 && rDryFalse.stdoutJson.reason === 'apply-not-supported-in-phase-4p5c');
+    assert('CLI rejects dryRun:false without --apply',
+      rDryFalse.exit === 2 && rDryFalse.stdoutJson.reason === 'dryRun-false-requires-apply');
 
     // reason + memo mutex
     await writePayload({ ...validPayload(), reason: 'a', memo: 'b' });
@@ -835,6 +837,256 @@ async function main() {
       // the multi-line string. So we assert mismatch instead of patcher fail-closed.
       assert('CLI repro-guard: block scalar value mismatch caught before patcher',
         rBlock.exit === 6 && rBlock.stdoutJson.reason === 'expected-old-value-mismatch');
+    }
+
+    // ── Phase 4.5e real-write gate (--apply + dryRun:false) ───────────
+    //   Hermetic gitStatus injection via __testOverrides; no `git status`
+    //   spawn during these tests. Production callers (process.argv entry)
+    //   do NOT pass __testOverrides; checkGitStatus runs as normal.
+    {
+      const cleanGit = async () => ({ ok: true, clean: true, dirtyFiles: [], untracked: [] });
+      const dirtyGit = async () => ({ ok: true, clean: false, dirtyFiles: ['some.md'], untracked: [] });
+
+      const fmFixture = (lines, body = 'body content here\n') =>
+        ['---', ...lines, '---', '', body].join('\n');
+
+      // ── (c) --apply + dryRun:false + draft + match → writes file ────
+      const writePath = path.join(postsDir, 'apply-test-write.md');
+      const beforeWrite = fmFixture([
+        'id: "20260528-apply-write"',
+        'site: "blogger"',
+        'title: "Apply Write"',
+        'tags: ["a", "b", "c"]',
+        'description: "old apply desc"',
+        'searchDescription: "old apply search"',
+        'publishTargets:',
+        '  blogger:',
+        '    enabled: true',
+        'status: "draft"',
+      ]);
+      await fs.writeFile(writePath, beforeWrite, 'utf-8');
+
+      await writePayload({
+        targetRel: 'content/blogger/posts/apply-test-write.md',
+        field: 'description',
+        newValue: 'new apply desc',
+        expectedOldValue: 'old apply desc',
+        dryRun: false,
+      });
+      const rApply = await runCli({
+        argv: [`--payload=${payloadPath}`, '--apply'],
+        projectRoot: cliTmp,
+        __testOverrides: { gitStatusFn: cleanGit },
+      });
+      assert('apply: --apply+dryRun:false+draft+match exits 0', rApply.exit === 0);
+      assert('apply: mode=apply', rApply.stdoutJson.mode === 'apply');
+      assert('apply: phase=4.5e-real-write', rApply.stdoutJson.phase === '4.5e-real-write');
+      assert('apply: written=true', rApply.stdoutJson.written === true);
+      assert('apply: changed=true', rApply.stdoutJson.changed === true);
+      assert('apply: diffSummary.changed=true', rApply.stdoutJson.diffSummary.changed === true);
+      assert('apply: diffSummary.bytesChanged=true', rApply.stdoutJson.diffSummary.bytesChanged === true);
+      assert('apply: bytesDelta=+4 (newValue len − oldValue len)',
+        rApply.stdoutJson.bytesDelta === ('new apply desc'.length - 'old apply desc'.length));
+      assert('apply: target normalized',
+        rApply.stdoutJson.target.replace(/\\/g, '/') === 'content/blogger/posts/apply-test-write.md');
+      assert('apply: kind=post-md', rApply.stdoutJson.kind === 'post-md');
+      assert('apply: site=blogger', rApply.stdoutJson.site === 'blogger');
+      assert('apply: status echoed', rApply.stdoutJson.status === 'draft');
+
+      // File must actually be mutated on disk
+      const afterWrite = await fs.readFile(writePath, 'utf-8');
+      assert('apply: file content updated', afterWrite !== beforeWrite);
+      assert('apply: new description in file', afterWrite.includes('description: "new apply desc"'));
+      assert('apply: old description gone', !afterWrite.includes('description: "old apply desc"'));
+      assert('apply: leaves no .tmp', (await existsPath(writePath + '.tmp')) === false);
+
+      // Only the target line changed; everything else preserved verbatim
+      const beforeLines = beforeWrite.split('\n');
+      const afterLines = afterWrite.split('\n');
+      assert('apply: line count preserved', beforeLines.length === afterLines.length);
+      let diffLines = 0;
+      for (let i = 0; i < beforeLines.length; i++) {
+        if (beforeLines[i] !== afterLines[i]) diffLines++;
+      }
+      assert('apply: exactly 1 line differs', diffLines === 1);
+      assert('apply: inline tags array preserved verbatim',
+        afterWrite.includes('tags: ["a", "b", "c"]'));
+      assert('apply: nested publishTargets preserved verbatim',
+        afterWrite.includes('publishTargets:\n  blogger:\n    enabled: true'));
+      assert('apply: searchDescription line preserved verbatim',
+        afterWrite.includes('searchDescription: "old apply search"'));
+      assert('apply: status line preserved', afterWrite.includes('status: "draft"'));
+      assert('apply: title preserved', afterWrite.includes('title: "Apply Write"'));
+
+      // ── (h) no-op apply (newValue equals current) — must NOT write ──
+      const beforeNoop = await fs.readFile(writePath, 'utf-8');
+      await writePayload({
+        targetRel: 'content/blogger/posts/apply-test-write.md',
+        field: 'description',
+        newValue: 'new apply desc', // same as current (post (c))
+        expectedOldValue: 'new apply desc',
+        dryRun: false,
+      });
+      const rNoopApply = await runCli({
+        argv: [`--payload=${payloadPath}`, '--apply'],
+        projectRoot: cliTmp,
+        __testOverrides: { gitStatusFn: cleanGit },
+      });
+      assert('apply no-op: exit 0', rNoopApply.exit === 0);
+      assert('apply no-op: mode=apply', rNoopApply.stdoutJson.mode === 'apply');
+      assert('apply no-op: written=false', rNoopApply.stdoutJson.written === false);
+      assert('apply no-op: changed=false', rNoopApply.stdoutJson.changed === false);
+      assert('apply no-op: skipped=no-op', rNoopApply.stdoutJson.skipped === 'no-op');
+      assert('apply no-op: bytesDelta=0', rNoopApply.stdoutJson.bytesDelta === 0);
+      assert('apply no-op: file byte-identical',
+        (await fs.readFile(writePath, 'utf-8')) === beforeNoop);
+      assert('apply no-op: leaves no .tmp', (await existsPath(writePath + '.tmp')) === false);
+
+      // ── (d) expectedOldValue mismatch in apply mode — must NOT write ─
+      const mismatchPath = path.join(postsDir, 'apply-test-mismatch.md');
+      const mismatchBefore = fmFixture([
+        'id: "20260528-apply-mismatch"',
+        'site: "blogger"',
+        'title: "Mismatch"',
+        'description: "actual value"',
+        'status: "draft"',
+      ]);
+      await fs.writeFile(mismatchPath, mismatchBefore, 'utf-8');
+      await writePayload({
+        targetRel: 'content/blogger/posts/apply-test-mismatch.md',
+        field: 'description',
+        newValue: 'attempted new',
+        expectedOldValue: 'wrong-expected-value',
+        dryRun: false,
+      });
+      const rMismatchApply = await runCli({
+        argv: [`--payload=${payloadPath}`, '--apply'],
+        projectRoot: cliTmp,
+        __testOverrides: { gitStatusFn: cleanGit },
+      });
+      assert('apply mismatch: exit 6', rMismatchApply.exit === 6);
+      assert('apply mismatch: reason=expected-old-value-mismatch',
+        rMismatchApply.stdoutJson.reason === 'expected-old-value-mismatch');
+      assert('apply mismatch: file unchanged',
+        (await fs.readFile(mismatchPath, 'utf-8')) === mismatchBefore);
+      assert('apply mismatch: leaves no .tmp',
+        (await existsPath(mismatchPath + '.tmp')) === false);
+
+      // ── (e) status:ready in apply mode — must reject (narrowed to draft) ─
+      const readyPath = path.join(postsDir, 'apply-test-ready.md');
+      const readyBefore = fmFixture([
+        'id: "20260528-apply-ready"',
+        'site: "blogger"',
+        'title: "Ready Post"',
+        'description: "ready desc"',
+        'status: "ready"',
+      ]);
+      await fs.writeFile(readyPath, readyBefore, 'utf-8');
+      await writePayload({
+        targetRel: 'content/blogger/posts/apply-test-ready.md',
+        field: 'description',
+        newValue: 'modified',
+        expectedOldValue: 'ready desc',
+        dryRun: false,
+      });
+      const rReadyApply = await runCli({
+        argv: [`--payload=${payloadPath}`, '--apply'],
+        projectRoot: cliTmp,
+        __testOverrides: { gitStatusFn: cleanGit },
+      });
+      assert('apply ready: exit 7', rReadyApply.exit === 7);
+      assert('apply ready: reason=target-status-not-allowed',
+        rReadyApply.stdoutJson.reason === 'target-status-not-allowed');
+      assert('apply ready: allowed list = [draft]',
+        Array.isArray(rReadyApply.stdoutJson.allowed) &&
+          rReadyApply.stdoutJson.allowed.length === 1 &&
+          rReadyApply.stdoutJson.allowed[0] === 'draft');
+      assert('apply ready: mode=apply echoed in rejection',
+        rReadyApply.stdoutJson.mode === 'apply');
+      assert('apply ready: file unchanged',
+        (await fs.readFile(readyPath, 'utf-8')) === readyBefore);
+
+      // No-regression: dry-run on same status:ready file still works
+      await writePayload({
+        targetRel: 'content/blogger/posts/apply-test-ready.md',
+        field: 'description',
+        newValue: 'modified',
+        expectedOldValue: 'ready desc',
+        dryRun: true,
+      });
+      const rReadyDry = await runCli({
+        argv: [`--payload=${payloadPath}`],
+        projectRoot: cliTmp,
+      });
+      assert('no-regression: dry-run on status:ready still ok',
+        rReadyDry.exit === 0 && rReadyDry.stdoutJson.mode === 'dry-run');
+      assert('no-regression: dry-run on ready does NOT mutate file',
+        (await fs.readFile(readyPath, 'utf-8')) === readyBefore);
+
+      // ── (f) field outside allowlist in apply mode — rejected at shape ─
+      await writePayload({
+        targetRel: 'content/blogger/posts/apply-test-write.md',
+        field: 'title',
+        newValue: 'pwned',
+        expectedOldValue: 'whatever',
+        dryRun: false,
+      });
+      const rFieldApply = await runCli({
+        argv: [`--payload=${payloadPath}`, '--apply'],
+        projectRoot: cliTmp,
+        __testOverrides: { gitStatusFn: cleanGit },
+      });
+      assert('apply field-outside-allowlist: exit 3',
+        rFieldApply.exit === 3 &&
+          rFieldApply.stdoutJson.detail.error === 'field-not-in-allowlist');
+
+      // ── (g) target outside content posts in apply mode — whitelist rejects ─
+      await writePayload({
+        targetRel: 'content/settings/site.config.json',
+        field: 'description',
+        newValue: 'x',
+        expectedOldValue: '',
+        dryRun: false,
+      });
+      const rOutsideApply = await runCli({
+        argv: [`--payload=${payloadPath}`, '--apply'],
+        projectRoot: cliTmp,
+        __testOverrides: { gitStatusFn: cleanGit },
+      });
+      assert('apply target-outside: exit 4',
+        rOutsideApply.exit === 4 && rOutsideApply.stdoutJson.reason === 'forbidden-target');
+
+      // ── (i) git-dirty rejects apply ──────────────────────────────────
+      const dirtyPath = path.join(postsDir, 'apply-test-gitdirty.md');
+      const dirtyBefore = fmFixture([
+        'id: "20260528-apply-gitdirty"',
+        'site: "blogger"',
+        'title: "Dirty"',
+        'description: "dirty desc"',
+        'status: "draft"',
+      ]);
+      await fs.writeFile(dirtyPath, dirtyBefore, 'utf-8');
+      await writePayload({
+        targetRel: 'content/blogger/posts/apply-test-gitdirty.md',
+        field: 'description',
+        newValue: 'should not land',
+        expectedOldValue: 'dirty desc',
+        dryRun: false,
+      });
+      const rDirty = await runCli({
+        argv: [`--payload=${payloadPath}`, '--apply'],
+        projectRoot: cliTmp,
+        __testOverrides: { gitStatusFn: dirtyGit },
+      });
+      assert('apply git-dirty: exit 8', rDirty.exit === 8);
+      assert('apply git-dirty: reason=safe-write-failed',
+        rDirty.stdoutJson.reason === 'safe-write-failed');
+      assert('apply git-dirty: safeWriteReason=git-dirty',
+        rDirty.stdoutJson.safeWriteReason === 'git-dirty');
+      assert('apply git-dirty: file unchanged',
+        (await fs.readFile(dirtyPath, 'utf-8')) === dirtyBefore);
+      assert('apply git-dirty: leaves no .tmp',
+        (await existsPath(dirtyPath + '.tmp')) === false);
     }
 
     // invalid projectRoot
