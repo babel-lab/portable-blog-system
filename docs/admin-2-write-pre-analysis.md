@@ -1085,7 +1085,7 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 ##### B. Problem recap
 
 - `diffSummary.changed` 與 `bytesChanged` **不等價**：前者反映「目標 field 之 string value 是否真的變了」，後者反映「整檔 `matter.stringify` 後 bytes 是否與原檔一致」
-- `js-yaml` `matter.stringify` 對 inline arrays / indentation / quoting / line-width / empty-line 等多個 surface 會 normalize；YAML inline comment 在 round-trip 後被丟棄
+- `gray-matter` 之 `matter.stringify`（內部使用 `js-yaml` emitter）對 inline arrays / indentation / quoting / line-width / empty-line 等多個 surface 會 normalize；YAML inline comment 在 round-trip 後被丟棄
 - **No-op 也可能 `bytesChanged: true`**：即使 `payload.newValue === payload.expectedOldValue`，stringify 仍會跑完整 dump；原檔任一非 emitter-default 樣式即會產生 byte drift
 - Concrete evidence — `content/github/posts/20260504-github-pages-blog-planning.md`：
   - field: `description`
