@@ -26,6 +26,7 @@ import {
   validateSearchDescription,
   LIMITS,
 } from './admin-field-validators.js';
+import { patchFrontmatter } from './admin-frontmatter-patcher.js';
 
 const ALLOWED_FIELDS = new Set(['description', 'searchDescription']);
 const ALLOWED_STATUSES = new Set(['draft', 'ready']);
@@ -377,19 +378,27 @@ export async function runCli({ argv, projectRoot } = {}) {
   }
   log(`validator (${getValidatorName(payload.field)}) = ok`);
 
-  // 11. Mutate + stringify (dry-run preview)
-  const newFm = { ...currentFm, [payload.field]: payload.newValue };
-  let newContent;
-  try {
-    newContent = matter.stringify(currentBody, newFm);
-  } catch (err) {
-    log(`frontmatter stringify failed: ${err.message}`);
+  // 11. Patch via targeted frontmatter patcher (Phase 4.5e-b mitigation A)
+  //   - replaces only the target field's inline scalar value
+  //   - preserves all other frontmatter bytes verbatim (inline arrays / nested objects)
+  //   - fail-closed on block scalar / missing key / duplicate key
+  //   - never falls back to matter.stringify full YAML dump
+  const patchRes = patchFrontmatter(currentContent, { [payload.field]: payload.newValue });
+  if (!patchRes.ok) {
+    log(`frontmatter patcher failed: ${patchRes.error}`);
     return buildResult({
       exit: 8,
-      stdoutJson: { ok: false, reason: 'frontmatter-stringify-failed', detail: err.message },
+      stdoutJson: {
+        ok: false,
+        reason: 'frontmatter-patch-failed',
+        detail: patchRes.error,
+        appliedPaths: patchRes.appliedPaths,
+        skippedPaths: patchRes.skippedPaths,
+      },
       stderrLines,
     });
   }
+  const newContent = patchRes.output;
 
   const currentBytes = Buffer.byteLength(currentContent, 'utf-8');
   const wouldWriteBytes = Buffer.byteLength(newContent, 'utf-8');
