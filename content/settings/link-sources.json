@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Central registry for relatedLinks / otherLinks source labels. This file is additive and currently has no renderer consumer.",
+  "description": "Central registry for relatedLinks / otherLinks source labels. Renderer and GA4 consumers read sourceKey when present; entries remain additive and backward compatible.",
   "sources": [
     {
       "sourceKey": "blogger",
