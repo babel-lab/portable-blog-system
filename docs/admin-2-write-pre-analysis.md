@@ -1759,6 +1759,139 @@ CLI output：
 - ❌ **無** middleware write route
 - ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `amend` / `force-push`
 
+#### 15.G.10 2026-05-29 AM fourth SEO write candidate scan — zero viable candidate checkpoint
+
+Phase: `20260529-am-3-fourth-seo-write-zero-candidate-checkpoint-docs-only-a`
+
+本 §15.G.10 為 docs-only checkpoint，紀錄前一 phase（`20260529-am-2-fourth-seo-write-candidate-preanalysis-readonly-a`）之 fourth SEO write candidate scan 結論。Scan 結論為 **0 viable candidate**；本 §15.G.10 **不**啟動第四次 real write、**不**改 content、**不**改 CLI source、**不**解除任何 dormant 邊界。
+
+##### A. Phase Identification
+
+| 項目 | 值 |
+|---|---|
+| Phase name | `20260529-am-3-fourth-seo-write-zero-candidate-checkpoint-docs-only-a` |
+| Source pre-analysis phase | `20260529-am-2-fourth-seo-write-candidate-preanalysis-readonly-a`（read-only；無 commit）|
+| Cold-start triage phase | `20260529-am-1-post-eod-cold-start-next-work-triage-readonly-a`（read-only；無 commit）|
+| Type | docs-only checkpoint（單檔 append at §15.G.10）|
+
+##### B. Baseline
+
+| 項目 | 值 |
+|---|---|
+| repo | `D:\github\blog-new\portable-blog-system` |
+| branch | `main` tracking `origin/main` |
+| HEAD（本 §15.G.10 commit 前）| `acabb4fd629b1bf9cd015af117bd7381cc253065`（== §15.G.9 night-12 之後加上 2026-05-28 EOD report commit `acabb4f`）|
+| ahead / behind | `0 / 0` |
+| working tree | clean |
+| safe-write:test | `209 pass / 0 fail` |
+| validate:content | `0 error(s) / 42 warning(s) / 37 post(s)` |
+
+##### C. Scan Scope
+
+| 範圍 | 對象 |
+|---|---|
+| 掃描路徑 | `content/blogger/posts/**/*.md` + `content/github/posts/**/*.md`（排除 `.fb.md` sidecar / `content/validation-fixtures/` / `content/templates/` / `content/shared/` / `content/drafts/` / `content/archive/`）|
+| Actual hit | **5 個 .md 檔** |
+| 5 hits 清單 | 1. `content/blogger/posts/20260504-sample-book-review.md`（draft）<br>2. `content/blogger/posts/20260515-we-media-myself2.md`（ready）<br>3. `content/blogger/posts/20260525-draft-book-review.md`（draft）<br>4. `content/github/posts/20260504-github-pages-blog-planning.md`（ready）<br>5. `content/github/posts/20260504-portable-blog-system-mvp.md`（ready）|
+
+##### D. Previous Three Real Write Precise Verification
+
+由 `git show --stat + diff` 從 commit object 精確讀取（**非推測**；對齊本 §15.G.7 / §15.G.8 / §15.G.9 紀錄並補上前 cold-start triage 之欄位誤標）：
+
+| # | commit（full）| date | target file | field | old value | new value |
+|---|---|---|---|---|---|---|
+| 1 | `abcb58e70f10744be5829679fc54aa307b3ee049` | 2026-05-28 16:26:54 +0800 | `content/blogger/posts/20260504-sample-book-review.md` | `description` | `"Blogger 書評文章範例。"` | `"Blogger 書評文章範例：用於驗證 portable-blog-system 的書評模板、SEO frontmatter 與 Admin 安全寫入流程。"` |
+| 2 | `9c6a915e5c4c6c9d3b9d56ab38dc0a76bfc783a8` | 2026-05-28 17:55:19 +0800 | `content/blogger/posts/20260525-draft-book-review.md` | `description` | `""` | `"Blogger 書評草稿範例：用於驗證 portable-blog-system 的書評文章欄位、SEO 描述與 Admin 安全寫入流程。"` |
+| 3 | `82be258a10cb09ec2c4cb8b3fc572f036d0b79e8` | 2026-05-28 21:09:51 +0800 | `content/blogger/posts/20260525-draft-book-review.md` | `searchDescription` | `""` | `"驗證 portable-blog-system 的 Blogger 書評草稿欄位、SEO 摘要與 Admin 安全寫入流程，作為後續書評內容建置範例。"` |
+
+每筆均 `1 file changed, 1 insertion(+), 1 deletion(-)`；無 body / 其他欄位變動。對應 docs 記錄位置：§15.G.7（first；pm-8 ~ pm-12）/ §15.G.8（second；night-2 ~ night-6）/ §15.G.9（third；night-9 ~ night-12）。
+
+前 cold-start triage 報告之欄位誤標（將 commit 2 target 寫成 `20260504-sample-book-review.md`、field 標 unknown）於本 §15.G.10 §D 正式校正。
+
+##### E. Scan Conclusion — Zero Viable Candidate
+
+| 結論 | **第四次 SEO real write viable candidate pool = 0** |
+|---|---|
+
+5 個 posts 經 CLI 雙條 hard gate 收斂後皆不可寫：
+
+| post | status gate（`ALLOWED_STATUSES_WRITE = {'draft'}`）| field 已寫 / 結構 | 結果 |
+|---|---|---|---|
+| `20260504-sample-book-review.md` | ✅ draft 通過 | `description` 已 §15.G.7 寫入；**`searchDescription` 欄位不存在** | ❌ patcher missing-key fail-closed（per `src/scripts/admin-frontmatter-patcher.js` 註解 line 7-8 + line 20 "fail-closed on ... missing key"）|
+| `20260515-we-media-myself2.md` | ❌ status=ready | description / searchDescription 已填 | ❌ exit 7 / `target-status-not-allowed` |
+| `20260525-draft-book-review.md` | ✅ draft 通過 | `description` 已 §15.G.8 寫入；`searchDescription` 已 §15.G.9 寫入 | ❌ 無剩餘 SEO 欄位 |
+| `20260504-github-pages-blog-planning.md` | ❌ status=ready | description / searchDescription 已填 | ❌ exit 7 / `target-status-not-allowed` |
+| `20260504-portable-blog-system-mvp.md` | ❌ status=ready | description / searchDescription 已填 | ❌ exit 7 / `target-status-not-allowed` |
+
+##### F. Zero-Candidate Root Cause Breakdown
+
+1. **Status gate（CLI `ALLOWED_STATUSES_WRITE = new Set(['draft'])`）**：5 posts 中 3 個 status=ready；ready 在 `--apply` 路徑直接 exit 7 reject（per `src/scripts/admin-write-cli.js` line 51-52 + step 8 status gate at line 346-363）。本檔不主張改為允許 ready；對齊 Phase 4.5e 安全收斂原則。
+2. **Patcher missing-key fail-closed**：唯一未飽和 SEO 欄位之 draft post（`20260504-sample-book-review.md` 之 `searchDescription`）整個欄位**不存在**於 frontmatter；CLI patcher（`src/scripts/admin-frontmatter-patcher.js`）對 missing key 直接 fail-closed → 即使 shape check 與 expectedOldValue check 通過（`""` 對 `""`），patcher step（CLI line 410-424）會 exit 8 / `frontmatter-patch-failed`。
+3. **Draft candidates 已無安全可寫欄位**：2 個 draft posts 中，`20260525-draft-book-review.md` 兩欄位已寫滿（§15.G.8 + §15.G.9）；`20260504-sample-book-review.md` 之 `description` 已寫滿（§15.G.7），餘 `searchDescription` 為 missing-key 而非空字串。
+4. **Ready posts 不應進 real write**：本 §15.G.10 不主張為了補第四次寫入而臨時切 status 或繞 gate；Phase 4.5e gate 設計即為阻擋此類冒進。
+
+##### G. Closest-But-Unwritable Half-Candidate
+
+| 項目 | 值 |
+|---|---|
+| Target file | `content/blogger/posts/20260504-sample-book-review.md` |
+| Target field | `searchDescription` |
+| Why half-candidate | status=draft 通過 gate；但 frontmatter 內整個 key 不存在 |
+| Reject stage | CLI step 11 `patchFrontmatter` → exit 8 / `frontmatter-patch-failed`（patcher 對 missing key fail-closed）|
+| 是否可進 dry-run | ❌ **不可**；patcher 在 dry-run 與 apply 兩路徑均跑（CLI line 410 在 mode-split 前），無分支可繞 |
+| 是否可進 apply | ❌ **不可**；同上 |
+| Body 狀態 | placeholder（`請在此撰寫書評內容。`）；屬 schema demo；不足以 SEO-grade fully justify newValue |
+
+##### H. Recommendation — Do Not Hard-Push Fourth Write
+
+1. **不建議**為了完成「第四次寫入」而硬改既有 `20260504-sample-book-review.md` 之 `description`：description 已於 §15.G.7 寫入 56 字之 SEO-grade 句；二次改寫屬 cosmetic / 無新增資訊；違反「不誇大內容 / 不新增文章沒有提到的資訊」之 SEO write 原則。
+2. **不建議**此時擴 patcher 支援 key insertion：屬 source change；改動 Phase 4.5e 安全邊界；需獨立 pre-analysis（評估 insertion 點之 YAML 上下文判斷、blank line / comment 保留、existing-key duplicate detection、validate baseline 對齊等）；本 §15.G.10 **不**啟動此方向。
+3. **不建議**繞過 status gate 或改 ready post：違反 Phase 4.5e gate 之設計目的；ready post 之 SEO 欄位已飽和或屬 production-grade content；不適合作為 gate-bypass 練習材料。
+
+##### I. Future Trigger Conditions
+
+第四次 SEO real write 可在以下任一條件成立後**獨立 phase**啟動（**本 §15.G.10 不啟動**）：
+
+| 觸發條件 | 性質 | 是否需新 phase |
+|---|---|---|
+| **I-1**：未來自然產生之新 draft post（如新書評草稿、新教具下載草稿、新技術筆記草稿）frontmatter 自帶 `description: ""` 或 `searchDescription: ""` 空字串欄位 | 被動 wait；自然觸發 | ✅ 須獨立 dry-run + apply phase |
+| **I-2**：user 於 VS Code 手動補 `searchDescription: ""` 行至 `20260504-sample-book-review.md`（緊接 description 下一行）後 commit；屬 user maintain `.md` 之既有許可範圍（per CLAUDE.md §1 / §27）| 主動 user manual | ✅ 須獨立 dry-run + apply phase |
+| **I-3**：未來獨立 pre-analysis 評估擴 CLI patcher 支援 key insertion 並 landed 後 | source change；長期 unblocker | ✅ 須獨立 pre-analysis → source → dry-run → apply 四段 |
+
+本 §15.G.10 **不**選擇任一觸發條件；亦**不**催促 user 主動觸發 I-2 / I-3。
+
+##### J. Governance Note
+
+| 項目 | 狀態 |
+|---|---|
+| 前三次 real write approval scope | 各**僅授權該一次**；不延伸至第四次（per §15.G.7 §E / §15.G.8 §E / §15.G.9 §E）|
+| Future real write 啟動條件 | 須**獨立 explicit user approval**；approval 必須**明列**：target file / field / expectedOldValue / newValue 四項全部 |
+| CLI source 之 `--apply` + `dryRun:false` 雙鎖 | 仍為「有條件接受」（per §15.G.7 §A）；不等同 production approval；per-phase user explicit simbolic gate 仍為唯一通行依據 |
+| Pre-analysis 與 docs-only checkpoint 之 scope | **均不**等同 write approval；無論本 §15.G.10 或前置 `20260529-am-2` 之 scan 結論為何，皆不可作為 future write 之預授權 |
+
+##### K. Phase Boundary
+
+本 §15.G.10 docs-only checkpoint phase（`20260529-am-3-...-a`）**僅**：
+
+- ✅ append §15.G.10 至 `docs/admin-2-write-pre-analysis.md`（本檔；單一 docs 變動）
+- ✅ 紀錄 `20260529-am-2` scan 之 0-candidate 結論 + reasons + half-candidate + future trigger conditions
+- ✅ 校正前 cold-start triage 報告之欄位誤標（§D 三筆 commit / file / field / old / new 全部精確列出）
+- ✅ 重申 governance：前三次 approval 不延伸至第四次
+
+本 §15.G.10 docs-only checkpoint phase **不做**：
+
+- ❌ **無** content posts 修改
+- ❌ **無** source 修改（含 `src/scripts/admin-write-cli.js` / `src/scripts/admin-frontmatter-patcher.js` / `src/views/admin/index.ejs` 等）
+- ❌ **無** settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js 變動
+- ❌ **無** CLI dry-run / apply 執行（含 payload 建立 / 加載）
+- ❌ **無** 第四次 real write
+- ❌ **無** Admin Apply UI 啟用（仍 disabled per `src/views/admin/index.ejs` line 616-619 / 721-724）
+- ❌ **無** middleware write route 新增（仍 not started；`vite.config.js` 無 `configureServer`）
+- ❌ **無** `npm install` / build / deploy / Blogger repost / GA4 validation / fixture creation
+- ❌ **無** reverse UTM dormant 狀態解除（per `CLAUDE.md` §16.4；remains landed but dormant）
+- ❌ **無** pm-26 deploy gate 解除（per `docs/reverse-utm-fixture-plan.md` §6；remains BLOCKED on no positive GitHub cross-link fixture）
+- ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `merge` / `amend` / `force-push`
+
 ### 15.H Boundary Reaffirmation
 
 本 §15 補充段：
