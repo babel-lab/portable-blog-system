@@ -10,7 +10,7 @@ updated: "2026-05-04"
 author: "Dean"
 category: "book-review"
 tags: ["book"]
-description: "Blogger 書評文章範例。"
+description: "Blogger 書評文章範例：用於驗證 portable-blog-system 的書評模板、SEO frontmatter 與 Admin 安全寫入流程。"
 status: "draft"
 draft: true
 publishTargets:
