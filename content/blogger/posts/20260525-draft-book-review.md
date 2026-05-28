@@ -16,7 +16,7 @@ category: "book-review"
 tags: ["book"]
 
 description: "Blogger 書評草稿範例：用於驗證 portable-blog-system 的書評文章欄位、SEO 描述與 Admin 安全寫入流程。"
-searchDescription: ""
+searchDescription: "驗證 portable-blog-system 的 Blogger 書評草稿欄位、SEO 摘要與 Admin 安全寫入流程，作為後續書評內容建置範例。"
 
 cover: ""
 coverAlt: ""
