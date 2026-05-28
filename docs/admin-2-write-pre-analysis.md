@@ -1601,6 +1601,164 @@ CLI output：
 - ❌ **無** middleware write route
 - ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `amend` / `force-push`
 
+#### 15.G.9 Phase 4.5e third gated SEO searchDescription write checkpoint（2026-05-28 night-9 → night-12）
+
+Phase 4.5e third-real-write 整段（night-9 → night-11）首次 third-write 端對端落地紀錄。本 §15.G.9 為 docs-only sync（night-12）；governance / content / commit 變動於 night-9 / night-10 / night-11 完成。CLI source infra **重用** §15.G.7 §A 之 pm-8 landing（commit `778e099`）；本系列 phase 無 source 變動。本次 write 目標欄位為 §15.G.8 §E 預先標記之 `searchDescription`（同 file `content/blogger/posts/20260525-draft-book-review.md`；同 file 上之第二個 SEO 欄位 write）。
+
+##### A. Phase night-9 sub-phase — Candidate Preanalysis (Read-only Scan)
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-night-9-third-seo-write-candidate-preanalysis-readonly-a` |
+| Baseline | HEAD `7e4896e`（== origin/main）；ahead / behind 0 / 0；working tree clean |
+| Approach | read-only scan only；**無** dry-run / **無** payload / **無** write / **無** file modification |
+| Scan scope | `content/blogger/posts/*.md` + `content/github/posts/*.md`（扣 `.fb.md` sidecar；扣 `validation-fixtures/**`）|
+| SEO 空值欄位 scan pattern | `description:\s*""` / `searchDescription:\s*""` / `titleEn:\s*""` / `coverAlt:\s*""` |
+| Candidates considered | 5（含 §15.G.7 first-write 後仍存在的 top-level SEO 空值；其中 `20260504-sample-book-review.md` 之 `description` 已 §15.G.7 寫入，餘 `book.titleEn` / `book.coverAlt` 屬 nested 不在 CLI top-level allowlist；`20260515-we-media-myself2.md` 為 `status: ready` → `--apply` 路徑 exit 7 reject；`20260504-github-pages-blog-planning.md` / `20260504-portable-blog-system-mvp.md` top-level SEO 已全填）|
+| Viable candidates | **1**（過 `status: draft` real-write gate + top-level SEO allowlist 之候選） |
+| Selected candidate | `content/blogger/posts/20260525-draft-book-review.md` |
+| Candidate status | `draft` |
+| Candidate description | `"Blogger 書評草稿範例：用於驗證 portable-blog-system 的書評文章欄位、SEO 描述與 Admin 安全寫入流程。"`（§15.G.8 night-4 之 second-write 已寫入；本系列 phase **不**動）|
+| Candidate searchDescription | `""`（empty string；§15.G.8 §E 預告留至本系列 phase）|
+| Recommended target field | `searchDescription`（mirror §15.G.7 / §15.G.8 之 single-field isolation pattern；同 file 上 description 與 searchDescription 為 sibling SEO field；風險類別同等）|
+| `safe-write:test` | `209 pass / 0 fail` |
+| `validate:content` | `0 errors / 42 warnings / 37 posts` |
+
+##### B. Phase night-10 sub-phase — Dry-run Verify
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-night-10-third-seo-write-dry-run-verify-a` |
+| Approach | read-only / dry-run only；**無** commit / **無** push / **無** content write |
+| Candidate file | `content/blogger/posts/20260525-draft-book-review.md` |
+| Field | `searchDescription` |
+| `expectedOldValue` | `""`（empty string；JS String.length=0；UTF-8=0 bytes） |
+| `newValue` | `"驗證 portable-blog-system 的 Blogger 書評草稿欄位、SEO 摘要與 Admin 安全寫入流程，作為後續書評內容建置範例。"`（JS String.length=75；UTF-8=141 bytes） |
+
+Dry-run output：
+
+- `ok`：`true`
+- `mode`：`"dry-run"`
+- `phase`：`"4.5e-dry-run"`
+- `written`：`false`（dry-run path short-circuit；CLI 不觸 `fs.writeFile` / `fs.rename` / `safeWrite`）
+- `changed`：`true`（bytes-level）
+- `diffSummary.changed` / `diffSummary.bytesChanged`：皆 `true`
+- `diffSummary.oldLen` / `diffSummary.newLen`：`0` / `75`
+- `bytesDelta`：`+141`（= 141 − 0；等於 newValue UTF-8 bytes 精確匹配；無 YAML emit drift）
+- `currentBytes` / `wouldWriteBytes`：`1662` / `1803`
+- `validators.searchDescription.ok`：`true`
+- `target` / `site` / `kind` / `status`：`content/blogger/posts/20260525-draft-book-review.md` / `blogger` / `post-md` / `draft`
+
+Pre/post candidate state（night-10）：
+
+- Pre-run `git hash-object`：`83715db0c3b91128dd5513c6b210d7f6edfb51ba`（1662 bytes；= §15.G.8 §D night-5 commit `9c6a915` 之 post-commit blob hash）
+- Post-run `git hash-object`：`83715db0c3b91128dd5513c6b210d7f6edfb51ba`（1662 bytes）**byte-identical**
+- `git status` 全程 clean；working tree 入場 = 出場
+- `safe-write:test`：`209 pass / 0 fail`
+- `validate:content`：`0 errors / 42 warnings / 37 posts`
+- Temp payload 建立於 OS temp dir（`C:\Users\babel\AppData\Local\Temp\third-seo-searchdescription-dryrun-payload.json`）；執行後 `Remove-Item` 刪除；Read tool 驗證 file UTF-8 bytes 正確（PowerShell console mojibake 屬 display-only，未影響 file content）
+
+Negative guard spot-checks（night-10，皆 dry-run；皆未 mutate）：
+
+- NEG-1 wrong `expectedOldValue`：`"not-empty-wrong"` against actual `""` → exit `6` / `reason: "expected-old-value-mismatch"`（`actualOldLen=0`, `expectedOldLen=15`）；file unchanged
+- NEG-2 wrong `field`：`field: "titleEn"`（CLI allowlist 僅 `description` / `searchDescription`）→ exit `3` / `reason: "invalid-payload"` / `detail.error: "field-not-in-allowlist"`（在 payload-shape stage reject；未觸 file read）；file unchanged
+- NEG-3 wrong `status`（status:ready target `20260515-we-media-myself2.md`，dry-run mode）→ status gate 在 dry-run 為 permissive (`{draft, ready}`)，故 status 通過；但 file 之 `searchDescription` 已非空（actualOldLen=126），故 expectedOldValue mismatch 先 fire → exit `6`；file unchanged。apply-mode `{draft}` only 之 hard reject 由 `safe-write:test` 既有 case `apply ready: exit 7 / reason=target-status-not-allowed / allowed list = [draft]` 覆蓋，本 phase 不重複（避免使用 `--apply`）
+
+##### C. Phase night-11 sub-phase — Third Real Write Apply
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-night-11-third-seo-write-apply-commit-push-a` |
+| Approach | third production content mutation via gated CLI；`--apply` + `dryRun: false`；同 phase 內 apply + commit + push |
+| Candidate file | `content/blogger/posts/20260525-draft-book-review.md` |
+| Field | `searchDescription` |
+| Pre-write `git hash-object` | `83715db0c3b91128dd5513c6b210d7f6edfb51ba` |
+| Post-write `git hash-object` | `b23eb19ba18f117f4ab27b31d0facd04f9dfaec0` |
+| File size | `1662` → `1803` bytes（delta **`+141`**；與 night-10 dry-run 預測精確相符；無 YAML emitter drift） |
+| `git diff --stat` | `1 file changed, 1 insertion(+), 1 deletion(-)` |
+| Diff scope | **只 line 19 searchDescription value** 之替換（`-searchDescription: ""` → `+searchDescription: "驗證 portable-blog-system 的 Blogger 書評草稿欄位、SEO 摘要與 Admin 安全寫入流程，作為後續書評內容建置範例。"`）；line 18 `description` 維持 §15.G.8 night-4 寫入後之值 byte-identical preserved；line 21 `cover: ""` / line 22 `coverAlt: ""` / line 24 `status: "draft"` / line 8 `titleEn: "Draft Book Review"` / `book.*` / `blocks.*` / `publishTargets.*` 皆 byte-identical preserved |
+| `safe-write:test` | `209 pass / 0 fail` |
+| `validate:content` | `0 errors / 42 warnings / 37 posts` |
+| `git diff --check` | clean（exit 0；無 whitespace error；stderr autocrlf warning 屬 Windows 行為，per §15.G.7 §C / §15.G.8 §C 同類處理）|
+| Temp payload | 建於 `C:\Users\babel\AppData\Local\Temp\third-seo-searchdescription-apply-payload.json`；執行後 `Remove-Item` 刪除 |
+
+CLI invocation（**單次**）：
+
+```
+node src/scripts/admin-write-cli.js --payload="<ABS_TEMP_PAYLOAD>" --apply
+```
+
+CLI output：
+
+- `exit`：`0`
+- `ok`：`true`
+- `mode`：`"apply"`
+- `phase`：`"4.5e-real-write"`
+- `written`：`true`
+- `changed`：`true`
+- 其餘 fields 同 night-10 dry-run（`bytesDelta: +141` / `currentBytes: 1662` / `wouldWriteBytes: 1803` / `diffSummary.changed: true` / `diffSummary.bytesChanged: true` / `validators.searchDescription.ok: true`）
+
+##### D. Phase night-11 sub-phase — Commit + Push
+
+| 項目 | 值 |
+|---|---|
+| Commit | `82be258a10cb09ec2c4cb8b3fc572f036d0b79e8`（short `82be258`） |
+| Parent | `7e4896e`（== §15.G.8 night-6 docs-sync commit） |
+| Subject | `content(blogger): apply third gated seo search description write` |
+| Push | ✅ pushed to `origin/main`；`7e4896e..82be258  main -> main`（fast-forward；無 force / 無 reject）|
+| HEAD == origin/main | ✅ `82be258` == `82be258` |
+| ahead / behind | `0 / 0` |
+| Working tree | clean |
+| Commit scope | `content/blogger/posts/20260525-draft-book-review.md` only（無其他 staged / untracked）|
+| Stat | `1 file changed, 1 insertion(+), 1 deletion(-)` |
+| Amend / force-push / hook skip | ❌ 皆無 |
+| Post-push `safe-write:test` | `209 pass / 0 fail` |
+| Post-push `validate:content` | `0 errors / 42 warnings / 37 posts` |
+
+##### E. Governance Note（explicit；持續適用）
+
+- ✅ **Third real write approval was specific to one file, one field, one newValue only**。night-11 user explicit approval 之範圍**限縮**為：
+  - File：`content/blogger/posts/20260525-draft-book-review.md`
+  - Field：`searchDescription`
+  - `expectedOldValue`：`""`
+  - `newValue`：`"驗證 portable-blog-system 的 Blogger 書評草稿欄位、SEO 摘要與 Admin 安全寫入流程，作為後續書評內容建置範例。"`
+- ✅ **Future real writes do NOT inherit this approval**。任何後續 `--apply` 與 `dryRun: false` 之執行皆**不**繼承 night-11 之 approval scope（亦**不**繼承 §15.G.7 §E 之 pm-10 first-write approval scope，亦**不**繼承 §15.G.8 §E 之 night-4 second-write approval scope）。
+- ✅ **Each future real write still requires a separate user explicit approval phase**。需獨立 phase + 獨立 user simbolic approval；CLI source 雖已具備 gated real-write path（per §15.G.7 §A 之 pm-8 `778e099`），但 source 之存在**不**等同 future write 之 approval。
+- ✅ **`cover` / `coverAlt` / `titleEn` on this same file remain empty / placeholder**：
+  - line 21 `cover: ""`（top-level；empty string）
+  - line 22 `coverAlt: ""`（top-level；empty string）
+  - line 8 `titleEn: "Draft Book Review"`（top-level；placeholder value）
+  - line 49 `book.titleEn: ""`（nested；不在 CLI top-level allowlist）
+  - line 63 `book.coverAlt: ""`（nested；不在 CLI top-level allowlist）
+  若未來需 SEO write 上述任一欄位，須**獨立 user explicit approval phase**（含獨立 candidate preanalysis / dry-run verify / apply / commit-push / docs sync 序列）；**不可**繼承 night-11 之 searchDescription approval。
+- ✅ **Admin Apply remains disabled**（`src/views/admin/index.ejs` lines ~616, ~721 之 `disabled aria-disabled="true"` 維持；本系列 phase 未動 Admin UI）。
+- ✅ **Middleware write route remains NOT started**（`vite.config.js` 無 `configureServer`；無 `/api/admin/**` endpoint）。
+- ✅ **No build / deploy / Blogger repost / GA4 validation occurred** in 本 third-real-write 系列（night-9 → night-12）。
+- ✅ **Reverse UTM remains landed but dormant**（per CLAUDE.md §16.4 之 source landed @ `7e1d356` / `e2309e9` / `7c769fe` 2026-05-23；pm-26 deploy gate 仍 blocked）。
+- ✅ **pm-26 deploy gate remains blocked** unless separately resolved（per `docs/reverse-utm-fixture-plan.md` §6 之啟動條件；本 §15.G.9 不解除 pm-26 阻擋）。
+- ✅ **CLI source 之 `--apply` 解開 + `dryRun:false` 解開 之 fail-safe 雙鎖**：兩者皆已於 §15.G.7 §A 之 pm-8 source 解開為**有條件接受**（任一單獨仍 reject）。但「有條件接受」不等於「production approval」；production approval 由 per-phase user explicit simbolic gate 界定。Third-write 之 night-11 approval 即屬此 per-phase gate；future writes 須各自取得獨立 gate。
+
+##### F. Phase Boundary（本 §15.G.9 docs sync = night-12）
+
+本 §15.G.9 docs sync phase（night-12）**僅**：
+
+- ✅ append §15.G.9 至 `docs/admin-2-write-pre-analysis.md`（本檔；單一 docs 變動）
+- ✅ 紀錄 night-9 / night-10 / night-11 完整 checkpoint
+- ✅ 紀錄 governance note；明確 future real writes 需獨立 user explicit approval；明確同 file 上 `cover` / `coverAlt` / `titleEn` 仍需各自 separate phase
+
+本 §15.G.9 docs sync phase **不做**：
+
+- ❌ **無** source change
+- ❌ **無** content / settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js / src/views/admin/index.ejs 變動
+- ❌ **無** write CLI 再執行
+- ❌ **無** payload 建立
+- ❌ **無** `npm install` / build / deploy / Blogger repost / GA4 validation
+- ❌ **無** fixture creation
+- ❌ **無** production content write
+- ❌ **無** Admin Apply enable
+- ❌ **無** middleware write route
+- ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `amend` / `force-push`
+
 ### 15.H Boundary Reaffirmation
 
 本 §15 補充段：
