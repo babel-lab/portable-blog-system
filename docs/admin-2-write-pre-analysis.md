@@ -1308,6 +1308,154 @@ per §15.G.5 §F 之保守拆批，下一條建議 phase 為 **`4.5e-real-write-
 - ❌ **無** `git fetch` / `pull`
 - ❌ **無** `amend` / `rebase` / `force-push`
 
+#### 15.G.7 Phase 4.5e first real SEO write checkpoint（2026-05-28 pm-8 → pm-12）
+
+Phase 4.5e-real-write-gate 整段（sub-phase A → D）首次端對端落地紀錄。本 §15.G.7 為 docs-only sync（pm-12）；source / content / governance 變動於 pm-8 / pm-10 / pm-11 完成。
+
+##### A. Phase 4.5e-real-write-gate sub-phase A — Source Landing
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-pm-8-admin-write-phase-4p5e-real-write-gate-source-landing-a` |
+| Commit | `778e099e6ff3a21930485f7e5cb6c58075a97920`（short `778e099`） |
+| Subject | `feat(admin): gate cli real writes safely` |
+| Changed files | `src/scripts/admin-write-cli.js`（+258 lines）/ `src/scripts/safe-write-test.js`（+262 lines）；**僅** 2 src 檔；無 patcher / safe-write / whitelist 變動 |
+| `safe-write:test` | `160 pass / 0 fail` → **`209 pass / 0 fail`**（+49 additive；既有 160 全保留無 regression）|
+| `validate:content` | `0 errors / 42 warnings / 37 posts`（與 baseline 一致；本 phase 未動 content）|
+
+Source landing summary：
+
+- **CLI gated real-write path landed**：僅 `--apply` flag **AND** `payload.dryRun === false` 兩者同時設立才進入 real-write 路徑；任一單獨 → reject（`apply-requires-dryRun-false` / `dryRun-false-requires-apply`，exit 2）
+- **Real-write status set narrowed to `{'draft'}`**：`ready` / `published` / missing 全 reject（exit 7）；dry-run 仍維持 `{'draft', 'ready'}` 無 regression
+- **`expectedOldValue` exact match required**：bytes-level equal（exit 6 on mismatch）
+- **`safeWrite` atomic tmp+rename path used**：透過 `src/scripts/safe-write.js` 既有 helper；`enforceCleanGit: true`；非 raw `fs.writeFile`
+- **Output shape**（real-write）含 `mode: "apply"` / `phase: "4.5e-real-write"` / `written: true|false` / `changed` / `target` / `site` / `kind` / `field` / `status` / `diffSummary` / `bytesDelta`
+- **TOCTOU pre-write 再保護層**：write 前再驗 `isWriteAllowed`；patcher `changed: false` → 不觸 fs（`written: false skipped: "no-op"`）
+- **Hermetic test injection**：`__testOverrides.gitStatusFn` 內部 hook 僅供 `safe-write-test.js`；production CLI entry（`process.argv` runner）永不傳；不開啟 production 旁路
+- **No content write occurred in pm-8**：所有 real-write 測試 fixture 寫於 OS temp dir（`os.tmpdir()` 之 `admin-write-cli-test-*`）；finally{} cleanup；production content/* 完全未動
+
+##### B. Phase 4.5e-real-write-gate sub-phase B — Dry-run Verify
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-pm-9-admin-write-phase-4p5e-real-write-candidate-dry-run-verify-a` |
+| Approach | read-only / dry-run only；無 commit；無 push；無 content write |
+| Candidate file | `content/blogger/posts/20260504-sample-book-review.md` |
+| Field | `description` |
+| `expectedOldValue` | `"Blogger 書評文章範例。"`（JS String.length=15；UTF-8=29 bytes） |
+| `newValue` | `"Blogger 書評文章範例：用於驗證 portable-blog-system 的書評模板、SEO frontmatter 與 Admin 安全寫入流程。"`（JS String.length=78；UTF-8=128 bytes） |
+
+Dry-run output：
+
+- `ok`：`true`
+- `mode`：`"dry-run"`
+- `phase`：`"4.5e-dry-run"`
+- `written`：`false`（dry-run path short-circuit；CLI 不觸 `fs.writeFile` / `fs.rename` / `safeWrite`）
+- `changed`：`true`（bytes-level）
+- `diffSummary.changed` / `diffSummary.bytesChanged`：皆 `true`
+- `diffSummary.oldLen` / `diffSummary.newLen`：`15` / `78`
+- `bytesDelta`：`+99`（=128 − 29；與 pm-7 §E 之 analytic prediction 完全一致）
+- `currentBytes` / `wouldWriteBytes`：`919` / `1018`
+- `validators.description.ok`：`true`
+- `target` / `site` / `kind` / `status`：`content/blogger/posts/20260504-sample-book-review.md` / `blogger` / `post-md` / `draft`
+
+Pre/post candidate state（pm-9）：
+
+- Pre-run `git hash-object`：`dc31134545d79a2b4a9de068259d9a212bdf9461`（919 bytes）
+- Post-run `git hash-object`：`dc31134545d79a2b4a9de068259d9a212bdf9461`（919 bytes）**byte-identical**
+- `git status` 全程 clean；working tree 入場=出場
+- `safe-write:test`：`209 pass / 0 fail`
+- `validate:content`：`0 errors / 42 warnings / 37 posts`
+- Temp payload 建立於 OS temp dir（`C:\Users\user\AppData\Local\Temp\admin-write-dryrun-4p5e-pm9.json`）；執行後 `rm -f` 刪除
+
+##### C. Phase 4.5e-real-write-gate sub-phase C — First Real Write Apply（uncommitted）
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-pm-10-admin-write-phase-4p5e-first-real-seo-write-apply-a` |
+| Approach | first ever production content mutation via gated CLI；`--apply` + `dryRun: false`；**not committed in pm-10** |
+| Candidate file | `content/blogger/posts/20260504-sample-book-review.md` |
+| Field | `description` |
+| Pre-write `git hash-object` | `dc31134545d79a2b4a9de068259d9a212bdf9461` |
+| Post-write `git hash-object` | `aeeac0c63ad551e74418ed00adc7a1f130b8fb58` |
+| File size | `919` → `1018` bytes（delta **`+99`**；與 pm-9 dry-run 預測精確相符；無 YAML emitter drift） |
+| `git diff --stat` | `1 file changed, 1 insertion(+), 1 deletion(-)` |
+| Diff scope | **只 line 13 description value** 之替換（line 13 之 `-description: "Blogger 書評文章範例。"` → `+description: "Blogger 書評文章範例：用於驗證 portable-blog-system 的書評模板、SEO frontmatter 與 Admin 安全寫入流程。"`）；line 11 `tags`、line 14 `status`、line 15 `draft`、line 16 `publishTargets:` 等前後 context **byte-identical preserved**（無 non-target frontmatter drift） |
+| `safe-write:test` | `209 pass / 0 fail` |
+| `validate:content` | `0 errors / 42 warnings / 37 posts` |
+| `git diff --check` | clean（無 whitespace error） |
+| Commit / Push in pm-10 | ❌ **無**（pm-10 留下 uncommitted change 供 user 手動 review） |
+| Temp payload | 建於 `C:\Users\user\AppData\Local\Temp\admin-write-apply-4p5e-pm10.json`；執行後 `rm -f` 刪除 |
+
+CLI invocation：
+
+```
+node src/scripts/admin-write-cli.js --payload="<ABS_TEMP_PAYLOAD>" --apply
+```
+
+CLI output：
+
+- `exit`：`0`
+- `ok`：`true`
+- `mode`：`"apply"`
+- `phase`：`"4.5e-real-write"`
+- `written`：`true`
+- `changed`：`true`
+- 其餘 fields 同 pm-9 dry-run（`bytesDelta: +99` / `currentBytes: 919` / `wouldWriteBytes: 1018` / `diffSummary.changed: true` / `diffSummary.bytesChanged: true` / `validators.description.ok: true`）
+
+##### D. Phase 4.5e-real-write-gate sub-phase D — Commit + Push
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-pm-11-admin-write-phase-4p5e-first-real-seo-write-commit-push-a` |
+| Commit | `abcb58e70f10744be5829679fc54aa307b3ee049`（short `abcb58e`） |
+| Subject | `content(blogger): apply first gated seo description write` |
+| Push | ✅ pushed to `origin/main`；`778e099..abcb58e  main -> main` |
+| HEAD == origin/main | ✅ `abcb58e` == `abcb58e` |
+| ahead / behind | `0 / 0` |
+| Working tree | clean |
+| Commit scope | `content/blogger/posts/20260504-sample-book-review.md` only（無其他 staged / untracked）|
+| Stat | `1 file changed, 1 insertion(+), 1 deletion(-)` |
+| Post-push `safe-write:test` | `209 pass / 0 fail` |
+| Post-push `validate:content` | `0 errors / 42 warnings / 37 posts` |
+
+##### E. Governance Note（explicit；持續適用）
+
+- ✅ **First real write approval was specific to one file, one field, one newValue only**。pm-10 user explicit approval 之範圍**限縮**為：
+  - File：`content/blogger/posts/20260504-sample-book-review.md`
+  - Field：`description`
+  - `expectedOldValue`：`"Blogger 書評文章範例。"`
+  - `newValue`：`"Blogger 書評文章範例：用於驗證 portable-blog-system 的書評模板、SEO frontmatter 與 Admin 安全寫入流程。"`
+- ✅ **Future real writes do NOT inherit this approval**。任何後續 `--apply` 與 `dryRun: false` 之執行皆**不**繼承 pm-10 之 approval scope。
+- ✅ **Each future real write still requires a separate user explicit approval phase**。需獨立 phase + 獨立 user simbolic approval；CLI source 雖已具備 gated real-write path（pm-8 landed），但 source 之存在**不**等同 future write 之 approval。
+- ✅ **Admin Apply remains disabled**（`src/views/admin/index.ejs` lines 616, 721 之 `disabled aria-disabled="true"` 維持；本系列 phase 未動 Admin UI）。
+- ✅ **Middleware write route remains NOT started**（`vite.config.js` 無 `configureServer`；無 `/api/admin/**` endpoint）。
+- ✅ **No build / deploy / Blogger repost / GA4 validation occurred** in 本 4.5e-real-write-gate 系列（pm-8 → pm-12）。
+- ✅ **Reverse UTM remains landed but dormant**（per CLAUDE.md §16.4 之 source landed @ `7e1d356` / `e2309e9` / `7c769fe` 2026-05-23；pm-26 deploy gate 仍 blocked）。
+- ✅ **pm-26 deploy gate remains blocked** unless separately resolved（per `docs/reverse-utm-fixture-plan.md` §6 之啟動條件；本 §15.G.7 不解除 pm-26 阻擋）。
+- ✅ **CLI source 之 `--apply` 解開 + `dryRun:false` 解開 之 fail-safe 雙鎖**：兩者皆已於 pm-8 source 解開為**有條件接受**（任一單獨仍 reject）。但「有條件接受」不等於「production approval」；production approval 由 per-phase user explicit simbolic gate 界定。
+
+##### F. Phase Boundary（本 §15.G.7 docs sync = pm-12）
+
+本 §15.G.7 docs sync phase（pm-12）**僅**：
+
+- ✅ append §15.G.7 至 `docs/admin-2-write-pre-analysis.md`（本檔；單一 docs 變動）
+- ✅ 紀錄 pm-8 / pm-9 / pm-10 / pm-11 完整 checkpoint
+- ✅ 紀錄 governance note；明確 future real writes 需獨立 user explicit approval
+
+本 §15.G.7 docs sync phase **不做**：
+
+- ❌ **無** source change
+- ❌ **無** content / settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js / src/views/admin/index.ejs 變動
+- ❌ **無** write CLI 再執行
+- ❌ **無** payload 建立
+- ❌ **無** `npm install` / build / deploy / Blogger repost / GA4 validation
+- ❌ **無** fixture creation
+- ❌ **無** production content write
+- ❌ **無** Admin Apply enable
+- ❌ **無** middleware write route
+- ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `amend` / `force-push`
+
 ### 15.H Boundary Reaffirmation
 
 本 §15 補充段：
