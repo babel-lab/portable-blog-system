@@ -1456,6 +1456,151 @@ CLI output：
 - ❌ **無** middleware write route
 - ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `amend` / `force-push`
 
+#### 15.G.8 Phase 4.5e second real SEO write checkpoint（2026-05-28 night-2 → night-6）
+
+Phase 4.5e second-real-write 整段（night-2 → night-5）首次 second-write 端對端落地紀錄。本 §15.G.8 為 docs-only sync（night-6）；governance / content / commit 變動於 night-2 / night-3 / night-4 / night-5 完成。CLI source infra **重用** §15.G.7 §A 之 pm-8 landing（commit `778e099`）；本系列 phase 無 source 變動。
+
+##### A. Phase night-2 sub-phase — Candidate Preanalysis (Read-only Scan)
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-night-2-second-real-seo-write-candidate-preanalysis-readonly-a` |
+| Baseline | HEAD `418480e`（== origin/main）；ahead / behind 0 / 0；working tree clean |
+| Approach | read-only scan only；**無** dry-run / **無** payload / **無** write / **無** file modification |
+| Scan scope | `content/blogger/posts/*.md` + `content/github/posts/*.md`（扣 `.fb.md` sidecar；扣 §15.G.7 之 first-write target `20260504-sample-book-review.md`）|
+| Posts scanned | 5（.md 計）|
+| Viable candidates | **1**（過 `status: draft` real-write gate 之候選；其他 4 個皆 `status: ready` → CLI exit 7 reject） |
+| Selected candidate | `content/blogger/posts/20260525-draft-book-review.md` |
+| Candidate status | `draft` |
+| Candidate description | `""`（empty string；JS String.length=0）|
+| Candidate searchDescription | `""`（empty string；本系列 phase **不**動）|
+| Recommended target field | `description`（mirror §15.G.7 之 single-field isolation pattern；`searchDescription` 留下次獨立 phase）|
+| `safe-write:test` | `209 pass / 0 fail` |
+| `validate:content` | `0 errors / 42 warnings / 37 posts` |
+
+##### B. Phase night-3 sub-phase — Dry-run Verify
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-night-3-second-seo-write-dry-run-verify-a` |
+| Approach | read-only / dry-run only；**無** commit / **無** push / **無** content write |
+| Candidate file | `content/blogger/posts/20260525-draft-book-review.md` |
+| Field | `description` |
+| `expectedOldValue` | `""`（empty string；JS String.length=0；UTF-8=0 bytes） |
+| `newValue` | `"Blogger 書評草稿範例：用於驗證 portable-blog-system 的書評文章欄位、SEO 描述與 Admin 安全寫入流程。"`（JS String.length=70；UTF-8=128 bytes） |
+
+Dry-run output：
+
+- `ok`：`true`
+- `mode`：`"dry-run"`
+- `phase`：`"4.5e-dry-run"`
+- `written`：`false`（dry-run path short-circuit；CLI 不觸 `fs.writeFile` / `fs.rename` / `safeWrite`）
+- `changed`：`true`（bytes-level）
+- `diffSummary.changed` / `diffSummary.bytesChanged`：皆 `true`
+- `diffSummary.oldLen` / `diffSummary.newLen`：`0` / `70`
+- `bytesDelta`：`+128`（= 128 − 0；等於 newValue UTF-8 bytes 精確匹配；無 YAML emit drift）
+- `currentBytes` / `wouldWriteBytes`：`1534` / `1662`
+- `validators.description.ok`：`true`
+- `target` / `site` / `kind` / `status`：`content/blogger/posts/20260525-draft-book-review.md` / `blogger` / `post-md` / `draft`
+
+Pre/post candidate state（night-3）：
+
+- Pre-run `git hash-object`：`9827142ae5215fdf0b984cc0b96d62f78ff55dd3`（1534 bytes）
+- Post-run `git hash-object`：`9827142ae5215fdf0b984cc0b96d62f78ff55dd3`（1534 bytes）**byte-identical**
+- `git status` 全程 clean；working tree 入場 = 出場
+- `safe-write:test`：`209 pass / 0 fail`
+- `validate:content`：`0 errors / 42 warnings / 37 posts`
+- Temp payload 建立於 OS temp dir（`C:\Users\user\AppData\Local\Temp\admin-write-dryrun-second-seo-night3.json`）；執行後 `rm -f` 刪除
+
+##### C. Phase night-4 sub-phase — Second Real Write Apply（uncommitted）
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-night-4-second-seo-write-apply-a` |
+| Approach | second production content mutation via gated CLI；`--apply` + `dryRun: false`；**not committed in night-4** |
+| Candidate file | `content/blogger/posts/20260525-draft-book-review.md` |
+| Field | `description` |
+| Pre-write `git hash-object` | `9827142ae5215fdf0b984cc0b96d62f78ff55dd3` |
+| Post-write `git hash-object` | `83715db0c3b91128dd5513c6b210d7f6edfb51ba` |
+| File size | `1534` → `1662` bytes（delta **`+128`**；與 night-3 dry-run 預測精確相符；無 YAML emitter drift） |
+| `git diff --stat` | `1 file changed, 1 insertion(+), 1 deletion(-)` |
+| Diff scope | **只 line 18 description value** 之替換（`-description: ""` → `+description: "Blogger 書評草稿範例：用於驗證 portable-blog-system 的書評文章欄位、SEO 描述與 Admin 安全寫入流程。"`）；line 19 `searchDescription: ""` byte-identical preserved（仍空字串；未動）；其餘 frontmatter 與正文 byte-identical |
+| `safe-write:test` | `209 pass / 0 fail` |
+| `validate:content` | `0 errors / 42 warnings / 37 posts` |
+| `git diff --check` | clean（exit 0；無 whitespace error；stderr autocrlf warning 屬 Windows 行為，per §15.G.7 §C 同類處理）|
+| Commit / Push in night-4 | ❌ **無**（night-4 留下 uncommitted change 供 user 手動 review） |
+| Temp payload | 建於 `C:\Users\user\AppData\Local\Temp\admin-write-apply-second-seo-night4.json`；執行後 `rm -f` 刪除 |
+
+CLI invocation（**單次**）：
+
+```
+node src/scripts/admin-write-cli.js --payload="<ABS_TEMP_PAYLOAD>" --apply
+```
+
+CLI output：
+
+- `exit`：`0`
+- `ok`：`true`
+- `mode`：`"apply"`
+- `phase`：`"4.5e-real-write"`
+- `written`：`true`
+- `changed`：`true`
+- 其餘 fields 同 night-3 dry-run（`bytesDelta: +128` / `currentBytes: 1534` / `wouldWriteBytes: 1662` / `diffSummary.changed: true` / `diffSummary.bytesChanged: true` / `validators.description.ok: true`）
+
+##### D. Phase night-5 sub-phase — Commit + Push
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-night-5-second-seo-write-commit-push-a` |
+| Commit | `9c6a915e5c4c6c9d3b9d56ab38dc0a76bfc783a8`（short `9c6a915`） |
+| Subject | `content(blogger): apply second gated seo description write` |
+| Push | ✅ pushed to `origin/main`；`418480e..9c6a915  main -> main`（fast-forward；無 force / 無 reject）|
+| HEAD == origin/main | ✅ `9c6a915` == `9c6a915` |
+| ahead / behind | `0 / 0` |
+| Working tree | clean |
+| Commit scope | `content/blogger/posts/20260525-draft-book-review.md` only（無其他 staged / untracked）|
+| Stat | `1 file changed, 1 insertion(+), 1 deletion(-)` |
+| Post-push `safe-write:test` | `209 pass / 0 fail` |
+| Post-push `validate:content` | `0 errors / 42 warnings / 37 posts` |
+
+##### E. Governance Note（explicit；持續適用）
+
+- ✅ **Second real write approval was specific to one file, one field, one newValue only**。night-4 user explicit approval 之範圍**限縮**為：
+  - File：`content/blogger/posts/20260525-draft-book-review.md`
+  - Field：`description`
+  - `expectedOldValue`：`""`
+  - `newValue`：`"Blogger 書評草稿範例：用於驗證 portable-blog-system 的書評文章欄位、SEO 描述與 Admin 安全寫入流程。"`
+- ✅ **Future real writes do NOT inherit this approval**。任何後續 `--apply` 與 `dryRun: false` 之執行皆**不**繼承 night-4 之 approval scope（亦**不**繼承 §15.G.7 §E 之 pm-10 first-write approval scope）。
+- ✅ **Each future real write still requires a separate user explicit approval phase**。需獨立 phase + 獨立 user simbolic approval；CLI source 雖已具備 gated real-write path（per §15.G.7 §A 之 pm-8 `778e099`），但 source 之存在**不**等同 future write 之 approval。
+- ✅ **`searchDescription` remains empty (`""`)**：候選 file `content/blogger/posts/20260525-draft-book-review.md` 之 line 19 `searchDescription: ""` 經 night-4 real write 後仍維持原值未動。若未來需 SEO write 該欄位，須**獨立 user explicit approval phase**（含獨立 candidate preanalysis / dry-run verify / apply / commit-push / docs sync 序列）；**不可**繼承 night-4 之 description approval。
+- ✅ **Admin Apply remains disabled**（`src/views/admin/index.ejs` lines ~616, ~721 之 `disabled aria-disabled="true"` 維持；本系列 phase 未動 Admin UI）。
+- ✅ **Middleware write route remains NOT started**（`vite.config.js` 無 `configureServer`；無 `/api/admin/**` endpoint）。
+- ✅ **No build / deploy / Blogger repost / GA4 validation occurred** in 本 second-real-write 系列（night-2 → night-6）。
+- ✅ **Reverse UTM remains landed but dormant**（per CLAUDE.md §16.4 之 source landed @ `7e1d356` / `e2309e9` / `7c769fe` 2026-05-23；pm-26 deploy gate 仍 blocked）。
+- ✅ **pm-26 deploy gate remains blocked** unless separately resolved（per `docs/reverse-utm-fixture-plan.md` §6 之啟動條件；本 §15.G.8 不解除 pm-26 阻擋）。
+- ✅ **CLI source 之 `--apply` 解開 + `dryRun:false` 解開 之 fail-safe 雙鎖**：兩者皆已於 §15.G.7 §A 之 pm-8 source 解開為**有條件接受**（任一單獨仍 reject）。但「有條件接受」不等於「production approval」；production approval 由 per-phase user explicit simbolic gate 界定。Second-write 之 night-4 approval 即屬此 per-phase gate；future writes 須各自取得獨立 gate。
+
+##### F. Phase Boundary（本 §15.G.8 docs sync = night-6）
+
+本 §15.G.8 docs sync phase（night-6）**僅**：
+
+- ✅ append §15.G.8 至 `docs/admin-2-write-pre-analysis.md`（本檔；單一 docs 變動）
+- ✅ 紀錄 night-2 / night-3 / night-4 / night-5 完整 checkpoint
+- ✅ 紀錄 governance note；明確 future real writes 需獨立 user explicit approval；明確 `searchDescription` 仍需 separate phase
+
+本 §15.G.8 docs sync phase **不做**：
+
+- ❌ **無** source change
+- ❌ **無** content / settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js / src/views/admin/index.ejs 變動
+- ❌ **無** write CLI 再執行
+- ❌ **無** payload 建立
+- ❌ **無** `npm install` / build / deploy / Blogger repost / GA4 validation
+- ❌ **無** fixture creation
+- ❌ **無** production content write
+- ❌ **無** Admin Apply enable
+- ❌ **無** middleware write route
+- ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `amend` / `force-push`
+
 ### 15.H Boundary Reaffirmation
 
 本 §15 補充段：
