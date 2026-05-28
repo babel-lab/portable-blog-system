@@ -766,7 +766,7 @@ UI 顯示「✅ 寫入完成 / git commit 提示 / rollback option」
 | **4.5b** | **CLI driver preanalysis acceptance cross-check**（read-only verify Phase 4.5a docs；docs sync at §15.G）| read-only；no commit（acceptance）→ optional docs-sync commit at §15.G.3 | 21 章節驗收；schema / exit code / allowed write scope 一致性；無檔案變動 | ✅ done (Phase 20260527-night-14 read-only) — no commit |
 | **4.5c** | **CLI source implementation dry-run only**（首個 safeWrite production caller；只支援 dry-run；不接 `--apply`；不啟用 real write）| source；新增 `src/scripts/admin-write-cli.js` + `package.json` 加 npm script `admin:write` | helper unit-testable；對 ≥3 篇 production `.md`（含 nested object）dry-run 通過；無 production content mutate；validate baseline 不退步 | ✅ landed `5efe83c` (2026-05-28 am-1) — see §15.G.4 |
 | **4.5d** | **CLI dry-run acceptance**（驗 YAML emitter 對 nested object 副作用；驗 wouldWriteBytes 對齊預期）| source / verify；無 real write | wouldWriteBytes 與 expected 對齊；無 unintended frontmatter normalize | ✅ done (Phase 20260528-am-3 read-only) — no commit；see §15.G.4 |
-| **4.5e** | **CLI real write gate**（首篇 production SEO description / searchDescription 寫入 draft / ready 文章；user 明確 `--apply`；首次 production content mutate）| source；CLI 解開 `--apply`；首次 safeWrite production write | git diff 驗目標 field only；validate baseline 不退步；user 手動 review + commit + push；無 auto rollback | 🔄 in-progress；YAML drift mitigation preanalysis ✅ landed `8268345` (2026-05-28 am-7) — see §15.G.5；Phase am-9 read-only acceptance ✅ done；real write **remains hard-blocked**；下一步**不是** `--apply`，而是 **4.5e-b mitigation prototype / dry-run-only spike**（field-preserving frontmatter patcher + bytes-drift fail-closed gate；CLI 維持 dry-run only；`--apply` / `dryRun:false` 雙重 fail-safe 不解開）；per §15.G.5 §F 保守拆批（4.5e-b → 4.5e-c → 4.5e-d → 4.5e-real-write）|
+| **4.5e** | **CLI real write gate**（首篇 production SEO description / searchDescription 寫入 draft / ready 文章；user 明確 `--apply`；首次 production content mutate）| source；CLI 解開 `--apply`；首次 safeWrite production write | git diff 驗目標 field only；validate baseline 不退步；user 手動 review + commit + push；無 auto rollback | 🔄 in-progress；YAML drift mitigation preanalysis ✅ landed `8268345` (2026-05-28 am-7) — see §15.G.5；Phase am-9 read-only acceptance ✅ done；real write **remains hard-blocked**；下一步**不是** `--apply`，而是 **4.5e-b mitigation prototype / dry-run-only spike**（field-preserving frontmatter patcher + bytes-drift fail-closed gate；CLI 維持 dry-run only；`--apply` / `dryRun:false` 雙重 fail-safe 不解開）；per §15.G.5 §F 保守拆批（4.5e-b → 4.5e-c → 4.5e-d → 4.5e-real-write）；**4.5e-b ✅ landed** `4de2d9b` (2026-05-28 pm-2) + **4.5e-c ✅ done** (pm-3 read-only acceptance；3 production .md pre/post `git hash-object` identical) + **4.5e-d ✅ docs sync** (pm-4) — see §15.G.6；real write **continues to remain blocked**；下一步為獨立 **`4.5e-real-write-gate`** phase（需 user explicit approval；尚未啟動；不繼承 4.5e-b/c 之 approval）|
 | 5 | **First real write behind explicit Apply: SEO fields**（依賴 phases 2-4；per §9.1 Admin-2-b-2 + §15.E.1 ranked #1）| source；`.md` description / searchDescription write；single-file atomic | git diff verify；validate baseline 不退步；rollback flow 演練 | ⏸ pending — CLI path (4.5e) 為當下推薦首選；middleware path 延後（per §15.G.3） |
 | 6 | Admin-2-b-3：FB sidecar write | source；per §9.1 | per §11 stop point 5 | ⏸ pending |
 | 7 | Admin-2-b-4：titleEn / cover / coverAlt / updated write | source；per §9.1 | per §11 stop point 6 | ⏸ pending |
@@ -1170,6 +1170,143 @@ per 4.5e preanalysis §9 之 phase sequence：
 - ✅ reverse UTM remains landed but dormant；pm-26 deploy gate remains blocked by no positive GitHub cross-link fixture（per CLAUDE.md §16.4）
 
 **下一個建議 phase**：Phase 4.5e-b（source spike / prototype；新增 field-preserving frontmatter patcher；仍 dry-run only）—— 屬源碼變更；**需獨立 user 簽收**；本 §15.G.5 docs sync 不啟動。
+
+#### 15.G.6 Phase 4.5e-b Patcher Prototype Landing + Phase 4.5e-c Production Acceptance（2026-05-28 pm-2 → pm-4）
+
+Phases that produced this checkpoint:
+
+- `20260528-pm-1-admin-write-yaml-drift-next-work-triage-readonly-a`（pm-1 read-only triage；no commit；recommended C = source implementation as next phase）
+- `20260528-pm-2-admin-write-phase-4p5e-b-patcher-prototype-commit-push-a`（4.5e-b patcher prototype source landing；source + tests；committed + pushed）
+- `20260528-pm-3-admin-write-phase-4p5e-c-patcher-acceptance-readonly-a`（4.5e-c production sample acceptance；read-only；no commit）
+- `20260528-pm-4-admin-write-phase-4p5e-d-docs-sync-commit-push-a`（本 §15.G.6 docs sync；docs-only）
+
+##### A. Phase 4.5e-b — Source Landing
+
+| 項目 | 值 |
+|---|---|
+| Commit full hash | `4de2d9b4e58d8e459bba421a29710d3aebc8b9fe` |
+| Short hash | `4de2d9b` |
+| Subject | `feat(admin): add frontmatter patcher prototype` |
+| Committed | 2026-05-28 14:39:10 +0800 |
+| Changed files | `src/scripts/admin-frontmatter-patcher.js`（新增 326 lines）/ `src/scripts/admin-write-cli.js`（mutation pipeline 改用 patcher）/ `src/scripts/safe-write-test.js`（+56 additive test cases）|
+| `safe-write:test` | `104 pass / 0 fail` → **`160 pass / 0 fail`**（+56 additive；既有 104 不退步）|
+| `validate:content` | `0 errors / 42 warnings / 37 posts`（與 baseline 一致；本 phase 未動 content）|
+| package.json / package-lock.json | 未動 |
+| vite.config.js | 未動 |
+| src/views/admin/index.ejs | 未動（Admin Apply button 維持 disabled）|
+
+##### B. Patcher Mitigation Summary
+
+per `src/scripts/admin-frontmatter-patcher.js`：
+
+- Line-based targeted frontmatter patcher（per §15.G.5 §D 方向 A 首選）
+- 對非目標 frontmatter sections **byte-for-byte preserved**（inline arrays / block-style arrays / nested objects / YAML inline comments / quoting / indentation 皆原樣保留）
+- No-op output **byte-identical** with input（避免 §15.G.4 之 `changed:false` 但 `bytesChanged:true` 之 semantic gap）
+- 避開 `gray-matter` `matter.stringify` / 內部 `js-yaml` emitter 之 round-trip normalize 行為
+- 目前僅支援 CLI 既允許之保守 top-level scalar 欄位：
+  - `description`
+  - `searchDescription`
+- Unsupported / unsafe structures **fail closed**（block scalar `|`/`>`、missing key、duplicate top-level key、nested dot path、non-allowlist field、non-string value、缺 frontmatter delimiter）；不退而 fallback `matter.stringify` 全量 dump
+- 不寫檔（純 in-memory 字串處理；返回 patched text）
+- 不 spawn process（無 `child_process` / `spawn` / `exec`）
+- 不引入新 npm package（zero import；既有 `gray-matter` 仍只用於 parse）
+- CLI 維持 **dry-run only**（patcher 之輸出供 dry-run preview 用；CLI 仍不呼叫 `fs.writeFile` / `safeWrite`）
+
+##### C. Phase 4.5e-c — Production Sample Acceptance Result
+
+| 項目 | 值 |
+|---|---|
+| Phase ID | `20260528-pm-3-admin-write-phase-4p5e-c-patcher-acceptance-readonly-a` |
+| Baseline HEAD | `4de2d9b` = `origin/main`；ahead/behind 0/0 |
+| `safe-write:test` | `160 pass / 0 fail` |
+| `validate:content` | `0 errors / 42 warnings / 37 posts` |
+| Working tree | clean |
+| Approach | read-only；CLI dry-run only；無 commit / push；無 src / docs / content mutation |
+| Pre/post `git hash-object` per file | identical（3 production .md 均 byte-identical 前後） |
+
+##### D. Production Sample Findings
+
+**§15.G.4 case 2 之 YAML emitter drift 已消失**：
+
+- File：`content/github/posts/20260504-github-pages-blog-planning.md`
+- Field：`description`
+- No-op invocation（`newValue === expectedOldValue`）result：
+  - `diffSummary.changed` = **`false`**
+  - `diffSummary.bytesChanged` = **`false`**（§15.G.4 之 hard-block surface 已解除）
+  - `bytesDelta` = **`0`**
+  - `currentBytes` → `wouldWriteBytes` = **`1143` → `1143`**（§15.G.4 紀錄之 `1143 → 1111 / −32` 已不再發生）
+
+**Targeted update dry-run（GitHub MVP，frontmatter 含 YAML inline comments + block-style tags array + nested seo）**：
+
+- File：`content/github/posts/20260504-portable-blog-system-mvp.md`
+- Field：`searchDescription`
+- Expected `bytesDelta` = **`+16`**；Actual `bytesDelta` = **`+16`**（精準預測；無 non-target YAML drift）
+- frontmatter 內 YAML 註解、`tags:` block-style array、`seo.indexing` nested 欄位、`publishTargets` nested 區塊皆 verbatim 保留
+
+**Targeted update dry-run（Blogger draft；empty description patch）**：
+
+- File：`content/blogger/posts/20260525-draft-book-review.md`
+- Field：`description`
+- Old value：`""`（empty quoted string）
+- Expected `bytesDelta` = **`+33`**；Actual `bytesDelta` = **`+33`**（11 中文字 × 3 bytes UTF-8 = 33；精準預測；無 non-target YAML drift）
+
+##### E. Status Wording Update
+
+§15.G.4 ⚠️ caveat（line 1012 起）紀錄之「YAML emitter drift hard-block」現況更新為：
+
+- **YAML emitter drift mitigation source is landed and accepted for dry-run scope**（per pm-2 commit `4de2d9b` + pm-3 acceptance）
+- Real write **remains blocked** until explicit future approval and a separate real-write gate phase
+- §15.G.4 之歷史紀錄（含 `1143 → 1111 / −32` 等具體 evidence）保留不動，作為 pre-mitigation baseline 參考
+
+本更新**不**意涵：
+
+- ❌ **不**意涵 real write 已可開放
+- ❌ **不**意涵 Admin Apply button 已可啟用
+- ❌ **不**意涵 middleware write route 已存在
+- ❌ **不**意涵 CLI `--apply` 已可使用
+- ❌ **不**意涵 `dryRun: false` 已可接受
+
+##### F. Continued Gates（仍維持 fail-safe）
+
+- ✅ CLI `--apply` flag **remains rejected**（exit 2 / `apply-not-supported-in-phase-4p5c`）
+- ✅ `payload.dryRun: false` **remains rejected**（同 reason）
+- ✅ Admin Apply button **remains disabled**（`src/views/admin/index.ejs` lines 616-619 之 `disabled aria-disabled="true"` 維持；本 phase 未動 Admin UI）
+- ✅ **No middleware write route**（`vite.config.js` 無 `configureServer`；無 `/api/admin/**` endpoint）
+- ✅ **No production content write**（pm-3 acceptance 之 pre/post `git hash-object` per file identical；3 個 production .md byte-identical）
+- ✅ CLI 仍不 `import safeWrite`、不 `fs.writeFile`、不 `fs.rename`、不 spawn git
+- ✅ Real-write first use **must be a separate explicit approval phase**；不繼承 4.5e-b / 4.5e-c acceptance 之 approval
+- ✅ 4.5e-b / 4.5e-c 之 acceptance **不**作為解開 `--apply` 之依據；解開條件由獨立 4.5e-real-write phase 之 user 簽收界定
+
+##### G. Suggested Future Phase（Not Started）
+
+per §15.G.5 §F 之保守拆批，下一條建議 phase 為 **`4.5e-real-write-gate`**：
+
+- 目的：首篇 production SEO description / searchDescription real write；user 明確 `--apply` 為前提
+- 啟動條件：獨立 user explicit approval；不可由本 §15.G.6 docs sync 之 landing 推導
+- 範圍：CLI source 解開 `--apply` 與 `dryRun: false` 之 fail-safe；新增首寫 production write 路徑；含 git diff manual review 之 reviewer flow
+- **狀態：尚未啟動**；本 §15.G.6 docs sync **不**啟動此 phase
+- 在啟動前 CLI 維持 dry-run only / dormant；patcher 之輸出僅供 dry-run preview 使用
+
+##### H. Phase Boundary（本 §15.G.6 docs sync）
+
+本 §15.G.6 docs sync phase（pm-4）**僅**：
+
+- ✅ append 至 `docs/admin-2-write-pre-analysis.md`（本檔；單一 docs 變動）
+- ✅ §4.5e 表格 row 之 status cell 精準補充 4.5e-b / 4.5e-c landed（不改寫歷史段落）
+
+本 §15.G.6 docs sync phase **不做**：
+
+- ❌ **無** source change（src/scripts/admin-frontmatter-patcher.js / admin-write-cli.js / safe-write-test.js 已於 pm-2 落地；本 phase 不動）
+- ❌ **無** content / settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js / src/views/admin/index.ejs 變動
+- ❌ **無** `npm install` / build / deploy / Blogger repost / GA4 validation
+- ❌ **無** fixture creation
+- ❌ **無** production content write
+- ❌ **無** Admin Apply enable
+- ❌ **無** middleware write route
+- ❌ **無** `--apply` enable
+- ❌ **無** `dryRun: false` enable
+- ❌ **無** `git fetch` / `pull`
+- ❌ **無** `amend` / `rebase` / `force-push`
 
 ### 15.H Boundary Reaffirmation
 
