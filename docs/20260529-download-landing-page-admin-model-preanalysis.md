@@ -80,7 +80,7 @@ Search / social / internal traffic
 
 - landing page **title / slug / display copy**（下載頁標題、slug、顯示文案）。
 - **article-to-landing-page CTA target**（文章頁 → 下載頁的 CTA 指向）。
-- **Google Form embed URL / form config**（內嵌表單 URL 與表單設定參照）。
+- **Google Form embed URL / public URL / form config**（內嵌表單 URL、公開填寫 URL 與表單設定參照）。
 - **asset metadata**（下載資產 metadata：標籤、類型、檔案數量等）。
 - **Google Drive delivery link metadata**（Google Drive 交付連結之 metadata / 參照）。
 - **noindex / sitemap exclusion flags**（noindex 與 sitemap 排除旗標）。
