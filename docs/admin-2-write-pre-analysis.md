@@ -2033,4 +2033,132 @@ Phase: `20260529-am-3-fourth-seo-write-zero-candidate-checkpoint-docs-only-a`
 
 ---
 
+#### §15.G.12 Phase 20260529-am-12 — add-empty-seo-field CLI preanalysis checkpoint
+
+##### A. Problem statement
+
+| 項目 | 內容 |
+|---|---|
+| Phase | `20260529-am-12-add-empty-seo-field-cli-preanalysis-docs-only-a` |
+| Type | docs-only preanalysis checkpoint（單檔 append at §15.G.12）|
+| 範圍 | 僅 `docs/admin-2-write-pre-analysis.md` 一檔 append 新 subsection §15.G.12 |
+| 不含 | source / content / settings / templates / package.json / dist / dist-blogger / dist-promotion / dist-reports / gh-pages |
+
+核心觀察：
+
+1. 現有 `admin-frontmatter-patcher.js` 對 missing key 採 fail-closed（`target-key-not-found`；line 240）；safe-write helper 與 `admin-write-cli.js` 之 dry-run / apply 兩路徑均 mode-split 前跑 patcher — 此 fail-closed 行為**屬正確安全設計**，非缺陷。
+2. **不**應為了解決第四次 SEO write blocker 而放寬既有 patcher 之 missing-key 拒絕語意 — 既有 209 safe-write tests + Phase 4.5e gate + T4b 語意全部依賴 fail-closed；放寬會讓 governance 損失與短期收益不成比例（per §15.G.11 §E Option D）。
+3. 目前「沒有 viable fourth SEO write candidate」之**部分**原因，是某些目標欄位（典型如 `searchDescription`）在某些文章之 frontmatter **完全缺 key**，而**非**只是 value 為空字串；既有 CLI 與 patcher 對「value 為 `""`」與「key 不存在」之區分，目前以「key 必須存在」為 hard precondition。
+4. 結論：missing key 之處理屬獨立問題；應**新增獨立工具**處理「補空 key」，而**不**改既有 SEO value write 流程。
+
+##### B. Proposed direction
+
+| 項目 | 內容 |
+|---|---|
+| 工具名稱（提議）| `add-empty-seo-field`（暫名；CLI；新 npm script）|
+| 對應檔案（提議）| `src/scripts/add-empty-seo-field.js`（新檔；不動既有 patcher / write CLI / safe-write helper / safe-write-test）|
+| 唯一職責 | 對指定 post 之 frontmatter **新增空欄位**（如 `searchDescription: ""`）；無其他寫入語意 |
+| **不**做 | ❌ 不寫入正式 SEO 文案（value 永遠 `""`）；❌ 不與 `admin-write-cli` 之 SEO value write 混合；❌ 不取代 `admin-frontmatter-patcher` 之既有 update 行為；❌ 不啟動 Admin Apply UI / middleware write route |
+| 與既有 patcher 之關係 | 解耦；既有 patcher 保留 fail-closed 語意不變；本 CLI 為**第二個獨立 write 表面**（per §15.G.11 §E Option E）|
+| Output 後續流程 | user 跑 add-empty-seo-field → key 補齊（value `""`）→ commit → 再以既有 `admin-write-cli` dry-run + apply 寫入正式 SEO value（兩段獨立 write，每段獨立 audit / approval）|
+
+##### C. Safety gates
+
+依保守原則，本 CLI 之 MVP 安全閘**至少**包含以下 11 條：
+
+| # | Gate | 規則 |
+|---|---|---|
+| C-1 | 路徑白名單 | 僅允許 `content/blogger/posts/*.md` 與 `content/github/posts/*.md`；其他路徑（含 `content/drafts/` / `content/archive/` / `content/shared/` / `validation-fixtures/`）**全拒** |
+| C-2 | Status 限制 | 僅允許 `status: draft` 或 `status: ready`；`status: published` / `status: archived` **預設拒絕** |
+| C-3 | Field 白名單（MVP）| **僅** `searchDescription` 一個欄位；`description` / `coverAlt` 等其他 SEO 欄位**留至後續 sub-batches** 評估 |
+| C-4 | Field 已存在保護 | 若目標 key 已存在於 frontmatter（任何 value，含 `""`），**拒絕**並回報 `target-key-already-exists`；不可覆寫 |
+| C-5 | Value 衝突保護 | 若同名 key 巢狀存在（如 `book.searchDescription`），**拒絕**並回報 `target-key-nested-conflict`；不可誤插 top-level 同名 |
+| C-6 | Frontmatter 合法性 | 若 frontmatter 解析失敗 / 缺 `---` delimiter / YAML 異常，**fail closed**；不嘗試「修復」 |
+| C-7 | Published post 預設保護 | per C-2；若未來開放 `published`，須另獨立 phase + per-post explicit user approval（不在 MVP scope）|
+| C-8 | Bulk apply 禁用（MVP）| 本 CLI MVP **不開放** bulk / glob / batch；每次只接受**單一** post 之單一 field；多檔處理留至後續 sub-batches |
+| C-9 | Dry-run-first | 必須先支援 `--dry-run`（default）；`--apply` 為 explicit opt-in；無 dry-run 則無 apply 路徑（與 `admin-write-cli` 雙鎖一致）|
+| C-10 | Apply 須 user explicit approval | 每次 apply 須**獨立 phase + 該次 phase 之 user explicit approval**；prior approval 不延伸至下一次（per §15.G.11 §G governance）|
+| C-11 | Byte-preserving 原則 | 除新增之單行外，其他 frontmatter / body byte 全保留；line count 僅 +1；不重排既有 keys / 不改 quote style / 不改 blank-line grouping（per §15.G.11 §D risk 1–3）|
+
+##### D. Boundary with existing patcher
+
+| 維度 | `admin-frontmatter-patcher.js`（既有）| `add-empty-seo-field`（提議）|
+|---|---|---|
+| 寫入語意 | **update** 既有 key 之 value | **insert** 不存在之 key（value 永遠 `""`）|
+| 必備輸入 | `field` + `expectedOldValue` + `newValue` 三件式 | `field` only（無 oldValue 需求；value 永遠 `""`）|
+| Missing key 行為 | fail-closed `target-key-not-found`（line 240）| **正常 path**（CLI 之主目的即「補不存在的 key」）|
+| Existing key 行為 | 正常 update（match `expectedOldValue` 後寫入 `newValue`）| **拒絕** `target-key-already-exists`（per C-4）|
+| Field allowlist | `description` / `searchDescription` 兩 key（line 33）| **僅** `searchDescription`（MVP；per C-3）|
+| Test 覆蓋 | `safe-write-test.js` 209 tests（含 T4b `'patcher T4b: missing key fail closed'`）| 新增**獨立** test set；不修改既有 209 tests |
+| Governance scope | Phase 4.5e gate；前三次 real write per-phase approval | 新增**獨立** write surface；解耦 Phase 4.5e；per-apply 獨立 approval |
+| Source 影響 | **不動**（保留 fail-closed 語意）| 新檔 `src/scripts/add-empty-seo-field.js` + 新 npm script |
+| 兩工具串接流程 | — | 先 `add-empty-seo-field` 補 key（value `""`）→ commit → 再 `admin-write-cli` dry-run + apply 寫入正式 SEO value |
+
+**核心邊界**：
+
+- ✅ `add-empty-seo-field` 只負責「補空 key」；**不**取代任何既有 write 路徑
+- ✅ 真正 SEO value write **仍由**既有安全寫入流程處理（`admin-write-cli` + `safe-write` helper + `admin-frontmatter-patcher`）
+- ✅ 既有 patcher 之 `field` + `expectedOldValue` + `newValue` 三件式語意**不變**；missing key fail-closed **不調整**
+- ✅ 既有 209 safe-write tests 全保留；不修改 `safe-write-test.js`
+
+##### E. Suggested future phase sequence
+
+本 §15.G.12 **不啟動**以下任一 phase；本節僅列保守落地順序，每段獨立 user explicit approval。
+
+| 序 | Phase 性質 | 內容 | 啟動條件 |
+|---|---|---|---|
+| E-1 | read-only | Candidate scan：掃描所有 `content/{github,blogger}/posts/*.md`，列出「缺 `searchDescription` key」之 post 清單（report-only；無寫入）| user explicit approval；獨立 phase |
+| E-2 | docs-only | `add-empty-seo-field` CLI source preanalysis（介面 / 安全閘 11 條 / 拒絕條件 / 退出碼設計 / payload schema / dry-run output 格式）| user 審 E-1 結果後 explicit approval |
+| E-3 | source + tests | Dry-run-only prototype：實作 CLI 本體 + dry-run 路徑；**無** apply 路徑落地；不可寫入 | user 審 E-2 後 explicit approval |
+| E-4 | source + tests | Tests：新增獨立 test set（命名 `add-empty-seo-field-test.js` 或併入 `safe-write-test.js` 新 section；含 fail-closed cases C-1 至 C-11）；不改既有 209 tests | 隨 E-3 同 phase 或獨立 |
+| E-5 | docs-only | Docs sync：`CLAUDE.md` § / `publish-bundle.md` / 本檔 §15 視需要 sync；`package.json` 新增 script entry（如 `add-empty-seo-field`）| 隨 E-3 / E-4 完成後 |
+| E-6 | read-only | Single-file dry-run verify：user 指定一篇缺 key 之 post；跑 CLI dry-run；驗 output 預期；不寫入 | user explicit approval |
+| E-7 | governance | User explicit approval：書面確認 apply 範圍（target file / field / value `""` 三項）| user 主動觸發 |
+| E-8 | source-mutation | Apply：單檔；無 bulk；CLI `--apply` 寫入；post-write `validate:content` 驗 0/42/37 baseline 不退步 | per E-7 |
+| E-9 | git | Commit + push：user 手動 `git add` + `git commit` + `git push origin main`（per §6.8「Admin 不整合 git CLI」原則）| per E-8 |
+| E-10 | docs-only | Docs checkpoint：append 至本檔新 subsection（如 §15.G.13）；紀錄 landed state / baseline 變化 | per E-9 |
+
+E-1 至 E-10 之**任一**啟動皆須**獨立 phase + 該次 phase 之 user explicit approval**；本 §15.G.12 docs checkpoint **不**等同 E-1 至 E-10 任一段之預授權。
+
+##### F. Explicit non-goals（本 §15.G.12）
+
+| # | 不做 | 理由 / 對齊文件 |
+|---|---|---|
+| F-1 | ❌ 不做第四次 SEO real write | per §15.G.10 §I / §15.G.11 §F-5；fourth SEO write 仍 unauthorized |
+| F-2 | ❌ 不建立 payload（含 `add-empty-seo-field` 任何 payload）| 本 phase 為 docs-only；無 source / 無 fixture 落地 |
+| F-3 | ❌ 不跑 `admin-write-cli` dry-run / apply | 既有 write CLI 不執行任何 dry-run / apply 路徑 |
+| F-4 | ❌ 不啟用 Admin Apply UI | 仍 disabled（per `src/views/admin/index.ejs` line 616-619 / 721-724）|
+| F-5 | ❌ 不新增 middleware route | `vite.config.js` 仍無 `configureServer`；無 HTTP write endpoint |
+| F-6 | ❌ 不 build | `npm run build` / `npm run build:github` / `npm run build:blogger` 全不跑 |
+| F-7 | ❌ 不 deploy | gh-pages 不動；deploy repo 不碰 |
+| F-8 | ❌ 不 Blogger repost | Blogger 後台不重貼 |
+| F-9 | ❌ 不 GA4 validation | 不開 GA4 Realtime / DebugView |
+| F-10 | ❌ 不建立 reverse UTM fixture | per `docs/reverse-utm-fixture-plan.md` §6；pm-26 deploy gate 仍 BLOCKED |
+| F-11 | ❌ 不新增 source / 不新增 tests / 不修 package.json | 本 phase docs-only；E-3 / E-4 / E-5 才是 source landing 時點 |
+| F-12 | ❌ 不解除 §15.G.11 §G governance | 既有 3 條 fourth-write future trigger 仍 gated；本 §15.G.12 不視為任一條件成立 |
+
+##### G. Boundary reaffirmation
+
+本 §15.G.12 docs-only preanalysis checkpoint phase **僅**：
+
+- ✅ append §15.G.12 至 `docs/admin-2-write-pre-analysis.md`（本檔；單一 docs 變動）
+- ✅ 紀錄「未來若處理 missing SEO key，應採新增獨立 CLI 而非放寬既有 patcher」之保守設計方向
+- ✅ 明列 11 條 safety gates（C-1 至 C-11）與 10 步保守 phase 順序（E-1 至 E-10）作為**未來啟動參考**，非啟動授權
+
+本 §15.G.12 docs-only preanalysis checkpoint phase **不做**：
+
+- ❌ **無** content posts 修改
+- ❌ **無** source 修改（含 `src/scripts/admin-frontmatter-patcher.js` / `src/scripts/admin-write-cli.js` / `src/scripts/safe-write-test.js` / `src/views/admin/index.ejs` / 新檔 `add-empty-seo-field.js` 等）
+- ❌ **無** settings / templates / validation-fixtures / dist / dist-blogger / dist-promotion / dist-reports / gh-pages / package.json / package-lock.json / vite.config.js 變動
+- ❌ **無** CLI dry-run / apply 執行（含 payload 建立 / 加載）
+- ❌ **無** 第四次 SEO real write
+- ❌ **無** Admin Apply UI 啟用
+- ❌ **無** middleware write route 新增
+- ❌ **無** build / deploy / Blogger repost / GA4 validation / fixture creation
+- ❌ **無** reverse UTM dormant 狀態解除（per `CLAUDE.md` §16.4；remains landed but dormant）
+- ❌ **無** pm-26 deploy gate 解除（per `docs/reverse-utm-fixture-plan.md` §6；remains BLOCKED）
+- ❌ **無** `git fetch` / `pull` / `checkout` / `reset` / `stash` / `rebase` / `merge` / `amend` / `force-push`
+
+---
+
 （本文件結束）
