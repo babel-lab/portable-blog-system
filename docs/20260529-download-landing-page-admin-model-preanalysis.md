@@ -237,3 +237,46 @@ Search / social / internal traffic
 - no admin-write-cli dry-run / apply
 - no Admin Apply enable
 - no middleware write route
+
+---
+
+## Appendix — Schema Evolution Note after 20260529-pm-16
+
+> Phase: `20260529-pm-18-download-landing-page-schema-supersession-note-docs-only-a`
+> 本 appendix 為 **docs-only 釐清註記**，**不**改寫上方既有段落，**不**代表開始任何 source / schema 實作。
+
+### A.1 背景
+
+本文件（pm-12 admin model preanalysis）屬 **admin / 管理流程 preanalysis**。其 §6「Proposed Structured Record Model」早期曾以較接近 **embedded record shape** 的表述描述下載頁、表單與資產之關係 —— 亦即把 `form`（單一物件）與 `assets[]`（陣列）**直接內嵌**於同一個 `DownloadLandingPage` 草案 record 之內。
+
+### A.2 後續演進（pm-16 收斂方向）
+
+後續的 `docs/20260529-download-landing-page-schema-preanalysis.md`（pm-16）已把 schema 方向**收斂為 normalized model**，將表單與資產自下載頁 record 中拆出為獨立實體，改以 ref 參照：
+
+```text
+DownloadLandingPage   ── formRef ──▶ FormConfig
+                      ── assetRefs[] ──▶ DownloadAsset (1..n)
+```
+
+對應實體（以 pm-16 §6–§8 為準）：
+
+- **DownloadLandingPage** —— 下載頁設定本體；以 `formRef`（字串）與 `assetRefs[]`（字串陣列）參照外部實體，**不再內嵌** form / asset 物件。
+- **FormConfig** —— 獨立表單設定實體（`formId` / `embedUrl` / `publicUrl` / 隱私與所有權註記）。
+- **DownloadAsset** —— 獨立資產 metadata 實體（`assetId` / `label` / `type` / storage / delivery mode / file count）。
+
+### A.3 supersession 結論
+
+- **未來若進入實作，應以 pm-16 schema preanalysis 的 normalized 方向為準**（`DownloadLandingPage` + `formRef` + `assetRefs[]` + `FormConfig` + `DownloadAsset`）。
+- 本文件（pm-12）§6 之 embedded record shape **不再視為最終資料結構規格**；其價值在於保留**需求 / 管理流程脈絡**（§5 Admin ownership boundary、§7 `download.fileUrl` 語意待釐清、§8 gate 狀態等），這些脈絡仍有效。
+- 換言之：**pm-12 = 管理脈絡來源；pm-16 = 資料結構方向來源**。兩者不衝突，分工不同。
+
+### A.4 狀態宣告（unchanged）
+
+本 note **不**改變任何既有 gate / 凍結狀態：
+
+- 此 note **不**代表已開始 source / schema 實作。
+- **reverse UTM remains landed but dormant.**
+- **pm-26 deploy gate remains BLOCKED.**
+- **draft fixture remains draft**（`content/blogger/posts/20260529-phonics-practice-sheet-download.md` 不碰）。
+- **`download.fileUrl` remains empty** unless a future explicit phase approves filling it.
+- **Future implementation still requires separate explicit phase approval**（對應 pm-16 §15 候選 A–G，任一啟動皆須該次 user explicit approval）。
