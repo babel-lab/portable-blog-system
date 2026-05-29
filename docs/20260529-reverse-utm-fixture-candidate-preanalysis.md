@@ -88,16 +88,17 @@
 ```yaml
 relatedLinks:
   - kind: internal
-    platform: "github"
     sourceKey: "github"
-    title: "{教具下載 metadata 與模板設計（GitHub 技術筆記）}"
+    platform: "github"
+    title: "GitHub 技術補充：portable-blog-system MVP 製作筆記"
     url: "{未來回填：GitHub-side portable-blog-system-mvp 已發布之真實 URL}"
 ```
 
 設計要點：
 - 放 **`relatedLinks`**（非 `otherLinks`）：Blogger → GitHub 屬自家跨站，`kind: internal`（per `docs/related-links-schema.md` §5.4 / `CLAUDE.md` §16.4）。
-- `sourceKey: "github"`：已存在於 `content/settings/link-sources.json`（displayLabel `GITHUB`；sourceType `internalPlatform`；defaultTargetType `internal`；isActive true）→ **不需新增 sourceKey**。
-- `platform: "github"`：對齊 registry `defaultPlatform`。
+- **`sourceKey: "github"` 為主要來源標籤寫法**：已存在於 `content/settings/link-sources.json`（displayLabel `GITHUB`；sourceType `internalPlatform`；defaultTargetType `internal`；isActive true）→ **不需新增 sourceKey**。新寫法應**以 `sourceKey` 為主**（machine-readable；對應 registry entry）。
+- **`platform: "github"` 僅作 fallback / backward-compatible 欄位**：對齊 registry `defaultPlatform`；當 entry 無 `sourceKey` 時 render 才 fallback 至 `platform` 字串前綴（per `docs/related-links-schema.md` §11.2.1）。**未來 fixture 不應以 `platform` 字串作為主要來源標籤寫法**——`platform` 不取代 `sourceKey`，僅並存供向後相容。
+- 候選 title 文案：**「GitHub 技術補充：portable-blog-system MVP 製作筆記」**（自然技術補充語意；非「點此測試 UTM」）。
 - `url`：未來以 GitHub-side 已發布之**真實 URL** 回填；本 phase **不**寫入、**不**預測。
 - 作者**不需手填** `target` / `rel`：由 build / render 依 `kind` + cross-site UTM 規則自動套（per `CLAUDE.md` §16.4 Blogger → GitHub 反向 source，現 dormant）。
 
