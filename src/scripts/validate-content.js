@@ -451,17 +451,22 @@ export function validateContent({ posts, settings }) {
         }
       }
 
-      // Phase 20260530-am-7：download.fileUrl 結構檢查（warning-only；D1 + D2）
-      //   - download 區塊不存在或非 plain object 時：D1 / D2 一律跳過
+      // Phase 20260530-am-7 / am-13：download.fileUrl 結構檢查（warning-only；D1 + D2 + D3）
+      //   - download 區塊不存在或非 plain object 時：D1 / D2 / D3 一律跳過
       //   - D2（download-fileurl-invalid-type）：download.fileUrl !== undefined 且非 string → warning
       //     mirror book-volume-invalid-type 既有 pattern
       //   - D1（download-enabled-fileurl-empty）：contentKind === 'download' 且 download.enabled === true
       //     且 fileUrl 為 undefined / empty string / whitespace-only string → warning
       //     mirror CLAUDE.md §13「若 download.enabled: true 但沒有 fileUrl，build 時應警告」
-      //   - D1 / D2 互斥：fileUrl 非 string 由 D2 接住，不再被 D1 視為 empty string
-      //     （per Phase 20260530-am-5 §7.1 / am-6 §6.1–§6.2）
+      //   - D3（download-fileurl-invalid-format；Phase 20260530-am-13）：fileUrl 為 non-empty trimmed string
+      //     但不符合 `^https?://` → warning
+      //     per docs/20260530-download-validation-d3-s1-s2-decision-preanalysis.md §5.8（B-strict regex）
+      //     per docs/20260530-download-validation-fileurl-relative-path-decision-preanalysis.md §6.1（Option D：不允許 relative path）
+      //   - D1 / D2 / D3 互斥：fileUrl 非 string 由 D2 接住；string 但空/whitespace 由 D1 接住（限 download 文章）；
+      //     其餘 non-empty trimmed string 但非 http(s) 由 D3 接住
+      //     （per Phase 20260530-am-5 §7.1 / am-6 §6.1–§6.2 / am-9 §5.2）
       //   - 範圍與 series / book 規則一致：僅 ready / published；loadPosts 已過濾 draft / archived
-      //   - 不檢查 URL format / preview URL risk（屬 am-9+ D3 / 後續規則範圍）
+      //   - 不檢查 URL reachability / Google Drive semantic / preview URL risk / noindex（屬後續 phase 範圍）
       if (post.download && typeof post.download === 'object' && !Array.isArray(post.download)) {
         const download = post.download;
         const fileUrl = download.fileUrl;
@@ -490,6 +495,17 @@ export function validateContent({ posts, settings }) {
             type: 'download-enabled-fileurl-empty',
             sourcePath,
             value: 'download.enabled=true but download.fileUrl is missing or empty',
+          });
+        } else if (
+          typeof fileUrl === 'string' &&
+          fileUrl.trim() !== '' &&
+          !/^https?:\/\//.test(fileUrl.trim())
+        ) {
+          issues.push({
+            severity: 'warning',
+            type: 'download-fileurl-invalid-format',
+            sourcePath,
+            value: `download.fileUrl=${fileUrl.trim()} does not match ^https?://`,
           });
         }
       }
