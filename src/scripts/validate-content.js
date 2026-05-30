@@ -451,6 +451,49 @@ export function validateContent({ posts, settings }) {
         }
       }
 
+      // Phase 20260530-am-7：download.fileUrl 結構檢查（warning-only；D1 + D2）
+      //   - download 區塊不存在或非 plain object 時：D1 / D2 一律跳過
+      //   - D2（download-fileurl-invalid-type）：download.fileUrl !== undefined 且非 string → warning
+      //     mirror book-volume-invalid-type 既有 pattern
+      //   - D1（download-enabled-fileurl-empty）：contentKind === 'download' 且 download.enabled === true
+      //     且 fileUrl 為 undefined / empty string / whitespace-only string → warning
+      //     mirror CLAUDE.md §13「若 download.enabled: true 但沒有 fileUrl，build 時應警告」
+      //   - D1 / D2 互斥：fileUrl 非 string 由 D2 接住，不再被 D1 視為 empty string
+      //     （per Phase 20260530-am-5 §7.1 / am-6 §6.1–§6.2）
+      //   - 範圍與 series / book 規則一致：僅 ready / published；loadPosts 已過濾 draft / archived
+      //   - 不檢查 URL format / preview URL risk（屬 am-9+ D3 / 後續規則範圍）
+      if (post.download && typeof post.download === 'object' && !Array.isArray(post.download)) {
+        const download = post.download;
+        const fileUrl = download.fileUrl;
+        if (fileUrl !== undefined && typeof fileUrl !== 'string') {
+          issues.push({
+            severity: 'warning',
+            type: 'download-fileurl-invalid-type',
+            sourcePath,
+            value:
+              typeof fileUrl === 'number'
+                ? `${fileUrl} (non-string)`
+                : Array.isArray(fileUrl)
+                  ? 'typeof=array'
+                  : fileUrl === null
+                    ? 'typeof=null'
+                    : `typeof=${typeof fileUrl}`,
+          });
+        } else if (
+          post.contentKind === 'download' &&
+          download.enabled === true &&
+          (fileUrl === undefined ||
+            (typeof fileUrl === 'string' && fileUrl.trim() === ''))
+        ) {
+          issues.push({
+            severity: 'warning',
+            type: 'download-enabled-fileurl-empty',
+            sourcePath,
+            value: 'download.enabled=true but download.fileUrl is missing or empty',
+          });
+        }
+      }
+
       // Phase 8-e-5-b：series metadata 結構檢查（warning-only）
       //   - series 區塊存在但非 plain object → series-not-object
       //   - series.id 存在但非 non-empty string → series-id-invalid
