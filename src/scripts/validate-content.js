@@ -467,6 +467,12 @@ export function validateContent({ posts, settings }) {
       //     （per Phase 20260530-am-5 §7.1 / am-6 §6.1–§6.2 / am-9 §5.2）
       //   - 範圍與 series / book 規則一致：僅 ready / published；loadPosts 已過濾 draft / archived
       //   - 不檢查 URL reachability / Google Drive semantic / preview URL risk / noindex（屬後續 phase 範圍）
+      // Phase 20260530-night-5：S (S1/S2 merged) 之 D-rule 結構性互斥旗標
+      //   - per docs/20260530-download-validation-s1-s2-merge-decision.md §F.1 + §G.1
+      //   - 若 download.fileUrl 本身結構不合法（D1 / D2 / D3 任一觸發），S 不再 push
+      //   - 與「invalid-seo-block / invalid-seo-indexing → 不重複報 S」之 cascade 策略對齊
+      //   - 設計意圖：先修 download.fileUrl 結構，再驗 SEO；mirror 既有 SEO 階層式 fix-first 規則
+      let hasDownloadFileUrlWarning = false;
       if (post.download && typeof post.download === 'object' && !Array.isArray(post.download)) {
         const download = post.download;
         const fileUrl = download.fileUrl;
@@ -484,6 +490,7 @@ export function validateContent({ posts, settings }) {
                     ? 'typeof=null'
                     : `typeof=${typeof fileUrl}`,
           });
+          hasDownloadFileUrlWarning = true;
         } else if (
           post.contentKind === 'download' &&
           download.enabled === true &&
@@ -496,6 +503,7 @@ export function validateContent({ posts, settings }) {
             sourcePath,
             value: 'download.enabled=true but download.fileUrl is missing or empty',
           });
+          hasDownloadFileUrlWarning = true;
         } else if (
           typeof fileUrl === 'string' &&
           fileUrl.trim() !== '' &&
@@ -507,6 +515,49 @@ export function validateContent({ posts, settings }) {
             sourcePath,
             value: `download.fileUrl=${fileUrl.trim()} does not match ^https?://`,
           });
+          hasDownloadFileUrlWarning = true;
+        }
+      }
+
+      // Phase 20260530-night-5：S（S1/S2 merged）download-content-should-be-noindex（warning-only）
+      //   - per docs/20260530-download-validation-s1-s2-merge-decision.md §F.1（Option Beta：合併單一 rule id）
+      //   - canonical rule id：download-content-should-be-noindex
+      //   - 觸發範圍：ready / published only（已被外層 if-block gating）
+      //   - 觸發條件：contentKind === 'download' 且 seo.indexing ∉ { 'noindex-follow', 'noindex-nofollow' }
+      //     → 涵蓋 seo block 不存在 / seo.indexing missing / seo.indexing === 'index'
+      //   - 互斥規則（依 §F.1 cascade）：
+      //     1. 若 invalid-seo-block 觸發（post.seo 非 plain object）→ 不重複報 S
+      //     2. 若 invalid-seo-indexing 觸發（seo.indexing 型別 / 列舉非法；含空字串 ''）→ 不重複報 S
+      //     3. 若 D1 / D2 / D3 任一觸發（download.fileUrl 結構不合法）→ 不重複報 S（per §G.1 audit）
+      //   - 不再實作 S2 獨立 id download-content-marked-index（§F.1：保留為 deprecated candidate name）
+      //   - 不擴張 D1 / D2 / D3 行為；不接 build-github / build-sitemap（行為層 fallback 已固化）
+      if (post.contentKind === 'download' && !hasDownloadFileUrlWarning) {
+        const seoBlockInvalid =
+          post.seo !== undefined &&
+          (post.seo === null || typeof post.seo !== 'object' || Array.isArray(post.seo));
+        const seoIndexingInvalid =
+          post.seo !== undefined &&
+          post.seo !== null &&
+          typeof post.seo === 'object' &&
+          !Array.isArray(post.seo) &&
+          post.seo.indexing !== undefined &&
+          (typeof post.seo.indexing !== 'string' || !VALID_SEO_INDEXING.has(post.seo.indexing));
+        if (!seoBlockInvalid && !seoIndexingInvalid) {
+          const indexing =
+            post.seo && typeof post.seo === 'object' && !Array.isArray(post.seo)
+              ? post.seo.indexing
+              : undefined;
+          if (indexing !== 'noindex-follow' && indexing !== 'noindex-nofollow') {
+            issues.push({
+              severity: 'warning',
+              type: 'download-content-should-be-noindex',
+              sourcePath,
+              value:
+                indexing === undefined
+                  ? 'seo.indexing is missing (download content should set seo.indexing to "noindex-follow" or "noindex-nofollow")'
+                  : `seo.indexing="${indexing}" (download content should set seo.indexing to "noindex-follow" or "noindex-nofollow")`,
+            });
+          }
         }
       }
 
