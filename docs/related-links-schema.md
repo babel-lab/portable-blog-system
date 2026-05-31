@@ -500,7 +500,7 @@ otherLinks:
 | 9-g-f-c | docs sync：本文件 §9 + `docs/future-roadmap.md` Phase 9-g row + `docs/phase-9g-completion-report.md` §3 / §4.12 / §5.2 / §8 補入 GitHub render 紀錄；可選 `docs/publish-workflow.md` §11 末段補一行；屬 **Phase 9-g-f 系列收尾** | ✅ completed（本批） |
 | 9-g-g（系列；含 a/b/c/d/z 5 子批） | JSON-LD `mentions` / `isPartOf` structured data；BlogPosting schema additive；Blogger / GitHub 兩端 mirror | ✅ completed（pre-plan commit `f5fb400` / isPartOf source commit `70fbf22` / mentions source commit `1d56f8a` / 收尾報告 `docs/phase-9g-g-completion-report.md`）|
 
-當前 validate baseline：**`0 error / 39 warning on 34 post(s)`**（簡稱 `0/39/34`；2026-05-25 實測值）
+當前 validate baseline：**`0 error / 47 warning on 42 post(s)`**（簡稱 `0/47/42`；2026-05-31 實測值）
 
 baseline 演進：
 
@@ -549,7 +549,7 @@ baseline 演進：
   - **dist**（GitHub）：`posts/{slug}/index.html` 達成 **byte-identical-modulo-builtAt**
 - 無 leaked text（兩個 EJS comment delimiter bug 皆已於 9-g-d-c-fix / 9-g-e-b 修復；9-g-f-b 採嚴格無 delimiter 字符 inline 預防）
 - 無意外 `[13]` 區塊 / 無意外「相關連結 / 其他連結內容檢查」checklist 區塊 / 無意外 `<aside class="lab-related-links">` / `<aside class="lab-other-links">` HTML 區塊
-- validate baseline 維持 **`0/22/17`**
+- validate baseline **`0/47/42`**（2026-05-31 實測值）
 
 **Phase 9-g-g** 屬 JSON-LD 範疇（structured data）；本節 §9.5 紀錄 mentions / isPartOf 之最終設計與 landed 狀態（per Phase 9-g-g-b pre-plan + Phase 9-g-g-c / 9-g-g-d source landings + Phase 9-g-g-z 收尾報告）。
 
