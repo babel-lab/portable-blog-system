@@ -212,7 +212,27 @@ content/settings/ga4.config.json
 content/settings/navigation.json
 content/settings/sidebar.config.json
 content/settings/footer.config.json
+content/settings/download-assets.json
+content/settings/download-forms.json
 ```
+
+`download-assets.json` 與 `download-forms.json` 為 **empty settings registry landing point**（於 commit `466e471` 落地；per `docs/20260531-download-empty-registry-implementation-plan.md` §5 / §8 + am-11 read-only acceptance）。當前狀態：
+
+- 兩檔內容為 `{ schemaVersion: 1, updatedAt: "", assets|forms: [], notes: "" }`（empty registry）
+- ❌ **沒有 loader source** 讀取此兩檔（`src/scripts/load-settings.js` 未串接）
+- ❌ **沒有 validator rule** 對應之 unknown-field / duplicate-id / ref-not-found / inactive / preview-risk-via-registry 等規則皆未實作
+- ❌ **沒有 Admin picker** 消費此 registry
+- ❌ **沒有 renderer** 讀取此 registry（landing page renderer 未實作）
+- ❌ **沒有 content migration**：既有 `download.fileUrl` 文章未遷移至 `assetRefs[]` / `formRef`
+- **empty registry settings 已 landed；但 download management 並未啟用**；兩檔僅為 future loader / validator / Admin / renderer 之穩定落點
+
+Registry 治理紅線（per `docs/20260531-download-asset-form-settings-registry-schema-decision.md` §8 + am-2 §4.1 + pm-20 §4 R1）：
+
+- ❌ **永不**含 respondent data（email / 姓名 / 電話 / 學校 / 答覆內容 / Google Sheet response rows）
+- ❌ **永不**含 access token / API key / OAuth secret / 帳號 email / private permission / 私人 Drive folder ID
+- ❌ Google Forms responses **remain in Google Forms / Sheets**；不進 repo
+- reverse UTM remains **dormant**；pm-26 deploy gate remains **BLOCKED**
+- Admin Apply / middleware write / admin-write-cli remain **dormant**
 
 ---
 
