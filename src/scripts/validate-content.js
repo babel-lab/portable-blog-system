@@ -269,6 +269,62 @@ function severityForFbPlaceholder(status, placeholderName, reason, target, prima
   return 'warning';
 }
 
+// Phase 20260601-pm-17：download registry 結構與 key 唯一性檢查（warning-only；registry-level）
+//   - 目標：download validator Option A 最小集（registry shape + registry key uniqueness）
+//   - key field names per docs/20260531-download-asset-form-settings-registry-schema-decision.md
+//     §5（asset key = assetId；form key = formId；均為 registry-unique kebab-case primary key）
+//   - 兩條 warning（severity 一律 'warning'；不新增 error）：
+//     - download-registry-invalid-shape：registry 非 plain object，或 assets/forms 非 array
+//     - download-registry-duplicate-key：array entry 之 key（trim 後）重複出現 ≥ 2 次
+//   - single warning name 即可，靠 value 區分 asset/form；不新增 separate names
+//   - 第一批不檢查 schemaVersion / updatedAt / notes（避免噪音）；只檢查 top-level object 與
+//     assets/forms array；empty registry（assets: [] / forms: []）合法，不產生 warning
+//   - malformed JSON 不在本批範圍：loader readJsonOptional 已 silent fallback 成 default object；
+//     validator 只檢查「loader 傳進來的 object shape」，不 throw、不 error（屬後續 hardening phase）
+//   - registry-level 檢查（post loop 外，避免每篇 post 重複 warning）
+//   - 不做 content reference validation（assetRefs[] / download.formRef 屬後續 phase）
+//   - label（downloadAssets / downloadForms）用於 shape message；arrayKey（assets / forms）+
+//     keyField（assetId / formId）用於 duplicate message
+function validateDownloadRegistry(registry, label, arrayKey, keyField, sourcePath, issues) {
+  const isPlainObject =
+    registry !== null && typeof registry === 'object' && !Array.isArray(registry);
+  const arr = isPlainObject ? registry[arrayKey] : undefined;
+  if (!isPlainObject || !Array.isArray(arr)) {
+    issues.push({
+      severity: 'warning',
+      type: 'download-registry-invalid-shape',
+      sourcePath,
+      value: `${label}.${arrayKey} must be an array`,
+    });
+    return;
+  }
+  // key uniqueness：只在 shape valid 且 array 存在時檢查
+  //   - 忽略非 object entry；忽略 key 非 string 或 trim 後 empty 之 entry
+  //   - 同一重複 key 只報一次（reported set），避免出現 3 次以上時重複噪音
+  const seen = new Set();
+  const reported = new Set();
+  for (const entry of arr) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const raw = entry[keyField];
+    if (typeof raw !== 'string') continue;
+    const key = raw.trim();
+    if (key === '') continue;
+    if (seen.has(key)) {
+      if (!reported.has(key)) {
+        issues.push({
+          severity: 'warning',
+          type: 'download-registry-duplicate-key',
+          sourcePath,
+          value: `${arrayKey}[].${keyField}=${key}`,
+        });
+        reported.add(key);
+      }
+    } else {
+      seen.add(key);
+    }
+  }
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -294,6 +350,26 @@ export function validateContent({ posts, settings }) {
   const fbConfig = settings.promotion?.facebook ?? {};
   const fbGloballyEnabled = fbConfig.enabled === true;
   const VALID_ABS_URL_RE = /^https?:\/\//;
+
+  // Phase 20260601-pm-17：download registry 驗證（registry-level；post loop 外，僅各檢一次）
+  //   - asset key = assetId；form key = formId（per schema-decision §5）
+  //   - current empty registry 應 0 warning（baseline 維持 0 error / 47 warning / 42 post）
+  validateDownloadRegistry(
+    settings.downloadAssets,
+    'downloadAssets',
+    'assets',
+    'assetId',
+    'content/settings/download-assets.json',
+    issues,
+  );
+  validateDownloadRegistry(
+    settings.downloadForms,
+    'downloadForms',
+    'forms',
+    'formId',
+    'content/settings/download-forms.json',
+    issues,
+  );
 
   for (const post of posts) {
     const sourcePath = post.sourcePath;
