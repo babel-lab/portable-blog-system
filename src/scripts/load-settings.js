@@ -50,6 +50,12 @@ export async function loadSettings() {
     result[key] = await readJson(file);
   }
   result.linkSources = await readJsonOptional('link-sources.json', { sources: [] });
+  // Phase 20260601-pm-11 download loader source：
+  //   download-assets.json / download-forms.json 為 additive optional registry（empty registry landing point）。
+  //   缺檔 / JSON 格式錯誤皆 fallback（沿用 readJsonOptional 既有 missing-or-parse-error 行為，本 phase 不改 helper semantics）。
+  //   僅以 additive keys 暴露給未來 validator / Admin picker / renderer，不啟動任何下游 consumer。
+  result.downloadAssets = await readJsonOptional('download-assets.json', { schemaVersion: 0, updatedAt: '', assets: [], notes: '' });
+  result.downloadForms = await readJsonOptional('download-forms.json', { schemaVersion: 0, updatedAt: '', forms: [], notes: '' });
   return result;
 }
 
