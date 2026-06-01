@@ -593,6 +593,65 @@ export function validateContent({ posts, settings }) {
           });
           hasDownloadFileUrlWarning = true;
         }
+
+        // Phase 20260601-night-9 Option 6：assetRefs / formRef 內容欄位 shape 檢查（warning-only；4 條規則）
+        //   - per docs/20260601-download-content-reference-fixture-creation-preflight.md §5–§7（Option 6 6-fixture batch）
+        //   - 純 frontmatter 型別/結構檢查；**不**讀 registry；不檢查 not-found / inactive / duplicate / coexistence
+        //   - 4 條互斥 rule（沿用既有 download-* warning-only / kebab-case 命名慣例）：
+        //     1. download-asset-refs-invalid-type：assetRefs !== undefined 且非 array
+        //     2. download-asset-ref-invalid-type：assetRefs 為 array 但 item 非 string
+        //     3. download-asset-ref-empty：assetRefs 為 array、item 為 string、trim 後為空
+        //     4. download-form-ref-invalid-type：formRef !== undefined 且非 string
+        //   - B1 / B2 互斥：item 非 string 走 invalid-type；string 但 trim 空走 empty
+        //   - A 與 B 互斥：assetRefs 非 array 不進 item loop
+        //   - 不引入 download-form-ref-empty（empty string policy 延後拍板）
+        //   - 不檢查 assetRefs: [] 空 array（語意層延後）
+        const assetRefs = download.assetRefs;
+        if (assetRefs !== undefined) {
+          if (!Array.isArray(assetRefs)) {
+            issues.push({
+              severity: 'warning',
+              type: 'download-asset-refs-invalid-type',
+              sourcePath,
+              value: assetRefs === null ? 'typeof=null' : `typeof=${typeof assetRefs}`,
+            });
+          } else {
+            for (let i = 0; i < assetRefs.length; i++) {
+              const item = assetRefs[i];
+              if (typeof item !== 'string') {
+                issues.push({
+                  severity: 'warning',
+                  type: 'download-asset-ref-invalid-type',
+                  sourcePath,
+                  value: `assetRefs[${i}] typeof=${
+                    item === null ? 'null' : Array.isArray(item) ? 'array' : typeof item
+                  }`,
+                });
+              } else if (item.trim() === '') {
+                issues.push({
+                  severity: 'warning',
+                  type: 'download-asset-ref-empty',
+                  sourcePath,
+                  value: `assetRefs[${i}] is empty or whitespace-only`,
+                });
+              }
+            }
+          }
+        }
+
+        const formRef = download.formRef;
+        if (formRef !== undefined && typeof formRef !== 'string') {
+          issues.push({
+            severity: 'warning',
+            type: 'download-form-ref-invalid-type',
+            sourcePath,
+            value: Array.isArray(formRef)
+              ? 'typeof=array'
+              : formRef === null
+                ? 'typeof=null'
+                : `typeof=${typeof formRef}`,
+          });
+        }
       }
 
       // Phase 20260530-night-5：S（S1/S2 merged）download-content-should-be-noindex（warning-only）
