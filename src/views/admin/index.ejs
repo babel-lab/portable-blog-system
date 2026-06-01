@@ -631,6 +631,72 @@
             </p>
           </div>
 
+          <%# Phase 20260601-am-3 sourceKey Admin selector preview surface（read-only / dry-run）
+              per docs/20260601-sourcekey-admin-selector-preanalysis.md §4 / §7
+              - selector 為 disabled <select>；無 Apply / 無 form submit / 無 fs write / 無 fetch / 無 safeWrite caller
+              - options 來自 content/settings/link-sources.json sources[]（active only；isActive=false 不顯示；sortOrder 升冪；per night-1 design §5.2）
+              - 不寫回 .md frontmatter；不改 renderer fallback chain；不改 GA4 attr 行為
+              - 不啟用 Admin Apply / middleware write / admin-write-cli；不接 source-inactive validation rule
+              - 樣式 mirror 既有 FB dry-run editor 之藍色 tint（與黃色 SEO dry-run 區隔）；不引導點擊 -%>
+          <% var srcOpts = Array.isArray(p.sourceOptions) ? p.sourceOptions : []; %>
+          <% var rItems = Array.isArray(p.relatedLinksItems) ? p.relatedLinksItems : []; %>
+          <% var oItems = Array.isArray(p.otherLinksItems) ? p.otherLinksItems : []; %>
+          <% if (rItems.length > 0 || oItems.length > 0) { %>
+          <div class="detail-section" style="border: 2px dashed #6c8ebf; background: #f0f4fa; padding: 0.75rem; border-radius: 4px; margin-top: 0.75rem;">
+            <h3 style="color: #2c5282; border-bottom: 1px solid #c5d6e8;">sourceKey selector preview (read-only / dry-run)</h3>
+            <p style="background: #d6e4f5; border: 1px solid #6c8ebf; padding: 0.4rem 0.6rem; border-radius: 3px; margin: 0.25rem 0; font-weight: 600; color: #2c5282; font-size: 0.85em;">
+              🔒 Read-only preview — selector 為 disabled；無 Apply / 無 form submit / 無 fs write；未來 Admin write 啟用須走 <code>docs/admin-2-write-pre-analysis.md</code> §15.F prerequisites + user explicit approval。
+            </p>
+            <p class="text-muted" style="font-size: 0.82em; margin: 0.25rem 0 0.5rem;">
+              options 來自 <code>content/settings/link-sources.json</code> active sources（<%= srcOpts.length %> 筆；sortOrder 升冪）；inactive sources 預設不顯示（per night-1 design §5.2）。當前 sourceKey 不存在 active registry 之 entry 會顯示「⚠ 未知 / inactive」viable warning（純視覺；不寫 .md；不觸發 validator）。詳見 <code>docs/20260601-sourcekey-admin-selector-preanalysis.md</code> §4。
+            </p>
+            <% [['relatedLinks', rItems], ['otherLinks', oItems]].forEach(function(pair) { %>
+              <% var listLabel = pair[0]; var items = pair[1]; %>
+              <% if (items.length > 0) { %>
+                <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9em; color: #2c5282;"><%= listLabel %> (<%= items.length %>)</h4>
+                <table style="font-size: 0.82em; width: 100%; background: #fff; border: 1px solid #c5d6e8;">
+                  <thead><tr style="background: #d6e4f5;"><th style="width: 2.5rem">#</th><th style="width: 5rem">kind</th><th style="width: 6rem">platform</th><th style="width: 10rem">current sourceKey</th><th>title / url</th><th style="width: 20rem">selector preview (disabled)</th></tr></thead>
+                  <tbody>
+                    <% items.forEach(function(item) { %>
+                      <%
+                        var skKnown = false;
+                        srcOpts.forEach(function(o) { if (o.sourceKey === item.sourceKey) { skKnown = true; } });
+                        var skClass = !item.sourceKey ? 'b-info' : (skKnown ? 'b-ok' : 'b-missing');
+                        var skDisplay = !item.sourceKey ? '(none)' : item.sourceKey;
+                      %>
+                      <tr>
+                        <td class="mono"><%= item.index %></td>
+                        <td><% if (item.kind) { %><span class="badge b-info"><%= item.kind %></span><% } else { %><span class="badge b-missing">(none)</span><% } %></td>
+                        <td><% if (item.platform) { %><span class="badge b-tag"><%= item.platform %></span><% } else { %><span class="text-muted">—</span><% } %></td>
+                        <td><span class="badge <%= skClass %>"><%= skDisplay %></span><% if (item.sourceKey && !skKnown) { %><br><span class="text-muted" style="font-size: 0.78em;">⚠ 未知 / inactive</span><% } %></td>
+                        <td>
+                          <% if (item.title) { %><div><%= item.title %></div><% } %>
+                          <% if (item.url) { %><div class="mono" style="font-size: 0.85em; word-break: break-all;"><%= item.url %></div><% } %>
+                          <% if (!item.title && !item.url) { %><span class="empty">(empty)</span><% } %>
+                        </td>
+                        <td>
+                          <select disabled aria-disabled="true" title="Read-only preview — no write enabled. 真正寫入須未來 Admin write phase 啟用。" style="width: 100%; padding: 0.2rem; font-family: inherit; font-size: 0.85em; background: #f5f5f5; color: #555; cursor: not-allowed;">
+                            <option value="" <%= !item.sourceKey ? 'selected' : '' %>>— 未指定 —</option>
+                            <% srcOpts.forEach(function(o) { %>
+                              <option value="<%= o.sourceKey %>" <%= (o.sourceKey === item.sourceKey) ? 'selected' : '' %>>[<%= o.sourceType %>] <%= o.displayLabel %> (<%= o.sourceKey %>)</option>
+                            <% }); %>
+                            <% if (item.sourceKey && !skKnown) { %>
+                              <option value="<%= item.sourceKey %>" selected>⚠ 未知 / inactive: <%= item.sourceKey %></option>
+                            <% } %>
+                          </select>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              <% } %>
+            <% }); %>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.5rem 0 0;">
+              注：本 phase 不啟用 source-inactive validation rule（per preanalysis §6 / §11.3）；inactive source 引用當前仍由既有 <code>source-key-not-found</code> rule 捕捉。selector 純顯示概念；frontmatter 寫入屬獨立未來 phase（per <code>docs/admin-2-write-pre-analysis.md</code> §15.F）。
+            </p>
+          </div>
+          <% } %>
+
           <div class="detail-section">
             <h3>Completeness summary</h3>
             <div class="completeness-summary">

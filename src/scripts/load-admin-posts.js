@@ -24,6 +24,10 @@ import {
   validateCoverAlt,
   validateRelatedLinkUrl,
 } from './admin-field-validators.js';
+// Phase 20260601-am-3 sourceKey Admin selector source implementation
+//   - read-only helper for selector preview UI（per docs/20260601-sourcekey-admin-selector-preanalysis.md §4）
+//   - 不啟用 Admin Apply / middleware write / admin-write-cli；不寫回 .md frontmatter
+import { buildActiveSourceOptions } from './active-source-keys.js';
 
 const SITES = ['github', 'blogger'];
 
@@ -114,7 +118,29 @@ async function loadOnePost(siteName, mdPath) {
   return { siteName, mdPath, fm: fm || {}, publishJson, fb };
 }
 
-function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
+// Phase 20260601-am-3 sourceKey Admin selector source implementation
+//   - 將 relatedLinks / otherLinks 之 frontmatter 條目 normalize 成 admin selector preview UI 所需之最小 metadata（5 欄）
+//   - 純 read-only；不寫回 frontmatter；不變動 renderer fallback chain；不變動 GA4 attr
+//   - 缺欄位 / 非預期 type → 空字串；不 throw
+//   - 不暴露 description / labelOverride 等其他欄位（picker UI 只需 sourceKey / kind / platform / title / url 即可定位）
+function extractLinkItemsForAdmin(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((it, idx) => {
+    if (!it || typeof it !== 'object' || Array.isArray(it)) {
+      return { index: idx, sourceKey: '', platform: '', kind: '', url: '', title: '' };
+    }
+    return {
+      index: idx,
+      sourceKey: typeof it.sourceKey === 'string' ? it.sourceKey : '',
+      platform: typeof it.platform === 'string' ? it.platform : '',
+      kind: typeof it.kind === 'string' ? it.kind : '',
+      url: typeof it.url === 'string' ? it.url : '',
+      title: typeof it.title === 'string' ? it.title : '',
+    };
+  });
+}
+
+function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, sourceOptions) {
   const slug = typeof fm.slug === 'string' ? fm.slug : '';
   const githubBase = (settings?.site?.githubSiteUrl || '').replace(/\/+$/, '');
   const description = typeof fm.description === 'string' ? fm.description : '';
@@ -144,6 +170,11 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
   };
   const relatedLinksCount = Array.isArray(fm.relatedLinks) ? fm.relatedLinks.length : 0;
   const otherLinksCount = Array.isArray(fm.otherLinks) ? fm.otherLinks.length : 0;
+  // Phase 20260601-am-3 sourceKey Admin selector source implementation
+  //   - per-item metadata 供 admin selector preview render（min subset；不含 description / labelOverride）
+  //   - 不影響 relatedLinksCount / otherLinksCount 之既有 consumers
+  const relatedLinksItems = extractLinkItemsForAdmin(fm.relatedLinks);
+  const otherLinksItems = extractLinkItemsForAdmin(fm.otherLinks);
 
   // Phase 20260520-b-2: publishedAt canonical fallback chain
   //   1. publishJson.blogger.publishedAt
@@ -299,6 +330,13 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings) {
     githubStatus,
     relatedLinksCount,
     otherLinksCount,
+    // Phase 20260601-am-3 sourceKey Admin selector source implementation
+    //   - per-post relatedLinks / otherLinks 條目 metadata（read-only display only）
+    //   - sourceOptions：active sources 排序後完整列表；shared reference across posts（同陣列實例）
+    //   - 不啟用 Admin Apply；不接 safeWrite / middleware；selector UI 為 disabled <select>
+    relatedLinksItems,
+    otherLinksItems,
+    sourceOptions: Array.isArray(sourceOptions) ? sourceOptions : [],
     completeness,
     missingFields,
     // Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
@@ -318,12 +356,16 @@ function getSortTime(value) {
 
 export async function loadAdminPosts({ settings }) {
   const posts = [];
+  // Phase 20260601-am-3 sourceKey Admin selector source implementation
+  //   - 建構一次共享 reference；不每 post 重算；不每 post 複製
+  //   - settings.linkSources.sources 缺檔時 → 空陣列；selector UI 仍能 render（只顯示「未指定」option）
+  const sourceOptions = buildActiveSourceOptions(settings);
   for (const site of SITES) {
     const pattern = `content/${site}/posts/*.md`;
     const mdFiles = await fg(pattern, { ignore: ['**/*.fb.md'], absolute: false });
     for (const mdPath of mdFiles) {
       const raw = await loadOnePost(site, path.resolve(mdPath));
-      posts.push(toAdminView(raw, settings));
+      posts.push(toAdminView(raw, settings, sourceOptions));
     }
   }
   // Phase 20260520-b-2: 主排序 publishedAt desc，fallback 至 id desc
