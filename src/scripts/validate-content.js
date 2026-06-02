@@ -594,17 +594,19 @@ export function validateContent({ posts, settings }) {
           hasDownloadFileUrlWarning = true;
         }
 
-        // Phase 20260601-night-9 Option 6：assetRefs / formRef 內容欄位 shape 檢查（warning-only；4 條規則）
+        // Phase 20260601-night-9 Option 6 + Phase 20260602-am-3 Option A：assetRefs / formRef 內容欄位 shape 檢查（warning-only；5 條規則）
         //   - per docs/20260601-download-content-reference-fixture-creation-preflight.md §5–§7（Option 6 6-fixture batch）
+        //   - per docs/20260602-download-form-ref-empty-policy-preanalysis.md §6 / §7（Option A：empty formRef 應 warn）
         //   - 純 frontmatter 型別/結構檢查；**不**讀 registry；不檢查 not-found / inactive / duplicate / coexistence
-        //   - 4 條互斥 rule（沿用既有 download-* warning-only / kebab-case 命名慣例）：
+        //   - 5 條互斥 rule（沿用既有 download-* warning-only / kebab-case 命名慣例）：
         //     1. download-asset-refs-invalid-type：assetRefs !== undefined 且非 array
         //     2. download-asset-ref-invalid-type：assetRefs 為 array 但 item 非 string
         //     3. download-asset-ref-empty：assetRefs 為 array、item 為 string、trim 後為空
         //     4. download-form-ref-invalid-type：formRef !== undefined 且非 string
+        //     5. download-form-ref-empty：formRef 為 string、trim 後為空（Phase 20260602-am-3 新增）
         //   - B1 / B2 互斥：item 非 string 走 invalid-type；string 但 trim 空走 empty
+        //   - F1 / F2 互斥：formRef 非 string 走 invalid-type；string 但 trim 空走 empty
         //   - A 與 B 互斥：assetRefs 非 array 不進 item loop
-        //   - 不引入 download-form-ref-empty（empty string policy 延後拍板）
         //   - 不檢查 assetRefs: [] 空 array（語意層延後）
         const assetRefs = download.assetRefs;
         if (assetRefs !== undefined) {
@@ -640,17 +642,26 @@ export function validateContent({ posts, settings }) {
         }
 
         const formRef = download.formRef;
-        if (formRef !== undefined && typeof formRef !== 'string') {
-          issues.push({
-            severity: 'warning',
-            type: 'download-form-ref-invalid-type',
-            sourcePath,
-            value: Array.isArray(formRef)
-              ? 'typeof=array'
-              : formRef === null
-                ? 'typeof=null'
-                : `typeof=${typeof formRef}`,
-          });
+        if (formRef !== undefined) {
+          if (typeof formRef !== 'string') {
+            issues.push({
+              severity: 'warning',
+              type: 'download-form-ref-invalid-type',
+              sourcePath,
+              value: Array.isArray(formRef)
+                ? 'typeof=array'
+                : formRef === null
+                  ? 'typeof=null'
+                  : `typeof=${typeof formRef}`,
+            });
+          } else if (formRef.trim() === '') {
+            issues.push({
+              severity: 'warning',
+              type: 'download-form-ref-empty',
+              sourcePath,
+              value: 'download.formRef must be a non-empty string when provided',
+            });
+          }
         }
       }
 
