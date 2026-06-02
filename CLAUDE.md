@@ -221,12 +221,22 @@ content/settings/download-forms.json
 - 兩檔內容為 `{ schemaVersion: 1, updatedAt: "", assets|forms: [], notes: "" }`（empty registry）
 - ✅ **loader 已 read-only 載入此兩檔**（`src/scripts/load-settings.js` Phase 20260601-pm-11；以 `readJsonOptional` 缺檔 / parse-error fallback；暴露為 `settings.downloadAssets` / `settings.downloadForms`，未啟動任何下游 consumer）
 - ✅ **validator 已有 registry-level shape + key uniqueness 檢查**（`src/scripts/validate-content.js` Phase 20260601-pm-17；warning-only：`download-registry-invalid-shape` / `download-registry-duplicate-key`）；frontmatter shape rules（`download.fileUrl` D1 / D2 / D3、`assetRefs[]` 與 `download.formRef` 5 條 shape rules）亦已落地
-- ❌ **content reference registry-aware validation 尚未啟動**：尚無 `download-asset-ref-not-found` / `download-form-ref-not-found` / `download-asset-ref-inactive` / `download-form-ref-inactive` / `download-asset-ref-duplicate`（intra-post）等規則；登錄 / 反查 / inactive 過濾皆未實作
+- 🔄 **content reference registry-aware validation 部分啟動**：
+  - ✅ **R2 not-found 已 landed**（Phase 20260602-night-9；commit `145a548`；warning-only）：
+    - `download-asset-ref-not-found`：當 `download.assetRefs[i]` 為非空 trimmed string 但未登錄於 `settings.downloadAssets` registry 時觸發
+    - `download-form-ref-not-found`：當 `download.formRef` 為非空 trimmed string 但未登錄於 `settings.downloadForms` registry 時觸發
+    - 使用 read-only registries（`settings.downloadAssets` / `settings.downloadForms`）
+    - rule ordering：invalid-type → empty → not-found（互斥分支 cascade）
+    - registry-shape invalid 時 `assetKeySet` / `formKeySet === null` → lookup 跳過，避免 cascade warnings
+    - R2 fixtures：`_test-download-asset-ref-not-found.md` / `_test-download-form-ref-not-found.md`（各觸發單一 R2 warning）
+  - ❌ **inactive rules 尚未啟動**：尚無 `download-asset-ref-inactive` / `download-form-ref-inactive`（R4 範圍）
+  - ❌ **duplicate / intra-post duplicate rule 尚未啟動**：尚無 `download-asset-ref-duplicate`（R5 範圍）
+  - ❌ **coexistence policy / rule 尚未啟動**（R6 範圍）
 - ❌ **沒有 Admin picker** 消費此 registry
 - ❌ **沒有 renderer** 讀取此 registry（landing page renderer 未實作）
 - ❌ **沒有 content migration**：既有 `download.fileUrl` 文章未遷移至 `assetRefs[]` / `formRef`
-- ❌ **沒有 user-facing 下載頁 / 表單串接**：系統不提供下載落地頁、不串接 Google Forms 收件、不回收 respondent data
-- **empty registry settings + loader read-only + registry-level validator（shape / dup-key）已 landed；但 download management（content reference registry-aware validation、Admin picker、renderer、landing page、content migration）並未啟用**；後續分階段計畫 per `docs/20260602-download-registry-aware-validation-preanalysis.md`（R1–R6 尚未啟動）
+- ❌ **沒有 user-facing 下載頁 / 表單串接**：系統不提供下載落地頁、不串接 Google Forms 收件、不回收 respondent data；Google Forms responses remain in Google Forms / Sheets，不進 repo
+- **empty registry settings + loader read-only + registry-level validator（shape / dup-key）+ R2 content reference not-found validation 已 landed；但 download management（inactive / duplicate / coexistence rules、Admin picker、renderer、landing page、content migration）並未啟用**；後續分階段計畫 per `docs/20260602-download-registry-aware-validation-preanalysis.md`（R2 landed；R4 / R5 / R6 尚未啟動）
 
 Registry 治理紅線（per `docs/20260531-download-asset-form-settings-registry-schema-decision.md` §8 + am-2 §4.1 + pm-20 §4 R1）：
 
