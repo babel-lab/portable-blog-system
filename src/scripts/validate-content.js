@@ -679,6 +679,37 @@ export function validateContent({ posts, settings }) {
                 });
               }
             }
+            // Phase 20260603-am-2 R5b：array-level intra-post duplicate detection（warning-only）
+            //   - per docs/20260603-am-1-download-r5a-duplicate-validation-preanalysis.md（Strategy S1：orthogonal with not-found）
+            //   - 只比較 typeof === 'string' && trim() !== '' 的 item
+            //     - non-string item 由 download-asset-ref-invalid-type 處理，不參與 duplicate
+            //     - empty / whitespace item 由 download-asset-ref-empty 處理，不參與 duplicate
+            //   - trim 後 case-sensitive 比對
+            //   - 每個 duplicated key 只產生 1 個 warning（避免 per-occurrence 爆量）
+            //   - 與 not-found 為 orthogonal cascade；同一 key 可同時出現 not-found 與 duplicate
+            //   - 不檢查 registry-level duplicate（已有 download-registry-duplicate-key）
+            //   - 不檢查 formRef（formRef 為 single value，無 intra-post duplicate 概念）
+            const seenAssetRefIndexes = new Map();
+            for (let i = 0; i < assetRefs.length; i++) {
+              const item = assetRefs[i];
+              if (typeof item !== 'string') continue;
+              const trimmed = item.trim();
+              if (trimmed === '') continue;
+              if (!seenAssetRefIndexes.has(trimmed)) {
+                seenAssetRefIndexes.set(trimmed, []);
+              }
+              seenAssetRefIndexes.get(trimmed).push(i);
+            }
+            for (const [key, indexes] of seenAssetRefIndexes) {
+              if (indexes.length > 1) {
+                issues.push({
+                  severity: 'warning',
+                  type: 'download-asset-ref-duplicate',
+                  sourcePath,
+                  value: `assetRefs[${indexes.join(',')}] duplicate key="${key}"`,
+                });
+              }
+            }
           }
         }
 
