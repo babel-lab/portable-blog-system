@@ -229,14 +229,24 @@ content/settings/download-forms.json
     - rule ordering：invalid-type → empty → not-found（互斥分支 cascade）
     - registry-shape invalid 時 `assetKeySet` / `formKeySet === null` → lookup 跳過，避免 cascade warnings
     - R2 fixtures：`_test-download-asset-ref-not-found.md` / `_test-download-form-ref-not-found.md`（各觸發單一 R2 warning）
-  - ❌ **inactive rules 尚未啟動**：尚無 `download-asset-ref-inactive` / `download-form-ref-inactive`（R4 範圍）
-  - ❌ **duplicate / intra-post duplicate rule 尚未啟動**：尚無 `download-asset-ref-duplicate`（R5 範圍）
+  - ✅ **R5b intra-post duplicate 已 landed**（Phase 20260603-am-2；commit `077c3d1`；warning-only）：
+    - `download-asset-ref-duplicate`：當 `download.assetRefs[]` 內存在重複 ref（trim 後 case-sensitive 相同）時觸發
+    - scope = **intra-post `download.assetRefs[]` duplicate only**（單一 post 內 array 重複）；與 registry-level `download-registry-duplicate-key`（檢查 registry 內 `assetId` 唯一性）為兩條獨立 rule
+    - duplicate 比對語意：trim、case-sensitive、只比對 `typeof === 'string'` 且 trim 後非空之 item（non-string item 由 `download-asset-ref-invalid-type` 處理；empty / whitespace 由 `download-asset-ref-empty` 處理；皆**不**參與 duplicate）
+    - 每個 duplicated key 只產生 **1 個 warning**（避免 per-occurrence 爆量）；warning value 樣式：`assetRefs[<idx1>,<idx2>,...] duplicate key="<key>"`
+    - 與 R2 not-found 為 **orthogonal cascade**：同一 key 可同時觸發 not-found 與 duplicate；duplicate 不 suppress not-found
+    - **不** consult / mutate registry key sets；**不**改 registry JSON；**不**動 loader
+    - **不**檢查 `formRef`（formRef 為 single value，無 intra-post duplicate 概念）
+    - R5b fixture：`_test-download-asset-ref-duplicate.md`（故意觸發 2× `download-asset-ref-not-found` + 1× `download-asset-ref-duplicate`，per S1 orthogonal 設計）
+    - production 影響：零（production posts 未使用 `assetRefs[]`）
+  - ❌ **inactive rules 尚未啟動**：尚無 `download-asset-ref-inactive` / `download-form-ref-inactive`（R4 範圍；R4a 已決定 keep registries empty / defer inactive）
   - ❌ **coexistence policy / rule 尚未啟動**（R6 範圍）
 - ❌ **沒有 Admin picker** 消費此 registry
 - ❌ **沒有 renderer** 讀取此 registry（landing page renderer 未實作）
 - ❌ **沒有 content migration**：既有 `download.fileUrl` 文章未遷移至 `assetRefs[]` / `formRef`
 - ❌ **沒有 user-facing 下載頁 / 表單串接**：系統不提供下載落地頁、不串接 Google Forms 收件、不回收 respondent data；Google Forms responses remain in Google Forms / Sheets，不進 repo
-- **empty registry settings + loader read-only + registry-level validator（shape / dup-key）+ R2 content reference not-found validation 已 landed；但 download management（inactive / duplicate / coexistence rules、Admin picker、renderer、landing page、content migration）並未啟用**；後續分階段計畫 per `docs/20260602-download-registry-aware-validation-preanalysis.md`（R2 landed；R4 / R5 / R6 尚未啟動）
+- **empty registry settings + loader read-only + registry-level validator（shape / dup-key）+ R2 content reference not-found + R5b intra-post `assetRefs[]` duplicate validation 已 landed；但 download management（inactive / coexistence rules、Admin picker、renderer、landing page、content migration）並未啟用**；後續分階段計畫 per `docs/20260602-download-registry-aware-validation-preanalysis.md`（R2 + R5b landed；R4 / R6 尚未啟動）
+- current `npm run validate:content` baseline = **0 errors / 60 warnings / 53 posts**（53 posts = 既有 52 + R5b 新增 fixture 1；60 warnings = 既有 57 + R5b fixture 觸發 2× not-found + 1× duplicate = 3）
 
 Registry 治理紅線（per `docs/20260531-download-asset-form-settings-registry-schema-decision.md` §8 + am-2 §4.1 + pm-20 §4 R1）：
 
