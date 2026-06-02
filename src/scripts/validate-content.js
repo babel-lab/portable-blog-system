@@ -325,6 +325,29 @@ function validateDownloadRegistry(registry, label, arrayKey, keyField, sourcePat
   }
 }
 
+// Phase 20260602-night-9 R2：build registry key set for content reference not-found lookup
+//   - per docs/20260602-download-registry-aware-validation-preanalysis.md（R2 source phase）
+//   - registry usable gate：若 registry shape invalid（非 plain object 或 assets/forms 非 array）
+//     回傳 null → caller 跳過 not-found 檢查，避免與 download-registry-invalid-shape cascade
+//   - 忽略非 object entry、key 非 string、trim 後 empty 之 entry（與 validateDownloadRegistry 一致）
+//   - 第一批不過濾 inactive：屬後續 phase 範圍（inactive rule 為獨立 phase）
+function buildDownloadKeySet(registry, arrayKey, keyField) {
+  const isPlainObject =
+    registry !== null && typeof registry === 'object' && !Array.isArray(registry);
+  const arr = isPlainObject ? registry[arrayKey] : undefined;
+  if (!isPlainObject || !Array.isArray(arr)) return null;
+  const set = new Set();
+  for (const entry of arr) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const raw = entry[keyField];
+    if (typeof raw !== 'string') continue;
+    const key = raw.trim();
+    if (key === '') continue;
+    set.add(key);
+  }
+  return set;
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -370,6 +393,13 @@ export function validateContent({ posts, settings }) {
     'content/settings/download-forms.json',
     issues,
   );
+
+  // Phase 20260602-night-9 R2：build registry key sets for not-found lookup（warning-only）
+  //   - per docs/20260602-download-registry-aware-validation-preanalysis.md（R2 source phase）
+  //   - 若 registry shape invalid 則回傳 null → 後續 not-found 檢查跳過（避免 cascade warning）
+  //   - 當前 empty registry（assets: [] / forms: []）視為 usable，空 Set；任何 ref 都會 not-found
+  const assetKeySet = buildDownloadKeySet(settings.downloadAssets, 'assets', 'assetId');
+  const formKeySet = buildDownloadKeySet(settings.downloadForms, 'forms', 'formId');
 
   for (const post of posts) {
     const sourcePath = post.sourcePath;
@@ -636,6 +666,17 @@ export function validateContent({ posts, settings }) {
                   sourcePath,
                   value: `assetRefs[${i}] is empty or whitespace-only`,
                 });
+              } else if (assetKeySet !== null && !assetKeySet.has(item.trim())) {
+                // Phase 20260602-night-9 R2：registry-aware not-found 檢查（warning-only）
+                //   - invalid-type / empty 之 mutually-exclusive 接續分支；shape 合法才走 lookup
+                //   - registry shape invalid 時 assetKeySet === null → 跳過（避免 cascade）
+                //   - 第一批不檢查 inactive（屬後續 phase 範圍）
+                issues.push({
+                  severity: 'warning',
+                  type: 'download-asset-ref-not-found',
+                  sourcePath,
+                  value: `assetRefs[${i}]="${item.trim()}" not found in downloadAssets registry`,
+                });
               }
             }
           }
@@ -660,6 +701,17 @@ export function validateContent({ posts, settings }) {
               type: 'download-form-ref-empty',
               sourcePath,
               value: 'download.formRef must be a non-empty string when provided',
+            });
+          } else if (formKeySet !== null && !formKeySet.has(formRef.trim())) {
+            // Phase 20260602-night-9 R2：registry-aware not-found 檢查（warning-only）
+            //   - invalid-type / empty 之 mutually-exclusive 接續分支；shape 合法才走 lookup
+            //   - registry shape invalid 時 formKeySet === null → 跳過（避免 cascade）
+            //   - 第一批不檢查 inactive（屬後續 phase 範圍）
+            issues.push({
+              severity: 'warning',
+              type: 'download-form-ref-not-found',
+              sourcePath,
+              value: `formRef="${formRef.trim()}" not found in downloadForms registry`,
             });
           }
         }
