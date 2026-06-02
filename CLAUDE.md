@@ -219,12 +219,14 @@ content/settings/download-forms.json
 `download-assets.json` 與 `download-forms.json` 為 **empty settings registry landing point**（於 commit `466e471` 落地；per `docs/20260531-download-empty-registry-implementation-plan.md` §5 / §8 + am-11 read-only acceptance）。當前狀態：
 
 - 兩檔內容為 `{ schemaVersion: 1, updatedAt: "", assets|forms: [], notes: "" }`（empty registry）
-- ❌ **沒有 loader source** 讀取此兩檔（`src/scripts/load-settings.js` 未串接）
-- ❌ **沒有 validator rule** 對應之 unknown-field / duplicate-id / ref-not-found / inactive / preview-risk-via-registry 等規則皆未實作
+- ✅ **loader 已 read-only 載入此兩檔**（`src/scripts/load-settings.js` Phase 20260601-pm-11；以 `readJsonOptional` 缺檔 / parse-error fallback；暴露為 `settings.downloadAssets` / `settings.downloadForms`，未啟動任何下游 consumer）
+- ✅ **validator 已有 registry-level shape + key uniqueness 檢查**（`src/scripts/validate-content.js` Phase 20260601-pm-17；warning-only：`download-registry-invalid-shape` / `download-registry-duplicate-key`）；frontmatter shape rules（`download.fileUrl` D1 / D2 / D3、`assetRefs[]` 與 `download.formRef` 5 條 shape rules）亦已落地
+- ❌ **content reference registry-aware validation 尚未啟動**：尚無 `download-asset-ref-not-found` / `download-form-ref-not-found` / `download-asset-ref-inactive` / `download-form-ref-inactive` / `download-asset-ref-duplicate`（intra-post）等規則；登錄 / 反查 / inactive 過濾皆未實作
 - ❌ **沒有 Admin picker** 消費此 registry
 - ❌ **沒有 renderer** 讀取此 registry（landing page renderer 未實作）
 - ❌ **沒有 content migration**：既有 `download.fileUrl` 文章未遷移至 `assetRefs[]` / `formRef`
-- **empty registry settings 已 landed；但 download management 並未啟用**；兩檔僅為 future loader / validator / Admin / renderer 之穩定落點
+- ❌ **沒有 user-facing 下載頁 / 表單串接**：系統不提供下載落地頁、不串接 Google Forms 收件、不回收 respondent data
+- **empty registry settings + loader read-only + registry-level validator（shape / dup-key）已 landed；但 download management（content reference registry-aware validation、Admin picker、renderer、landing page、content migration）並未啟用**；後續分階段計畫 per `docs/20260602-download-registry-aware-validation-preanalysis.md`（R1–R6 尚未啟動）
 
 Registry 治理紅線（per `docs/20260531-download-asset-form-settings-registry-schema-decision.md` §8 + am-2 §4.1 + pm-20 §4 R1）：
 
