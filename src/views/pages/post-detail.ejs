@@ -122,6 +122,34 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   </div>
   <% } -%>
 
+  <%# Phase 20260603-pm-2：下載落地頁 minimal guarded branch（Option D；per docs/20260603-download-landing-page-content-model-decision.md §5 / §7 / §11） -%>
+  <%# 主 guard（§7.2 G-c）：download 存在 / enabled 為 true / landingPage 為 true；explicit boolean 避免與一般 download box 誤判 -%>
+  <%# 與既有 lab-download-box（fileUrl guard，line 106）正交：本分支 append-only，不改既有 download box 之 fileUrl 行為 -%>
+  <%# 本階段為 empty-registry placeholder layout：不做 registry resolve / 不讀 assetRefs / formRef registry / 不輸出 Google Form URL / 不輸出 Google Drive URL / 不收 respondent data / 不做 network reachability -%>
+  <%# title fallback：download.title → detailTitle（display.title 或 post.title）；摘要 fallback：download.description → post.description → post.searchDescription -%>
+  <%# placeholder：表單與下載資產暫不可用（registry empty 過渡狀態）；提示填表資料由外部表單服務處理，不存於本站靜態檔 -%>
+  <%# 不新增 SCSS / JS：沿用 lab-download-box BEM；新增 element class 無對應樣式時僅為語意結構 -%>
+  <%# trim-newline pattern：對無 landingPage 之既有 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
+  <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 既有 download box / affiliate / hashtag 預防經驗） -%>
+  <% if (post.download && post.download.enabled === true && post.download.landingPage === true) { %>
+  <div class="lab-container">
+    <section class="lab-download-box lab-download-box--landing">
+      <h2 class="lab-download-box__title"><%= post.download.title || detailTitle %></h2>
+      <% const landingDesc = post.download.description || post.description || post.searchDescription; %>
+      <% if (landingDesc) { %>
+      <p class="lab-download-box__description"><%= landingDesc %></p>
+      <% } %>
+      <div class="lab-download-box__form-placeholder">
+        <p>表單暫不可用 / 尚未設定表單。</p>
+      </div>
+      <div class="lab-download-box__asset-placeholder">
+        <p>下載資產暫不可用 / 尚未設定下載資產。</p>
+      </div>
+      <p class="lab-download-box__note">填表資料由外部表單服務處理，不儲存在本站靜態檔案中。</p>
+    </section>
+  </div>
+  <% } -%>
+
   <%# Phase 9-h-b-b：聯盟販售連結 Box 後置（mirror Blogger 端 post-full.ejs 之 affiliate bottom） -%>
   <%# 5 條 AND guard：affiliate 存在 / enabled 為 true / links 非空 array / position 存在 / position.bottom 為 true -%>
   <%# 對無 affiliate 或 5 條 guard 不通過之既有 ready post，本區塊完全不渲染 -%>
