@@ -348,6 +348,222 @@ function buildDownloadKeySet(registry, arrayKey, keyField) {
   return set;
 }
 
+// Phase 20260603-night-25：commerce links registry-level validator helpers（warning-only；Phase A source-only）
+//   - per docs/20260603-commerce-links-validator-preanalysis.md §5（registry-level rules）+ spec
+//   - 本批只實作 11 條 safe registry-level rules（R3–R9 / R11–R14）；明確 defer：
+//     - R1 / R2（commerce-links registry root shape / array shape）：loader 已 unwrap 為 array，
+//       validator 看不到 raw registry shape；屬後續 loader-exposure phase
+//     - R10（commerce-link-invalid-merchant-key）：merchant registry 尚未存在；syntax-only 規格未凍
+//     - R15（commerce-link-suspicious-secret-token）：誤判風險大，留至 long-tail safety phase
+//   - 不檢查文章 frontmatter commerce refs（C1–C9）：屬後續 content-reference phase
+//   - empty registry（commerceLinks: []）必須維持 R1-clean（0 warnings）→ baseline 不變
+
+// buildActiveAffiliateNetworkIdSet：從 settings.affiliateNetworks 建構 id set
+//   - affiliate-networks.json 為 root array；entries 含 { id, name, rel }
+//   - 目前 schema 無 isActive 欄位 → 所有 entries 視為 active
+//   - settings.affiliateNetworks 不是 array → 回傳 null（caller 須 skip R11，避免 false positive）
+//   - id 非 string 或 trim 後空 → 忽略該 entry
+function buildActiveAffiliateNetworkIdSet(settings) {
+  if (!settings || !Array.isArray(settings.affiliateNetworks)) return null;
+  const set = new Set();
+  for (const entry of settings.affiliateNetworks) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (typeof entry.id !== 'string') continue;
+    const key = entry.id.trim();
+    if (key === '') continue;
+    set.add(key);
+  }
+  return set;
+}
+
+// buildCommerceLinkIdSet：建構 registry 內 valid linkId set（for R12 replacementTarget lookup）
+//   - 非 array → 回傳 null；caller 須 skip R12 not-found 檢查
+//   - 忽略非 plain object entry、linkId 非 string、trim 後空之 entry
+//   - case-sensitive（不做 lowercase normalize；沿用 kebab-case 慣例）
+function buildCommerceLinkIdSet(commerceLinks) {
+  if (!Array.isArray(commerceLinks)) return null;
+  const set = new Set();
+  for (const entry of commerceLinks) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (typeof entry.linkId !== 'string') continue;
+    const key = entry.linkId.trim();
+    if (key === '') continue;
+    set.add(key);
+  }
+  return set;
+}
+
+// validateCommerceLinkRegistry：registry-level entry validation（warning-only；11 條 rule）
+//   - 觸發位置：post loop 外（mirror validateDownloadRegistry pattern）
+//   - sourcePath: 'content/settings/commerce-links.json'
+//   - empty array [] → 不產生任何 warning（current production registry 即此狀態）
+//   - cascade：
+//     - R3（entry 非 object） → 報 R3 並 skip 該 entry R4..R14
+//     - R4（missing linkId） → 報 R4；該 entry 不參與 dup-key / R12 / R13；R6..R11 / R14 仍檢查
+//     - R5（duplicate linkId） → 兩階段：先 collect 有效 linkId，再針對每個 duplicated key 報 1 條
+//     - R6 / R7 互斥：targetUrl 缺漏 → R6；non-empty 但非 http(s) → R7
+//     - R8 / R9 互斥：internalLabel 非 string → R8；string 但 trim 空 → R9
+//     - R11：networkKey 為非空 string 但不在 affiliate-networks registry；網路 id set 為 null 時 skip
+//     - R12 / R13 互斥：replacementTarget self 比對優先於 not-found（noise 較低）；需 valid linkId
+//     - R14：active === false 且 replacementTarget 缺漏 → 報 R14（與其他欄位 warning 可並存）
+function validateCommerceLinkRegistry(commerceLinks, sourcePath, issues, affiliateNetworkIdSet) {
+  if (!Array.isArray(commerceLinks)) return;
+  if (commerceLinks.length === 0) return;
+
+  // Pass 1：collect valid linkIds 與 occurrence indexes（for R5 duplicate detection）
+  const linkIdToIndexes = new Map();
+  for (let i = 0; i < commerceLinks.length; i++) {
+    const entry = commerceLinks[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (typeof entry.linkId !== 'string') continue;
+    const key = entry.linkId.trim();
+    if (key === '') continue;
+    if (!linkIdToIndexes.has(key)) linkIdToIndexes.set(key, []);
+    linkIdToIndexes.get(key).push(i);
+  }
+
+  // R12 lookup set（valid linkId 全集；mirror buildCommerceLinkIdSet 之語意）
+  const linkIdSet = new Set(linkIdToIndexes.keys());
+
+  // R5：每個 duplicated key 只報 1 條（mirror download-registry-duplicate-key 之 reported 模式）
+  for (const [key, indexes] of linkIdToIndexes) {
+    if (indexes.length > 1) {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-duplicate-link-id',
+        sourcePath,
+        value: `commerceLinks[${indexes.join(',')}].linkId="${key}"`,
+      });
+    }
+  }
+
+  // Pass 2：per-entry rules
+  for (let i = 0; i < commerceLinks.length; i++) {
+    const entry = commerceLinks[i];
+
+    // R3：entry 非 plain object → skip R4..R14 for this entry
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      const typeLabel =
+        entry === null ? 'null' : Array.isArray(entry) ? 'array' : typeof entry;
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-invalid-entry-type',
+        sourcePath,
+        value: `commerceLinks[${i}] typeof=${typeLabel} (must be plain object)`,
+      });
+      continue;
+    }
+
+    // R4：missing / invalid linkId（不阻擋其他 field 檢查；只影響 dup-key / R12 / R13）
+    const linkIdRaw = entry.linkId;
+    let validLinkId = null;
+    if (typeof linkIdRaw !== 'string' || linkIdRaw.trim() === '') {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-missing-link-id',
+        sourcePath,
+        value: `commerceLinks[${i}].linkId missing or empty`,
+      });
+    } else {
+      validLinkId = linkIdRaw.trim();
+    }
+    const linkIdDisplay = validLinkId !== null ? validLinkId : '';
+
+    // R6 / R7 互斥：targetUrl 缺漏 vs 格式不合
+    const targetUrl = entry.targetUrl;
+    if (typeof targetUrl !== 'string' || targetUrl.trim() === '') {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-missing-target-url',
+        sourcePath,
+        value: `commerceLinks[${i}].targetUrl missing or empty (linkId="${linkIdDisplay}")`,
+      });
+    } else if (!/^https?:\/\//.test(targetUrl.trim())) {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-invalid-target-url',
+        sourcePath,
+        value: `commerceLinks[${i}].targetUrl="${targetUrl.trim()}" does not match ^https?:// (linkId="${linkIdDisplay}")`,
+      });
+    }
+
+    // R8 / R9 互斥：internalLabel 缺 vs 空 trim
+    const internalLabel = entry.internalLabel;
+    if (typeof internalLabel !== 'string') {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-missing-internal-label',
+        sourcePath,
+        value: `commerceLinks[${i}].internalLabel missing (linkId="${linkIdDisplay}")`,
+      });
+    } else if (internalLabel.trim() === '') {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-internal-label-empty',
+        sourcePath,
+        value: `commerceLinks[${i}].internalLabel is empty or whitespace-only (linkId="${linkIdDisplay}")`,
+      });
+    }
+
+    // R11：networkKey 非空 string 但不在 affiliate-networks active id set
+    //   - affiliateNetworkIdSet === null（settings.affiliateNetworks 非 array）→ skip，避免 false positive
+    //   - networkKey === undefined / null / 非 string / trim 空 → skip
+    const networkKey = entry.networkKey;
+    if (
+      affiliateNetworkIdSet !== null &&
+      typeof networkKey === 'string' &&
+      networkKey.trim() !== '' &&
+      !affiliateNetworkIdSet.has(networkKey.trim())
+    ) {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-invalid-network-key',
+        sourcePath,
+        value: `commerceLinks[${i}].networkKey="${networkKey}" not found in affiliate-networks registry (linkId="${linkIdDisplay}")`,
+      });
+    }
+
+    // R12 / R13 互斥（self 優先；noise 較低設計）：
+    //   - 需 valid linkId（無 linkId 之 entry 不參與，per spec）
+    //   - replacementTarget 為非空 trimmed string 且等於自身 linkId → R13；不再報 R12
+    //   - replacementTarget 為非空 trimmed string 且不在 linkIdSet → R12
+    const replacementTarget = entry.replacementTarget;
+    const replacementTargetTrimmed =
+      typeof replacementTarget === 'string' ? replacementTarget.trim() : '';
+    if (validLinkId !== null && replacementTargetTrimmed !== '') {
+      if (replacementTargetTrimmed === validLinkId) {
+        issues.push({
+          severity: 'warning',
+          type: 'commerce-link-replacement-target-self',
+          sourcePath,
+          value: `commerceLinks[${i}].replacementTarget="${replacementTargetTrimmed}" points to itself (linkId="${linkIdDisplay}")`,
+        });
+      } else if (!linkIdSet.has(replacementTargetTrimmed)) {
+        issues.push({
+          severity: 'warning',
+          type: 'commerce-link-replacement-target-not-found',
+          sourcePath,
+          value: `commerceLinks[${i}].replacementTarget="${replacementTargetTrimmed}" not found in commerce-links registry (linkId="${linkIdDisplay}")`,
+        });
+      }
+    }
+
+    // R14：active === false 且 replacementTarget 缺漏 / 非 string / trim 空
+    //   - 與其他欄位 warning 可並存（per spec）
+    if (
+      entry.active === false &&
+      (typeof replacementTarget !== 'string' || replacementTarget.trim() === '')
+    ) {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-link-inactive-missing-replacement',
+        sourcePath,
+        value: `commerceLinks[${i}] active=false but replacementTarget is missing (linkId="${linkIdDisplay}")`,
+      });
+    }
+  }
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -400,6 +616,21 @@ export function validateContent({ posts, settings }) {
   //   - 當前 empty registry（assets: [] / forms: []）視為 usable，空 Set；任何 ref 都會 not-found
   const assetKeySet = buildDownloadKeySet(settings.downloadAssets, 'assets', 'assetId');
   const formKeySet = buildDownloadKeySet(settings.downloadForms, 'forms', 'formId');
+
+  // Phase 20260603-night-25：commerce links registry-level validation（warning-only；11 條 rule）
+  //   - per docs/20260603-commerce-links-validator-preanalysis.md §5 + Phase A source-only spec
+  //   - 涵蓋 R3 / R4 / R5 / R6 / R7 / R8 / R9 / R11 / R12 / R13 / R14
+  //   - 明確 deferred：R1 / R2（loader unwrap 後無法看到 raw registry shape）/
+  //     R10（merchant registry 未存在）/ R15（誤判風險）/ C1–C9（content reference 屬後續 phase）
+  //   - empty registry（settings.commerceLinks === []）必須維持 0 warnings；baseline 預期不變
+  //   - sourcePath 為 settings JSON 之相對路徑，mirror validateDownloadRegistry pattern
+  const affiliateNetworkIdSet = buildActiveAffiliateNetworkIdSet(settings);
+  validateCommerceLinkRegistry(
+    settings.commerceLinks,
+    'content/settings/commerce-links.json',
+    issues,
+    affiliateNetworkIdSet,
+  );
 
   for (const post of posts) {
     const sourcePath = post.sourcePath;
