@@ -56,6 +56,14 @@ export async function loadSettings() {
   //   僅以 additive keys 暴露給未來 validator / Admin picker / renderer，不啟動任何下游 consumer。
   result.downloadAssets = await readJsonOptional('download-assets.json', { schemaVersion: 0, updatedAt: '', assets: [], notes: '' });
   result.downloadForms = await readJsonOptional('download-forms.json', { schemaVersion: 0, updatedAt: '', forms: [], notes: '' });
+  // Phase 20260603-night-21 commerce-links loader exposure（source-only）：
+  //   commerce-links.json 為 additive optional registry（empty registry landing point）。
+  //   缺檔 / JSON 格式錯誤 / commerceLinks 欄位非 array → fallback []。
+  //   依 phase spec §4：暴露為 array（settings.commerceLinks）而非 registry object；
+  //   metadata 欄位（schemaVersion / updatedAt / notes）本 phase 不暴露，待後續 validator / Admin picker 階段視需要再加。
+  //   本 phase 不啟動任何下游 consumer（validator / renderer / Admin）。
+  const commerceLinksRegistry = await readJsonOptional('commerce-links.json', { commerceLinks: [] });
+  result.commerceLinks = Array.isArray(commerceLinksRegistry?.commerceLinks) ? commerceLinksRegistry.commerceLinks : [];
   return result;
 }
 
