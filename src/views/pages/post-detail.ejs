@@ -123,27 +123,42 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   <% } -%>
 
   <%# Phase 20260603-pm-2：下載落地頁 minimal guarded branch（Option D；per docs/20260603-download-landing-page-content-model-decision.md §5 / §7 / §11） -%>
+  <%# Phase 20260603-pm-7：改用 build 端 registry-resolved derived object downloadLandingRendered（Option A）；registry empty 時 graceful fallback 到 placeholder -%>
   <%# 主 guard（§7.2 G-c）：download 存在 / enabled 為 true / landingPage 為 true；explicit boolean 避免與一般 download box 誤判 -%>
   <%# 與既有 lab-download-box（fileUrl guard，line 106）正交：本分支 append-only，不改既有 download box 之 fileUrl 行為 -%>
-  <%# 本階段為 empty-registry placeholder layout：不做 registry resolve / 不讀 assetRefs / formRef registry / 不輸出 Google Form URL / 不輸出 Google Drive URL / 不收 respondent data / 不做 network reachability -%>
-  <%# title fallback：download.title → detailTitle（display.title 或 post.title）；摘要 fallback：download.description → post.description → post.searchDescription -%>
-  <%# placeholder：表單與下載資產暫不可用（registry empty 過渡狀態）；提示填表資料由外部表單服務處理，不存於本站靜態檔 -%>
+  <%# 紅線：registry empty / 未 resolve 時不輸出 Google Form URL / Google Drive URL；不收 respondent data；不做 network reachability；form / asset 僅顯示 title / label / fileType -%>
+  <%# title fallback：downloadLandingRendered.title → download.title → detailTitle（display.title 或 post.title）；摘要 fallback：derived description → download.description → post.description → post.searchDescription -%>
+  <%# downloadLandingRendered 不存在或 null 時 graceful fallback 到 placeholder（不 crash） -%>
   <%# 不新增 SCSS / JS：沿用 lab-download-box BEM；新增 element class 無對應樣式時僅為語意結構 -%>
   <%# trim-newline pattern：對無 landingPage 之既有 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
   <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 既有 download box / affiliate / hashtag 預防經驗） -%>
   <% if (post.download && post.download.enabled === true && post.download.landingPage === true) { %>
+  <% const dl = (typeof downloadLandingRendered !== 'undefined' && downloadLandingRendered) ? downloadLandingRendered : null; %>
   <div class="lab-container">
     <section class="lab-download-box lab-download-box--landing">
-      <h2 class="lab-download-box__title"><%= post.download.title || detailTitle %></h2>
-      <% const landingDesc = post.download.description || post.description || post.searchDescription; %>
+      <h2 class="lab-download-box__title"><%= (dl && dl.title) || post.download.title || detailTitle %></h2>
+      <% const landingDesc = (dl && dl.description) || post.download.description || post.description || post.searchDescription; %>
       <% if (landingDesc) { %>
       <p class="lab-download-box__description"><%= landingDesc %></p>
       <% } %>
       <div class="lab-download-box__form-placeholder">
+        <% if (dl && dl.form && dl.form.found && dl.form.title) { %>
+        <p>表單：<%= dl.form.title %></p>
+        <% } else { %>
         <p>表單暫不可用 / 尚未設定表單。</p>
+        <% } %>
       </div>
       <div class="lab-download-box__asset-placeholder">
+        <% const resolvedAssets = (dl && Array.isArray(dl.assets)) ? dl.assets.filter(function (a) { return a && a.found; }) : []; %>
+        <% if (resolvedAssets.length > 0) { %>
+        <ul class="lab-download-box__asset-list">
+          <% resolvedAssets.forEach(function (a) { %>
+          <li><%= a.title %><% if (a.fileType) { %>（<%= a.fileType %>）<% } %></li>
+          <% }); %>
+        </ul>
+        <% } else { %>
         <p>下載資產暫不可用 / 尚未設定下載資產。</p>
+        <% } %>
       </div>
       <p class="lab-download-box__note">填表資料由外部表單服務處理，不儲存在本站靜態檔案中。</p>
     </section>

@@ -435,6 +435,116 @@ function deriveRenderedCrossLinks(rawLinks, settings, slot) {
   });
 }
 
+// Phase 20260603-pm-7：download landing page registry resolution（minimal source slice）
+//   - per docs/20260603-download-landing-page-content-model-decision.md（Option D）+ renderer-preanalysis（Option A：derived data 由 build 端產生，避免 EJS 直接 registry lookup）
+//   - 只在 landing branch guard 命中（download 存在 / enabled === true / landingPage === true）時回傳 derived object；否則 null
+//   - registry shape invalid 或非 array 視為 empty；不 throw；不做 network check；不讀 respondent data；不寫檔；不改 registry
+//   - key convention：asset key = assetId、form key = formId（mirror validate-content.js buildDownloadKeySet §5）；容忍未來 alias `key`，但不破壞既有 assetId / formId convention
+//   - registry 目前 empty → form / assets 全 placeholder；isPlaceholderOnly = true；本階段不做 inactive（R4）/ coexistence（R6）/ migration / seeding
+function buildDownloadRegistryMap(registry, arrayKey, keyField) {
+  const map = new Map();
+  const isPlainObject =
+    registry !== null && typeof registry === 'object' && !Array.isArray(registry);
+  const arr = isPlainObject ? registry[arrayKey] : undefined;
+  if (!Array.isArray(arr)) return map;
+  for (const entry of arr) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    // 既有 convention 用 keyField（assetId / formId）；容忍未來 alias `key`，不破壞既有 convention
+    const raw =
+      typeof entry[keyField] === 'string' && entry[keyField].trim() !== ''
+        ? entry[keyField]
+        : entry.key;
+    if (typeof raw !== 'string') continue;
+    const key = raw.trim();
+    if (key === '') continue;
+    if (!map.has(key)) map.set(key, entry);
+  }
+  return map;
+}
+
+function resolveDownloadEntryTitle(entry, ref) {
+  if (entry) {
+    if (typeof entry.title === 'string' && entry.title.trim() !== '') return entry.title;
+    if (typeof entry.label === 'string' && entry.label.trim() !== '') return entry.label;
+  }
+  return ref;
+}
+
+function deriveRenderedDownloadLanding(post, settings) {
+  const d = post && post.download;
+  if (!d || d.enabled !== true || d.landingPage !== true) return null;
+
+  const assetMap = buildDownloadRegistryMap(
+    settings && settings.downloadAssets,
+    'assets',
+    'assetId'
+  );
+  const formMap = buildDownloadRegistryMap(
+    settings && settings.downloadForms,
+    'forms',
+    'formId'
+  );
+
+  // form：single value（無 intra-post duplicate 概念）；只有 string 且 trim 後非空才 resolve
+  let form = null;
+  if (typeof d.formRef === 'string' && d.formRef.trim() !== '') {
+    const ref = d.formRef.trim();
+    const entry = formMap.get(ref) || null;
+    if (entry) {
+      form = { ref, found: true, title: resolveDownloadEntryTitle(entry, ref), placeholder: false };
+    } else {
+      form = { ref, found: false, title: '', placeholder: true };
+    }
+  }
+
+  // assets：只有 array 才處理；只處理 string 且 trim 後非空之 ref；去重顯示（R5b duplicate warning 仍由 validator 負責）
+  const assets = [];
+  if (Array.isArray(d.assetRefs)) {
+    const seen = new Set();
+    for (const item of d.assetRefs) {
+      if (typeof item !== 'string') continue;
+      const ref = item.trim();
+      if (ref === '') continue;
+      if (seen.has(ref)) continue;
+      seen.add(ref);
+      const entry = assetMap.get(ref) || null;
+      if (entry) {
+        assets.push({
+          ref,
+          found: true,
+          title: resolveDownloadEntryTitle(entry, ref),
+          fileType: typeof entry.fileType === 'string' ? entry.fileType : '',
+          placeholder: false,
+        });
+      } else {
+        assets.push({ ref, found: false, title: '', fileType: '', placeholder: true });
+      }
+    }
+  }
+
+  const hasResolvedForm = !!(form && form.found);
+  const hasResolvedAssets = assets.some((a) => a.found);
+  const hasPendingRefs = !!(form && !form.found) || assets.some((a) => !a.found);
+  const isPlaceholderOnly = !hasResolvedForm && !hasResolvedAssets;
+
+  return {
+    enabled: true,
+    landingPage: true,
+    title: typeof d.title === 'string' ? d.title : '',
+    description:
+      (typeof d.description === 'string' && d.description) ||
+      (typeof post.description === 'string' && post.description) ||
+      (typeof post.searchDescription === 'string' && post.searchDescription) ||
+      '',
+    form,
+    assets,
+    hasResolvedForm,
+    hasResolvedAssets,
+    hasPendingRefs,
+    isPlaceholderOnly,
+  };
+}
+
 function buildSeoNoindex({ pageType, settings }) {
   return {
     ...commonSeo({ pageType, settings, canonicalUrl: null }),
@@ -508,6 +618,8 @@ async function main() {
     //   - 既有 utm_* 套用策略 A：跳過 UTM 注入但仍套 target/rel
     const relatedLinksRendered = deriveRenderedCrossLinks(post.relatedLinks, settings, 'related_links');
     const otherLinksRendered = deriveRenderedCrossLinks(post.otherLinks, settings, 'other_links');
+    // Phase 20260603-pm-7：download landing page registry-resolved derived data（null 表示非 landing post）
+    const downloadLandingRendered = deriveRenderedDownloadLanding(post, settings);
     const detailHtml = await renderPage({
       template: 'pages/post-detail.ejs',
       data: baseData({
@@ -523,6 +635,7 @@ async function main() {
         seo: buildSeoForPostDetail({ settings, post }),
         relatedLinksRendered,
         otherLinksRendered,
+        downloadLandingRendered,
       }),
     });
     await writeText(path.join(PAGES_DIR, 'posts', post.slug, 'index.html'), detailHtml, outputs);
