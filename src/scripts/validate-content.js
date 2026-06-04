@@ -564,6 +564,96 @@ function validateCommerceLinkRegistry(commerceLinks, sourcePath, issues, affilia
   }
 }
 
+// validateCommerceRefs：content-reference validation for post affiliate.links[].ref（warning-only）
+//   - Phase 20260604-am-10；per docs/20260604-commerce-links-content-reference-validation-preanalysis.md §5
+//   - 觸發位置：post frontmatter affiliate.links[i]（sourcePath = post .md 路徑）
+//   - 只掃 affiliate.links[]；entry 含 ref（ref !== undefined）時才檢查；raw-only links 不觸發
+//   - in-scope rules（C1 / C2 / C3 / C5）；defer C4（inactive）/ C8（role enum）/ C9（display override）；
+//     不啟用 C6（coexistence）/ C7（role missing）；不檢查 raw url coexistence / labelOverride
+//   - guard：affiliate 非 plain object → 整段 skip；affiliate.links 非 array → 整段 skip
+//   - cascade（per §5.9）：
+//     - C1（ref 非 string）→ 報 C1 並 skip C2 / C3 / C5 for that entry
+//     - C2（ref trim 空）→ 報 C2 並 skip C3 / C5 for that entry
+//     - C3 / C5 orthogonal（同一 ref 可同時 not-found + duplicate）
+//   - registry usable gate：commerceLinkIdSet === null → skip C3（避免 registry shape invalid 噪音）
+//   - empty registry + 0 篇 production 用 ref → 0 觸發（baseline 預期不變）
+function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet) {
+  if (!affiliate || typeof affiliate !== 'object' || Array.isArray(affiliate)) return;
+  const links = affiliate.links;
+  if (!Array.isArray(links)) return;
+
+  for (let i = 0; i < links.length; i++) {
+    const entry = links[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const ref = entry.ref;
+    if (ref === undefined) continue;
+
+    // C1：ref 非 string → skip C2 / C3 for this entry
+    if (typeof ref !== 'string') {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-ref-invalid-type',
+        sourcePath,
+        value: `affiliate.links[${i}].ref typeof=${
+          ref === null ? 'null' : Array.isArray(ref) ? 'array' : typeof ref
+        } (must be string)`,
+      });
+      continue;
+    }
+
+    const trimmed = ref.trim();
+
+    // C2：ref trim 後空 → skip C3 for this entry
+    if (trimmed === '') {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-ref-empty',
+        sourcePath,
+        value: `affiliate.links[${i}].ref is empty or whitespace-only`,
+      });
+      continue;
+    }
+
+    // C3：非空 ref 不在 registry → not-found
+    //   - commerceLinkIdSet === null（registry shape invalid）→ skip（避免 cascade noise）
+    //   - 不實作 inactive / archived 檢查（C4 defer）
+    if (commerceLinkIdSet !== null && !commerceLinkIdSet.has(trimmed)) {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-ref-not-found',
+        sourcePath,
+        value: `affiliate.links[${i}].ref="${trimmed}" not found in commerce-links registry`,
+      });
+    }
+  }
+
+  // C5：intra-post duplicate ref（warning-only；orthogonal with C3）
+  //   - 只比對 typeof === 'string' && trim() !== '' 之 ref（non-string 由 C1、empty 由 C2 處理，皆不參與）
+  //   - trim 後 case-sensitive 比對
+  //   - 每個 duplicated key 只報 1 warning（避免 per-occurrence 爆量）
+  const seenRefIndexes = new Map();
+  for (let i = 0; i < links.length; i++) {
+    const entry = links[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const ref = entry.ref;
+    if (typeof ref !== 'string') continue;
+    const trimmed = ref.trim();
+    if (trimmed === '') continue;
+    if (!seenRefIndexes.has(trimmed)) seenRefIndexes.set(trimmed, []);
+    seenRefIndexes.get(trimmed).push(i);
+  }
+  for (const [key, indexes] of seenRefIndexes) {
+    if (indexes.length > 1) {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-ref-duplicate-in-post',
+        sourcePath,
+        value: `affiliate.links[${indexes.join(',')}] duplicate ref="${key}"`,
+      });
+    }
+  }
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -631,6 +721,12 @@ export function validateContent({ posts, settings }) {
     issues,
     affiliateNetworkIdSet,
   );
+
+  // Phase 20260604-am-10：content-reference linkId set for post affiliate.links[].ref lookup（C3 not-found）
+  //   - per docs/20260604-commerce-links-content-reference-validation-preanalysis.md §5.4 / §5.10
+  //   - registry shape invalid → null → C3 lookup skip（避免 cascade noise）
+  //   - empty registry（commerceLinks === []）→ 空 Set；但 0 篇 production 用 ref → 0 觸發
+  const commerceLinkIdSet = buildCommerceLinkIdSet(settings.commerceLinks);
 
   for (const post of posts) {
     const sourcePath = post.sourcePath;
@@ -1302,6 +1398,11 @@ export function validateContent({ posts, settings }) {
       //   - per docs/related-links-schema.md §3.3 / §4.1 / §9.1
       validateRelatedLinksField('relatedLinks', post.relatedLinks, sourcePath, issues, activeSourceKeys);
       validateRelatedLinksField('otherLinks', post.otherLinks, sourcePath, issues, activeSourceKeys);
+
+      // Phase 20260604-am-10：commerce-links content-reference validation（warning-only；C1 / C2 / C3 / C5）
+      //   - per docs/20260604-commerce-links-content-reference-validation-preanalysis.md §5
+      //   - 只掃 affiliate.links[].ref；raw-only links 不觸發；empty registry + 0-ref production → 0 觸發
+      validateCommerceRefs(post.affiliate, sourcePath, issues, commerceLinkIdSet);
     }
 
     if (post.category) {
