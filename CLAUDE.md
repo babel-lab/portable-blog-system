@@ -248,6 +248,50 @@ content/settings/download-forms.json
 - **empty registry settings + loader read-only + registry-level validator（shape / dup-key）+ R2 content reference not-found + R5b intra-post `assetRefs[]` duplicate validation 已 landed；但 download management（inactive / coexistence rules、Admin picker、renderer、landing page、content migration）並未啟用**；後續分階段計畫 per `docs/20260602-download-registry-aware-validation-preanalysis.md`（R2 + R5b landed；R4 / R6 尚未啟動）
 - current `npm run validate:content` baseline = **0 errors / 60 warnings / 53 posts**（53 posts = 既有 52 + R5b 新增 fixture 1；60 warnings = 既有 57 + R5b fixture 觸發 2× not-found + 1× duplicate = 3）
 
+`commerce-links.json` 為 **commerce affiliate link registry empty landing point**（於 Phase 20260603-night-20 commit `c1a6974` 落地；per `docs/20260603-commerce-affiliate-link-empty-registry-preanalysis.md` + night-22 validator preanalysis + night-25 source landing + am-2 fixture mechanism preanalysis）。當前狀態：
+
+- 檔內容為 `{ schemaVersion: 1, updatedAt: "", commerceLinks: [], notes: "" }`（empty registry；R1-clean per night-19 §7.3 七條件全滿足）
+- ✅ **loader 已 read-only 載入並 unwrap 為 array**（`src/scripts/load-settings.js` Phase 20260603-night-21 commit `78f1e9a`；以 `readJsonOptional` 缺檔 / parse-error / 非 array fallback `[]`；暴露為 `settings.commerceLinks`；metadata 欄位（`schemaVersion` / `updatedAt` / `notes`）**不**暴露；未啟動任何下游 consumer）
+- ✅ **registry-level validator 已 landed 11 條 warning-only rules**（`src/scripts/validate-content.js` Phase 20260603-night-25 commit `94a1d47`；helpers：`validateCommerceLinkRegistry` / `buildCommerceLinkIdSet` / `buildActiveAffiliateNetworkIdSet`；call site：post loop **外**單一呼叫）：
+  - R3 `commerce-link-invalid-entry-type`
+  - R4 `commerce-link-missing-link-id`
+  - R5 `commerce-link-duplicate-link-id`（每個 dup key 1 warning；不 per-occurrence 爆量）
+  - R6 `commerce-link-missing-target-url`（僅 `active !== false` entry 觸發）
+  - R7 `commerce-link-invalid-target-url`（不符 `^https?://`；與 R6 互斥 cascade）
+  - R8 `commerce-link-missing-internal-label`
+  - R9 `commerce-link-internal-label-empty`（trim 後空；與 R8 互斥 cascade）
+  - R11 `commerce-link-invalid-network-key`（against `settings.affiliateNetworks`；undefined 不觸發；`affiliateNetworkIdSet === null` 時 skip 避免 false positive）
+  - R12 `commerce-link-replacement-target-not-found`
+  - R13 `commerce-link-replacement-target-self`（與 R12 互斥；self 優先）
+  - R14 `commerce-link-inactive-missing-replacement`（active=false + 無 replacementTarget；與 R12 / R13 orthogonal）
+  - R1 / R2（root shape / commerceLinks not array）**deferred**：loader unwrap 後不可觀察
+  - R10 `commerce-link-invalid-merchant-key` **deferred**：merchant registry 未存在；syntax-only 規格未凍
+  - R15 `commerce-link-suspicious-secret-token` **deferred**：heuristic 誤判風險大
+- current `npm run validate:content` baseline = **0 errors / 60 warnings / 53 posts**（empty registry → 11 條 commerce rule 全 0 觸發；mirror download R1 cadence；与 download R-series landing 後 baseline 完全一致）
+- ✅ **fixture mechanism decision frozen**（Phase 20260604-am-2 commit `89cbf75`；per `docs/20260604-commerce-links-registry-fixture-mechanism-preanalysis.md`）：
+  - **Option D selected**（near-term）：skip settings-level fixtures；沿用 download R1-style source-only acceptance；零 baseline drift；零紅線觸碰；mirror `download-registry-invalid-shape` / `download-registry-duplicate-key` 之 zero-fixture cadence
+  - **Option A path naming convention frozen as future escape hatch**：`content/validation-fixtures/settings/commerce-links/_test-<rule-id>.json`（per am-2 §10）；不在當前 phase 啟用；待未來 user 明確要求 registry-level runtime evidence 時為**獨立 phase** 啟動（屆時須擴 loader 暴露 raw registry + 新 fixture-mode code path + sourcePath 改寫）
+  - **Option B rejected/deferred for v1**：source harness / mock injection 雛形違反 CLAUDE.md §1 「不過度工程化」+ §29「第一版未規劃 test 框架」
+  - **Option C rejected as red-line violation**：temporary production registry mutation 違反 R1-clean 紅線與本專案治理
+- ❌ **content-reference validation 尚未啟動**：C1..C9（per night-22 §6）source 未 landed；無 `affiliate.links[].ref` / `affiliate.commerceLinks[].ref` 之 not-found / inactive / duplicate / coexistence rules
+- ❌ **content-reference fixtures 尚未建立**：F7 / F11 / F12 / F13（per night-22 §10.1 / am-2 §9.3）皆未建
+- ❌ **沒有 Admin picker / selector / display** 消費此 registry
+- ❌ **沒有 renderer / output** 讀取此 registry（commerce link 渲染 fallback 未實作）
+- ❌ **沒有 registry seed**：production `commerce-links.json` 維持 empty `[]`；無真實 affiliate entry；無 production commerce 文章使用 `ref`
+- ❌ **沒有 build / deploy / Blogger repost / GA4 commerce dimension**：commerce GA4 event / Blogger live commerce content / dist commerce rendering 全部 dormant
+- **empty registry settings + loader read-only + registry-level validator（11 條 warning-only rules）+ fixture mechanism 決策（Option D）已 landed；但 commerce management（content-reference validation / fixtures、Admin selector / display、renderer / output、registry seed、build / deploy / Blogger repost / GA4 commerce dimension）並未啟用**
+
+Commerce registry 治理紅線（per `docs/20260603-commerce-affiliate-link-empty-registry-preanalysis.md` §4.3 / §5.3 + night-22 §9 + am-2 §12）：
+
+- ❌ **永不**含 affiliate dashboard credentials（email / password / OAuth client secret / API key）
+- ❌ **永不**含 access token / bearer token / refresh token / session id / Authorization header
+- ❌ **永不**含 commission / payout / clickCount 等 dashboard 統計
+- ❌ **永不**含帳號 email / 結算密碼 / 私人 Drive folder ID
+- ❌ **不**用 URL pattern 自動推斷 `merchantKey` / `networkKey` / `linkId`；所有 key 由作者明示填寫
+- ❌ **禁止**為 fixture 修改 production `affiliate-networks.json`；R11 fixture 須採「故意不存在 networkKey」設計
+- reverse UTM remains **dormant**；pm-26 deploy gate remains **BLOCKED**
+- Admin Apply / middleware write / admin-write-cli remain **dormant**
+
 Registry 治理紅線（per `docs/20260531-download-asset-form-settings-registry-schema-decision.md` §8 + am-2 §4.1 + pm-20 §4 R1）：
 
 - ❌ **永不**含 respondent data（email / 姓名 / 電話 / 學校 / 答覆內容 / Google Sheet response rows）
