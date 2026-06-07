@@ -566,17 +566,18 @@ function validateCommerceLinkRegistry(commerceLinks, sourcePath, issues, affilia
 
 // validateCommerceRefs：content-reference validation for post affiliate.links[].ref（warning-only）
 //   - Phase 20260604-am-10；per docs/20260604-commerce-links-content-reference-validation-preanalysis.md §5
+//   - Phase 20260607-night-14：新增 C6 commerce-ref-direct-url-coexist（per docs/20260607-commerce-c6-coexistence-warning-preanalysis.md §F）
 //   - 觸發位置：post frontmatter affiliate.links[i]（sourcePath = post .md 路徑）
 //   - 只掃 affiliate.links[]；entry 含 ref（ref !== undefined）時才檢查；raw-only links 不觸發
-//   - in-scope rules（C1 / C2 / C3 / C5）；defer C4（inactive）/ C8（role enum）/ C9（display override）；
-//     不啟用 C6（coexistence）/ C7（role missing）；不檢查 raw url coexistence / labelOverride
+//   - in-scope rules（C1 / C2 / C3 / C5 / C6）；defer C4（inactive）/ C8（role enum）/ C9（display override）；
+//     不啟用 C7（role missing）；不檢查 labelOverride
 //   - guard：affiliate 非 plain object → 整段 skip；affiliate.links 非 array → 整段 skip
-//   - cascade（per §5.9）：
-//     - C1（ref 非 string）→ 報 C1 並 skip C2 / C3 / C5 for that entry
-//     - C2（ref trim 空）→ 報 C2 並 skip C3 / C5 for that entry
-//     - C3 / C5 orthogonal（同一 ref 可同時 not-found + duplicate）
+//   - cascade（per §5.9 + C6 preanalysis §F.4）：
+//     - C1（ref 非 string）→ 報 C1 並 skip C2 / C3 / C5 / C6 for that entry
+//     - C2（ref trim 空）→ 報 C2 並 skip C3 / C5 / C6 for that entry
+//     - C3 / C5 / C6 orthogonal（同一 ref 可同時 not-found + duplicate + url-coexist）
 //   - registry usable gate：commerceLinkIdSet === null → skip C3（避免 registry shape invalid 噪音）
-//   - empty registry + 0 篇 production 用 ref → 0 觸發（baseline 預期不變）
+//   - empty registry + 0 篇 production 用 ref + 0 篇 production 同時帶 ref/url → 0 觸發（baseline 預期不變）
 function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet) {
   if (!affiliate || typeof affiliate !== 'object' || Array.isArray(affiliate)) return;
   const links = affiliate.links;
@@ -623,6 +624,24 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet) 
         type: 'commerce-ref-not-found',
         sourcePath,
         value: `affiliate.links[${i}].ref="${trimmed}" not found in commerce-links registry`,
+      });
+    }
+
+    // C6：ref 與直接 raw url 同時存在 → coexist warning（warning-only；migration mode 提示）
+    //   - per docs/20260607-commerce-c6-coexistence-warning-preanalysis.md §F.3 / §F.4
+    //   - trigger：entry.url 為 non-empty trimmed string；ref 已通過 C1 / C2 cascade 為 non-empty trimmed string
+    //   - direct url 欄位 scope：只認 entry.url（per §E.3；renderer / production 唯一既定 raw URL 欄位）
+    //   - 不擴大支援 href / targetUrl / linkUrl / directUrl / affiliateUrl / rawUrl（避免 false positive / 治理不一致）
+    //   - orthogonal with C3（not-found）/ C5（duplicate）：同一 entry 可同時觸發
+    //   - 與 C3 不互斥：ref not-found 仍可同時觸發 C6（ref 存在於 frontmatter 即視為作者宣告使用 registry）
+    //   - 不 echo url value（避免 log 內洩漏 affiliate URL / merchant token / tracking id；per §F.3.3 + governance §K.2）
+    //   - warning-only；不阻擋 build；不自動移除 raw url；不 codemod migration
+    if (typeof entry.url === 'string' && entry.url.trim() !== '') {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-ref-direct-url-coexist',
+        sourcePath,
+        value: `affiliate.links[${i}] has both ref and url; remove url after commerce registry renderer migration`,
       });
     }
   }
