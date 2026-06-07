@@ -274,16 +274,21 @@ content/settings/download-forms.json
   - **Option B rejected/deferred for v1**：source harness / mock injection 雛形違反 CLAUDE.md §1 「不過度工程化」+ §29「第一版未規劃 test 框架」
   - **Option C rejected as red-line violation**：temporary production registry mutation 違反 R1-clean 紅線與本專案治理
 - 🔄 **content-reference validation 部分啟動**（per `docs/20260604-commerce-links-content-reference-validation-preanalysis.md` §5）：
-  - ✅ **C1 / C2 / C3 / C5 已 landed**（Phase 20260604-am-10 source landed；am-11 source acceptance read-only PASS；am-12 docs sync；commit `39b89e3` `feat(validate): warn on commerce link refs`；warning-only）：
+  - ✅ **C1 / C2 / C3 / C5 / C6 已 landed**（C1 / C2 / C3 / C5：Phase 20260604-am-10 source landed；am-11 source acceptance read-only PASS；am-12 docs sync；commit `39b89e3` `feat(validate): warn on commerce link refs`。C6：Phase 20260607-night-14 source landed；night-15 source acceptance read-only PASS；commit `281cd43` `feat(validate): warn on commerce ref url coexistence`。皆 warning-only）：
     - helper `validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet)` + `buildCommerceLinkIdSet(commerceLinks)`（call site：post loop **內**，掃 published post `affiliate.links[].ref`）
-    - C1 `commerce-ref-invalid-type`：`affiliate.links[i].ref` 非 string（報後 skip C2 / C3 for that entry）
-    - C2 `commerce-ref-empty`：`ref` trim 後空（報後 skip C3 for that entry）
+    - C1 `commerce-ref-invalid-type`：`affiliate.links[i].ref` 非 string（報後 skip C2 / C3 / C5 / C6 for that entry）
+    - C2 `commerce-ref-empty`：`ref` trim 後空（報後 skip C3 / C5 / C6 for that entry）
     - C3 `commerce-ref-not-found`：非空 ref 不在 `settings.commerceLinks` registry（`commerceLinkIdSet === null` 即 registry shape invalid 時 skip 避免噪音）
     - C5 `commerce-ref-duplicate-in-post`：intra-post `affiliate.links[]` 重複 ref（trim 後 case-sensitive；每個 dup key 1 warning；與 C3 orthogonal cascade）
+    - C6 `commerce-ref-direct-url-coexist`：同一 `affiliate.links[i]` entry 同時持有非空 trimmed string `ref` 與非空 trimmed string `url`（registry-managed ref 與直接 raw URL 共存；migration mode 提示）：
+      - direct URL field scope = **只認 `entry.url`**（per `docs/20260607-commerce-c6-coexistence-warning-preanalysis.md` §E.3 / §F.3）；**不**檢查 `href` / `targetUrl` / `linkUrl` / `directUrl` / `affiliateUrl` / `rawUrl`
+      - cascade：C1 / C2 為 mutually exclusive cascade（ref 非 string 或 trim 空 → skip C6 for that entry）；C6 與 C3（not-found）/ C5（duplicate）orthogonal（同一 entry 可同時觸發 C3 / C5 / C6；不互相 suppress）
+      - warning message **不** echo ref / url value（per `docs/20260607-commerce-c6-coexistence-warning-preanalysis.md` §F.3.3 + governance §K.2；避免 log 內洩漏 affiliate URL / merchant token / tracking id）
+      - warning-only；不阻擋 build；不自動移除 raw url；不 codemod migration；不強迫 renderer 改變行為（per night-9 renderer fallback contract §E.5 情境 4）
     - scope：只掃 `affiliate.links[].ref`；entry 含 `ref`（`ref !== undefined`）時才檢查；**raw-only affiliate links（無 ref）不觸發 warning**
     - guard：affiliate 非 plain object → skip；`affiliate.links` 非 array → skip
-    - empty registry + 0 篇 production 用 `ref` → **0 觸發**（baseline 不變）
-  - ❌ **C4（inactive / archived）/ C6（raw URL coexistence policy）/ C7（missing role）/ C8（role enum）/ C9（display override risk）未實作**；C7 / C8 / C9 preanalysis 未開始
+    - empty registry + 0 篇 production 用 `ref` + 0 篇 production 同時帶 `ref` 與 `url` → **0 觸發**（baseline 不變）
+  - ❌ **C4（inactive / archived）/ C7（missing role）/ C8（role enum）/ C9（display override risk）未實作**；C7 / C8 / C9 preanalysis 未開始
 - 🔄 **content-reference fixtures 部分建立**：C1 / C2 / C3 / C5 fixtures 已 landed（Phase 20260607-night-4 commit `149efdc` `test(fixtures): add commerce ref C1 C2 C3 C5 fixtures`；night-5 read-only acceptance PASS；per `docs/20260607-commerce-content-ref-c1c2c3c5-fixture-preanalysis.md`）：
   - `content/validation-fixtures/blogger/posts/_test-commerce-ref-invalid-type.md`（觸發 1 × `commerce-ref-invalid-type`；ref 為 number 42）
   - `content/validation-fixtures/blogger/posts/_test-commerce-ref-empty.md`（觸發 1 × `commerce-ref-empty`；ref 為 `""`）
@@ -291,13 +296,14 @@ content/settings/download-forms.json
   - `content/validation-fixtures/blogger/posts/_test-commerce-ref-duplicate.md`（觸發 1 × `commerce-ref-duplicate-in-post` + 2 × `commerce-ref-not-found`；orthogonal cascade 為 empty registry 下之預期設計，mirror download R5b cadence，per 20260607-night-2 preanalysis §3.4 / §6.2）
   - 累積對 global baseline 貢獻：+6 warnings / +4 posts → 60/53 → 66/57
   - frontmatter 採 `contentKind: "book-review"` + fixture-namespaced refs；無真實 affiliate URL / merchant token / tracking id；不變動 commerce registry（registry 維持 empty `[]`）
-- ❌ **C4 / C6 / C7 / C8 / C9 content-ref fixtures 尚未建立**：C4 需 registry 有 `active: false` entry → Option A coupling defer；C6 gated by renderer + migration phase；C7 long-tail（不建議啟用）；C8 需 enum 凍結後再 land；C9 需 registry entry → Option A coupling defer（per 20260607-night-2 §3 / §8.2 + 20260604 am-7 §5.5–§5.8）
+  - 既有 4 個 commerce content-ref fixtures **皆未含 `url` 欄位** → C6 source landing（commit `281cd43`）後對既有 fixtures 之 trigger 數為 **0**；fixtures 仍維持各自單一 / orthogonal cascade，未產生 C6 衍生 warning
+- ❌ **C4 / C6 / C7 / C8 / C9 content-ref fixtures 尚未建立**：C4 需 registry 有 `active: false` entry → Option A coupling defer；C6 source 已 landed at commit `281cd43`，**fixture 尚未建立**（屬獨立 fixture-only follow-up phase；尚未授權）；C7 long-tail（不建議啟用）；C8 需 enum 凍結後再 land；C9 需 registry entry → Option A coupling defer（per 20260607-night-2 §3 / §8.2 + 20260604 am-7 §5.5–§5.8）
 - ❌ **沒有 Admin picker / selector / display** 消費此 registry
 - ❌ **沒有 renderer / output** 讀取此 registry（commerce link 渲染 fallback 未實作）
 - ❌ **沒有 registry seed**：production `commerce-links.json` 維持 empty `[]`；無真實 affiliate entry；無 production commerce 文章使用 `ref`
 - ❌ **沒有 build / deploy / Blogger repost / GA4 commerce dimension**：commerce GA4 event / Blogger live commerce content / dist commerce rendering 全部 dormant
-- current `npm run validate:content` baseline = **0 errors / 66 warnings / 57 posts**（empty registry + 0 篇 production 用 `ref` → 11 條 registry-level + C1 / C2 / C3 / C5 content-ref rules 對 production posts 全 0 觸發；當前 66/57 為 night-4 content-ref fixtures landing 之 +6 warnings / +4 posts 貢獻，per `149efdc`）
-- **empty registry settings + loader read-only + registry-level validator（11 條 warning-only rules）+ content-reference validator（C1 / C2 / C3 / C5 warning-only）+ content-reference fixtures（C1 / C2 / C3 / C5；4 個 post-level fixtures）+ fixture mechanism 決策（Option D）已 landed；但 commerce management（C4 / C6 / C7 / C8 / C9 content-ref rules + 相應 fixtures、Admin selector / display、renderer / output、registry seed、production content migration、build / deploy / Blogger repost / GA4 commerce dimension）並未啟用**
+- current `npm run validate:content` baseline = **0 errors / 66 warnings / 57 posts**（empty registry + 0 篇 production 用 `ref` + 0 篇 production 同時帶 `ref` 與 `url` → 11 條 registry-level + C1 / C2 / C3 / C5 / C6 content-ref rules 對 production posts 全 0 觸發；當前 66/57 為 night-4 content-ref fixtures landing 之 +6 warnings / +4 posts 貢獻，per `149efdc`；C6 source landing（commit `281cd43`）**未變動 baseline**，因 production 0 用 ref+url 且既有 4 個 commerce content-ref fixtures 皆無 `url` 欄位 → C6 trigger 0）
+- **empty registry settings + loader read-only + registry-level validator（11 條 warning-only rules）+ content-reference validator（C1 / C2 / C3 / C5 / C6 warning-only）+ content-reference fixtures（C1 / C2 / C3 / C5；4 個 post-level fixtures）+ fixture mechanism 決策（Option D）已 landed；但 commerce management（C6 fixture、C4 / C7 / C8 / C9 content-ref rules + 相應 fixtures、Admin selector / display、renderer / output、registry seed、production content migration、build / deploy / Blogger repost / GA4 commerce dimension）並未啟用**
 
 Commerce registry 治理紅線（per `docs/20260603-commerce-affiliate-link-empty-registry-preanalysis.md` §4.3 / §5.3 + night-22 §9 + am-2 §12）：
 
