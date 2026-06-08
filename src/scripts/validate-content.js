@@ -50,6 +50,11 @@ const VALID_BOOK_MEDIA_TYPE = new Set(['book', 'magazine']);
 //   - role 缺省為 "author"（於 book-authors-invalid-role 規則內處理：undefined 不觸發）
 const VALID_BOOK_AUTHOR_ROLE = new Set(['author', 'translator', 'illustrator', 'editor', 'other']);
 
+// C8（commerce-ref-invalid-role）：post-level affiliate.links[i].role 允許值 enum
+//   - per docs/20260608-commerce-c8-invalid-role-preanalysis.md §5（am-7 §4.5 凍結候選；user final-confirmed）
+//   - lowercase kebab-case；case-sensitive exact match（mirror VALID_BOOK_AUTHOR_ROLE idiom）
+const VALID_COMMERCE_LINK_ROLE = new Set(['primary', 'alternate', 'official', 'price-check', 'library', 'direct']);
+
 // Phase 9-g-c-c：relatedLinks / otherLinks entry kind 列舉
 //   - per docs/related-links-schema.md §3.2 / §4.1
 //   - 用於 related-links-entry-kind-invalid 規則之檢查
@@ -668,6 +673,29 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet) 
         type: 'commerce-ref-duplicate-in-post',
         sourcePath,
         value: `affiliate.links[${indexes.join(',')}] duplicate ref="${key}"`,
+      });
+    }
+  }
+
+  // C8：post-level affiliate.links[i].role enum 檢查（warning-only；獨立 pass）
+  //   - per docs/20260608-commerce-c8-invalid-role-preanalysis.md §3 / §5 / §6.3（user final-confirmed）
+  //   - 獨立 pass（在 C5 duplicate pass 之後）；完全不碰 ref cascade（不改 C1 / C2 / C3 / C6 之 continue 流程）
+  //   - 覆蓋 ref-only / ref+raw / raw-only entry：不依賴 entry.ref，故 raw-only links 之 role 亦受檢
+  //   - role === undefined → 不觸發（缺漏 role 屬 C7，本 phase 不啟用）
+  //   - role 存在但不在 VALID_COMMERCE_LINK_ROLE → warning（含非字串 role：.has() 回 false → 走 typeof message，非 hard error）
+  //   - 與 C1..C6 全 orthogonal；不影響 ref validation 結果；不依賴 commerce registry 是否 empty
+  for (let i = 0; i < links.length; i++) {
+    const entry = links[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (entry.role !== undefined && !VALID_COMMERCE_LINK_ROLE.has(entry.role)) {
+      issues.push({
+        severity: 'warning',
+        type: 'commerce-ref-invalid-role',
+        sourcePath,
+        value:
+          typeof entry.role === 'string'
+            ? `affiliate.links[${i}].role="${entry.role}"`
+            : `affiliate.links[${i}].role typeof=${typeof entry.role}`,
       });
     }
   }
