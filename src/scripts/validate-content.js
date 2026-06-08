@@ -399,6 +399,26 @@ function buildCommerceLinkIdSet(commerceLinks) {
   return set;
 }
 
+// buildCommerceLinkEntryMap：建構 registry 內 linkId → entry map（for C4 inactive / C9 display-override-risk）
+//   - Phase 20260608-L5b；per docs/20260608-commerce-c4-inactive-ref-validation-preanalysis.md §6.3
+//     + docs/20260608-commerce-c9-display-override-risk-preanalysis.md §10.4（C4 / C9 共用）
+//   - 非 array → 回傳 null；caller 須 skip C4 / C9（mirror buildCommerceLinkIdSet 之 registry gate 語意）
+//   - 忽略非 plain object entry、linkId 非 string、trim 後空之 entry（與 buildCommerceLinkIdSet 一致）
+//   - case-sensitive trim key（沿用 kebab-case 慣例；不 lowercase normalize）
+//   - duplicate linkId → first-wins（決定性；duplicate 本身由 registry-level R5 警告，不在此處理）
+function buildCommerceLinkEntryMap(commerceLinks) {
+  if (!Array.isArray(commerceLinks)) return null;
+  const map = new Map();
+  for (const entry of commerceLinks) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (typeof entry.linkId !== 'string') continue;
+    const key = entry.linkId.trim();
+    if (key === '') continue;
+    if (!map.has(key)) map.set(key, entry);
+  }
+  return map;
+}
+
 // validateCommerceLinkRegistry：registry-level entry validation（warning-only；11 條 rule）
 //   - 觸發位置：post loop 外（mirror validateDownloadRegistry pattern）
 //   - sourcePath: 'content/settings/commerce-links.json'
@@ -575,16 +595,17 @@ function validateCommerceLinkRegistry(commerceLinks, sourcePath, issues, affilia
 //   - Phase 20260607-night-14：新增 C6 commerce-ref-direct-url-coexist（per docs/20260607-commerce-c6-coexistence-warning-preanalysis.md §F）
 //   - 觸發位置：post frontmatter affiliate.links[i]（sourcePath = post .md 路徑）
 //   - 只掃 affiliate.links[]；entry 含 ref（ref !== undefined）時才檢查；raw-only links 不觸發
-//   - in-scope rules（C1 / C2 / C3 / C5 / C6）；defer C4（inactive）/ C8（role enum）/ C9（display override）；
-//     不啟用 C7（role missing）；不檢查 labelOverride
+//   - in-scope rules（C1 / C2 / C3 / C5 / C6 / C8 / C4 / C9）；不啟用 C7（role missing）
+//   - Phase 20260608-L5b：新增 C4 commerce-ref-inactive + C9 commerce-ref-display-override-risk
+//     （registry-coupled；共用 buildCommerceLinkEntryMap；獨立 pass，不改 C1 / C2 / C3 / C5 / C6 / C8 行為）
 //   - guard：affiliate 非 plain object → 整段 skip；affiliate.links 非 array → 整段 skip
 //   - cascade（per §5.9 + C6 preanalysis §F.4）：
 //     - C1（ref 非 string）→ 報 C1 並 skip C2 / C3 / C5 / C6 for that entry
 //     - C2（ref trim 空）→ 報 C2 並 skip C3 / C5 / C6 for that entry
 //     - C3 / C5 / C6 orthogonal（同一 ref 可同時 not-found + duplicate + url-coexist）
-//   - registry usable gate：commerceLinkIdSet === null → skip C3（避免 registry shape invalid 噪音）
+//   - registry usable gate：commerceLinkIdSet === null → skip C3；commerceLinkEntryMap === null → skip C4 / C9
 //   - empty registry + 0 篇 production 用 ref + 0 篇 production 同時帶 ref/url → 0 觸發（baseline 預期不變）
-function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet) {
+function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, commerceLinkEntryMap) {
   if (!affiliate || typeof affiliate !== 'object' || Array.isArray(affiliate)) return;
   const links = affiliate.links;
   if (!Array.isArray(links)) return;
@@ -700,6 +721,68 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet) 
       });
     }
   }
+
+  // C4 + C9：registry-coupled content-reference rules（warning-only；獨立 pass；需 ref → entry map）
+  //   - C4 per docs/20260608-commerce-c4-inactive-ref-validation-preanalysis.md §7 / Appendix C
+  //   - C9 per docs/20260608-commerce-c9-display-override-risk-preanalysis.md §7 / §10 / Appendix C
+  //   - registry gate：commerceLinkEntryMap === null（registry shape invalid）→ skip C4 / C9（mirror C3 gate）
+  //   - 只處理 ref 命中 registry 之 entry：C1（非字串）/ C2（空）/ C3（not-found）皆 continue → 不進入比對
+  //     → 與 C3 互斥（C4）、與 C1..C8 orthogonal；完全不改 C1 / C2 / C3 / C5 / C6 / C8 之觸發或結果
+  //   - empty registry → map 為空 → ref 不可能命中 → 0 觸發（baseline 預期不變）
+  if (commerceLinkEntryMap !== null) {
+    for (let i = 0; i < links.length; i++) {
+      const entry = links[i];
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+      const ref = entry.ref;
+      if (typeof ref !== 'string') continue; // C1 範疇；不在此 pass 觸發
+      const trimmed = ref.trim();
+      if (trimmed === '') continue; // C2 範疇
+      const registryEntry = commerceLinkEntryMap.get(trimmed);
+      if (!registryEntry) continue; // C3 not-found：無對應 entry → 不比對
+
+      // C4：ref 命中但 registry entry active === false → inactive warning
+      //   - 嚴格 active === false（缺漏 / 非 false → 視為 active；不觸發）
+      //   - 不 echo targetUrl / token / tracking；replacementTarget 只暗示「是否已配置替代」，不導向真實 URL
+      //   - 不自動改 ref / label / url；warning-only
+      if (registryEntry.active === false) {
+        const hasReplacement =
+          typeof registryEntry.replacementTarget === 'string' &&
+          registryEntry.replacementTarget.trim() !== '';
+        issues.push({
+          severity: 'warning',
+          type: 'commerce-ref-inactive',
+          sourcePath,
+          value: `affiliate.links[${i}].ref="${trimmed}" matched but registry entry is inactive${
+            hasReplacement ? ' (a replacement target is configured)' : ''
+          }`,
+        });
+      }
+
+      // C9：post labelOverride 等於 registry entry.internalLabel → 內部識別洩漏風險（leak-equality）
+      //   - trigger：labelOverride 為非空 string && entry.internalLabel 為非空 string
+      //     && labelOverride.trim() === internalLabel.trim()（case-sensitive exact，mirror C5 / C8）
+      //   - 缺 labelOverride / 非字串 / 空 → 不觸發；entry 無 internalLabel / 空 → 不觸發；非 hard error
+      //   - ⚠️ message 絕不 echo internalLabel / labelOverride 值；只報欄位名 + ref machine key + 風險類型
+      //     （mirror C6 不 echo url；ref 為作者明示 machine key，非 token / tracking，可安全出現）
+      //   - 不自動改 label；不 heuristic merchant/product 推斷；與 C1..C8 / C4 orthogonal
+      const labelOverride = entry.labelOverride;
+      if (typeof labelOverride === 'string' && labelOverride.trim() !== '') {
+        const internalLabel = registryEntry.internalLabel;
+        if (
+          typeof internalLabel === 'string' &&
+          internalLabel.trim() !== '' &&
+          labelOverride.trim() === internalLabel.trim()
+        ) {
+          issues.push({
+            severity: 'warning',
+            type: 'commerce-ref-display-override-risk',
+            sourcePath,
+            value: `affiliate.links[${i}].labelOverride matches the registry internalLabel for ref="${trimmed}" (possible internal-identifier leak; use displayLabel or a public CTA)`,
+          });
+        }
+      }
+    }
+  }
 }
 
 export function validateContent({ posts, settings }) {
@@ -775,6 +858,11 @@ export function validateContent({ posts, settings }) {
   //   - registry shape invalid → null → C3 lookup skip（避免 cascade noise）
   //   - empty registry（commerceLinks === []）→ 空 Set；但 0 篇 production 用 ref → 0 觸發
   const commerceLinkIdSet = buildCommerceLinkIdSet(settings.commerceLinks);
+
+  // Phase 20260608-L5b：content-reference linkId → entry map（for C4 inactive / C9 display-override-risk）
+  //   - 與 commerceLinkIdSet 同源獨立建構；registry shape invalid → null → C4 / C9 skip
+  //   - empty registry（commerceLinks === []）→ 空 Map；0 篇 production 用 ref → 0 觸發
+  const commerceLinkEntryMap = buildCommerceLinkEntryMap(settings.commerceLinks);
 
   for (const post of posts) {
     const sourcePath = post.sourcePath;
@@ -1450,7 +1538,7 @@ export function validateContent({ posts, settings }) {
       // Phase 20260604-am-10：commerce-links content-reference validation（warning-only；C1 / C2 / C3 / C5）
       //   - per docs/20260604-commerce-links-content-reference-validation-preanalysis.md §5
       //   - 只掃 affiliate.links[].ref；raw-only links 不觸發；empty registry + 0-ref production → 0 觸發
-      validateCommerceRefs(post.affiliate, sourcePath, issues, commerceLinkIdSet);
+      validateCommerceRefs(post.affiliate, sourcePath, issues, commerceLinkIdSet, commerceLinkEntryMap);
     }
 
     if (post.category) {
