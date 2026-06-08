@@ -1,0 +1,45 @@
+{
+  "$comment": [
+    "sample-only blueprint（template only）。",
+    "NOT loaded by src/scripts/load-settings.js（loader 以 SETTINGS_FILES 白名單 + 具名 readJsonOptional 載入，無 readdir/glob；_sample.* 永不被讀）。",
+    "NOT used by production renderer / build。",
+    "NOT a validation fixture（validator 透過 loader key 取 registry + post-glob 只掃 .md；不掃本檔）。",
+    "NOT a real registry seed —— 真實 entry 由 user 依 CLAUDE.md §3 紅線手填至 commerce-links.json。",
+    "placeholders only：所有值皆 fixture-namespaced（sample-*）+ RFC 2606 reserved（example.invalid）；無真實 affiliate URL / tracking id / merchant id / token / credential。",
+    "不得加入 loader 白名單；不得整檔複製為 production commerce-links.json。",
+    "欄位藍本依 docs/20260608-registry-sample-design-preanalysis.md §6。"
+  ],
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-08",
+  "commerceLinks": [
+    {
+      "linkId": "sample-commerce-active",
+      "active": true,
+      "displayLabel": "Sample Store A (sample-only)",
+      "internalLabel": "sample-internal-label-a",
+      "networkKey": "sample-network",
+      "targetUrl": "https://example.invalid/sample-commerce-a",
+      "notes": "sample only; not production; not a real merchant"
+    },
+    {
+      "linkId": "sample-commerce-inactive",
+      "active": false,
+      "replacementTarget": "sample-commerce-active",
+      "displayLabel": "Sample Store (retired, sample-only)",
+      "internalLabel": "sample-internal-label-retired",
+      "networkKey": "sample-network",
+      "targetUrl": "https://example.invalid/sample-commerce-retired",
+      "notes": "sample only; inactive entry; replacementTarget points to sample-commerce-active to avoid R12/R14"
+    },
+    {
+      "linkId": "sample-commerce-c9",
+      "active": true,
+      "displayLabel": "Sample Store C9 (sample-only)",
+      "internalLabel": "sample-internal-label-c9",
+      "networkKey": "sample-network",
+      "targetUrl": "https://example.invalid/sample-commerce-c9",
+      "notes": "sample only; internalLabel is a meaningless namespaced token, NOT a real internal code; C9 display-override-risk blueprint reference"
+    }
+  ],
+  "notes": "sample-only blueprint; not loaded by load-settings.js; not used by production renderer; not a validation fixture; not a real registry seed; placeholders only"
+}

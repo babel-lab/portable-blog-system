@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "sample-only blueprint（template only）。",
+    "NOT loaded by src/scripts/load-settings.js（loader 以 SETTINGS_FILES 白名單 + 具名 readJsonOptional 載入，無 readdir/glob；_sample.* 永不被讀）。",
+    "NOT used by production renderer / build。",
+    "NOT a validation fixture（validator 透過 loader key 取 registry + post-glob 只掃 .md；不掃本檔）。",
+    "NOT a real registry seed —— 真實 entry 由 user 依 CLAUDE.md §3 紅線手填至 download-forms.json。",
+    "placeholders only：formId 皆 fixture-namespaced（sample-*）；刻意不含 Google Form URL / form id / Sheet id；無 respondent data。",
+    "respondent data remain in Google Forms / Sheets，不進 repo。",
+    "不得加入 loader 白名單；不得整檔複製為 production download-forms.json。",
+    "欄位藍本依 docs/20260608-registry-sample-design-preanalysis.md §7.2。"
+  ],
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-08",
+  "forms": [
+    {
+      "formId": "sample-form-signup",
+      "title": "Sample Signup Form (sample-only)",
+      "notes": "sample only; respondent data stays in Google; Google Form id intentionally omitted"
+    },
+    {
+      "formId": "sample-form-feedback",
+      "title": "Sample Feedback Form (sample-only)",
+      "notes": "sample only; respondent data stays in Google; Google Form id intentionally omitted"
+    }
+  ],
+  "notes": "sample-only blueprint; not loaded by load-settings.js; not used by production renderer; not a validation fixture; not a real registry seed; placeholders only"
+}

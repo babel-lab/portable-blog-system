@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "sample-only blueprint（template only）。",
+    "NOT loaded by src/scripts/load-settings.js（loader 以 SETTINGS_FILES 白名單 + 具名 readJsonOptional 載入，無 readdir/glob；_sample.* 永不被讀）。",
+    "NOT used by production renderer / build。",
+    "NOT a validation fixture（validator 透過 loader key 取 registry + post-glob 只掃 .md；不掃本檔）。",
+    "NOT a real registry seed —— 真實 entry 由 user 依 CLAUDE.md §3 紅線手填至 download-assets.json。",
+    "placeholders only：assetId 皆 fixture-namespaced（sample-*）；刻意不含 direct download URL / fileUrl；無 Google Drive 直連 / 私人 Drive folder id。",
+    "不得加入 loader 白名單；不得整檔複製為 production download-assets.json。",
+    "欄位藍本依 docs/20260608-registry-sample-design-preanalysis.md §7.1。"
+  ],
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-08",
+  "assets": [
+    {
+      "assetId": "sample-asset-pdf",
+      "title": "Sample Worksheet (PDF, sample-only)",
+      "fileType": "PDF",
+      "notes": "sample only; no downloadable resource; direct URL intentionally omitted"
+    },
+    {
+      "assetId": "sample-asset-zip",
+      "title": "Sample Bundle (ZIP, sample-only)",
+      "fileType": "ZIP",
+      "notes": "sample only; no downloadable resource; direct URL intentionally omitted"
+    }
+  ],
+  "notes": "sample-only blueprint; not loaded by load-settings.js; not used by production renderer; not a validation fixture; not a real registry seed; placeholders only"
+}
