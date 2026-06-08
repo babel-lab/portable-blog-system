@@ -259,8 +259,74 @@
       <% } else { %>
         <% commerceRoles.forEach(function(r) { %><code style="margin: 0 0.2rem; padding: 0.1rem 0.35rem; background: #e3ecf7; border-radius: 3px; font-size: 0.82em;"><%= r %></code><% }); %>
       <% } %>
-      <p class="text-muted" style="font-size: 0.78em; margin-top: 0.35rem;">role 非必填（recommended-but-optional）；此清單僅供作者參考合法值，避免 C8 invalid-role。本 phase 不提供 interactive 選取、不產生可 apply 之 snippet。</p>
+      <p class="text-muted" style="font-size: 0.78em; margin-top: 0.35rem;">role 非必填（recommended-but-optional）；此清單僅供作者參考合法值，避免 C8 invalid-role。下方 snippet 為作者手動複製貼上輔助；不自動寫入 .md / registry / middleware。</p>
     </div>
+
+    <%# Phase 20260608-night-1 commerce-admin-copyable-yaml-snippet-source-only-a
+        per docs/20260608-commerce-admin-copyable-yaml-snippet-preanalysis.md §5 / §6 / §7 / §8 / §10 / §14
+        - 純 authoring helper：產生可手動複製、貼進 .md frontmatter 之 affiliate.links YAML fragment
+        - read-only：不自動寫 .md / registry / fs / fetch / middleware / admin-write-cli
+        - snippet 只輸出：ref（linkId machine key）+ role（enum；空則省略 key 避免 C8 誤觸）+ labelOverride（空則省略）
+        - 永不輸出：targetUrl / internalLabel / tracking URL / token / credential / merchant id / networkKey
+        - registry empty → 不渲染 snippet UI（既有 empty-state 已說明）
+        - labelOverride 預設空（讓 renderer 未來 fallback 至 registry displayLabel）；不自動帶 displayLabel；永不帶 internalLabel
+    %>
+    <% if (commerceRows.length > 0) { %>
+    <div class="commerce-snippet-block" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #c5d6e8;">
+      <h4 style="margin: 0 0 0.4rem; font-size: 0.95em; color: #2c5282;">Copyable YAML snippet（authoring helper）</h4>
+      <p class="text-muted" style="font-size: 0.82em; line-height: 1.55; margin: 0 0 0.5rem;">
+        勾選下方 entry 並（選填）指定 role / labelOverride，下方 textarea 會即時產生可貼入文章 <code>.md</code> frontmatter 之 <code>affiliate.links</code> YAML fragment。
+        <strong>純文字產出</strong>，不執行任何寫入。複製貼上後請執行 <code>npm run validate:content</code> 把關（snippet 不取代 validator）。
+        <strong>labelOverride 限 display-safe 文字</strong>；不可放 tracking / commission / 私人備註 / 任何 sensitive 內容。
+      </p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; background: #fff; border: 1px solid #c5d6e8;">
+        <thead>
+          <tr style="background: #d6e4f5;">
+            <th style="text-align: left; padding: 0.3rem 0.5rem; width: 2.5rem;">pick</th>
+            <th style="text-align: left; padding: 0.3rem 0.5rem;">ref (linkId) — display label</th>
+            <th style="text-align: left; padding: 0.3rem 0.5rem; width: 10rem;">role (optional)</th>
+            <th style="text-align: left; padding: 0.3rem 0.5rem; width: 18rem;">labelOverride (optional, display-safe)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% commerceRows.forEach(function(row, i) { %>
+            <tr>
+              <td style="padding: 0.3rem 0.5rem; text-align: center;">
+                <input type="checkbox" data-commerce-pick="<%= i %>" data-commerce-link-id="<%= row.linkId %>" aria-label="pick <%= row.linkId %>">
+              </td>
+              <td style="padding: 0.3rem 0.5rem;">
+                <code class="mono"><%= row.linkId %></code>
+                <span class="text-muted"> — <%= row.displayLabel %></span>
+                <% if (!row.active) { %> <span class="badge b-missing" title="inactive entry；引用會觸發 C4 warning">inactive</span><% } %>
+              </td>
+              <td style="padding: 0.3rem 0.5rem;">
+                <select data-commerce-role="<%= i %>" style="width: 100%; padding: 0.2rem; font-family: inherit; font-size: 0.85em;">
+                  <option value="">— (省略 role) —</option>
+                  <% commerceRoles.forEach(function(r) { %><option value="<%= r %>"><%= r %></option><% }); %>
+                </select>
+              </td>
+              <td style="padding: 0.3rem 0.5rem;">
+                <input type="text" data-commerce-label="<%= i %>" value="" placeholder="(空 → fallback registry displayLabel)" maxlength="120" style="width: 100%; padding: 0.2rem; font-family: inherit; font-size: 0.85em;">
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <div style="margin-top: 0.5rem;">
+        <textarea id="commerce-snippet-output" readonly rows="8"
+                  style="width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82em; padding: 0.4rem; border: 1px solid #c5d6e8; background: #fff; resize: vertical;"
+                  aria-label="commerce affiliate links YAML snippet"
+                  spellcheck="false"></textarea>
+      </div>
+      <div style="margin-top: 0.4rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        <button type="button" id="commerce-snippet-copy"
+                style="padding: 0.35rem 0.75rem; border: 1px solid #2c5282; background: #cfe2ff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #2c5282;"
+                disabled aria-disabled="true">Copy YAML</button>
+        <span id="commerce-snippet-copy-status" style="font-size: 0.82em;" aria-live="polite"></span>
+        <span class="text-muted" style="font-size: 0.78em;">tip：若文章已有 <code>affiliate:</code> 區塊，只需貼 <code>links:</code> 之後的 <code>- ref: ...</code> 項目（自行對齊縮排）。</span>
+      </div>
+    </div>
+    <% } %>
   </section>
 
   <% if (posts.length === 0) { %>
@@ -1205,6 +1271,112 @@
           fbResult.hidden = false;
         });
       });
+    })();
+  </script>
+  <% } %>
+
+  <%# Phase 20260608-night-1 commerce-admin-copyable-yaml-snippet-source-only-a
+      per docs/20260608-commerce-admin-copyable-yaml-snippet-preanalysis.md §5 / §6 / §7 / §10 / §14
+      - 純 client-side：無 fetch / XHR / form submit / fs write / safeWrite caller / middleware ping
+      - 與 posts.length 無關（snippet 來源為 registry；故不放在 posts.length > 0 之 script 內）
+      - role 空 → 省略 key（per preanalysis §6.1 Design A；避免 C8 invalid-role 誤觸）
+      - labelOverride 空 → 省略 key；非空時以 double-quoted + escape 包裝（display-safe single-line）
+      - clipboard：navigator.clipboard.writeText 優先；不可用時 fallback execCommand('copy')；皆失敗則僅顯示提示
+  %>
+  <% if (commerceRows.length > 0) { %>
+  <script>
+    (function () {
+      var pickEls = document.querySelectorAll('[data-commerce-pick]');
+      var output = document.getElementById('commerce-snippet-output');
+      var copyBtn = document.getElementById('commerce-snippet-copy');
+      var statusEl = document.getElementById('commerce-snippet-copy-status');
+      if (!pickEls.length || !output || !copyBtn) return;
+
+      function yamlQuote(s) {
+        var t = String(s == null ? '' : s)
+          .replace(/\r?\n/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return t.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      }
+
+      function buildSnippet() {
+        var items = [];
+        for (var i = 0; i < pickEls.length; i++) {
+          var cb = pickEls[i];
+          if (!cb.checked) continue;
+          var idx = cb.getAttribute('data-commerce-pick');
+          var linkId = cb.getAttribute('data-commerce-link-id') || '';
+          if (!linkId) continue;
+          var roleEl = document.querySelector('[data-commerce-role="' + idx + '"]');
+          var labelEl = document.querySelector('[data-commerce-label="' + idx + '"]');
+          var role = roleEl ? (roleEl.value || '') : '';
+          var label = labelEl ? (labelEl.value || '') : '';
+          var lines = ['    - ref: ' + linkId];
+          if (role !== '') lines.push('      role: ' + role);
+          var labelTrim = label.replace(/\s+/g, ' ').trim();
+          if (labelTrim !== '') lines.push('      labelOverride: "' + yamlQuote(label) + '"');
+          items.push(lines.join('\n'));
+        }
+        if (items.length === 0) {
+          output.value = '# 勾選上方 entry 以產生 snippet';
+          copyBtn.disabled = true;
+          copyBtn.setAttribute('aria-disabled', 'true');
+          return;
+        }
+        output.value = 'affiliate:\n  links:\n' + items.join('\n') + '\n';
+        copyBtn.disabled = false;
+        copyBtn.setAttribute('aria-disabled', 'false');
+      }
+
+      function showStatus(msg, isErr) {
+        if (!statusEl) return;
+        statusEl.textContent = msg;
+        statusEl.style.color = isErr ? '#a00' : '#080';
+        setTimeout(function () {
+          if (statusEl.textContent === msg) statusEl.textContent = '';
+        }, 2000);
+      }
+
+      function fallbackCopy() {
+        try {
+          output.removeAttribute('readonly');
+          output.focus();
+          output.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          output.setAttribute('readonly', 'readonly');
+          if (ok) { showStatus('已複製 (Copied)', false); }
+          else { showStatus('複製失敗，請手動選取後 Ctrl+C', true); }
+        } catch (e) {
+          showStatus('複製失敗，請手動選取後 Ctrl+C', true);
+        }
+      }
+
+      copyBtn.addEventListener('click', function () {
+        if (copyBtn.disabled) return;
+        var text = output.value || '';
+        if (!text || text.charAt(0) === '#') {
+          showStatus('尚未選取 entry', true);
+          return;
+        }
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(text).then(function () {
+            showStatus('已複製 (Copied)', false);
+          }).catch(function () {
+            fallbackCopy();
+          });
+        } else {
+          fallbackCopy();
+        }
+      });
+
+      function wireInput(el, evt) { el.addEventListener(evt, buildSnippet); }
+      for (var i = 0; i < pickEls.length; i++) wireInput(pickEls[i], 'change');
+      document.querySelectorAll('[data-commerce-role]').forEach(function (el) { wireInput(el, 'change'); });
+      document.querySelectorAll('[data-commerce-label]').forEach(function (el) { wireInput(el, 'input'); });
+
+      buildSnippet();
     })();
   </script>
   <% } %>
