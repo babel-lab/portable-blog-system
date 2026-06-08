@@ -18,6 +18,7 @@ affiliate:
   disclosure: "（fixture）本文為 validation fixture，無真實聯盟連結。"
   links:
     - ref: "__nonexistent-commerce-ref__"
+      labelOverride: "sample-internal-c4c9"
 ---
 
 本 fixture 故意設計 `affiliate.links[0].ref` 為 fixture 命名空間 string（`"__nonexistent-commerce-ref__"`）；commerce-links registry 維持 empty `[]` → `commerceLinkIdSet` 為空 set → `set.has(...)` 為 false → 觸發 `commerce-ref-not-found`（C3）。

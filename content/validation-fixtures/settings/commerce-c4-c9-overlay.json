@@ -1,0 +1,34 @@
+{
+  "$comment": [
+    "overlay-only test fixture（L6b / Option C）。",
+    "僅由 `node src/scripts/validate-content.js --registry-overlay <path>`（或 npm run validate:content:overlay）顯式讀取；replace-in-memory，不寫回 production。",
+    "NOT loaded by src/scripts/load-settings.js（loader 白名單無 readdir/glob，永不讀本檔）。",
+    "NOT a production registry seed —— 不得整檔複製為 content/settings/commerce-links.json；不得加入 loader 白名單。",
+    "placeholders only：所有 key 皆 fixture-namespaced（sample-* / __nonexistent-*__）+ URL 為 RFC 2606 reserved（example.invalid）；無真實 affiliate / merchant / token / tracking / commission / Google Form / respondent data。",
+    "schemaVersion: 0 作為『非 production registry』人類防呆信號。",
+    "Entry A（linkId=__nonexistent-commerce-ref__，== _test-commerce-ref-not-found.md 之 ref）active=false + internalLabel → overlay mode 下同時觸發 C4 commerce-ref-inactive + C9 commerce-ref-display-override-risk。",
+    "Entry B 為 active replacement target，避免 Entry A 觸發 R12 / R14。",
+    "兩 entry 皆省略 networkKey → R11 skip → overlay 自身 0 registry-level warning。",
+    "藍本依 docs/20260608-commerce-c4-c9-overlay-fixture-plan.md §7.3 / Appendix B。"
+  ],
+  "schemaVersion": 0,
+  "updatedAt": "",
+  "commerceLinks": [
+    {
+      "linkId": "__nonexistent-commerce-ref__",
+      "active": false,
+      "replacementTarget": "sample-commerce-c4c9-active",
+      "internalLabel": "sample-internal-c4c9",
+      "targetUrl": "https://example.invalid/c4c9-inactive",
+      "notes": "overlay test only; inactive entry; supplies C4 (active:false) + C9 (internalLabel == fixture labelOverride); linkId equals reused fixture ref"
+    },
+    {
+      "linkId": "sample-commerce-c4c9-active",
+      "active": true,
+      "internalLabel": "sample-internal-active",
+      "targetUrl": "https://example.invalid/c4c9-active",
+      "notes": "overlay test only; active replacement target for Entry A; avoids R12/R14"
+    }
+  ],
+  "notes": "overlay-only test fixture; not loaded by load-settings.js; not a production registry seed; placeholders only; read only via --registry-overlay"
+}
