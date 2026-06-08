@@ -194,6 +194,75 @@
     <div class="stat-card" title="計數 GitHub enabled=true 且 previewUrl 為空之文章（completeness.github === 'missing'；通常為 slug 缺漏）；幫助直接定位需補 slug / preview URL 之文章。per Phase 20260523-night-admin-b3"><strong><%= missingGithubUrl %></strong>Missing GitHub URL</div>
   </div>
 
+  <%# Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
+      registry-global read-only commerce links / affiliate references preview
+      per docs/20260608-commerce-admin-selector-preanalysis.md §6 / §10
+        + docs/20260608-commerce-admin-selector-ui-source-preanalysis.md §5 / §6 / §7
+      - DATA SOURCE = production settings.commerceLinks（loader unwrap array）；registry empty → empty-state
+      - read-only / no Apply / no registry write / no markdown write / no middleware / no admin-write-cli
+      - 只顯示 safe 欄位：linkId(ref machine key) / active status / safe displayLabel / has replacement target
+      - 永不顯示 targetUrl / tracking URL / internalLabel / networkKey(merchant) / token / credential
+      - role enum = C8 mirror（authoring guidance；role 仍 recommended-but-optional；C7 missing-role deferred）
+  %>
+  <%
+    var commercePreview = (typeof commerceLinksPreview === 'object' && commerceLinksPreview)
+      ? commerceLinksPreview : { rows: [], count: 0 };
+    var commerceRows = Array.isArray(commercePreview.rows) ? commercePreview.rows : [];
+    var commerceRoles = (typeof allowedCommerceRoles !== 'undefined' && Array.isArray(allowedCommerceRoles))
+      ? allowedCommerceRoles : [];
+  %>
+  <section style="margin: 1.5rem 0; padding: 1rem 1.25rem; border: 1px solid #c5d6e8; border-radius: 4px; background: #f3f7fc;">
+    <h3 style="margin-top: 0; color: #2c5282; border-bottom: 1px solid #c5d6e8; padding-bottom: 0.4rem;">commerce links / affiliate references preview (read-only)</h3>
+    <p class="text-muted" style="font-size: 0.85em; line-height: 1.6;">
+      🔒 Read-only preview — no Admin Apply · no registry write · no markdown write · no middleware · no admin-write-cli.
+      資料來源為 production <code>settings.commerceLinks</code>（<code>content/settings/commerce-links.json</code>）；
+      不讀 <code>_sample.commerce-links.json</code>、不讀 validation overlay / fixture、不 auto-promote sample。
+      僅顯示安全欄位（ref machine key / active status / 公開 display label / has replacement target）；
+      不顯示 targetUrl / tracking URL / internalLabel / merchant id / token / credential。
+      role 為 <strong>recommended-but-optional</strong>；C7（missing-role required）目前 <strong>deferred</strong>，下方 role enum 僅為 authoring guidance。
+    </p>
+
+    <% if (commerceRows.length === 0) { %>
+      <p class="empty" style="font-style: italic; color: #666;">No production commerce links configured（registry empty）。請依 CLAUDE.md §3 紅線規範手填 <code>content/settings/commerce-links.json</code> 後，此處才會列出可引用之 entry。</p>
+    <% } else { %>
+      <table class="detail-table" style="width: 100%; border-collapse: collapse; font-size: 0.88em;">
+        <thead>
+          <tr style="background: #d6e4f5;">
+            <th style="text-align: left; padding: 0.3rem 0.5rem; width: 16rem;">ref (linkId)</th>
+            <th style="text-align: left; padding: 0.3rem 0.5rem; width: 6rem;">status</th>
+            <th style="text-align: left; padding: 0.3rem 0.5rem;">display label (safe)</th>
+            <th style="text-align: left; padding: 0.3rem 0.5rem; width: 9rem;">replacement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% commerceRows.forEach(function(row) { %>
+            <tr>
+              <td class="mono" style="padding: 0.3rem 0.5rem;"><%= row.linkId %></td>
+              <td style="padding: 0.3rem 0.5rem;">
+                <% if (row.active) { %><span class="badge b-ok">active</span><% } else { %><span class="badge b-missing">inactive</span><% } %>
+              </td>
+              <td style="padding: 0.3rem 0.5rem;"><%= row.displayLabel %></td>
+              <td style="padding: 0.3rem 0.5rem;">
+                <% if (row.hasReplacementTarget) { %><span class="badge b-info">has replacement</span><% } else { %><span class="text-muted">—</span><% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <p class="text-muted" style="font-size: 0.8em; margin-top: 0.5rem;">共 <%= commerceRows.length %> 筆 active/inactive entry（inactive 不建議直接引用，請改用其 replacement / active entry）。</p>
+    <% } %>
+
+    <div style="margin-top: 0.75rem;">
+      <strong style="font-size: 0.85em;">allowed role enum (authoring guidance；C8 mirror)：</strong>
+      <% if (commerceRoles.length === 0) { %>
+        <span class="text-muted" style="font-size: 0.85em;">（enum 不可用）</span>
+      <% } else { %>
+        <% commerceRoles.forEach(function(r) { %><code style="margin: 0 0.2rem; padding: 0.1rem 0.35rem; background: #e3ecf7; border-radius: 3px; font-size: 0.82em;"><%= r %></code><% }); %>
+      <% } %>
+      <p class="text-muted" style="font-size: 0.78em; margin-top: 0.35rem;">role 非必填（recommended-but-optional）；此清單僅供作者參考合法值，避免 C8 invalid-role。本 phase 不提供 interactive 選取、不產生可 apply 之 snippet。</p>
+    </div>
+  </section>
+
   <% if (posts.length === 0) { %>
     <p class="empty">無 posts 可顯示（content/{github,blogger}/posts/*.md 為空）</p>
   <% } else { %>

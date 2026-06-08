@@ -28,6 +28,10 @@ import {
 //   - read-only helper for selector preview UI（per docs/20260601-sourcekey-admin-selector-preanalysis.md §4）
 //   - 不啟用 Admin Apply / middleware write / admin-write-cli；不寫回 .md frontmatter
 import { buildActiveSourceOptions } from './active-source-keys.js';
+// Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
+//   - read-only helper for commerce selector / registry preview UI（per docs/20260608-commerce-admin-selector-*.md）
+//   - 只讀 production settings.commerceLinks；只輸出 safe 欄位；不啟用 Admin Apply / middleware / admin-write-cli
+import { buildCommerceLinkPreviewOptions, ALLOWED_COMMERCE_ROLES } from './active-commerce-links.js';
 
 const SITES = ['github', 'blogger'];
 
@@ -360,6 +364,11 @@ export async function loadAdminPosts({ settings }) {
   //   - 建構一次共享 reference；不每 post 重算；不每 post 複製
   //   - settings.linkSources.sources 缺檔時 → 空陣列；selector UI 仍能 render（只顯示「未指定」option）
   const sourceOptions = buildActiveSourceOptions(settings);
+  // Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
+  //   - registry-global read-only preview（非 per-post）；建構一次，於 loadAdminPosts return 暴露
+  //   - production registry empty → { rows: [], count: 0 } → UI 顯示 empty-state
+  //   - 只含 safe 欄位（linkId / displayLabel / active / hasReplacementTarget）；不含 targetUrl / internalLabel / networkKey
+  const commerceLinksPreview = buildCommerceLinkPreviewOptions(settings);
   for (const site of SITES) {
     const pattern = `content/${site}/posts/*.md`;
     const mdFiles = await fg(pattern, { ignore: ['**/*.fb.md'], absolute: false });
@@ -378,5 +387,8 @@ export async function loadAdminPosts({ settings }) {
     if (tb !== ta) return tb - ta;
     return (b.id || '').localeCompare(a.id || '');
   });
-  return { posts };
+  // Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
+  //   - additive read-only context；既有 { posts } consumer 不受影響
+  //   - allowedCommerceRoles = C8 enum mirror（authoring guidance；role 仍 recommended-but-optional；C7 deferred）
+  return { posts, commerceLinksPreview, allowedCommerceRoles: ALLOWED_COMMERCE_ROLES };
 }

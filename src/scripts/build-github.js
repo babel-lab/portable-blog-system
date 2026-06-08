@@ -782,7 +782,16 @@ async function main() {
     const adminData = await loadAdminPosts({ settings });
     const adminHtml = await ejs.renderFile(
       path.join(VIEWS_DIR, 'admin', 'index.ejs'),
-      { posts: adminData.posts, builtAt: startedAt.toISOString() },
+      {
+        posts: adminData.posts,
+        builtAt: startedAt.toISOString(),
+        // Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
+        //   - additive read-only context；registry-global commerce preview + C8 role enum mirror
+        //   - production registry empty → commerceLinksPreview.count === 0 → EJS empty-state
+        //   - 不啟用 Admin Apply / middleware / write route；render 端純顯示
+        commerceLinksPreview: adminData.commerceLinksPreview || { rows: [], count: 0 },
+        allowedCommerceRoles: adminData.allowedCommerceRoles || [],
+      },
       { async: true },
     );
     await writeText(path.join(PAGES_DIR, 'admin', 'index.html'), adminHtml, outputs);
