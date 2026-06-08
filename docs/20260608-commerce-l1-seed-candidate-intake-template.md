@@ -103,7 +103,7 @@ Each candidate entry the user proposes should contain at minimum the following f
 
 - **Format**: public HTTPS URL pointing at the destination page. Must satisfy §6 safe-URL policy.
 - **Purpose**: the actual destination the end-user reaches when they click the rendered link.
-- **Acceptable examples**: `https://www.kingstone.com.tw/basic/<isbn>`, `https://www.books.com.tw/products/<id>` (only if no tracking params), `https://publisher.example.com/book/<slug>`
+- **Acceptable examples**: `https://bookstore.example.com/basic/<isbn>`, `https://books.example.org/products/<id>` (only if no tracking params), `https://publisher.example.net/book/<slug>`. **Note**: real merchant domains (e.g., actual Taiwanese bookstores, real publisher sites) may only be supplied **by the user** in the actual candidate list; this template-doc never contains real merchant domains in its illustrative examples.
 - **Unacceptable examples**: see §6 in full. In short: anything containing tracking params, shorteners, tokens, login-required URLs, private Drive URLs, Google Form edit URLs, or admin/editor URLs.
 - **Will enter production registry?** Yes — stored as `targetUrl` on the entry.
 - **Will appear in Admin UI / snippet?** **No** — `active-commerce-links.js` deliberately excludes `targetUrl` from the Admin selector preview row (it is never echoed back to UI). The snippet helper similarly does not write `targetUrl` into the post (the post references the entry via `ref`, and the registry holds the URL).
@@ -224,7 +224,7 @@ commerceSeedCandidates:
   - linkId: "example-library-catalogue"
     displayLabel: "Example Public Library Catalogue Entry"
     role: "library"
-    targetUrl: "https://library.example.gov/catalogue/item-id"
+    targetUrl: "https://library.example.org/catalogue/item-id"
     sourceReason: "Public library catalogue; no auth; safe for first seed review."
 
   - linkId: "example-price-check"
@@ -234,7 +234,7 @@ commerceSeedCandidates:
     sourceReason: "Bookstore product page with all tracking params stripped; verified canonical URL."
 ```
 
-All values in the template above are placeholders using `example.com` / `example.gov` / `store.example.com` (RFC 2606 reserved). Replacing them is the user's job, in a later session, with real candidate entries.
+All values in the template above are placeholders using `example.com` / `example.org` / `library.example.org` / `store.example.com`. RFC 2606 reserves **only** the second-level domains `example.com` / `example.org` / `example.net` plus the TLDs `.example` / `.invalid` / `.test` / `.localhost`. Do **not** substitute any other TLD (no country-code TLDs, no real-government or real-organisation TLDs, no real merchant domains) into the placeholder URLs — only the above reserved namespaces are safe for template-doc examples. Replacing the reserved-namespace placeholders with real URLs is the user's job, in a later session, with real candidate entries.
 
 ### 8.2 Per-entry self-check (user fills in before submitting the block)
 
@@ -277,7 +277,35 @@ Each of the above is a separate phase. None of them start because this template 
 
 ---
 
-## 11. References (read-only)
+## 11. L1 / L2 / L3 / L4 ladder reminder
+
+The commerce seed ladder is deliberately staged. Each rung is its own phase with its own preanalysis, its own approval, and its own acceptance:
+
+| Rung | Scope | Modifies | This template's relation |
+| --- | --- | --- | --- |
+| **L1** | Candidate preflight — docs-only / read-only review of user-provided candidate entries against §4 / §5 / §6 / §7 / §8.2 | **Nothing** is written. Output is a per-entry pass/fail report. | This template **is the input form** for L1. Filling it does not start L1; L1 starts only when user pastes candidates and explicitly opens an L1 phase. |
+| **L2** | Settings-only seed implementation | `content/settings/commerce-links.json` (`commerceLinks: []` → non-empty array of vetted entries). No source / renderer / content / build changes. | This template **is not** L2 and does not authorize an L2 write. L2 requires L1 to have passed, a separate L2 preanalysis, and explicit user approval. |
+| **L3** | L2 seed acceptance — read-only cross-check of the L2 write | **Nothing** is written. Output is registry-shape, validator output, Admin selector preview, and red-line re-scan. | This template **is not** L3. L3 only runs after L2 has landed and been pushed. |
+| **L4** | Renderer activation | source (`src/**`) — wires `affiliate.links[].ref` resolution into post detail render output; optionally enables C7 source. Possibly triggers production content migration (raw `url` → `ref`). | This template **is not** L4. L4 requires L3 acceptance, a separate L4 preanalysis, and explicit user approval. C7 source remains dormant until L4 (or its own dedicated phase). |
+
+Explicit non-claims:
+
+- This template **is not** an L1 execution result. L1 runs only when user submits candidates and authorizes the L1 phase.
+- This template **is not** an L2 seed. `commerce-links.json` remains `commerceLinks: []` after this template lands.
+- This template **is not** an L4 renderer activation. Renderer remains dormant. No post output changes because this template exists.
+
+---
+
+## 12. Final recommendation
+
+- **After this template (or its docs-only correction) lands, recommend Final Idle Freeze / EXIT.** The next conversation has the form it needs; nothing else needs to happen until user provides candidates.
+- **Do not auto-start L1.** AI must not preemptively run L1 checks against fabricated or guessed entries. L1 starts only when user explicitly pastes a `commerceSeedCandidates:` block (per §8) and asks for the L1 phase.
+- **Wait for user-provided candidate entries.** No registry write, no L2 preanalysis, no L3, no L4, no C7 activation, no renderer activation, no Admin Apply, no production content migration, no deploy, no Blogger repost, no GA4 validation should be initiated based on this template alone.
+- **Any future L1 phase must be independently authorized** by user with its own phase name, its own scope statement, and its own acceptance criteria — this template does not pre-authorize any of them.
+
+---
+
+## 13. References (read-only)
 
 - `CLAUDE.md` §3.1 commerce registry governance red-line
 - `docs/20260608-project-wide-status-checkpoint.md` — current project-wide status
