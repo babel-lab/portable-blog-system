@@ -9,6 +9,7 @@
 //     （回傳物件保留 `warnings` 欄位，內容為 severity:'warning' 的子集合）
 
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { loadSettings } from './load-settings.js';
@@ -1755,11 +1756,120 @@ export function printWarnings(arr) {
   console.warn(`[validate-content] ${arr.length} warning(s) on ${byPath.size} post(s)`);
 }
 
+// Phase 20260608-pm-9：validation-only registry overlay infrastructure（source-only）
+//   - per docs/20260608-registry-overlay-source-preflight.md（§6 activation A+E / §7 護欄 /
+//     §9 touch points / §10 merge=replace / §12 安全）
+//   - 目的：未來讓 validator 在 fixture 情境讀 overlay registry，以主動測 C4/C9/download R2。
+//     本輪只實作「讀 overlay 的能力」基礎設施，不實作 C4/C9 source、不建 overlay 檔、不建 fixture。
+//   - activation：explicit CLI flag `--registry-overlay <repo-local path>`（無 flag → overlay-blind）。
+//   - 注入點：validate-content.js main（gated by flag）；loadSettings() 維持純 production path →
+//     build / dev / preview / renderer / report / Admin 永不讀 overlay（§9.2 / §13.1）。
+//   - merge semantics：replace（overlay 宣告之 registry 完全取代 settings.*；不 merge entry；§10.2 A）。
+//   - 安全：overlay path 限 repo-local content/validation-fixtures/settings/** 子樹；JSON parse error /
+//     path unsafe → clear hard error；不 echo 檔案內容；不放真實 affiliate/download/token/Form 資料（§12）。
+
+// 解析 --registry-overlay flag（支援 "--registry-overlay <path>" 與 "--registry-overlay=<path>"）。
+// 回傳 path 字串，或 null（未提供 flag）。
+function parseRegistryOverlayArg(argv) {
+  const FLAG = '--registry-overlay';
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === FLAG) {
+      return argv[i + 1] !== undefined ? argv[i + 1] : '';
+    }
+    if (a.startsWith(`${FLAG}=`)) {
+      return a.slice(FLAG.length + 1);
+    }
+  }
+  return null;
+}
+
+// repo-local path safety guard：僅允許 content/validation-fixtures/settings/** 子樹之檔案。
+//   - 拒絕：網路 URL / 協定 / UNC path、repo 外絕對路徑、`..` 逃逸、production settings path。
+//   - 回傳安全解析後之絕對路徑；任何違規 → throw（clear hard error；不 echo 檔案內容）。
+function resolveOverlayPathSafe(overlayPath) {
+  if (typeof overlayPath !== 'string' || overlayPath.trim() === '') {
+    throw new Error('[validate-content] --registry-overlay requires a repo-local path argument under content/validation-fixtures/settings/');
+  }
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(overlayPath) || overlayPath.startsWith('\\\\') || overlayPath.startsWith('//')) {
+    throw new Error('[validate-content] --registry-overlay rejects network / protocol / UNC paths; use a repo-local path under content/validation-fixtures/settings/');
+  }
+  const here = path.dirname(fileURLToPath(import.meta.url)); // src/scripts
+  const repoRoot = path.resolve(here, '..', '..');
+  const allowedRoot = path.resolve(repoRoot, 'content', 'validation-fixtures', 'settings');
+  const resolved = path.resolve(repoRoot, overlayPath);
+  const rel = path.relative(allowedRoot, resolved);
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('[validate-content] --registry-overlay must point to a file under content/validation-fixtures/settings/ (rejected production settings path / .. traversal / outside-repo path)');
+  }
+  return resolved;
+}
+
+// 讀取 + parse + shape-extract overlay registry 檔。
+//   - JSON parse error / 非物件 → clear hard error（不 echo 檔案內容）。
+//   - shape mismatch（如 commerceLinks 非 array）→ 不 hard error；mirror loader（非 array → []），
+//     其餘交由既有 warning-only registry validator（validateCommerceLinkRegistry /
+//     validateDownloadRegistry）處理（§6「沿用現有 warning-only 設計」）。
+//   - overlay shape 對應 validator 內部使用之 registry 結構：
+//       commerce  : `commerceLinks` array            → settings.commerceLinks（array）
+//       dl asset  : `downloadAssets` object 或 `assets` array  → settings.downloadAssets（registry object）
+//       dl form   : `downloadForms` object 或 `forms` array    → settings.downloadForms（registry object）
+//   - 回傳 { commerceLinks?, downloadAssets?, downloadForms? }；只含 overlay 顯式宣告之 registry。
+function loadValidationOverlay(overlayPath) {
+  const resolved = resolveOverlayPathSafe(overlayPath);
+  let raw;
+  try {
+    raw = readFileSync(resolved, 'utf8');
+  } catch (err) {
+    throw new Error(`[validate-content] --registry-overlay cannot read file: ${overlayPath} (${err.code || 'read error'})`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`[validate-content] --registry-overlay JSON parse failed: ${overlayPath}`);
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`[validate-content] --registry-overlay must be a JSON object registry file: ${overlayPath}`);
+  }
+  const overlay = {};
+  // commerce：mirror loader unwrap（settings.commerceLinks = array；非 array → []）。
+  if ('commerceLinks' in parsed) {
+    overlay.commerceLinks = Array.isArray(parsed.commerceLinks) ? parsed.commerceLinks : [];
+  }
+  // download asset registry：downloadAssets（registry object）或 assets（整檔即 registry object）。
+  if ('downloadAssets' in parsed) {
+    overlay.downloadAssets = parsed.downloadAssets;
+  } else if ('assets' in parsed) {
+    overlay.downloadAssets = parsed;
+  }
+  // download form registry：downloadForms（registry object）或 forms（整檔即 registry object）。
+  if ('downloadForms' in parsed) {
+    overlay.downloadForms = parsed.downloadForms;
+  } else if ('forms' in parsed) {
+    overlay.downloadForms = parsed;
+  }
+  return overlay;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
 
 if (isMain) {
   const settings = await loadSettings();
+  // Phase 20260608-pm-9：optional validation-only registry overlay（gated by --registry-overlay flag）
+  //   - 無 flag → overlayPath === null → overlay-blind → settings 維持純 production → baseline byte-identical。
+  //   - 有 flag → replace semantics：overlay 宣告之 registry 取代 settings.*（不 merge entry；§10.2 A）。
+  //   - loadSettings() 本身不變 → build / dev / renderer / Admin 永不讀 overlay（§9.5 / §13.1）。
+  //   - 只 echo overlay path（repo-local，非敏感）；不 echo 檔案內容（§12）。
+  const overlayPath = parseRegistryOverlayArg(process.argv.slice(2));
+  if (overlayPath !== null) {
+    const overlay = loadValidationOverlay(overlayPath);
+    if ('commerceLinks' in overlay) settings.commerceLinks = overlay.commerceLinks;
+    if ('downloadAssets' in overlay) settings.downloadAssets = overlay.downloadAssets;
+    if ('downloadForms' in overlay) settings.downloadForms = overlay.downloadForms;
+    console.warn(`[validate-content] registry overlay active: ${overlayPath} (validation-only; production registry replaced for this run)`);
+  }
   // Phase 4-g：main 模式同時檢查 github + blogger
   // build:github / build:blogger 仍依各自呼叫方傳入的 posts 範圍處理
   // Phase 8-f-2-b：plumbing — 將 settings 轉發給 loadPosts → processMarkdownEntry → normalizePostOutput

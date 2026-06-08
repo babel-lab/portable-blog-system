@@ -17,6 +17,7 @@
     "build:sitemap": "node src/scripts/build-sitemap.js",
     "build:blogger-theme": "node src/scripts/build-blogger-theme-css.js",
     "validate:content": "node src/scripts/validate-content.js",
+    "validate:content:overlay": "node src/scripts/validate-content.js",
     "new:post": "node src/scripts/new-post.js",
     "backfill:url": "node src/scripts/backfill-published-url.js",
     "report:build": "node src/scripts/export-build-report.js",
