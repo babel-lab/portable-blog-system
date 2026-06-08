@@ -202,9 +202,26 @@ npm run check:images
 
 ## §7 最近一次穩定 checkpoint
 
-（更新時點：2026-05-26；pm-17 docs-only checkpoint refresh；本 phase 為 docs-only baseline sync — 未跑 build / validate / deploy / Blogger repost / GA4 validation。下方「5/21 重點摘要 / 解除 deferred items / 新增 docs」起之區塊為**歷史紀錄保留**；非當前快照；請以本節 7.1 為當前狀態）
+（更新時點：2026-06-09 am-1；docs-only baseline sync。當前狀態以 §7.0 為準；§7.1 / §7.2 屬 5/26 與 5/21 之前快照保留，不代表 6/9 狀態）
 
-### 7.1 當前 checkpoint（2026-05-26）
+### 7.0 當前 checkpoint（2026-06-09）
+
+- source HEAD: `ff86083 docs(commerce): fix L1 intake placeholder examples`
+- branch: `main` / tracking `origin/main` / 與 remote 同步 / working tree clean
+- validate baseline：
+  - normal `npm run validate:content` = **0 errors / 69 warnings / 59 posts**
+  - overlay `node src/scripts/validate-content.js --registry-overlay content/validation-fixtures/settings/commerce-c4-c9-overlay.json` = **0 errors / 70 warnings / 59 posts**
+- commerce registry：empty `[]`（未 seed）；Admin commerce read-only preview + YAML snippet copy helper **已 landed/accepted**（commit `77d9ad8`）；L1 seed candidate intake template **已 landed** 但尚未啟動 L1 seed ladder（registry 仍 empty）
+- C4 / C7 / C8 / C9 commerce content-ref rules + Admin Apply / middleware write / admin-write-cli / renderer activation / production migration / deploy / Blogger repost / GA4 commerce dimension / reverse UTM / pm-26 deploy gate：**全部 dormant**
+- 2026-06-08 重要 docs（cold-start 可發現性入口）：
+  - `docs/20260608-project-wide-status-checkpoint.md`（夜 night-7；frozen state project-wide snapshot；HEAD `5b3177f` 時點）
+  - `docs/20260608-commerce-admin-snippet-helper-acceptance-checkpoint.md`（夜 night-5；commit `77d9ad8` Admin YAML snippet copy helper acceptance 存證）
+  - `docs/20260608-commerce-l1-seed-candidate-intake-template.md`（夜 night-9；user-facing L1 seed candidate intake template；docs-only；不啟動 seed）
+  - `docs/20260608-commerce-registry-seed-governance-preanalysis.md`（pm-29；commerce registry seed governance 治理紅線；docs-only；不 seed / 不 source / 不 Admin / 不 write path）
+
+### 7.1 5/26 快照（歷史保留）
+
+（以下為 5/26 pm-17 docs-only checkpoint refresh 之內容；**非當前狀態**；當前狀態以 §7.0 為準）
 
 - source HEAD: `d6b6719 docs(operations): record template body scaffold cleanup`（5/26 多 phase 線性堆疊：`863d7e8` reverse-utm fixture scan → `e34b002` roadmap align → `d4fd450` / `1c2a346` / `007875d` template refactor 三連 → `e295af7` phase-1 guide note → `7f18266` PROJECT_TREE refresh → `6f20cf8` README §7 baseline refresh → `3191bea` template body scaffold cleanup（blogger book / magazine / download 三檔）→ `726bb3b` sibling template body scaffold cleanup（post / github-tech-note / blogger-summary 三檔）→ `e6ecd83` README §7 baseline refresh → `d6b6719` phase-1 guide template scaffold record；皆 docs-only / template-only / listing-only；無 source code / build / deploy 變動）
 - branch: `main` / tracking `origin/main` / 與 remote 同步
@@ -218,7 +235,7 @@ npm run check:images
 
 ### 7.2 歷史紀錄（2026-05-22 之前快照保留）
 
-（以下為原 §7 內容；屬 5/22 day-1-docs-cleanup-a 後當時快照；保留為歷史 trail；**非當前狀態**。當前狀態以 §7.1 為準）
+（以下為原 §7 內容；屬 5/22 day-1-docs-cleanup-a 後當時快照；保留為歷史 trail；**非當前狀態**。當前狀態以 §7.0 為準）
 
 - HEAD: `6593e4c docs(project): add custom domain root files safety strategy` （5/21 夜 custom-domain-root-files-safety-a 已落地；其後 pm-66 EOD §18 commit `f202e51` 已先在 5/21 末段落地；5/22 day-1 docs-cleanup-a 為本批；本 §7 自身落後 1 commit 為既知遞迴）
 - branch: `main` / tracking `origin/main` / 與 remote 同步

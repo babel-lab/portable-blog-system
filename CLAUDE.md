@@ -221,7 +221,10 @@ empty registry（`{ schemaVersion:1, updatedAt:"", commerceLinks:[], notes:"" }`
 
 ### 當前 baseline
 
-`npm run validate:content` = **0 errors / 68 warnings / 58 posts**。empty registries + production 0 篇用 `ref` / `assetRefs[]` / `formRef` / ref+url coexist → 所有 registry-level + content-ref rules 對 production posts 全 0 觸發。68/58 = 既有 baseline + download R5b fixture（+2/+1）+ commerce content-ref C1/C2/C3/C5 fixtures（+6/+4）+ C6 fixture（+2/+1）；validation-fixtures 為唯一 warning 來源。
+`npm run validate:content` = **0 errors / 69 warnings / 59 posts**（normal baseline；HEAD `ff86083`）。
+`node src/scripts/validate-content.js --registry-overlay content/validation-fixtures/settings/commerce-c4-c9-overlay.json` = **0 errors / 70 warnings / 59 posts**（overlay baseline；C4/C9 inactive-ref + internal-label rules 觸發於 overlay 注入之 inactive entries）。
+
+empty registries + production 0 篇用 `ref` / `assetRefs[]` / `formRef` / ref+url coexist → 所有 registry-level + content-ref rules 對 production posts 全 0 觸發；validation-fixtures 為唯一 warning 來源。normal 69 / overlay 70 之差距為 overlay-injected C4/C9 fixture entries。
 
 Commerce registry 治理紅線（per `docs/20260603-commerce-affiliate-link-empty-registry-preanalysis.md` §4.3 / §5.3 + night-22 §9 + am-2 §12）：
 
