@@ -137,54 +137,33 @@ content/
 ```yaml
 ---
 id: "20260504-github-pages-blog-planning"
-site: "github"
-contentKind: "tech-note"
+site: "github"                 # github | blogger
+contentKind: "tech-note"       # post / tech-note / book-review / download / comic / life-note / page
 primaryPlatform: "github"
-
 title: "GitHub Pages 免費空間限制與部落格規劃"
 titleEn: "GitHub Pages Free Hosting Limits and Blog Planning"
 slug: "github-pages-blog-planning"
-
 date: "2026-05-04"
 updated: "2026-05-04"
 author: "Dean"
-
-category: "tech-note"
-tags:
-  - github
-  - vite
-  - static-site
-
-description: "整理 GitHub Pages 免費空間限制與可搬家部落格規劃。"
-searchDescription: "GitHub Pages 免費空間、Vite 靜態網站、Markdown 部落格、Google AdSense 與搬家規劃。"
-
+category: "tech-note"          # 必須存在於 categories.json
+tags: [github, vite, static-site]    # 必須存在於 tags.json
+description: "..."
+searchDescription: "..."
 cover: ""
 coverAlt: ""
-
-status: "draft"
+status: "draft"                # draft / ready / published / archived
 draft: true
-
 canonical: "auto"
-
 publishTargets:
-  github:
-    enabled: true
-    mode: "full"
-  blogger:
-    enabled: true
-    mode: "summary"
-
-blocks:
-  toc: false
+  github:  { enabled: true, mode: "full" }
+  blogger: { enabled: true, mode: "summary" }    # full / summary / redirect-card
+blocks:                        # toc / adsenseTop / adsenseMiddle / adsenseBottom / hashtags / socialFollow / relatedPosts / sidebar
   adsenseTop: true
-  adsenseMiddle: false
-  adsenseBottom: true
   hashtags: true
-  socialFollow: true
-  relatedPosts: true
-  sidebar: true
 ---
 ```
+（完整欄位字典見下方 See also）
 
 See also:
 - `docs/publish-bundle.md` §2.6.1（`.md` frontmatter 內容屬性欄位列表）
@@ -216,95 +195,33 @@ content/settings/download-assets.json
 content/settings/download-forms.json
 ```
 
-`download-assets.json` 與 `download-forms.json` 為 **empty settings registry landing point**（於 commit `466e471` 落地；per `docs/20260531-download-empty-registry-implementation-plan.md` §5 / §8 + am-11 read-only acceptance）。當前狀態：
+### download-assets.json / download-forms.json（empty registry landing point）
 
-- 兩檔內容為 `{ schemaVersion: 1, updatedAt: "", assets|forms: [], notes: "" }`（empty registry）
-- ✅ **loader 已 read-only 載入此兩檔**（`src/scripts/load-settings.js` Phase 20260601-pm-11；以 `readJsonOptional` 缺檔 / parse-error fallback；暴露為 `settings.downloadAssets` / `settings.downloadForms`，未啟動任何下游 consumer）
-- ✅ **validator 已有 registry-level shape + key uniqueness 檢查**（`src/scripts/validate-content.js` Phase 20260601-pm-17；warning-only：`download-registry-invalid-shape` / `download-registry-duplicate-key`）；frontmatter shape rules（`download.fileUrl` D1 / D2 / D3、`assetRefs[]` 與 `download.formRef` 5 條 shape rules）亦已落地
-- 🔄 **content reference registry-aware validation 部分啟動**：
-  - ✅ **R2 not-found 已 landed**（Phase 20260602-night-9；commit `145a548`；warning-only）：
-    - `download-asset-ref-not-found`：當 `download.assetRefs[i]` 為非空 trimmed string 但未登錄於 `settings.downloadAssets` registry 時觸發
-    - `download-form-ref-not-found`：當 `download.formRef` 為非空 trimmed string 但未登錄於 `settings.downloadForms` registry 時觸發
-    - 使用 read-only registries（`settings.downloadAssets` / `settings.downloadForms`）
-    - rule ordering：invalid-type → empty → not-found（互斥分支 cascade）
-    - registry-shape invalid 時 `assetKeySet` / `formKeySet === null` → lookup 跳過，避免 cascade warnings
-    - R2 fixtures：`_test-download-asset-ref-not-found.md` / `_test-download-form-ref-not-found.md`（各觸發單一 R2 warning）
-  - ✅ **R5b intra-post duplicate 已 landed**（Phase 20260603-am-2；commit `077c3d1`；warning-only）：
-    - `download-asset-ref-duplicate`：當 `download.assetRefs[]` 內存在重複 ref（trim 後 case-sensitive 相同）時觸發
-    - scope = **intra-post `download.assetRefs[]` duplicate only**（單一 post 內 array 重複）；與 registry-level `download-registry-duplicate-key`（檢查 registry 內 `assetId` 唯一性）為兩條獨立 rule
-    - duplicate 比對語意：trim、case-sensitive、只比對 `typeof === 'string'` 且 trim 後非空之 item（non-string item 由 `download-asset-ref-invalid-type` 處理；empty / whitespace 由 `download-asset-ref-empty` 處理；皆**不**參與 duplicate）
-    - 每個 duplicated key 只產生 **1 個 warning**（避免 per-occurrence 爆量）；warning value 樣式：`assetRefs[<idx1>,<idx2>,...] duplicate key="<key>"`
-    - 與 R2 not-found 為 **orthogonal cascade**：同一 key 可同時觸發 not-found 與 duplicate；duplicate 不 suppress not-found
-    - **不** consult / mutate registry key sets；**不**改 registry JSON；**不**動 loader
-    - **不**檢查 `formRef`（formRef 為 single value，無 intra-post duplicate 概念）
-    - R5b fixture：`_test-download-asset-ref-duplicate.md`（故意觸發 2× `download-asset-ref-not-found` + 1× `download-asset-ref-duplicate`，per S1 orthogonal 設計）
-    - production 影響：零（production posts 未使用 `assetRefs[]`）
-  - ❌ **inactive rules 尚未啟動**：尚無 `download-asset-ref-inactive` / `download-form-ref-inactive`（R4 範圍；R4a 已決定 keep registries empty / defer inactive）
-  - ❌ **coexistence policy / rule 尚未啟動**（R6 範圍）
-- ❌ **沒有 Admin picker** 消費此 registry
-- ❌ **沒有 renderer** 讀取此 registry（landing page renderer 未實作）
-- ❌ **沒有 content migration**：既有 `download.fileUrl` 文章未遷移至 `assetRefs[]` / `formRef`
-- ❌ **沒有 user-facing 下載頁 / 表單串接**：系統不提供下載落地頁、不串接 Google Forms 收件、不回收 respondent data；Google Forms responses remain in Google Forms / Sheets，不進 repo
-- **empty registry settings + loader read-only + registry-level validator（shape / dup-key）+ R2 content reference not-found + R5b intra-post `assetRefs[]` duplicate validation 已 landed；但 download management（inactive / coexistence rules、Admin picker、renderer、landing page、content migration）並未啟用**；後續分階段計畫 per `docs/20260602-download-registry-aware-validation-preanalysis.md`（R2 + R5b landed；R4 / R6 尚未啟動）
-- current `npm run validate:content` baseline = **0 errors / 68 warnings / 58 posts**（download R5b landing 後 snapshot 為 60/53 = 既有 57 warnings + R5b fixture 觸發 2× not-found + 1× duplicate / 既有 52 posts + R5b fixture 1；後續 commerce content-ref C1 / C2 / C3 / C5 fixtures landing 累積 +6 warnings / +4 posts → 66/57，per Phase 20260607-night-4 commit `149efdc`；C6 fixture landing 再累積 +2 warnings / +1 post → 68/58，per Phase 20260607-night-20 commit `3aeabbc`）
+empty registry（`{ schemaVersion:1, updatedAt:"", assets|forms:[], notes:"" }`；commit `466e471`）。當前狀態：
 
-`commerce-links.json` 為 **commerce affiliate link registry empty landing point**（於 Phase 20260603-night-20 commit `c1a6974` 落地；per `docs/20260603-commerce-affiliate-link-empty-registry-preanalysis.md` + night-22 validator preanalysis + night-25 source landing + am-2 fixture mechanism preanalysis）。當前狀態：
+- ✅ **loader read-only 載入**（`src/scripts/load-settings.js`；暴露 `settings.downloadAssets` / `settings.downloadForms`；無下游 consumer）
+- ✅ **validator landed（warning-only，`src/scripts/validate-content.js`）**：registry-level shape + key-uniqueness（`download-registry-invalid-shape` / `download-registry-duplicate-key`）；frontmatter shape rules（`download.fileUrl` D1/D2/D3 + `assetRefs[]` / `formRef` 共 5 條）；R2 not-found（`download-asset-ref-not-found` / `download-form-ref-not-found`，commit `145a548`）；R5b intra-post `assetRefs[]` duplicate（`download-asset-ref-duplicate`，commit `077c3d1`；與 R2 orthogonal cascade，formRef 無 duplicate 概念）
+- ❌ **deferred / 未啟動**：R4 inactive rules、R6 coexistence rule、Admin picker、renderer / landing page、content migration（既有 `download.fileUrl` 未遷至 `assetRefs[]` / `formRef`）、user-facing 下載頁 / Google Forms 串接
+- production posts 未使用 `assetRefs[]` / `formRef` → production 觸發為零
+- detail：commits + `docs/20260602-download-registry-aware-validation-preanalysis.md`
 
-- 檔內容為 `{ schemaVersion: 1, updatedAt: "", commerceLinks: [], notes: "" }`（empty registry；R1-clean per night-19 §7.3 七條件全滿足）
-- ✅ **loader 已 read-only 載入並 unwrap 為 array**（`src/scripts/load-settings.js` Phase 20260603-night-21 commit `78f1e9a`；以 `readJsonOptional` 缺檔 / parse-error / 非 array fallback `[]`；暴露為 `settings.commerceLinks`；metadata 欄位（`schemaVersion` / `updatedAt` / `notes`）**不**暴露；未啟動任何下游 consumer）
-- ✅ **registry-level validator 已 landed 11 條 warning-only rules**（`src/scripts/validate-content.js` Phase 20260603-night-25 commit `94a1d47`；helpers：`validateCommerceLinkRegistry` / `buildCommerceLinkIdSet` / `buildActiveAffiliateNetworkIdSet`；call site：post loop **外**單一呼叫）：
-  - R3 `commerce-link-invalid-entry-type`
-  - R4 `commerce-link-missing-link-id`
-  - R5 `commerce-link-duplicate-link-id`（每個 dup key 1 warning；不 per-occurrence 爆量）
-  - R6 `commerce-link-missing-target-url`（僅 `active !== false` entry 觸發）
-  - R7 `commerce-link-invalid-target-url`（不符 `^https?://`；與 R6 互斥 cascade）
-  - R8 `commerce-link-missing-internal-label`
-  - R9 `commerce-link-internal-label-empty`（trim 後空；與 R8 互斥 cascade）
-  - R11 `commerce-link-invalid-network-key`（against `settings.affiliateNetworks`；undefined 不觸發；`affiliateNetworkIdSet === null` 時 skip 避免 false positive）
-  - R12 `commerce-link-replacement-target-not-found`
-  - R13 `commerce-link-replacement-target-self`（與 R12 互斥；self 優先）
-  - R14 `commerce-link-inactive-missing-replacement`（active=false + 無 replacementTarget；與 R12 / R13 orthogonal）
-  - R1 / R2（root shape / commerceLinks not array）**deferred**：loader unwrap 後不可觀察
-  - R10 `commerce-link-invalid-merchant-key` **deferred**：merchant registry 未存在；syntax-only 規格未凍
-  - R15 `commerce-link-suspicious-secret-token` **deferred**：heuristic 誤判風險大
-- current `npm run validate:content` baseline = **0 errors / 68 warnings / 58 posts**（empty registry → 11 條 registry-level commerce rule 全 0 觸發；registry-level 維持 mirror download R1 cadence、zero drift；當前 68/58 為 content-ref C1 / C2 / C3 / C5 fixtures landing 累積 +6/+4 → 66/57（per `149efdc`），再加上 C6 fixture landing 累積 +2/+1 → 68/58（per `3aeabbc`）之結果，registry-level 本身不貢獻 warning）
-- ✅ **fixture mechanism decision frozen**（Phase 20260604-am-2 commit `89cbf75`；per `docs/20260604-commerce-links-registry-fixture-mechanism-preanalysis.md`）：
-  - **Option D selected**（near-term）：skip settings-level fixtures；沿用 download R1-style source-only acceptance；零 baseline drift；零紅線觸碰；mirror `download-registry-invalid-shape` / `download-registry-duplicate-key` 之 zero-fixture cadence
-  - **Option A path naming convention frozen as future escape hatch**：`content/validation-fixtures/settings/commerce-links/_test-<rule-id>.json`（per am-2 §10）；不在當前 phase 啟用；待未來 user 明確要求 registry-level runtime evidence 時為**獨立 phase** 啟動（屆時須擴 loader 暴露 raw registry + 新 fixture-mode code path + sourcePath 改寫）
-  - **Option B rejected/deferred for v1**：source harness / mock injection 雛形違反 CLAUDE.md §1 「不過度工程化」+ §29「第一版未規劃 test 框架」
-  - **Option C rejected as red-line violation**：temporary production registry mutation 違反 R1-clean 紅線與本專案治理
-- 🔄 **content-reference validation 部分啟動**（per `docs/20260604-commerce-links-content-reference-validation-preanalysis.md` §5）：
-  - ✅ **C1 / C2 / C3 / C5 / C6 已 landed**（C1 / C2 / C3 / C5：Phase 20260604-am-10 source landed；am-11 source acceptance read-only PASS；am-12 docs sync；commit `39b89e3` `feat(validate): warn on commerce link refs`。C6：Phase 20260607-night-14 source landed；night-15 source acceptance read-only PASS；commit `281cd43` `feat(validate): warn on commerce ref url coexistence`。皆 warning-only）：
-    - helper `validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet)` + `buildCommerceLinkIdSet(commerceLinks)`（call site：post loop **內**，掃 published post `affiliate.links[].ref`）
-    - C1 `commerce-ref-invalid-type`：`affiliate.links[i].ref` 非 string（報後 skip C2 / C3 / C5 / C6 for that entry）
-    - C2 `commerce-ref-empty`：`ref` trim 後空（報後 skip C3 / C5 / C6 for that entry）
-    - C3 `commerce-ref-not-found`：非空 ref 不在 `settings.commerceLinks` registry（`commerceLinkIdSet === null` 即 registry shape invalid 時 skip 避免噪音）
-    - C5 `commerce-ref-duplicate-in-post`：intra-post `affiliate.links[]` 重複 ref（trim 後 case-sensitive；每個 dup key 1 warning；與 C3 orthogonal cascade）
-    - C6 `commerce-ref-direct-url-coexist`：同一 `affiliate.links[i]` entry 同時持有非空 trimmed string `ref` 與非空 trimmed string `url`（registry-managed ref 與直接 raw URL 共存；migration mode 提示）：
-      - direct URL field scope = **只認 `entry.url`**（per `docs/20260607-commerce-c6-coexistence-warning-preanalysis.md` §E.3 / §F.3）；**不**檢查 `href` / `targetUrl` / `linkUrl` / `directUrl` / `affiliateUrl` / `rawUrl`
-      - cascade：C1 / C2 為 mutually exclusive cascade（ref 非 string 或 trim 空 → skip C6 for that entry）；C6 與 C3（not-found）/ C5（duplicate）orthogonal（同一 entry 可同時觸發 C3 / C5 / C6；不互相 suppress）
-      - warning message **不** echo ref / url value（per `docs/20260607-commerce-c6-coexistence-warning-preanalysis.md` §F.3.3 + governance §K.2；避免 log 內洩漏 affiliate URL / merchant token / tracking id）
-      - warning-only；不阻擋 build；不自動移除 raw url；不 codemod migration；不強迫 renderer 改變行為（per night-9 renderer fallback contract §E.5 情境 4）
-    - scope：只掃 `affiliate.links[].ref`；entry 含 `ref`（`ref !== undefined`）時才檢查；**raw-only affiliate links（無 ref）不觸發 warning**
-    - guard：affiliate 非 plain object → skip；`affiliate.links` 非 array → skip
-    - empty registry + 0 篇 production 用 `ref` + 0 篇 production 同時帶 `ref` 與 `url` → **0 觸發**（baseline 不變）
-  - ❌ **C4（inactive / archived）/ C7（missing role）/ C8（role enum）/ C9（display override risk）未實作**；C7 / C8 / C9 preanalysis 未開始
-- 🔄 **content-reference fixtures 部分建立**：C1 / C2 / C3 / C5 / C6 fixtures 已 landed（C1 / C2 / C3 / C5：Phase 20260607-night-4 commit `149efdc` `test(fixtures): add commerce ref C1 C2 C3 C5 fixtures`；night-5 read-only acceptance PASS；per `docs/20260607-commerce-content-ref-c1c2c3c5-fixture-preanalysis.md`。C6：Phase 20260607-night-20 commit `3aeabbc` `test(fixtures): add commerce C6 coexistence fixture`；night-21 read-only acceptance PASS；per `docs/20260607-commerce-c6-fixture-strategy-preanalysis.md` Option A）：
-  - `content/validation-fixtures/blogger/posts/_test-commerce-ref-invalid-type.md`（觸發 1 × `commerce-ref-invalid-type`；ref 為 number 42）
-  - `content/validation-fixtures/blogger/posts/_test-commerce-ref-empty.md`（觸發 1 × `commerce-ref-empty`；ref 為 `""`）
-  - `content/validation-fixtures/blogger/posts/_test-commerce-ref-not-found.md`（觸發 1 × `commerce-ref-not-found`；ref 為 fixture-namespaced `"__nonexistent-commerce-ref__"`）
-  - `content/validation-fixtures/blogger/posts/_test-commerce-ref-duplicate.md`（觸發 1 × `commerce-ref-duplicate-in-post` + 2 × `commerce-ref-not-found`；orthogonal cascade 為 empty registry 下之預期設計，mirror download R5b cadence，per 20260607-night-2 preanalysis §3.4 / §6.2）
-  - `content/validation-fixtures/blogger/posts/_test-commerce-ref-direct-url-coexist.md`（觸發 1 × `commerce-ref-direct-url-coexist` + 1 × `commerce-ref-not-found`；orthogonal C3 cascade 為 empty registry 下 Option A 接受設計，per 20260607-night-18 fixture strategy §G.2.1；同一 `affiliate.links[0]` entry 同時持有 fixture-namespaced `ref = "fixture-c6-coexist-ref"` + RFC 2606 reserved `url = "https://example.invalid/commerce-fixture"`；無真實 affiliate URL / merchant token / tracking id）
-  - 累積對 global baseline 貢獻：C1 / C2 / C3 / C5 fixtures +6 warnings / +4 posts → 60/53 → 66/57；C6 fixture +2 warnings / +1 post → 66/57 → 68/58
-  - frontmatter 採 `contentKind: "book-review"` + fixture-namespaced refs；無真實 affiliate URL / merchant token / tracking id；不變動 commerce registry（registry 維持 empty `[]`）
-  - 既有 4 個 commerce content-ref fixtures（C1 / C2 / C3 / C5）**皆未含 `url` 欄位** → C6 source landing（commit `281cd43`）後對既有 4 fixtures 之 trigger 數為 **0**；fixtures 仍維持各自單一 / orthogonal cascade，未產生 C6 衍生 warning。第 5 個 C6 fixture（commit `3aeabbc`）為唯一含 `url` 欄位之 commerce content-ref fixture，故意觸發 C6 + 1× C3 orthogonal cascade
-- ❌ **C4 / C7 / C8 / C9 content-ref fixtures 尚未建立**：C4 需 registry 有 `active: false` entry → Option A coupling defer；C7 long-tail（不建議啟用）；C8 需 enum 凍結後再 land；C9 需 registry entry → Option A coupling defer（per 20260607-night-2 §3 / §8.2 + 20260604 am-7 §5.5–§5.8）
-- ❌ **沒有 Admin picker / selector / display** 消費此 registry
-- ❌ **沒有 renderer / output** 讀取此 registry（commerce link 渲染 fallback 未實作）
-- ❌ **沒有 registry seed**：production `commerce-links.json` 維持 empty `[]`；無真實 affiliate entry；無 production commerce 文章使用 `ref`
-- ❌ **沒有 build / deploy / Blogger repost / GA4 commerce dimension**：commerce GA4 event / Blogger live commerce content / dist commerce rendering 全部 dormant
-- current `npm run validate:content` baseline = **0 errors / 68 warnings / 58 posts**（empty registry + 0 篇 production 用 `ref` + 0 篇 production 同時帶 `ref` 與 `url` → 11 條 registry-level + C1 / C2 / C3 / C5 / C6 content-ref rules 對 production posts 全 0 觸發；當前 68/58 為 night-4 content-ref fixtures landing 之 +6 warnings / +4 posts 貢獻（per `149efdc`，66/57 中繼點），加上 C6 fixture landing 之 +2 warnings / +1 post 貢獻（per `3aeabbc`，per 20260607-night-20）；C6 source landing（commit `281cd43`）**未變動 baseline**，因 production 0 用 ref+url 且既有 4 個 commerce content-ref fixtures 皆無 `url` 欄位 → C6 trigger 0；C6 fixture landing（commit `3aeabbc`）為唯一含 `url` 欄位之 commerce content-ref fixture，**故意**觸發 C6 + 1× C3 orthogonal cascade，per 20260607-night-18 fixture strategy Option A）
-- **empty registry settings + loader read-only + registry-level validator（11 條 warning-only rules）+ content-reference validator（C1 / C2 / C3 / C5 / C6 warning-only）+ content-reference fixtures（C1 / C2 / C3 / C5 / C6；5 個 post-level fixtures）+ fixture mechanism 決策（Option D）已 landed；但 commerce management（C4 / C7 / C8 / C9 content-ref rules + 相應 fixtures、Admin selector / display、renderer / output、registry seed、production content migration、build / deploy / Blogger repost / GA4 commerce dimension）並未啟用**
+### commerce-links.json（empty registry landing point）
+
+empty registry（`{ schemaVersion:1, updatedAt:"", commerceLinks:[], notes:"" }`；commit `c1a6974`）。當前狀態：
+
+- ✅ **loader read-only 載入並 unwrap 為 array**（`settings.commerceLinks`；metadata 不暴露；無下游 consumer；commit `78f1e9a`）
+- ✅ **registry-level validator landed 11 條 warning-only rules**（commit `94a1d47`；post loop **外**單一呼叫）：R3 invalid-entry-type、R4 missing-link-id、R5 duplicate-link-id、R6 missing-target-url（僅 `active!==false`）、R7 invalid-target-url（與 R6 互斥）、R8 missing-internal-label、R9 internal-label-empty（與 R8 互斥）、R11 invalid-network-key（against `affiliate-networks.json`）、R12 replacement-target-not-found、R13 replacement-target-self（與 R12 互斥）、R14 inactive-missing-replacement。**deferred**：R1 / R2（unwrap 後不可觀察）、R10 invalid-merchant-key（merchant registry 未存在）、R15 suspicious-secret-token（heuristic 誤判風險）
+- ✅ **content-reference validator landed C1 / C2 / C3 / C5 / C6**（warning-only；commits `39b89e3` / `281cd43`；post loop **內**掃 published post `affiliate.links[].ref`）：C1 invalid-type、C2 empty、C3 not-found（against registry）、C5 intra-post duplicate（與 C3 orthogonal）、C6 ref+url coexist（只認 `entry.url`；不 echo ref / url value；與 C3 / C5 orthogonal）。guard：affiliate 非 object 或 `links` 非 array → skip；raw-only links（無 `ref`）不觸發
+- 🔄 **C4 = docs-only plan landed（commit `8c9fddf`）；source 未實作**
+- ✅ **fixture mechanism = Option D**（skip settings-level fixtures；mirror download R1 source-only cadence；Option A naming `content/validation-fixtures/settings/commerce-links/_test-<rule-id>.json` 保留為未來 escape hatch；Option B/C rejected；commit `89cbf75`）
+- ✅ **content-ref fixtures landed C1 / C2 / C3 / C5 / C6**（5 個 post-level fixtures，`content/validation-fixtures/blogger/posts/_test-commerce-ref-*.md`；commits `149efdc` / `3aeabbc`；fixture-namespaced refs + RFC 2606 reserved url；無真實 affiliate URL / token / tracking id；commerce registry 維持 empty `[]`）
+- ❌ **deferred / not started**：C7 / C8 / C9 content-ref rules（preanalysis 未開始）、C4 / C7 / C8 / C9 fixtures、Admin picker / selector / display、renderer / output、registry seed、production content migration（raw url → `ref`）、build / deploy / Blogger repost / GA4 commerce dimension（全部 dormant）
+- production 0 篇用 `ref` / 0 篇 ref+url coexist → production 觸發為零
+- detail：`docs/20260604-commerce-links-content-reference-validation-preanalysis.md` + per-rule preanalysis docs
+
+### 當前 baseline
+
+`npm run validate:content` = **0 errors / 68 warnings / 58 posts**。empty registries + production 0 篇用 `ref` / `assetRefs[]` / `formRef` / ref+url coexist → 所有 registry-level + content-ref rules 對 production posts 全 0 觸發。68/58 = 既有 baseline + download R5b fixture（+2/+1）+ commerce content-ref C1/C2/C3/C5 fixtures（+6/+4）+ C6 fixture（+2/+1）；validation-fixtures 為唯一 warning 來源。
 
 Commerce registry 治理紅線（per `docs/20260603-commerce-affiliate-link-empty-registry-preanalysis.md` §4.3 / §5.3 + night-22 §9 + am-2 §12）：
 
@@ -818,232 +735,25 @@ I-02 sticky-header.js
 
 # 8. 建議資料夾結構
 
-Claude Code 可依此自動建立資料夾。
+Claude Code 可依此自動建立資料夾。以下為 top-level outline；現況以 live `Glob` 為準（tree 為建議結構，docs/ 與 fixtures 會持續演化）。
 
 ```text
 portable-blog-system/
-├─ README.md
-├─ CLAUDE.md
-├─ package.json
-├─ vite.config.js
-├─ .gitignore
-│
-├─ docs/
-│  ├─ requirements.md
-│  ├─ architecture.md
-│  ├─ content-schema.md
-│  ├─ design-system.md
-│  ├─ blogger-export.md
-│  ├─ github-deploy.md
-│  ├─ link-rules.md
-│  ├─ seo-ga4-adsense.md
-│  ├─ promotion-export.md
-│  ├─ publish-workflow.md
-│  ├─ backup-and-migration.md
-│  ├─ rwd-interaction.md
-│  └─ future-roadmap.md
-│
-├─ docs/checklists/
-│  ├─ blogger-publish-checklist.md
-│  ├─ github-deploy-checklist.md
-│  ├─ fb-promotion-checklist.md
-│  ├─ image-upload-checklist.md
-│  ├─ seo-checklist.md
-│  └─ backup-checklist.md
-│
+├─ README.md  CLAUDE.md  package.json  vite.config.js  .gitignore
+├─ docs/  docs/checklists/        # 規格文件與 checklists
 ├─ content/
-│  ├─ settings/
-│  │  ├─ site.config.json
-│  │  ├─ themes.json
-│  │  ├─ categories.json
-│  │  ├─ tags.json
-│  │  ├─ ads.config.json
-│  │  ├─ social-links.json
-│  │  ├─ promotion.config.json
-│  │  ├─ affiliate-networks.json
-│  │  ├─ link-rules.json
-│  │  ├─ seo.config.json
-│  │  ├─ ga4.config.json
-│  │  ├─ navigation.json
-│  │  ├─ sidebar.config.json
-│  │  └─ footer.config.json
-│  │
-│  ├─ github/
-│  │  ├─ posts/
-│  │  └─ pages/
-│  │
-│  ├─ blogger/
-│  │  ├─ posts/
-│  │  └─ pages/
-│  │
-│  ├─ shared/
-│  │  ├─ posts/
-│  │  └─ snippets/
-│  │
-│  ├─ drafts/
-│  ├─ archive/
-│  │
-│  └─ templates/
-│     ├─ post-template.md
-│     ├─ github-tech-note-template.md
-│     ├─ blogger-book-review-template.md
-│     ├─ blogger-download-template.md
-│     └─ blogger-summary-template.md
-│
+│  ├─ settings/                   # 全站 JSON 設定（site / categories / tags / ads / ga4 / affiliate-networks / commerce-links / download-* / ...）
+│  ├─ github/  blogger/  shared/  # posts/ + pages/（shared 含 snippets/）
+│  ├─ drafts/  archive/
+│  ├─ templates/                  # post / tech-note / book-review / download / summary
+│  └─ validation-fixtures/        # validator fixtures（_test-*.md）
 ├─ src/
-│  ├─ views/
-│  │  ├─ layout/
-│  │  │  ├─ base.ejs
-│  │  │  ├─ head.ejs
-│  │  │  ├─ header.ejs
-│  │  │  ├─ nav.ejs
-│  │  │  ├─ mobile-drawer.ejs
-│  │  │  ├─ footer.ejs
-│  │  │  ├─ sidebar.ejs
-│  │  │  └─ breadcrumb.ejs
-│  │  │
-│  │  ├─ pages/
-│  │  │  ├─ home.ejs
-│  │  │  ├─ post-list.ejs
-│  │  │  ├─ post-detail.ejs
-│  │  │  ├─ category.ejs
-│  │  │  ├─ tag.ejs
-│  │  │  ├─ search.ejs
-│  │  │  ├─ about.ejs
-│  │  │  └─ 404.ejs
-│  │  │
-│  │  ├─ blogger/
-│  │  │  ├─ blogger-post-full.ejs
-│  │  │  ├─ blogger-post-summary.ejs
-│  │  │  ├─ blogger-redirect-card.ejs
-│  │  │  ├─ blogger-home-index.ejs
-│  │  │  ├─ blogger-category-index.ejs
-│  │  │  ├─ blogger-copy-helper.ejs
-│  │  │  ├─ blogger-publish-checklist.ejs
-│  │  │  └─ blogger-meta-json.ejs
-│  │  │
-│  │  ├─ design-system/
-│  │  │  ├─ index.ejs
-│  │  │  ├─ colors.ejs
-│  │  │  ├─ spacing.ejs
-│  │  │  ├─ typography.ejs
-│  │  │  ├─ buttons.ejs
-│  │  │  ├─ cards.ejs
-│  │  │  ├─ article-components.ejs
-│  │  │  ├─ layouts.ejs
-│  │  │  └─ forms-search.ejs
-│  │  │
-│  │  ├─ seo/
-│  │  │  ├─ meta-tags.ejs
-│  │  │  ├─ open-graph.ejs
-│  │  │  ├─ json-ld.ejs
-│  │  │  └─ canonical.ejs
-│  │  │
-│  │  ├─ tracking/
-│  │  │  ├─ ga4.ejs
-│  │  │  └─ ga4-events-helper.ejs
-│  │  │
-│  │  ├─ ads/
-│  │  │  ├─ adsense-slot.ejs
-│  │  │  ├─ adsense-post-top.ejs
-│  │  │  ├─ adsense-post-middle.ejs
-│  │  │  ├─ adsense-post-bottom.ejs
-│  │  │  ├─ adsense-sidebar.ejs
-│  │  │  ├─ adsense-home-inline.ejs
-│  │  │  └─ adsense-head.ejs
-│  │  │
-│  │  └─ promotion/
-│  │     ├─ facebook-post.ejs
-│  │     ├─ facebook-summary.ejs
-│  │     └─ facebook-hashtags.ejs
-│  │
-│  ├─ styles/
-│  │  ├─ main.scss
-│  │  ├─ abstracts/
-│  │  │  ├─ _tokens.scss
-│  │  │  ├─ _themes.scss
-│  │  │  ├─ _spacing.scss
-│  │  │  ├─ _typography.scss
-│  │  │  ├─ _breakpoints.scss
-│  │  │  ├─ _mixins.scss
-│  │  │  └─ _z-index.scss
-│  │  │
-│  │  ├─ base/
-│  │  │  ├─ _reset.scss
-│  │  │  ├─ _base.scss
-│  │  │  ├─ _article.scss
-│  │  │  └─ _print.scss
-│  │  │
-│  │  ├─ layout/
-│  │  │  ├─ _header.scss
-│  │  │  ├─ _nav.scss
-│  │  │  ├─ _mobile-drawer.scss
-│  │  │  ├─ _footer.scss
-│  │  │  ├─ _sidebar.scss
-│  │  │  └─ _grid.scss
-│  │  │
-│  │  └─ components/
-│  │     ├─ _button.scss
-│  │     ├─ _card.scss
-│  │     ├─ _post-card.scss
-│  │     ├─ _tag.scss
-│  │     ├─ _hashtag.scss
-│  │     ├─ _breadcrumb.scss
-│  │     ├─ _adsense.scss
-│  │     ├─ _social-follow.scss
-│  │     ├─ _affiliate-box.scss
-│  │     ├─ _book-photo.scss
-│  │     ├─ _download-box.scss
-│  │     ├─ _related-posts.scss
-│  │     ├─ _prev-next.scss
-│  │     ├─ _back-to-top.scss
-│  │     ├─ _toc.scss
-│  │     └─ _code-block.scss
-│  │
-│  ├─ js/
-│  │  ├─ main.js
-│  │  └─ modules/
-│  │     ├─ sticky-header.js
-│  │     ├─ mobile-drawer.js
-│  │     ├─ back-to-top.js
-│  │     ├─ ga4-events.js
-│  │     ├─ link-tracker.js
-│  │     ├─ active-nav.js
-│  │     ├─ lazy-image.js
-│  │     ├─ search.js
-│  │     ├─ toc.js
-│  │     └─ copy-code.js
-│  │
-│  └─ scripts/
-│     ├─ load-posts.js
-│     ├─ load-settings.js
-│     ├─ parse-markdown.js
-│     ├─ validate-content.js
-│     ├─ build-github.js
-│     ├─ build-blogger.js
-│     ├─ build-promotion.js
-│     ├─ build-sitemap.js
-│     ├─ build-design-system.js
-│     ├─ build-blogger-theme-css.js
-│     ├─ new-post.js
-│     ├─ generate-index-data.js
-│     ├─ link-processor.js
-│     ├─ ga4-url-builder.js
-│     ├─ check-broken-links.js
-│     ├─ check-image-links.js
-│     └─ export-build-report.js
-│
-├─ public/
-│  ├─ images/
-│  ├─ images/placeholders/
-│  ├─ icons/
-│  ├─ downloads/
-│  └─ favicon/
-│
-├─ dist/
-├─ dist-blogger/
-├─ dist-promotion/
-└─ dist-reports/
+│  ├─ views/                      # EJS：layout / pages / blogger / design-system / seo / tracking / ads / promotion
+│  ├─ styles/                     # SCSS：abstracts / base / layout / components
+│  ├─ js/                         # main.js + modules/（sticky-header / mobile-drawer / back-to-top / ga4-events / link-tracker / active-nav / lazy-image / ...）
+│  └─ scripts/                    # build-* / load-* / parse-markdown / validate-content / link-processor / ga4-url-builder / check-* / ...
+├─ public/                        # images / icons / downloads / favicon
+└─ dist/  dist-blogger/  dist-promotion/  dist-reports/
 ```
 
 ---
@@ -1354,47 +1064,20 @@ target / rel 自動處理：
 
 ### Blogger → GitHub Pages（source landed；un-deployed；live but dormant）
 
-狀態（2026-05-23 EOD）：
+狀態（2026-05-23）：**source landed but un-deployed；live 狀態 dormant；pm-26 deploy gate BLOCKED**。
 
-- ✅ source 已 push origin/main：
-  - pm-24a `7e1d356`：`src/scripts/ga4-url-builder.js`（新增 `isGithubCrossLink`；`applyCrossSiteUtm` 加 `direction` 參數，default `'to_blogger'` 保留 backward compat）
-  - pm-24b `e2309e9`：`src/scripts/build-blogger.js`（新增 `deriveRenderedCrossLinks` mirror build-github.js pattern；`direction: 'to_github'`）
-  - pm-24c `7c769fe`：`src/views/blogger/blogger-post-full.ejs`（讀 `relatedLinksRendered` / `otherLinksRendered`；fallback `post.relatedLinks` / `post.otherLinks` raw）
-- ✅ build verification 通過（pm-24d）：`dist-blogger/` 既有 3 ready posts post.html byte-identical-modulo-builtAt；無 GitHub cross-link 之 ready post 無新 UTM 注入
-- ❌ 尚未 deploy；尚未碰 gh-pages
-- ❌ Blogger 後台尚未重貼；live 狀態 dormant
-- ⏭ pm-26 deploy verify 階段才會啟動 user 手動重貼 Blogger + GA4 Realtime 驗收
-- ⏭ pm-26 啟動條件詳見 `docs/reverse-utm-fixture-plan.md` §6；fixture 必須符合 §3 設計原則與 §4 fixture 類型
+- ✅ source 已 push origin/main：pm-24a `7e1d356`（`ga4-url-builder.js`：`isGithubCrossLink` + `applyCrossSiteUtm` `direction` 參數，default `'to_blogger'` 保 backward compat）、pm-24b `e2309e9`（`build-blogger.js`：`deriveRenderedCrossLinks`，`direction:'to_github'`）、pm-24c `7c769fe`（`blogger-post-full.ejs`：讀 `relatedLinksRendered` / `otherLinksRendered`，fallback raw）
+- ✅ build verify（pm-24d）：`dist-blogger/` ready posts byte-identical-modulo-builtAt；無 GitHub cross-link 之 post 無新 UTM
+- ❌ 尚未 deploy；尚未碰 gh-pages；Blogger 後台尚未重貼
+- ⏭ pm-26 deploy verify 階段才啟動 user 手動重貼 Blogger + GA4 Realtime 驗收；啟動條件見 `docs/reverse-utm-fixture-plan.md` §6
 
-套用範圍：Blogger 文章頁（`bloggerMode: 'full'`）之 `relatedLinks` / `otherLinks` 中之 GitHub Pages cross-link。
+套用範圍：Blogger 文章頁（`bloggerMode:'full'`，`renderFullPost` 為唯一 caller）之 `relatedLinks` / `otherLinks` 中之 GitHub cross-link（hostname = `settings.site.githubSiteUrl` host；不依賴 `kind`）。
 
-判斷依據：URL hostname 等於 `settings.site.githubSiteUrl` 之 host → 視為 GitHub cross-link；**不**依賴 frontmatter 之 `kind` 欄位（即使 `kind: internal` 亦同樣套用）。
+UTM / target / rel 規則 mirror 上方 GitHub→Blogger 方向，差異僅 `utm_source=blogger`（`utm_medium=referral` / `utm_campaign=portable_blog_system` / `utm_content=related_links`|`other_links`；策略 A 已含 UTM 不覆蓋；強制 `target="_blank"` + 合併 `rel="nofollow noopener noreferrer"`，保留既有 token）。
 
-正式 UTM 規則：
+不受影響：Blogger 同站內部連結、第三方非 GitHub external（按 §16.1）、Blogger summary / redirect-card / home-index / category-index 模式、`buildBloggerToGithubUrl` / canonical / JSON-LD / summary CTA / redirect CTA / index CTA。
 
-```text
-utm_source=blogger
-utm_medium=referral
-utm_campaign=portable_blog_system
-utm_content=related_links     ← relatedLinks aside 內之連結
-utm_content=other_links       ← otherLinks aside 內之連結
-```
-
-target / rel 自動處理：
-
-- 強制 `target="_blank"`（開新分頁）
-- 合併 `rel="nofollow noopener noreferrer"`；保留既有 token，不重複
-
-策略 A（已含 UTM 之 url 處理）：若原 URL 已含**任一** `utm_source` / `utm_medium` / `utm_campaign` / `utm_content`，視為作者手動指定 → 系統**不覆蓋**、**不重複注入** UTM；但仍套 `target="_blank"` + `rel` 合併。
-
-未受影響範圍：
-
-- ❌ Blogger 同站內部連結 → 不加 UTM
-- ❌ 第三方非 GitHub external links → 不加 Blogger→GitHub UTM；仍按 §16.1 預設 `target="_blank" rel="nofollow noopener noreferrer"` 處理
-- ❌ Blogger summary / redirect-card / home-index / category-index 模式 → 本批不串接，不受影響（`renderFullPost` 為唯一 caller）
-- ❌ `buildBloggerToGithubUrl` / canonical / JSON-LD / summary CTA / redirect CTA / index CTA → 不變
-
-實作位置：`src/scripts/ga4-url-builder.js`（`isGithubCrossLink` / `applyCrossSiteUtm` `direction='to_github'`）+ `src/scripts/build-blogger.js`（`deriveRenderedCrossLinks` 於 `renderFullPost` 前套用）+ `src/views/blogger/blogger-post-full.ejs`（render 端讀 `relatedLinksRendered` / `otherLinksRendered` 並使用 `item.target` / `item.rel`）。
+實作位置：`src/scripts/ga4-url-builder.js`（`isGithubCrossLink` / `applyCrossSiteUtm` `direction='to_github'`）+ `src/scripts/build-blogger.js`（`deriveRenderedCrossLinks`）+ `src/views/blogger/blogger-post-full.ejs`。
 
 ## 16.5 relatedLinks / otherLinks 連結處理
 
