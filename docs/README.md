@@ -139,7 +139,8 @@
 ## §4 常用驗證指令
 
 ```bash
-# 內容驗證（baseline 目前 0/38/33）
+# 內容驗證（baseline 目前 0 errors / 69 warnings / 59 posts；
+# overlay 驗證見 §7.0：node src/scripts/validate-content.js --registry-overlay content/validation-fixtures/settings/commerce-c4-c9-overlay.json = 0/70/59）
 npm run validate:content
 
 # GitHub Pages 本機預覽
@@ -202,11 +203,11 @@ npm run check:images
 
 ## §7 最近一次穩定 checkpoint
 
-（更新時點：2026-06-09 am-1；docs-only baseline sync。當前狀態以 §7.0 為準；§7.1 / §7.2 屬 5/26 與 5/21 之前快照保留，不代表 6/9 狀態）
+（更新時點：2026-06-09 am-9；docs-only index sync。當前狀態以 §7.0 為準；§7.1 / §7.2 屬 5/26 與 5/21 之前快照保留，不代表 6/9 狀態）
 
 ### 7.0 當前 checkpoint（2026-06-09）
 
-- source HEAD: `ff86083 docs(commerce): fix L1 intake placeholder examples`
+- source HEAD: `b7d5c14 docs(commerce): plan C9 label override safety`
 - branch: `main` / tracking `origin/main` / 與 remote 同步 / working tree clean
 - validate baseline：
   - normal `npm run validate:content` = **0 errors / 69 warnings / 59 posts**
@@ -218,6 +219,7 @@ npm run check:images
   - `docs/20260608-commerce-admin-snippet-helper-acceptance-checkpoint.md`（夜 night-5；commit `77d9ad8` Admin YAML snippet copy helper acceptance 存證）
   - `docs/20260608-commerce-l1-seed-candidate-intake-template.md`（夜 night-9；user-facing L1 seed candidate intake template；docs-only；不啟動 seed）
   - `docs/20260608-commerce-registry-seed-governance-preanalysis.md`（pm-29；commerce registry seed governance 治理紅線；docs-only；不 seed / 不 source / 不 Admin / 不 write path）
+  - `docs/20260609-commerce-c9-label-override-safety-preanalysis.md`（am-4；commerce C9 `labelOverride` 安全規則 broader preanalysis；**結論 Option D：不擴大 C9 / 維持現有 narrow leak-equality 不動**；docs-only；不加 source / fixture / registry seed；baseline 維持 normal 0/69/59 + overlay 0/70/59 不變；C7 NO-GO 不變；L1 seed gate 不變）
 
 ### 7.1 5/26 快照（歷史保留）
 
