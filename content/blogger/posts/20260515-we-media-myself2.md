@@ -57,11 +57,11 @@ book:
   showBookPhoto: false
 
 affiliate:
-  enabled: false
+  enabled: true
   disclosure: "本文包含聯盟行銷連結。若你透過連結購買，本站可能取得少量回饋。"
   position:
     top: false
-    bottom: false
+    bottom: true
   links:
     - label: "博客來：實體書"
       network: "通路王"
