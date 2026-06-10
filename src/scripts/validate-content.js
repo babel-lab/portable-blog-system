@@ -964,6 +964,222 @@ function validateAffiliateBlocks(affiliate, sourcePath, issues, commerceLinkIdSe
   }
 }
 
+// Phase 20260610-night-6：adsense.blocks[] frontmatter validator（warning-only）
+//   - per docs/20260610-night-4-adsense-six-slot-convention-preanalysis.md §6 / §7 / §9
+//   - 僅檢查 shape；不渲染、不遷移；production 0 篇用 adsense.blocks[] → 0 production 觸發（fixture-isolated）
+//   - 不報 legacy blocks.adsenseTop / adsenseBottom 與 adsense.blocks[] coexistence（per night-4 §6.2 fallback + pm-5 preflight §7.3）
+//   - settings shape 不在本 phase 範圍（per night-5 §6 split：N5 frontmatter-only）
+//   - message 不 echo url / token / slot id 值；id / anchor / slotKey 為作者明示 machine/enum 值，可安全出現
+const VALID_ADSENSE_ANCHOR = new Set([
+  'afterHeader',
+  'afterCover',
+  'afterBookPhoto',
+  'afterAffiliateTop',
+  'beforeDownloadBox',
+  'afterDownloadBox',
+  'beforeAffiliateBottom',
+  'afterAffiliateBottom',
+  'beforeRelatedLinks',
+  'afterRelatedLinks',
+  'beforeOtherLinks',
+  'afterOtherLinks',
+  'beforeHashtags',
+  'afterHashtags',
+]);
+
+function buildValidAdsenseSlotKeySet(settings) {
+  const slots = settings && settings.ads ? settings.ads.slots : null;
+  if (!slots || typeof slots !== 'object' || Array.isArray(slots)) return new Set();
+  return new Set(Object.keys(slots));
+}
+
+function validateAdsenseBlocks(adsense, sourcePath, issues, validSlotKeySet) {
+  if (adsense === undefined || adsense === null) return;
+  if (typeof adsense !== 'object' || Array.isArray(adsense)) return;
+
+  // post.adsense.enabled type check（present 時須 boolean）
+  if (adsense.enabled !== undefined && typeof adsense.enabled !== 'boolean') {
+    issues.push({
+      severity: 'warning',
+      type: 'adsense-enabled-invalid-type',
+      sourcePath,
+      value: `adsense.enabled typeof=${typeof adsense.enabled} (must be boolean)`,
+    });
+  }
+
+  const blocks = adsense.blocks;
+  if (blocks === undefined) return;
+
+  // adsense.blocks 存在但非 array
+  if (!Array.isArray(blocks)) {
+    issues.push({
+      severity: 'warning',
+      type: 'adsense-blocks-not-array',
+      sourcePath,
+      value: `adsense.blocks typeof=${blocks === null ? 'null' : typeof blocks} (must be array)`,
+    });
+    return;
+  }
+
+  const seenIdIndexes = new Map();
+
+  for (let j = 0; j < blocks.length; j++) {
+    const block = blocks[j];
+
+    // block entry 須 plain object
+    if (!block || typeof block !== 'object' || Array.isArray(block)) {
+      issues.push({
+        severity: 'warning',
+        type: 'adsense-block-invalid-entry-type',
+        sourcePath,
+        value: `adsense.blocks[${j}] typeof=${
+          block === null ? 'null' : Array.isArray(block) ? 'array' : typeof block
+        } (must be plain object)`,
+      });
+      continue;
+    }
+
+    // enabled：present 時須 boolean；effectiveEnabled = enabled !== false（convention 預設 true）
+    const enabledRaw = block.enabled;
+    if (enabledRaw !== undefined && typeof enabledRaw !== 'boolean') {
+      issues.push({
+        severity: 'warning',
+        type: 'adsense-block-invalid-enabled-type',
+        sourcePath,
+        value: `adsense.blocks[${j}].enabled typeof=${typeof enabledRaw} (must be boolean)`,
+      });
+    }
+    const effectiveEnabled = enabledRaw !== false;
+
+    // id：required（所有 object block entry）；非空 string 才 track 供 duplicate 偵測
+    const id = block.id;
+    const idIsNonEmptyString = typeof id === 'string' && id.trim() !== '';
+    if (!idIsNonEmptyString) {
+      issues.push({
+        severity: 'warning',
+        type: 'adsense-block-missing-id',
+        sourcePath,
+        value: `adsense.blocks[${j}].id missing or empty`,
+      });
+    } else {
+      const key = id.trim();
+      if (!seenIdIndexes.has(key)) seenIdIndexes.set(key, []);
+      seenIdIndexes.get(key).push(j);
+    }
+
+    // surfaces：present 時須 array of allowed values（blogger / pages）；省略 = convention-deferred default，不警；explicit [] = empty-surfaces 警
+    const surfaces = block.surfaces;
+    if (surfaces !== undefined) {
+      if (!Array.isArray(surfaces)) {
+        issues.push({
+          severity: 'warning',
+          type: 'adsense-block-invalid-surfaces-type',
+          sourcePath,
+          value: `adsense.blocks[${j}].surfaces typeof=${
+            surfaces === null ? 'null' : typeof surfaces
+          } (must be array)`,
+        });
+      } else if (surfaces.length === 0) {
+        issues.push({
+          severity: 'warning',
+          type: 'adsense-block-empty-surfaces',
+          sourcePath,
+          value: `adsense.blocks[${j}].surfaces is an empty array`,
+        });
+      } else {
+        for (let k = 0; k < surfaces.length; k++) {
+          const s = surfaces[k];
+          if (typeof s !== 'string' || (s !== 'blogger' && s !== 'pages')) {
+            issues.push({
+              severity: 'warning',
+              type: 'adsense-block-invalid-surface-value',
+              sourcePath,
+              value:
+                typeof s === 'string'
+                  ? `adsense.blocks[${j}].surfaces[${k}]="${s}" (allowed: blogger, pages)`
+                  : `adsense.blocks[${j}].surfaces[${k}] typeof=${
+                      s === null ? 'null' : typeof s
+                    } (allowed: blogger, pages)`,
+            });
+          }
+        }
+      }
+    }
+
+    // anchor：enabled block required；missing / non-string → missing-anchor；non-empty string but unknown → invalid-anchor（互斥）
+    if (effectiveEnabled) {
+      const anchor = block.anchor;
+      const anchorIsNonEmptyString = typeof anchor === 'string' && anchor.trim() !== '';
+      if (!anchorIsNonEmptyString) {
+        issues.push({
+          severity: 'warning',
+          type: 'adsense-block-missing-anchor',
+          sourcePath,
+          value:
+            anchor === undefined || anchor === null
+              ? `adsense.blocks[${j}].anchor missing or empty`
+              : `adsense.blocks[${j}].anchor typeof=${typeof anchor} (must be non-empty string)`,
+        });
+      } else if (!VALID_ADSENSE_ANCHOR.has(anchor.trim())) {
+        issues.push({
+          severity: 'warning',
+          type: 'adsense-block-invalid-anchor',
+          sourcePath,
+          value: `adsense.blocks[${j}].anchor="${anchor}" (unknown; v1 enum per night-4 §7.2)`,
+        });
+      }
+    }
+
+    // slotKey：enabled block required；missing / non-string → missing-slot-key；non-empty string but not in registry → slot-key-not-found（互斥）
+    if (effectiveEnabled) {
+      const slotKey = block.slotKey;
+      const slotKeyIsNonEmptyString = typeof slotKey === 'string' && slotKey.trim() !== '';
+      if (!slotKeyIsNonEmptyString) {
+        issues.push({
+          severity: 'warning',
+          type: 'adsense-block-missing-slot-key',
+          sourcePath,
+          value:
+            slotKey === undefined || slotKey === null
+              ? `adsense.blocks[${j}].slotKey missing or empty`
+              : `adsense.blocks[${j}].slotKey typeof=${typeof slotKey} (must be non-empty string)`,
+        });
+      } else if (validSlotKeySet && validSlotKeySet.size > 0 && !validSlotKeySet.has(slotKey.trim())) {
+        issues.push({
+          severity: 'warning',
+          type: 'adsense-block-slot-key-not-found',
+          sourcePath,
+          value: `adsense.blocks[${j}].slotKey="${slotKey}" not in settings.ads.slots`,
+        });
+      }
+    }
+
+    // order：present 時須 finite number
+    if (block.order !== undefined) {
+      if (typeof block.order !== 'number' || !Number.isFinite(block.order)) {
+        issues.push({
+          severity: 'warning',
+          type: 'adsense-block-invalid-order-type',
+          sourcePath,
+          value: `adsense.blocks[${j}].order typeof=${typeof block.order} (must be finite number)`,
+        });
+      }
+    }
+  }
+
+  // duplicate block id（每個重複 key 報 1 warning；mirror affiliate-block-duplicate-id pattern）
+  for (const [key, indexes] of seenIdIndexes) {
+    if (indexes.length > 1) {
+      issues.push({
+        severity: 'warning',
+        type: 'adsense-block-duplicate-id',
+        sourcePath,
+        value: `adsense.blocks[${indexes.join(',')}] duplicate id="${key}"`,
+      });
+    }
+  }
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -1042,6 +1258,13 @@ export function validateContent({ posts, settings }) {
   //   - 與 commerceLinkIdSet 同源獨立建構；registry shape invalid → null → C4 / C9 skip
   //   - empty registry（commerceLinks === []）→ 空 Map；0 篇 production 用 ref → 0 觸發
   const commerceLinkEntryMap = buildCommerceLinkEntryMap(settings.commerceLinks);
+
+  // Phase 20260610-night-6：valid AdSense slot key set（derived from current settings.ads.slots; warning-only）
+  //   - per docs/20260610-night-4-...-preanalysis.md §5 + night-5 pm-5 §10.2 N5 split
+  //   - 當前 production slots = {postTop, postMiddle, postBottom, sidebar, homeInline}；未含 articleAd1~6（N6 才擴充）
+  //   - settings.ads.slots 缺漏 / shape invalid → empty Set → slot-key-not-found 規則於 size>0 才檢，empty 時跳過
+  //   - 0 篇 production 用 adsense.blocks[] → 0 production 觸發（fixture-isolated）
+  const validAdsenseSlotKeySet = buildValidAdsenseSlotKeySet(settings);
 
   for (const post of posts) {
     const sourcePath = post.sourcePath;
@@ -1722,6 +1945,12 @@ export function validateContent({ posts, settings }) {
       // Phase 20260610-pm-9：affiliate.blocks[] shape validation（warning-only；block links 重用 validateCommerceLinkArray，entryMap=null → defer block-level C4/C9）
       //   - production 0 篇用 blocks[] → 0 production 觸發（fixture-isolated）；不報 legacy/blocks coexistence
       validateAffiliateBlocks(post.affiliate, sourcePath, issues, commerceLinkIdSet);
+
+      // Phase 20260610-night-6：adsense.blocks[] shape validation（warning-only；frontmatter-only；settings-level deferred to N5b/N6）
+      //   - per docs/20260610-night-4-...-preanalysis.md §6 / §7 / §9 + night-5 pm-5 §7.2 / §10.2
+      //   - 0 production posts 用 adsense.blocks[] → 0 production 觸發（fixture-isolated）
+      //   - 不報 legacy blocks.adsenseTop / adsenseBottom 與 adsense.blocks[] coexistence
+      validateAdsenseBlocks(post.adsense, sourcePath, issues, validAdsenseSlotKeySet);
     }
 
     if (post.category) {
