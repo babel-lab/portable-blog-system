@@ -46,7 +46,9 @@
 
 ---
 
-## 3. Seeded entries（9 筆，全 active、networkKey=books）
+> **🟢 UPDATE（2026-06-10 follow-up phase `20260610-am-commerce-append-held-mysterious-travel-ebook-link-a`，commit append 後）**：held 第 10 筆已由 user 補回 targetUrl 並 append。**registry 現為 10 active entries；held = 0**。新增筆 = `book-mysterious-travel-kim-youngha-books-com-tw-ebook-books`，`targetUrl: https://joymall.co/3QoxU?uid1=blog`（affiliate redirect，未轉 canonical / 未移除 `uid1=blog`），其餘欄位同 §4.1 預備值。既有 9 筆未改（append 於陣列末端）。excluded 仍 1 筆（KOBO，§4.2）。validate 維持 0/69/59。下方 §3 / §4.1 / §6 / §8 已標更新。
+
+## 3. Seeded entries（10 筆，全 active、networkKey=books）
 
 | # | linkId | merchant | 版本 | role* | targetUrl |
 | --- | --- | --- | --- | --- | --- |
@@ -59,6 +61,7 @@
 | 7 | `book-mysterious-travel-kim-youngha-books-com-tw-physical-books` | 博客來 | 實體 | primary | `https://whitehippo.net/3QoxT?uid1=blog` |
 | 8 | `book-mysterious-travel-kim-youngha-kingstone-physical-books` | 金石堂 | 實體 | alternate | `https://product.mchannles.com/3Qoxl?uid1=blog` |
 | 9 | `book-mysterious-travel-kim-youngha-hyread-ebook-books` | HyRead | 電子 | alternate | `https://shoppingfun.co/3Qoxh?uid1=blog` |
+| 10 | `book-mysterious-travel-kim-youngha-books-com-tw-ebook-books` | 博客來 | 電子 | alternate | `https://joymall.co/3QoxU?uid1=blog`（append follow-up）|
 
 \* `role` 為 article-side per-instance 屬性，**未寫入 registry**；此處僅作 audit 記錄（未來文章端 `affiliate.links[].ref` 引用時填）。
 
@@ -66,13 +69,13 @@
 
 ## 4. Held / Excluded（未寫入 registry）
 
-### 4.1 HELD — 1 筆（targetUrl 傳輸遺失，待 user 重新提供）
+### 4.1 HELD — 1 筆（🟢 已於 follow-up phase 解除）
 
-| linkId | 原因 |
+| linkId | 原因 / 結果 |
 | --- | --- |
-| `book-mysterious-travel-kim-youngha-books-com-tw-ebook-books` | user 本輪 seed YAML 中此筆 **targetUrl 行於傳輸中遺失/亂碼**（僅餘 `…?uid1=blog` 尾段，domain + token 不可辨識）。本輪 seed YAML 已證實部分 URL 較 preflight 修訂（如 entry #2 由 `whitehippo.net` 改 `adcenter.conn.tw`），故**不可**用 preflight 舊值回填。依「不自行幻想 / 不 fabricate 真實 affiliate URL」紅線 → **held，不 seed**。待 user 重新提供該筆 targetUrl 後，於後續 1 行 follow-up append（其餘欄位已備齊：博客來 / 電子書 / networkKey books / role alternate / productTitle 懂也沒用的神秘旅行…）。 |
+| `book-mysterious-travel-kim-youngha-books-com-tw-ebook-books` | **原因**：初次 L1 seed 時，user seed YAML 中此筆 targetUrl 行於傳輸中遺失/亂碼（僅餘 `…?uid1=blog` 尾段），依「不 fabricate 真實 affiliate URL」紅線 → held。**結果（🟢 RESOLVED）**：follow-up phase `20260610-am-commerce-append-held-mysterious-travel-ebook-link-a` 由 user 補回 `targetUrl: https://joymall.co/3QoxU?uid1=blog` 並 append 至 registry 末端。**held 現為 0**。 |
 
-→ 因此本輪實際 seed **9 筆**（user 原列 10 筆 active 之其一 held）。
+→ 初次 seed **9 筆**；follow-up append **+1** → registry 現 **10 active entries**；held **0**。
 
 ### 4.2 EXCLUDED — 1 筆（user 裁定本輪不販售）
 
@@ -106,13 +109,13 @@
 
 `npm run validate:content` = **0 errors / 69 warnings / 59 posts**（與 pre-seed baseline **相同**）。
 
-warning 數**未增加**之原因：registry-level R-rules（R3–R14，warning-only）對 9 筆 entry 全數通過 —— 皆 plain object（R3）、linkId 非空且唯一（R4/R5）、active 且 targetUrl 非空（R6）、targetUrl 符 `^https?://`（R7）、internalLabel 非空（R8/R9）、`networkKey: books` 命中 `affiliate-networks.json`（R11 不觸發）、全 active 無 replacementTarget（R12/R13/R14 skip）。production posts 未用 `affiliate.links[].ref` → content-ref C-rules 對 production 維持 0 觸發。69 warnings 仍全來自 validation-fixtures。
+warning 數**未增加**之原因：registry-level R-rules（R3–R14，warning-only）對 10 筆 entry（含 follow-up append 之第 10 筆）全數通過 —— 皆 plain object（R3）、linkId 非空且唯一（R4/R5）、active 且 targetUrl 非空（R6）、targetUrl 符 `^https?://`（R7）、internalLabel 非空（R8/R9）、`networkKey: books` 命中 `affiliate-networks.json`（R11 不觸發）、全 active 無 replacementTarget（R12/R13/R14 skip）。production posts 未用 `affiliate.links[].ref` → content-ref C-rules 對 production 維持 0 觸發。69 warnings 仍全來自 validation-fixtures。
 
 ---
 
 ## 7. Mutation scope
 
-- ✅ `content/settings/commerce-links.json`：empty `[]` → **9 entries**（settings-only）
+- ✅ `content/settings/commerce-links.json`：empty `[]` → **10 entries**（settings-only；初次 9 + follow-up append 1）
 - ✅ 本 audit doc（新增）
 - ❌ **零** Blogger posts / src / template / renderer / Admin / middleware / fixture / `affiliate-networks.json` 變更
 - ❌ **零** build / deploy / gh-pages / Blogger repost
@@ -124,7 +127,7 @@ warning 數**未增加**之原因：registry-level R-rules（R3–R14，warning-
 
 | 項目 | 狀態 |
 | --- | --- |
-| 第 10 筆（mysterious-travel 博客來電子書）| **HELD** —— 待 user 重新提供 targetUrl，再 append（§4.1）|
+| 第 10 筆（mysterious-travel 博客來電子書）| ✅ **DONE** —— user 補回 `joymall.co/3QoxU`，已 append（held 現 0）|
 | KOBO 電子書（金石堂電子書）| deferred —— 未來經聯盟網處理（§4.2）|
 | 聯盟網（`networkKey: affiliate-network`）| 未啟動（本輪不建）|
 | renderer / Admin picker / C7 source | dormant（registry 已非空，但無下游 consumer；render 仍 dormant）|

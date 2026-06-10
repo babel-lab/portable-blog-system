@@ -100,7 +100,18 @@
       "merchant": "HyRead",
       "networkKey": "books",
       "targetUrl": "https://shoppingfun.co/3Qoxh?uid1=blog"
+    },
+    {
+      "linkId": "book-mysterious-travel-kim-youngha-books-com-tw-ebook-books",
+      "active": true,
+      "displayLabel": "博客來：電子書",
+      "internalLabel": "懂也沒用的神秘旅行：小說家金英夏旅行的理由｜博客來｜電子書｜通路王",
+      "productTitle": "懂也沒用的神秘旅行：小說家金英夏旅行的理由",
+      "merchantKey": "books-com-tw",
+      "merchant": "博客來",
+      "networkKey": "books",
+      "targetUrl": "https://joymall.co/3QoxU?uid1=blog"
     }
   ],
-  "notes": "2026-06-10 L1 seed of existing Blogger Tongluwang (networkKey=books) book-selling links. 9 entries seeded; 1 entry (book-mysterious-travel-kim-youngha-books-com-tw-ebook-books) held pending targetUrl re-supply; 1 candidate (book-rouhou-time-kingstone-ebook-books, KOBO) excluded per user. internalLabel is author-only / never rendered."
+  "notes": "2026-06-10 L1 seed of existing Blogger Tongluwang (networkKey=books) book-selling links. 10 entries seeded; 0 held; 1 candidate (book-rouhou-time-kingstone-ebook-books, KOBO) excluded per user. internalLabel is author-only / never rendered."
 }
