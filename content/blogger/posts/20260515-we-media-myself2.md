@@ -69,6 +69,36 @@ affiliate:
     - label: "金石堂：實體書"
       network: "通路王"
       ref: "book-we-media-myself2-kingstone-physical-books"
+  # Phase 20260610-pm-13：Blogger-only 上下雙 commerce 區塊（刻意保留 Blogger 文章版面）。
+  #   legacy links[] / position 不變（GitHub Pages 仍渲染既有單一 bottom box）。
+  #   下方為「聯盟網 slot」：聯盟網通路上線前，暫以現有通路王 ref 提供；上下文案故意不同。
+  blocks:
+    - id: "blogger-top-books"
+      enabled: true
+      surfaces: ["blogger"]
+      position: "top"
+      heading: "想入手這本書？"
+      disclosure: "以下為通路王聯盟連結；透過連結購買不影響你的價格，本站可能取得少量回饋。"
+      links:
+        - label: "博客來：實體書"
+          network: "通路王"
+          ref: "book-we-media-myself2-books-com-tw-physical-books"
+        - label: "金石堂：實體書"
+          network: "通路王"
+          ref: "book-we-media-myself2-kingstone-physical-books"
+    - id: "blogger-bottom-network-slot"
+      enabled: true
+      surfaces: ["blogger"]
+      position: "bottom"
+      heading: "讀完想收藏一本？這裡也能購買"
+      disclosure: "下方同為聯盟連結（聯盟網通路上線前，暫以通路王連結提供）。"
+      links:
+        - label: "博客來：實體書"
+          network: "通路王"
+          ref: "book-we-media-myself2-books-com-tw-physical-books"
+        - label: "金石堂：實體書"
+          network: "通路王"
+          ref: "book-we-media-myself2-kingstone-physical-books"
 
 relatedLinks:
   - kind: internal
