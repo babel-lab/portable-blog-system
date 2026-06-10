@@ -23,7 +23,7 @@ import { resolveTitleTemplate } from './resolve-series-title.js';
 //   不動 buildBloggerToGithubUrl / canonicalUrl / JSON-LD / summary CTA / redirect CTA / index CTA。
 import { applyCrossSiteUtm } from './ga4-url-builder.js';
 // Phase 20260610-am-6：commerce renderer ref resolver（R1）；Blogger 與 GitHub 共用同一 helper。
-import { deriveRenderedAffiliateLinks } from './resolve-affiliate-links.js';
+import { deriveRenderedAffiliateLinks, deriveRenderedAffiliateBlocks } from './resolve-affiliate-links.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -128,6 +128,10 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
   // Phase 20260610-am-6：commerce affiliate ref → registry targetUrl 解析（R1；與 GitHub 共用同一 helper）。
   //   url-backward-compatible-first → 既有 raw url ready post 之 post.html byte-identical（modulo builtAt）。
   const affiliateLinksRendered = deriveRenderedAffiliateLinks(post.affiliate, settings.commerceLinks);
+  // Phase 20260610-pm-12：Blogger-only dual-block；resolved per-block { id, position, heading, disclosure, links }。
+  //   legacy affiliateLinksRendered wiring 不變；template 在 blocks 非空時改走 blocks 並抑制 legacy box（避免重複）。
+  //   GitHub build（build-github.js）不呼叫此 helper → GitHub 端 by construction 維持 legacy-only。
+  const affiliateBlocksRendered = deriveRenderedAffiliateBlocks(post.affiliate, settings.commerceLinks);
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-full.ejs'),
     {
@@ -138,6 +142,7 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
       relatedLinksRendered,
       otherLinksRendered,
       affiliateLinksRendered,
+      affiliateBlocksRendered,
     },
     { async: true },
   );

@@ -13,6 +13,12 @@ const identity = view.identity || {};
 const fullTitle = display.title || post.title;
 const fullDescription = display.description || post.description;
 const fullContentKind = identity.contentKind || post.contentKind || post.type;
+// Phase 20260610-pm-12：affiliate.blocks[] dual-block（Blogger-only）；build 端傳入 resolved affiliateBlocksRendered。
+//   blocks 非空 → 改走 blocks（top before body / bottom after body）並抑制 legacy box；空 → legacy 行為 byte-identical。
+const affiliateBlocks = (typeof affiliateBlocksRendered !== 'undefined' && Array.isArray(affiliateBlocksRendered)) ? affiliateBlocksRendered : [];
+const hasAffiliateBlocks = affiliateBlocks.length > 0;
+const affiliateTopBlocks = affiliateBlocks.filter(function (b) { return b && b.position === 'top'; });
+const affiliateBottomBlocks = affiliateBlocks.filter(function (b) { return b && b.position === 'bottom'; });
 %>
 <div class="lab-blogger-article">
 
@@ -57,9 +63,25 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
   </figure>
   <% } %>
 
-  <%# === Affiliate Box（前置；enabled + links 非空 + position.top） === %>
+<%# === Affiliate Blocks（前置；position=top；Phase 20260610-pm-12 dual-block，Blogger-only） === -%>
+<% if (hasAffiliateBlocks) { -%>
+<% affiliateTopBlocks.forEach(function (block) { var blockDisclosure = block.disclosure || (post.affiliate && post.affiliate.disclosure); -%>
+  <aside class="lab-affiliate-box">
+    <h3 class="lab-affiliate-box__title"><%= block.heading || '立即購買' %></h3>
+    <% if (blockDisclosure) { -%>
+    <p class="lab-affiliate-box__disclosure"><%= blockDisclosure %></p>
+    <% } -%>
+    <ul class="lab-affiliate-box__links">
+      <% block.links.forEach(function (link) { -%>
+      <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+      <% }); -%>
+    </ul>
+  </aside>
+<% }); -%>
+<% } -%>
+  <%# === Affiliate Box（前置；enabled + links 非空 + position.top；legacy，blocks 非空時抑制） === %>
   <%# Phase 20260610-am-6：links 來源改讀 build 端 resolved affiliateLinksRendered（ref→targetUrl / omit 已處理；url 保證非空）；enabled / position guard 仍讀 post.affiliate %>
-  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(affiliateLinksRendered) && affiliateLinksRendered.length > 0 && post.affiliate.position && post.affiliate.position.top) { %>
+  <% if (!hasAffiliateBlocks && post.affiliate && post.affiliate.enabled && Array.isArray(affiliateLinksRendered) && affiliateLinksRendered.length > 0 && post.affiliate.position && post.affiliate.position.top) { %>
   <aside class="lab-affiliate-box">
     <h3 class="lab-affiliate-box__title">立即購買</h3>
     <% if (post.affiliate.disclosure) { %>
@@ -96,9 +118,9 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
   </aside>
   <% } %>
 
-  <%# === Affiliate Box（後置；條件同前置但檢查 position.bottom） === %>
+  <%# === Affiliate Box（後置；條件同前置但檢查 position.bottom；legacy，blocks 非空時抑制） === %>
   <%# Phase 20260610-am-6：同 top，links 來源改讀 resolved affiliateLinksRendered %>
-  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(affiliateLinksRendered) && affiliateLinksRendered.length > 0 && post.affiliate.position && post.affiliate.position.bottom) { %>
+  <% if (!hasAffiliateBlocks && post.affiliate && post.affiliate.enabled && Array.isArray(affiliateLinksRendered) && affiliateLinksRendered.length > 0 && post.affiliate.position && post.affiliate.position.bottom) { %>
   <aside class="lab-affiliate-box">
     <h3 class="lab-affiliate-box__title">立即購買</h3>
     <% if (post.affiliate.disclosure) { %>
@@ -111,6 +133,22 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
     </ul>
   </aside>
   <% } %>
+<%# === Affiliate Blocks（後置；position=bottom；Phase 20260610-pm-12 dual-block，Blogger-only） === -%>
+<% if (hasAffiliateBlocks) { -%>
+<% affiliateBottomBlocks.forEach(function (block) { var blockDisclosure = block.disclosure || (post.affiliate && post.affiliate.disclosure); -%>
+  <aside class="lab-affiliate-box">
+    <h3 class="lab-affiliate-box__title"><%= block.heading || '立即購買' %></h3>
+    <% if (blockDisclosure) { -%>
+    <p class="lab-affiliate-box__disclosure"><%= blockDisclosure %></p>
+    <% } -%>
+    <ul class="lab-affiliate-box__links">
+      <% block.links.forEach(function (link) { -%>
+      <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
+      <% }); -%>
+    </ul>
+  </aside>
+<% }); -%>
+<% } -%>
 
   <%# === Related Links（作者手動指定；相關連結） === -%>
   <%# - per docs/related-links-schema.md §8.2 之預期 markup -%>

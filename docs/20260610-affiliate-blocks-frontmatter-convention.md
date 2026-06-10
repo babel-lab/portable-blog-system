@@ -169,9 +169,11 @@ affiliate:
 
 ---
 
-## 6. renderer 實作（**resolver ✅ LANDED pm-11；template / build wiring 仍未實作**）
+## 6. renderer 實作（**resolver ✅ LANDED pm-11；Blogger renderer wiring ✅ LANDED pm-12；GitHub 未動**）
 
-> **狀態更新（pm-11）**：resolver 層已落地 —— additive helper `deriveRenderedAffiliateBlocks(affiliate, commerceLinks)`（`src/scripts/resolve-affiliate-links.js`）：Blogger-only surface gate（`surfaces` 含 `blogger`，省略預設 `["blogger"]`；`pages` 本 phase 不 render）+ `enabled !== false` + `position ∈ {top,bottom}` + 解析後 `links` ≥1 才 render；每 block links **委派既有** `deriveRenderedAffiliateLinks`（ref→targetUrl 逐字含 `uid1=blog`、omit、不洩 `internalLabel`）；回傳 per-block `{ id, position, heading, disclosure, links }`。`deriveRenderedAffiliateLinks` **未改**（GitHub Pages + legacy Blogger backward-compat）。smoke 14→**23/23**（+9 block case）。**template（`blogger-post-full.ejs`）/ build wiring（`build-blogger.js`）仍未接；GitHub 端完全未動；無 production 遷移 / build / deploy / Blogger repost。**
+> **狀態更新（pm-11）**：resolver 層已落地 —— additive helper `deriveRenderedAffiliateBlocks(affiliate, commerceLinks)`（`src/scripts/resolve-affiliate-links.js`）：Blogger-only surface gate（`surfaces` 含 `blogger`，省略預設 `["blogger"]`；`pages` 本 phase 不 render）+ `enabled !== false` + `position ∈ {top,bottom}` + 解析後 `links` ≥1 才 render；每 block links **委派既有** `deriveRenderedAffiliateLinks`（ref→targetUrl 逐字含 `uid1=blog`、omit、不洩 `internalLabel`）；回傳 per-block `{ id, position, heading, disclosure, links }`。`deriveRenderedAffiliateLinks` **未改**。smoke 14→**23/23**。
+>
+> **狀態更新（pm-12）**：Blogger renderer wiring 已落地 —— `build-blogger.js` `renderFullPost` 計算 `affiliateBlocksRendered` 並傳入 `blogger-post-full.ejs`（legacy `affiliateLinksRendered` wiring 不變）；template 在 `blocks` 非空時渲染 **top（body 前）/ bottom（body 後）** blocks（per-block heading fallback「立即購買」/ disclosure fallback `affiliate.disclosure`/ links；沿用 `.lab-affiliate-box` markup；whitespace-neutral `-%>` → blocks 空時 zero output）並**抑制 legacy box**（避免重複）；blocks 空 → legacy **byte-identical**（stash-diff 證實，we-media 仍 1 legacy bottom box modulo builtAt）。**GitHub（`post-detail.ejs` / `build-github.js`）完全未改 → by construction 忽略 `blocks[]`**。local-only 臨時測試（we-media 暫加 blocks[]）證實 top+bottom 雙區塊 + 不同 heading/disclosure + href 逐字 `uid1=blog` + 0 internalLabel + 0 `href="undefined"`，測後 **revert，無 production 遷移**。**無 build/deploy/gh-pages/Blogger repost；repost 仍 BLOCKED/DEFERRED（須 user approval + 內容遷移決策）。**
 
 下方為原始規劃（保留為設計記錄）：
 
