@@ -9,6 +9,8 @@
 > - `docs/20260610-blogger-repost-commerce-affiliate-box-preflight.md`（pm-9：bottom-only output preflight）
 > - `docs/20260610-github-pages-commerce-live-acceptance.md`（pm-8：GitHub Pages bottom-only box LIVE PASS）
 > - pm-4 readiness verdict = **BLOCKED**（bottom-only generated output 無法保留 Blogger 雙區塊版面）
+>
+> **🔵 AMENDED — pm-6 surface decision（2026-06-10，docs-only sync）**：使用者裁定 §6 open question #1 → **dual-block intent = Blogger-only（暫定）**；GitHub Pages 維持已 live-accepted 之單區塊 / legacy 輸出，**不得**因 we-media-myself2 之 Blogger 雙區塊需求而改變。完整裁定見新增 **§3.1**；§6 Q1 已標 **RESOLVED**。Phase: `20260610-pm-6-blogger-dual-block-surface-decision-docs-only-a`。
 
 ---
 
@@ -164,6 +166,34 @@ affiliate:
 
 ---
 
+## 3.1 Surface decision — Blogger-only（pm-6，RESOLVED；docs-only）
+
+> 本節為 `20260610-pm-6-blogger-dual-block-surface-decision-docs-only-a` 之 decision sync，裁定 §6 open question #1。**docs-only，未實作。**
+
+使用者裁定（authoritative，binding 後續實作 phase）：
+
+1. **dual-block strategy = Blogger-only（暫定）**。Blogger actual article 需支援上下雙 commerce block。
+2. **GitHub Pages 維持已 live-accepted 之單一 commerce block / legacy-compatible 輸出**，**不得**因 we-media-myself2 之 Blogger 雙區塊需求而改變 —— 直到未來有明確 command + 重新 acceptance。
+3. **建議 Option B 之實作必須包含 per-block surface gating（或等效機制）**：block 可指定 render surface（例如僅 `blogger`），或令 GitHub Pages legacy fallback 保持不變。
+4. **把 we-media-myself2 遷至 `blocks[]` 不得改變 GitHub Pages 輸出**，除非另經明確授權。
+5. **renderer 分工**：Blogger renderer 可渲染 top/bottom 雙 block；GitHub Pages renderer 維持目前已接受行為，**除非**某 block 在未來 phase 明確 target `pages`（GitHub）。
+6. **未來 GitHub Pages 雙區塊支援須另開 phase + 獨立 acceptance**，不在本輪範圍。
+
+### 3.1.1 對既有設計章節的影響
+
+- §3 建議（Option B）**不變**，但 surface gate 從「可選 `surfaces` 欄位（§6 待決）」升級為 **實作必備約束**：Option B 落地時，per-block surface gating 為 **MUST**，非 optional。
+- §4 step 6（we-media 遷移）/ step 8（acceptance）**綁定本裁定**：遷移後須驗證 GitHub Pages 輸出 **byte-identical-modulo-builtAt**（we-media GitHub 端維持單一 bottom box，live PASS 不被擾動）。
+- §5 向後相容 additive fallback **不變**；surface gate 與 legacy fallback 兩者共同保證 GitHub 輸出穩定。
+
+### 3.1.2 surface gating 語意（設計層；實作另案）
+
+- block 預設 surface 行為**待實作 phase 定案**（兩種等效候選，本 phase 不選定）：
+  - (a) block 顯式 `surfaces: ["blogger"]` → 僅 Blogger render；GitHub skip。
+  - (b) 或：採用 `affiliate.blocks[]` 之文章，GitHub renderer 一律走 legacy `affiliate.links[]` + `position` fallback（忽略 `blocks[]`），直到未來明確授權 GitHub 讀 `blocks[]`。
+- 兩者皆滿足本裁定「GitHub 輸出不變」；**選 (a) 或 (b) 屬未來實作 phase 決策**，須各自 acceptance。
+
+---
+
 ## 4. 最小實作順序（拆成安全 phase；**本 phase 不實作任何一項**）
 
 各 phase 須**獨立** + **explicit approval**；順序 / 取捨由 user 決定。
@@ -195,9 +225,7 @@ affiliate:
 
 ## 6. Open questions（實作前須 user 決定）
 
-1. **雙區塊的 surface 範圍**：上下雙區塊是 **Blogger-only** 意圖，還是 GitHub Pages 也要雙區塊？
-   - 關鍵：content model 為兩端**共用**。若 we-media 遷至 `blocks[]` 且無 surface gate → **GitHub Pages 輸出也會從單區塊變雙區塊**（we-media GitHub 端目前是 LIVE-accepted 單 bottom box → 會被改變，須重新 deploy + 驗收）。
-   - 若只要 Blogger 雙區塊 → 需 per-block `surfaces: ["blogger"]`（Option B 內建可選欄位），GitHub 端略過該 block。**此決策直接影響 §4 step 6/8。**
+1. ~~**雙區塊的 surface 範圍**：上下雙區塊是 **Blogger-only** 意圖，還是 GitHub Pages 也要雙區塊？~~ → **✅ RESOLVED（pm-6，見 §3.1）：Blogger-only（暫定）。GitHub Pages 維持單區塊 / legacy 輸出不變；Option B 實作 per-block surface gating 為 MUST；we-media 遷移不得改變 GitHub 輸出；未來 GitHub 雙區塊須另開 phase + 獨立 acceptance。**
 2. **上下 disclosure 揭露合規**：上下各一 disclosure 是否符合聯盟揭露要求？是否要強制「至少一個 block 有 disclosure」的 validator 規則？
 3. **block heading 文案**：上下 heading 是否都用「立即購買」，還是允許各自自訂（如「實體書」/「電子書」）？影響 schema 是否需 `heading` 欄位 vs 沿用固定 `<h3>立即購買</h3>`。
 4. **聯盟網納入時程**：下方 block 目標是聯盟網，但聯盟網尚未進 `affiliate-networks.json` / registry。雙區塊 model 可先落地（下方暫用通路王 ref），但「真正聯盟網 ref」須等聯盟網 network seed phase（另案，L2 gate / governance 紅線不變）。
