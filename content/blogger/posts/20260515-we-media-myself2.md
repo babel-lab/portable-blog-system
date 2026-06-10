@@ -67,7 +67,7 @@ affiliate:
       network: "通路王"
       ref: "book-we-media-myself2-books-com-tw-physical-books"
     - label: "金石堂：實體書"
-      network: "聯盟網"
+      network: "通路王"
       ref: "book-we-media-myself2-kingstone-physical-books"
 
 relatedLinks:
