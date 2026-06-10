@@ -64,8 +64,8 @@ R4 有**兩個獨立 deploy surface**（we-media `site:blogger` 但 `publishTarg
 | **artifact path** | `dist/`（含 `posts/we-media-myself2/index.html`）|
 | **deploy branch** | `gh-pages`（origin/HEAD → gh-pages；GitHub Pages Source = Deploy from branch `gh-pages` / root）|
 | **deploy 步驟**（github-deploy.md §5.4 增量）| 於獨立 deploy worktree/clone（如 `D:\github\blog-new\portable-blog-deploy`）：`rm -rf ./*` → `cp -r ../portable-blog-system/dist/* .` → `touch .nojekyll` → `git add .` → `git commit -m "deploy: 51ac797 snapshot"` → `git push origin gh-pages` |
-| **Pages URL** | user site `https://babel-lab.github.io/` |
-| **we-media live URL** | `https://babel-lab.github.io/posts/we-media-myself2/` |
+| **Pages URL** | **project site** `https://babel-lab.github.io/portable-blog-system/`（⚠️ **更正**：本 doc 原誤寫 user-site `https://babel-lab.github.io/`；實際為 project-site，含 `/portable-blog-system/` subpath，per pm-7 `docs/20260610-github-pages-project-site-url-note.md`）|
+| **we-media live URL** | `https://babel-lab.github.io/portable-blog-system/posts/we-media-myself2/`（⚠️ **更正**：原誤寫 `https://babel-lab.github.io/posts/we-media-myself2/`）|
 | **手動複製 HTML？** | 否（GitHub Pages 直接 serve dist 靜態檔；只需 push gh-pages branch）|
 
 ### 3.2 Blogger repost（手動；per blogger-repost-checklist.md）
@@ -80,7 +80,7 @@ R4 有**兩個獨立 deploy surface**（we-media `site:blogger` 但 `publishTarg
 
 ### 3.3 部署後 live checks（browser）
 
-GitHub Pages（`https://babel-lab.github.io/posts/we-media-myself2/`）+ Blogger 重貼後文章，各確認：
+GitHub Pages（`https://babel-lab.github.io/portable-blog-system/posts/we-media-myself2/`；⚠️ 原誤寫 user-site URL，per pm-7 更正）+ Blogger 重貼後文章，各確認：
 - 文章底部有且只有 **1 個** affiliate box（bottom），**無 top box**。
 - 2 個 affiliate 連結文字 = 「博客來：實體書 通路王」/「金石堂：實體書 通路王」。
 - 點擊 → 跳轉至 affiliate redirect（網址列含 `uid1=blog`；`whitehippo.net/3QaKr` / `adcenter.conn.tw/3QaLi`）。
