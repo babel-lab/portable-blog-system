@@ -152,7 +152,11 @@ affiliate:
 
 ---
 
-## 5. 未來 validator 行為（**列出，不實作**）
+## 5. validator 行為（**✅ LANDED warning-only — Phase `20260610-pm-9`**）
+
+> **狀態更新（pm-9）**：本節規則已落地於 `src/scripts/validate-content.js`（warning-only，fixture-isolated）。實作摘要：抽出共用 helper `validateCommerceLinkArray`（行為中立，legacy `affiliate.links[]` 輸出 byte-identical）+ 新 `validateAffiliateBlocks`（call site 於既有 `validateCommerceRefs` 之後）。落地 rule IDs：`affiliate-blocks-not-array` / `affiliate-block-invalid-entry-type` / `affiliate-block-missing-id` / `affiliate-block-duplicate-id` / `affiliate-block-invalid-enabled-type` / `affiliate-block-invalid-surfaces-type` / `affiliate-block-invalid-surface-value` / `affiliate-block-invalid-position` / `affiliate-block-links-not-array` / `affiliate-block-enabled-no-links`；block links 重用 `validateCommerceLinkArray`（C1/C2/C3/C5/C6/C8；**block-level C4/C9 deferred**，傳 `entryMap=null`）；**不**報 legacy/blocks coexistence；**tracking 驗證 deferred**（reserved/dormant，本 phase 不檢查）。13 fixtures（11 觸發 + 2 zero-warning guard）；normal baseline 0/69/59 → **0/80/70**，overlay 0/72/60 → **0/83/71**（全 fixture-only；production 0 觸發）。**renderer 仍未實作。**
+
+下方為原始規劃（保留為設計記錄）：
 
 - **block `id`**：enabled block 必填；**post 內唯一**（重複 → warn）。
 - **`position`**：允許值 `top` / `bottom`；其他 → warn。

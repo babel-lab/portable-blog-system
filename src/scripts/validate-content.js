@@ -609,7 +609,18 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
   if (!affiliate || typeof affiliate !== 'object' || Array.isArray(affiliate)) return;
   const links = affiliate.links;
   if (!Array.isArray(links)) return;
+  // Phase 20260610-pm-9：抽出 pathPrefix-parameterized helper（行為中立；legacy 走 prefix='affiliate.links'，message byte-identical）
+  validateCommerceLinkArray(links, 'affiliate.links', sourcePath, issues, commerceLinkIdSet, commerceLinkEntryMap);
+}
 
+// validateCommerceLinkArray：commerce-link array content-reference validation（warning-only；pathPrefix-parameterized）
+//   - Phase 20260610-pm-9：自 validateCommerceRefs body 抽出，供 legacy affiliate.links[] 與
+//     affiliate.blocks[].links[]（dual-block）共用同一套 C1/C2/C3/C5/C6/C8 + C4/C9 邏輯，避免邏輯分裂。
+//   - pathPrefix 決定 message 內欄位路徑前綴（legacy 'affiliate.links'；block 'affiliate.blocks[j].links'）。
+//   - C4/C9（registry-coupled）僅在 commerceLinkEntryMap !== null 時觸發；block links 由 caller 傳 null → 本 phase
+//     defer block-level C4/C9（per docs/20260610-affiliate-blocks-frontmatter-convention.md §8 + pm-8 §6）。
+//   - caller 須自行確保 links 為 array（mirror 舊 validateCommerceRefs guard）。
+function validateCommerceLinkArray(links, pathPrefix, sourcePath, issues, commerceLinkIdSet, commerceLinkEntryMap) {
   for (let i = 0; i < links.length; i++) {
     const entry = links[i];
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
@@ -622,7 +633,7 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
         severity: 'warning',
         type: 'commerce-ref-invalid-type',
         sourcePath,
-        value: `affiliate.links[${i}].ref typeof=${
+        value: `${pathPrefix}[${i}].ref typeof=${
           ref === null ? 'null' : Array.isArray(ref) ? 'array' : typeof ref
         } (must be string)`,
       });
@@ -637,7 +648,7 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
         severity: 'warning',
         type: 'commerce-ref-empty',
         sourcePath,
-        value: `affiliate.links[${i}].ref is empty or whitespace-only`,
+        value: `${pathPrefix}[${i}].ref is empty or whitespace-only`,
       });
       continue;
     }
@@ -650,7 +661,7 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
         severity: 'warning',
         type: 'commerce-ref-not-found',
         sourcePath,
-        value: `affiliate.links[${i}].ref="${trimmed}" not found in commerce-links registry`,
+        value: `${pathPrefix}[${i}].ref="${trimmed}" not found in commerce-links registry`,
       });
     }
 
@@ -668,7 +679,7 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
         severity: 'warning',
         type: 'commerce-ref-direct-url-coexist',
         sourcePath,
-        value: `affiliate.links[${i}] has both ref and url; remove url after commerce registry renderer migration`,
+        value: `${pathPrefix}[${i}] has both ref and url; remove url after commerce registry renderer migration`,
       });
     }
   }
@@ -694,7 +705,7 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
         severity: 'warning',
         type: 'commerce-ref-duplicate-in-post',
         sourcePath,
-        value: `affiliate.links[${indexes.join(',')}] duplicate ref="${key}"`,
+        value: `${pathPrefix}[${indexes.join(',')}] duplicate ref="${key}"`,
       });
     }
   }
@@ -716,8 +727,8 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
         sourcePath,
         value:
           typeof entry.role === 'string'
-            ? `affiliate.links[${i}].role="${entry.role}"`
-            : `affiliate.links[${i}].role typeof=${typeof entry.role}`,
+            ? `${pathPrefix}[${i}].role="${entry.role}"`
+            : `${pathPrefix}[${i}].role typeof=${typeof entry.role}`,
       });
     }
   }
@@ -752,7 +763,7 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
           severity: 'warning',
           type: 'commerce-ref-inactive',
           sourcePath,
-          value: `affiliate.links[${i}].ref="${trimmed}" matched but registry entry is inactive${
+          value: `${pathPrefix}[${i}].ref="${trimmed}" matched but registry entry is inactive${
             hasReplacement ? ' (a replacement target is configured)' : ''
           }`,
         });
@@ -777,10 +788,178 @@ function validateCommerceRefs(affiliate, sourcePath, issues, commerceLinkIdSet, 
             severity: 'warning',
             type: 'commerce-ref-display-override-risk',
             sourcePath,
-            value: `affiliate.links[${i}].labelOverride matches the registry internalLabel for ref="${trimmed}" (possible internal-identifier leak; use displayLabel or a public CTA)`,
+            value: `${pathPrefix}[${i}].labelOverride matches the registry internalLabel for ref="${trimmed}" (possible internal-identifier leak; use displayLabel or a public CTA)`,
           });
         }
       }
+    }
+  }
+}
+
+// validateAffiliateBlocks：Blogger dual-block affiliate.blocks[] shape validation（warning-only）
+//   - Phase 20260610-pm-9；per docs/20260610-affiliate-blocks-frontmatter-convention.md §2 / §5 / §6
+//   - 僅檢查 shape；不渲染、不遷移；production 0 篇用 blocks[] → 0 production 觸發（fixture-isolated）
+//   - block links content-ref 重用 validateCommerceLinkArray（C1/C2/C3/C5/C6/C8）；entryMap 傳 null → defer block-level C4/C9
+//   - **不**報 legacy affiliate.links[] 與 affiliate.blocks[] coexistence（per convention §3.3：we-media 遷移刻意並存）
+//   - tracking 驗證 deferred（reserved/dormant；本 phase 不檢查，避免 overbuild）
+//   - message 不 echo url / token / internalLabel；id / surfaces / position 為作者明示 machine/enum 值，可安全出現
+function validateAffiliateBlocks(affiliate, sourcePath, issues, commerceLinkIdSet) {
+  if (!affiliate || typeof affiliate !== 'object' || Array.isArray(affiliate)) return;
+  const blocks = affiliate.blocks;
+  if (blocks === undefined) return;
+
+  // affiliate.blocks 存在但非 array
+  if (!Array.isArray(blocks)) {
+    issues.push({
+      severity: 'warning',
+      type: 'affiliate-blocks-not-array',
+      sourcePath,
+      value: `affiliate.blocks typeof=${blocks === null ? 'null' : typeof blocks} (must be array)`,
+    });
+    return;
+  }
+
+  const seenIdIndexes = new Map();
+
+  for (let j = 0; j < blocks.length; j++) {
+    const block = blocks[j];
+
+    // block entry 須 plain object
+    if (!block || typeof block !== 'object' || Array.isArray(block)) {
+      issues.push({
+        severity: 'warning',
+        type: 'affiliate-block-invalid-entry-type',
+        sourcePath,
+        value: `affiliate.blocks[${j}] typeof=${
+          block === null ? 'null' : Array.isArray(block) ? 'array' : typeof block
+        } (must be plain object)`,
+      });
+      continue;
+    }
+
+    // enabled：present 時須 boolean；effectiveEnabled = enabled !== false（convention 預設 true）
+    const enabledRaw = block.enabled;
+    if (enabledRaw !== undefined && typeof enabledRaw !== 'boolean') {
+      issues.push({
+        severity: 'warning',
+        type: 'affiliate-block-invalid-enabled-type',
+        sourcePath,
+        value: `affiliate.blocks[${j}].enabled typeof=${typeof enabledRaw} (must be boolean)`,
+      });
+    }
+    const effectiveEnabled = enabledRaw !== false;
+
+    // id：required（所有 object block entry）；非空 string 才 track 供 duplicate 偵測
+    const id = block.id;
+    const idIsNonEmptyString = typeof id === 'string' && id.trim() !== '';
+    if (!idIsNonEmptyString) {
+      issues.push({
+        severity: 'warning',
+        type: 'affiliate-block-missing-id',
+        sourcePath,
+        value: `affiliate.blocks[${j}].id missing or empty`,
+      });
+    } else {
+      const key = id.trim();
+      if (!seenIdIndexes.has(key)) seenIdIndexes.set(key, []);
+      seenIdIndexes.get(key).push(j);
+    }
+
+    // position：enabled block 須為 top / bottom（per convention：position required for enabled blocks）
+    if (effectiveEnabled) {
+      const position = block.position;
+      if (position !== 'top' && position !== 'bottom') {
+        issues.push({
+          severity: 'warning',
+          type: 'affiliate-block-invalid-position',
+          sourcePath,
+          value:
+            typeof position === 'string'
+              ? `affiliate.blocks[${j}].position="${position}" (must be top or bottom)`
+              : `affiliate.blocks[${j}].position typeof=${
+                  position === undefined ? 'undefined' : typeof position
+                } (must be top or bottom)`,
+        });
+      }
+    }
+
+    // surfaces：present 時須 array of allowed values（blogger / pages）；省略 = 預設 ["blogger"]，不警
+    const surfaces = block.surfaces;
+    if (surfaces !== undefined) {
+      if (!Array.isArray(surfaces)) {
+        issues.push({
+          severity: 'warning',
+          type: 'affiliate-block-invalid-surfaces-type',
+          sourcePath,
+          value: `affiliate.blocks[${j}].surfaces typeof=${
+            surfaces === null ? 'null' : typeof surfaces
+          } (must be array)`,
+        });
+      } else {
+        for (let k = 0; k < surfaces.length; k++) {
+          const s = surfaces[k];
+          if (typeof s !== 'string' || (s !== 'blogger' && s !== 'pages')) {
+            issues.push({
+              severity: 'warning',
+              type: 'affiliate-block-invalid-surface-value',
+              sourcePath,
+              value:
+                typeof s === 'string'
+                  ? `affiliate.blocks[${j}].surfaces[${k}]="${s}" (allowed: blogger, pages)`
+                  : `affiliate.blocks[${j}].surfaces[${k}] typeof=${
+                      s === null ? 'null' : typeof s
+                    } (allowed: blogger, pages)`,
+            });
+          }
+        }
+      }
+    }
+
+    // links：present 時須 array；enabled block 須有非空 usable links
+    const links = block.links;
+    if (links !== undefined && !Array.isArray(links)) {
+      issues.push({
+        severity: 'warning',
+        type: 'affiliate-block-links-not-array',
+        sourcePath,
+        value: `affiliate.blocks[${j}].links typeof=${
+          links === null ? 'null' : typeof links
+        } (must be array)`,
+      });
+    }
+    const hasUsableLink =
+      Array.isArray(links) && links.some((l) => l && typeof l === 'object' && !Array.isArray(l));
+    if (effectiveEnabled && !hasUsableLink) {
+      issues.push({
+        severity: 'warning',
+        type: 'affiliate-block-enabled-no-links',
+        sourcePath,
+        value: `affiliate.blocks[${j}] is enabled but has no usable links`,
+      });
+    }
+
+    // block links content-reference 驗證（重用 helper；entryMap=null → defer block-level C4/C9）
+    if (Array.isArray(links)) {
+      validateCommerceLinkArray(
+        links,
+        `affiliate.blocks[${j}].links`,
+        sourcePath,
+        issues,
+        commerceLinkIdSet,
+        null
+      );
+    }
+  }
+
+  // duplicate block id（每個重複 key 報 1 warning；mirror C5 duplicate pattern）
+  for (const [key, indexes] of seenIdIndexes) {
+    if (indexes.length > 1) {
+      issues.push({
+        severity: 'warning',
+        type: 'affiliate-block-duplicate-id',
+        sourcePath,
+        value: `affiliate.blocks[${indexes.join(',')}] duplicate id="${key}"`,
+      });
     }
   }
 }
@@ -1539,6 +1718,10 @@ export function validateContent({ posts, settings }) {
       //   - per docs/20260604-commerce-links-content-reference-validation-preanalysis.md §5
       //   - 只掃 affiliate.links[].ref；raw-only links 不觸發；empty registry + 0-ref production → 0 觸發
       validateCommerceRefs(post.affiliate, sourcePath, issues, commerceLinkIdSet, commerceLinkEntryMap);
+
+      // Phase 20260610-pm-9：affiliate.blocks[] shape validation（warning-only；block links 重用 validateCommerceLinkArray，entryMap=null → defer block-level C4/C9）
+      //   - production 0 篇用 blocks[] → 0 production 觸發（fixture-isolated）；不報 legacy/blocks coexistence
+      validateAffiliateBlocks(post.affiliate, sourcePath, issues, commerceLinkIdSet);
     }
 
     if (post.category) {
