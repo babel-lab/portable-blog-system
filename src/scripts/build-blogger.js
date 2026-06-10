@@ -22,6 +22,8 @@ import { resolveTitleTemplate } from './resolve-series-title.js';
 //   本批僅用於預處理 relatedLinks / otherLinks 之 GitHub cross-link → reverse UTM；
 //   不動 buildBloggerToGithubUrl / canonicalUrl / JSON-LD / summary CTA / redirect CTA / index CTA。
 import { applyCrossSiteUtm } from './ga4-url-builder.js';
+// Phase 20260610-am-6：commerce renderer ref resolver（R1）；Blogger 與 GitHub 共用同一 helper。
+import { deriveRenderedAffiliateLinks } from './resolve-affiliate-links.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,6 +125,9 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
   //   - 對無 GitHub cross-link 之 ready post：rendered 與 raw 結構等價（item 同物件 reference）→ EJS 仍讀 raw → post.html byte-identical
   const relatedLinksRendered = deriveRenderedCrossLinks(post.relatedLinks, settings, 'related_links');
   const otherLinksRendered = deriveRenderedCrossLinks(post.otherLinks, settings, 'other_links');
+  // Phase 20260610-am-6：commerce affiliate ref → registry targetUrl 解析（R1；與 GitHub 共用同一 helper）。
+  //   url-backward-compatible-first → 既有 raw url ready post 之 post.html byte-identical（modulo builtAt）。
+  const affiliateLinksRendered = deriveRenderedAffiliateLinks(post.affiliate, settings.commerceLinks);
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-full.ejs'),
     {
@@ -132,6 +137,7 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
       jsonLd,
       relatedLinksRendered,
       otherLinksRendered,
+      affiliateLinksRendered,
     },
     { async: true },
   );

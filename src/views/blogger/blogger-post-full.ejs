@@ -58,14 +58,15 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
   <% } %>
 
   <%# === Affiliate Box（前置；enabled + links 非空 + position.top） === %>
-  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(post.affiliate.links) && post.affiliate.links.length > 0 && post.affiliate.position && post.affiliate.position.top) { %>
+  <%# Phase 20260610-am-6：links 來源改讀 build 端 resolved affiliateLinksRendered（ref→targetUrl / omit 已處理；url 保證非空）；enabled / position guard 仍讀 post.affiliate %>
+  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(affiliateLinksRendered) && affiliateLinksRendered.length > 0 && post.affiliate.position && post.affiliate.position.top) { %>
   <aside class="lab-affiliate-box">
     <h3 class="lab-affiliate-box__title">立即購買</h3>
     <% if (post.affiliate.disclosure) { %>
     <p class="lab-affiliate-box__disclosure"><%= post.affiliate.disclosure %></p>
     <% } %>
     <ul class="lab-affiliate-box__links">
-      <% post.affiliate.links.forEach(function(link) { %>
+      <% affiliateLinksRendered.forEach(function(link) { %>
       <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
       <% }); %>
     </ul>
@@ -96,14 +97,15 @@ const fullContentKind = identity.contentKind || post.contentKind || post.type;
   <% } %>
 
   <%# === Affiliate Box（後置；條件同前置但檢查 position.bottom） === %>
-  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(post.affiliate.links) && post.affiliate.links.length > 0 && post.affiliate.position && post.affiliate.position.bottom) { %>
+  <%# Phase 20260610-am-6：同 top，links 來源改讀 resolved affiliateLinksRendered %>
+  <% if (post.affiliate && post.affiliate.enabled && Array.isArray(affiliateLinksRendered) && affiliateLinksRendered.length > 0 && post.affiliate.position && post.affiliate.position.bottom) { %>
   <aside class="lab-affiliate-box">
     <h3 class="lab-affiliate-box__title">立即購買</h3>
     <% if (post.affiliate.disclosure) { %>
     <p class="lab-affiliate-box__disclosure"><%= post.affiliate.disclosure %></p>
     <% } %>
     <ul class="lab-affiliate-box__links">
-      <% post.affiliate.links.forEach(function(link) { %>
+      <% affiliateLinksRendered.forEach(function(link) { %>
       <li><a class="lab-affiliate-box__link" href="<%= link.url %>" rel="sponsored nofollow noopener noreferrer" target="_blank"><%= link.label %><% if (link.network) { %> <span class="lab-affiliate-box__network"><%= link.network %></span><% } %></a></li>
       <% }); %>
     </ul>

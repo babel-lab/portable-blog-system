@@ -10,6 +10,8 @@ import { renderBody } from './parse-markdown.js';
 import { validateContent, printWarnings } from './validate-content.js';
 import { applyCrossSiteUtm } from './ga4-url-builder.js';
 import { loadAdminPosts } from './load-admin-posts.js';
+// Phase 20260610-am-6：commerce renderer ref resolver（R1）；GitHub 與 Blogger 共用同一 helper。
+import { deriveRenderedAffiliateLinks } from './resolve-affiliate-links.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -620,6 +622,11 @@ async function main() {
     const otherLinksRendered = deriveRenderedCrossLinks(post.otherLinks, settings, 'other_links');
     // Phase 20260603-pm-7：download landing page registry-resolved derived data（null 表示非 landing post）
     const downloadLandingRendered = deriveRenderedDownloadLanding(post, settings);
+    // Phase 20260610-am-6：commerce affiliate ref → registry targetUrl 解析（R1）。
+    //   - url-backward-compatible-first：既有 raw url post 之輸出 byte-identical（ref 不改寫 url）
+    //   - ref-only 命中 active entry → url = registry targetUrl（逐字，保留 uid1=blog）
+    //   - missing / not-found / inactive / malformed ref → omit（不 fabricate；避免 href="undefined"）
+    const affiliateLinksRendered = deriveRenderedAffiliateLinks(post.affiliate, settings.commerceLinks);
     const detailHtml = await renderPage({
       template: 'pages/post-detail.ejs',
       data: baseData({
@@ -636,6 +643,7 @@ async function main() {
         relatedLinksRendered,
         otherLinksRendered,
         downloadLandingRendered,
+        affiliateLinksRendered,
       }),
     });
     await writeText(path.join(PAGES_DIR, 'posts', post.slug, 'index.html'), detailHtml, outputs);
