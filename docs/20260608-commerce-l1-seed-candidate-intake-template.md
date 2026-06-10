@@ -150,6 +150,12 @@ Rationale for collecting `role` at intake even though C7 source is dormant: when
 
 ## 6. Safe `targetUrl` policy (first seed)
 
+> **🟡 SUPERSEDED FOR COMMERCE AFFILIATE REDIRECT USE CASE（2026-06-10 user clarification）**
+> §6.2 之保守條款（first-seed `targetUrl` 不應含 tracking token / shortener）對 **commerce affiliate redirect use case** 已 **superseded**。
+> 裁定（見 `docs/20260610-commerce-blogger-tongluwang-seed-candidates-intake-preflight.md` §0.6 T1–T3）：**commerce `targetUrl` stores the affiliate redirect URL when the redirect URL is the intended monetized click target** —— 允許已知通路（如通路王 redirect domain）之 affiliate redirect URL 與公開 tracking parameter（如 `uid1=blog`），不要求轉 canonical、不移除公開 tracking param。
+> **未變更之安全限制**：`targetUrl` 仍**不可**含 secret / API key / private token / credential / PII / respondent data / 後台登入資訊；發現敏感資訊必須 block。§6.2 對「**非聯盟、無法治理審閱之第三方不透明 shortener**」之顧慮仍適用。
+> 本 banner 為 docs-only harmonization 記錄；**未改 source schema / validator / registry**；正式跨文件條款收斂標記為 **needs future doc harmonization**。
+
 For the **first L1 seed entries**, prefer the most conservative URL form available for each destination. The first non-empty registry is high-visibility; later, more permissive URL forms can be considered per-entry through their own approval, but the first seed should be exemplary.
 
 ### 6.1 Acceptable URL forms
