@@ -220,6 +220,7 @@ npm run check:images
   - `docs/20260608-commerce-l1-seed-candidate-intake-template.md`（夜 night-9；user-facing L1 seed candidate intake template；docs-only；不啟動 seed）
   - `docs/20260608-commerce-registry-seed-governance-preanalysis.md`（pm-29；commerce registry seed governance 治理紅線；docs-only；不 seed / 不 source / 不 Admin / 不 write path）
   - `docs/20260609-commerce-c9-label-override-safety-preanalysis.md`（am-4；commerce C9 `labelOverride` 安全規則 broader preanalysis；**結論 Option D：不擴大 C9 / 維持現有 narrow leak-equality 不動**；docs-only；不加 source / fixture / registry seed；baseline 維持 normal 0/69/59 + overlay 0/70/59 不變；C7 NO-GO 不變；L1 seed gate 不變）
+  - `docs/20260610-commerce-yaml-fields-site-productkey-category-preanalysis.md`（2026-06-10 am-1；commerce / affiliate YAML 欄位命名 convention 決策；docs-only；完整 `targetUrl` 集中 registry / post 只放 `affiliate.links[].ref` / 不新增 per-link `site`（未來跨站採 optional `surfaces`，v1 deferred）/ `productType`·`productKey`·`surfaces` 全 v1 optional additive / `linkId` 唯一 PK·`productKey` 僅分組線索 / 命名對齊既有 source（networkKey·merchantKey·internalLabel·displayLabel·targetUrl·active）/ L1 seed gate 不變；commit `aa63bce`）
 
 ### 7.1 5/26 快照（歷史保留）
 
