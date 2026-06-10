@@ -1,11 +1,24 @@
 {
   "enabled": false,
   "adsenseClient": "",
+  "loader": {
+    "blogger": "theme",
+    "pages": "head"
+  },
   "slots": {
     "postTop": "",
     "postMiddle": "",
     "postBottom": "",
     "sidebar": "",
-    "homeInline": ""
+    "homeInline": "",
+    "articleAd1": "",
+    "articleAd2": "",
+    "articleAd3": "",
+    "articleAd4": "",
+    "articleAd5": "",
+    "articleAd6": ""
+  },
+  "defaults": {
+    "blocks": []
   }
 }

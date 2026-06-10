@@ -1180,6 +1180,174 @@ function validateAdsenseBlocks(adsense, sourcePath, issues, validSlotKeySet) {
   }
 }
 
+// Phase 20260610-night-8（N6a）：ads settings shape validator（warning-only；settings-level；post loop 外，僅檢一次）
+//   - per docs/20260610-night-4-...-preanalysis.md §5 + night-7 preflight §8.1（11 條 shape rules）
+//   - 範圍：top-level shape + enabled/adsenseClient/slots/loader/defaults 之 shape 檢查
+//   - 不檢查 defaults.blocks[] per-block（N6b deferred；per night-7 §10.2）
+//   - 不檢查 ads-slot-id-empty-when-enabled（cross-cutting；deferred 至 renderer phase per night-7 §8.3）
+//   - 不擴充 overlay 機制（fixtures source-only acceptance；per night-7 §9.1）
+//   - 當前 production ads.config.json target shape 須 0 警告
+//   - messages 不 echo client / slot id 值；rule id 本身為 machine enum 可安全出現
+const VALID_ADS_LOADER_BLOGGER = new Set(['theme', 'article', 'none']);
+const VALID_ADS_LOADER_PAGES = new Set(['head', 'none']);
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateAdsSettings(settings, issues) {
+  const sourcePath = 'content/settings/ads.config.json';
+  const ads = settings ? settings.ads : undefined;
+  if (ads === undefined || ads === null) return;
+
+  // R1 ads-settings-invalid-shape：top-level 須 plain object（陣列 / 標量視為 misconfig）
+  if (!isPlainObject(ads)) {
+    issues.push({
+      severity: 'warning',
+      type: 'ads-settings-invalid-shape',
+      sourcePath,
+      value: `settings.ads typeof=${Array.isArray(ads) ? 'array' : typeof ads} (must be plain object)`,
+    });
+    return;
+  }
+
+  // R2 ads-enabled-invalid-type：present 時須 boolean
+  if (ads.enabled !== undefined && typeof ads.enabled !== 'boolean') {
+    issues.push({
+      severity: 'warning',
+      type: 'ads-enabled-invalid-type',
+      sourcePath,
+      value: `ads.enabled typeof=${typeof ads.enabled} (must be boolean)`,
+    });
+  }
+
+  // R3 ads-adsense-client-invalid-type：present 時須 string
+  const clientIsString = typeof ads.adsenseClient === 'string';
+  if (ads.adsenseClient !== undefined && !clientIsString) {
+    issues.push({
+      severity: 'warning',
+      type: 'ads-adsense-client-invalid-type',
+      sourcePath,
+      value: `ads.adsenseClient typeof=${
+        ads.adsenseClient === null ? 'null' : typeof ads.adsenseClient
+      } (must be string)`,
+    });
+  }
+
+  // R4 ads-adsense-client-missing-when-enabled：enabled === true 且 client 空 / 缺
+  //   - 與 R3 互斥：client 非 string 時走 R3 而非 R4
+  if (ads.enabled === true && clientIsString && ads.adsenseClient.trim() === '') {
+    issues.push({
+      severity: 'warning',
+      type: 'ads-adsense-client-missing-when-enabled',
+      sourcePath,
+      value: 'ads.enabled is true but ads.adsenseClient is empty',
+    });
+  } else if (ads.enabled === true && ads.adsenseClient === undefined) {
+    issues.push({
+      severity: 'warning',
+      type: 'ads-adsense-client-missing-when-enabled',
+      sourcePath,
+      value: 'ads.enabled is true but ads.adsenseClient is missing',
+    });
+  }
+
+  // R5 ads-slots-invalid-shape：slots present 時須 plain object
+  if (ads.slots !== undefined) {
+    if (!isPlainObject(ads.slots)) {
+      issues.push({
+        severity: 'warning',
+        type: 'ads-slots-invalid-shape',
+        sourcePath,
+        value: `ads.slots typeof=${Array.isArray(ads.slots) ? 'array' : typeof ads.slots} (must be plain object)`,
+      });
+    } else {
+      // R6 ads-slot-id-invalid-type：per-key value 須 string
+      for (const slotKey of Object.keys(ads.slots)) {
+        const slotValue = ads.slots[slotKey];
+        if (slotValue !== undefined && typeof slotValue !== 'string') {
+          issues.push({
+            severity: 'warning',
+            type: 'ads-slot-id-invalid-type',
+            sourcePath,
+            value: `ads.slots["${slotKey}"] typeof=${
+              slotValue === null ? 'null' : typeof slotValue
+            } (must be string)`,
+          });
+        }
+      }
+    }
+  }
+
+  // R7 ads-loader-invalid-shape：loader present 時須 plain object
+  if (ads.loader !== undefined) {
+    if (!isPlainObject(ads.loader)) {
+      issues.push({
+        severity: 'warning',
+        type: 'ads-loader-invalid-shape',
+        sourcePath,
+        value: `ads.loader typeof=${Array.isArray(ads.loader) ? 'array' : typeof ads.loader} (must be plain object)`,
+      });
+    } else {
+      // R8 ads-loader-blogger-invalid-value：present 時須在 {theme, article, none}
+      if (ads.loader.blogger !== undefined) {
+        const v = ads.loader.blogger;
+        if (typeof v !== 'string' || !VALID_ADS_LOADER_BLOGGER.has(v)) {
+          issues.push({
+            severity: 'warning',
+            type: 'ads-loader-blogger-invalid-value',
+            sourcePath,
+            value:
+              typeof v === 'string'
+                ? `ads.loader.blogger="${v}" (allowed: theme, article, none)`
+                : `ads.loader.blogger typeof=${v === null ? 'null' : typeof v} (allowed: theme, article, none)`,
+          });
+        }
+      }
+      // R9 ads-loader-pages-invalid-value：present 時須在 {head, none}
+      if (ads.loader.pages !== undefined) {
+        const v = ads.loader.pages;
+        if (typeof v !== 'string' || !VALID_ADS_LOADER_PAGES.has(v)) {
+          issues.push({
+            severity: 'warning',
+            type: 'ads-loader-pages-invalid-value',
+            sourcePath,
+            value:
+              typeof v === 'string'
+                ? `ads.loader.pages="${v}" (allowed: head, none)`
+                : `ads.loader.pages typeof=${v === null ? 'null' : typeof v} (allowed: head, none)`,
+          });
+        }
+      }
+    }
+  }
+
+  // R10 ads-defaults-invalid-shape：defaults present 時須 plain object
+  if (ads.defaults !== undefined) {
+    if (!isPlainObject(ads.defaults)) {
+      issues.push({
+        severity: 'warning',
+        type: 'ads-defaults-invalid-shape',
+        sourcePath,
+        value: `ads.defaults typeof=${Array.isArray(ads.defaults) ? 'array' : typeof ads.defaults} (must be plain object)`,
+      });
+    } else {
+      // R11 ads-defaults-blocks-not-array：defaults.blocks present 時須 array
+      if (ads.defaults.blocks !== undefined && !Array.isArray(ads.defaults.blocks)) {
+        issues.push({
+          severity: 'warning',
+          type: 'ads-defaults-blocks-not-array',
+          sourcePath,
+          value: `ads.defaults.blocks typeof=${
+            ads.defaults.blocks === null ? 'null' : typeof ads.defaults.blocks
+          } (must be array)`,
+        });
+      }
+      // defaults.blocks[] per-block recursion deferred to N6b
+    }
+  }
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -1258,6 +1426,12 @@ export function validateContent({ posts, settings }) {
   //   - 與 commerceLinkIdSet 同源獨立建構；registry shape invalid → null → C4 / C9 skip
   //   - empty registry（commerceLinks === []）→ 空 Map；0 篇 production 用 ref → 0 觸發
   const commerceLinkEntryMap = buildCommerceLinkEntryMap(settings.commerceLinks);
+
+  // Phase 20260610-night-8（N6a）：ads settings shape validation（warning-only；post loop 外；僅檢一次）
+  //   - per docs/20260610-night-4-...-preanalysis.md §5 + night-7 preflight §8.1
+  //   - 11 條 shape rules；defaults.blocks[] per-block 由 N6b 補（本 phase 不做 recursion / helper refactor）
+  //   - production target ads.config.json shape 須 0 警告（normal 0/94/84、overlay 0/101/85 不變）
+  validateAdsSettings(settings, issues);
 
   // Phase 20260610-night-6：valid AdSense slot key set（derived from current settings.ads.slots; warning-only）
   //   - per docs/20260610-night-4-...-preanalysis.md §5 + night-5 pm-5 §10.2 N5 split
