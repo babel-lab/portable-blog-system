@@ -25,6 +25,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   deriveRenderedAffiliateLinks,
+  deriveRenderedAffiliateBlocks,
   buildActiveCommerceLinkEntryMap,
 } from './resolve-affiliate-links.js';
 
@@ -230,6 +231,141 @@ check('11 KOBO excluded entry not resolvable', () => {
   assert.ok(!activeEntryMap.has(KOBO), 'KOBO linkId must NOT be in active entry map');
   const out = deriveRenderedAffiliateLinks({ links: [{ ref: KOBO, label: 'KOBO' }] }, commerceLinks);
   assert.equal(out.length, 0, 'ref to KOBO excluded entry must be omitted (validator C3 not-found)');
+});
+
+// ─── Section 3：deriveRenderedAffiliateBlocks（Blogger dual-block resolver；Phase pm-11）──
+//   - additive helper；不改 deriveRenderedAffiliateLinks（Section 1/2 行為仍須全 pass = backward-compat 證明）
+//   - in-memory deterministic（registry-independent，除非明確帶入 registry）
+
+// 12. 缺 affiliate / 缺 blocks / blocks 非 array → []
+check('12 blocks: missing affiliate / missing blocks / non-array → []', () => {
+  assert.deepEqual(deriveRenderedAffiliateBlocks(undefined, []), []);
+  assert.deepEqual(deriveRenderedAffiliateBlocks(null, []), []);
+  assert.deepEqual(deriveRenderedAffiliateBlocks({}, []), []); // 無 blocks
+  assert.deepEqual(deriveRenderedAffiliateBlocks({ blocks: 'x' }, []), []); // 非 array
+  assert.deepEqual(deriveRenderedAffiliateBlocks({ blocks: {} }, []), []); // object 非 array
+});
+
+// 13. enabled:false block → skip
+check('13 enabled:false block skipped', () => {
+  const out = deriveRenderedAffiliateBlocks(
+    { blocks: [{ id: 'b', enabled: false, position: 'top', links: [{ label: 'L', url: 'https://e.example.invalid/?uid1=blog' }] }] },
+    [],
+  );
+  assert.equal(out.length, 0);
+});
+
+// 14. surfaces 省略 → 預設 blogger（render）
+check('14 surfaces omitted defaults to blogger (renders)', () => {
+  const out = deriveRenderedAffiliateBlocks(
+    { blocks: [{ id: 'b', position: 'top', links: [{ label: 'L', url: 'https://e.example.invalid/?uid1=blog' }] }] },
+    [],
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].position, 'top');
+});
+
+// 15. surfaces ['blogger'] → render；surfaces ['pages'] → 本 phase 不 render
+check("15 surfaces ['blogger'] renders, ['pages'] does not (this phase)", () => {
+  const mk = (surfaces) => ({
+    blocks: [{ id: 'b', surfaces, position: 'top', links: [{ label: 'L', url: 'https://e.example.invalid/?uid1=blog' }] }],
+  });
+  assert.equal(deriveRenderedAffiliateBlocks(mk(['blogger']), []).length, 1);
+  assert.equal(deriveRenderedAffiliateBlocks(mk(['pages']), []).length, 0);
+  assert.equal(deriveRenderedAffiliateBlocks(mk(['pages', 'blogger']), []).length, 1); // 含 blogger → render
+  assert.equal(deriveRenderedAffiliateBlocks(mk('blogger'), []).length, 0); // 非 array → 不 render
+});
+
+// 16. invalid position → skip；top/bottom 皆 resolve
+check('16 invalid position skipped; top + bottom both resolve', () => {
+  const link = [{ label: 'L', url: 'https://e.example.invalid/?uid1=blog' }];
+  assert.equal(
+    deriveRenderedAffiliateBlocks({ blocks: [{ id: 'b', position: 'middle', links: link }] }, []).length,
+    0,
+  );
+  const out = deriveRenderedAffiliateBlocks(
+    { blocks: [{ id: 't', position: 'top', links: link }, { id: 'b', position: 'bottom', links: link }] },
+    [],
+  );
+  assert.equal(out.length, 2);
+  assert.equal(out[0].position, 'top');
+  assert.equal(out[1].position, 'bottom');
+});
+
+// 17. heading / disclosure / id 保留（非空 string）；缺則 undefined
+check('17 heading / disclosure / id preserved when present', () => {
+  const out = deriveRenderedAffiliateBlocks(
+    { blocks: [{ id: 'top-x', position: 'top', heading: '上方標題', disclosure: '上方揭露', links: [{ label: 'L', url: 'https://e.example.invalid/?uid1=blog' }] }] },
+    [],
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, 'top-x');
+  assert.equal(out[0].heading, '上方標題');
+  assert.equal(out[0].disclosure, '上方揭露');
+  // 缺 heading/disclosure → undefined
+  const out2 = deriveRenderedAffiliateBlocks(
+    { blocks: [{ id: 'b', position: 'bottom', links: [{ label: 'L', url: 'https://e.example.invalid/?uid1=blog' }] }] },
+    [],
+  );
+  assert.equal(out2[0].heading, undefined);
+  assert.equal(out2[0].disclosure, undefined);
+});
+
+// 18. block links 透過既有 ref resolver：ref-only active → url=targetUrl 逐字（uid1=blog），不洩 internalLabel
+check('18 block links resolve via existing ref behavior (targetUrl verbatim, no internalLabel leak)', () => {
+  const registry = [
+    { linkId: 'm-active', active: true, displayLabel: '博客來：實體書', internalLabel: 'SECRET-INTERNAL', targetUrl: 'https://whitehippo.net/3QWBP?uid1=blog' },
+  ];
+  const out = deriveRenderedAffiliateBlocks(
+    { blocks: [{ id: 'b', position: 'top', links: [{ ref: 'm-active' }] }] },
+    registry,
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].links.length, 1);
+  assert.equal(out[0].links[0].url, 'https://whitehippo.net/3QWBP?uid1=blog'); // 逐字含 uid1=blog
+  assert.equal(out[0].links[0].label, '博客來：實體書'); // displayLabel，非 internalLabel
+  assert.ok(!JSON.stringify(out).includes('SECRET-INTERNAL'), 'internalLabel must not leak in blocks output');
+  assertSafeUrls(out[0].links, ['m-active']);
+});
+
+// 19. block 內 inactive / not-found / malformed links 全 omit；若 block 解析後 0 link → 整個 block 不 render
+check('19 inactive/not-found/malformed links omitted; empty-after-resolve block skipped', () => {
+  const registry = [
+    { linkId: 'm-inactive', active: false, displayLabel: 'safe', targetUrl: 'https://x.example.invalid/?uid1=blog' },
+    { linkId: 'm-active', active: true, displayLabel: '博客來', targetUrl: 'https://a.example.invalid/?uid1=blog' },
+  ];
+  // block 1：全部不可解析（inactive + not-found + malformed）→ 0 link → block skip
+  // block 2：1 raw + 1 active + 1 invalid → 2 link render
+  const out = deriveRenderedAffiliateBlocks(
+    {
+      blocks: [
+        { id: 'empty', position: 'top', links: [{ ref: 'm-inactive' }, { ref: '__nope__' }, { ref: 123 }] },
+        { id: 'mixed', position: 'bottom', links: [{ label: 'raw', url: 'https://raw.example.invalid/?uid1=blog' }, { ref: 'm-active' }, { ref: '__nope__' }] },
+      ],
+    },
+    registry,
+  );
+  assert.equal(out.length, 1, 'only the non-empty block should render');
+  assert.equal(out[0].id, 'mixed');
+  assert.equal(out[0].links.length, 2);
+  assert.equal(out[0].links[0].url, 'https://raw.example.invalid/?uid1=blog');
+  assert.equal(out[0].links[1].url, 'https://a.example.invalid/?uid1=blog');
+  assertSafeUrls(out[0].links, ['m-active', '__nope__']);
+});
+
+// 20. registry-coupled：production 真實 active entry 經 block resolver → targetUrl 逐字（uid1=blog）
+check('20 production active entry via block resolver → targetUrl verbatim (uid1=blog)', () => {
+  const firstActive = commerceLinks.find((e) => e && e.active !== false && typeof e.linkId === 'string' && e.linkId.trim() !== '');
+  assert.ok(firstActive, 'registry should contain at least 1 active entry');
+  const out = deriveRenderedAffiliateBlocks(
+    { blocks: [{ id: 'b', position: 'top', links: [{ ref: firstActive.linkId }] }] },
+    commerceLinks,
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].links.length, 1);
+  assert.equal(out[0].links[0].url, firstActive.targetUrl); // 逐字
+  assert.ok(out[0].links[0].url.includes('uid1=blog'), 'production targetUrl should retain uid1=blog');
+  assertSafeUrls(out[0].links, [firstActive.linkId]);
 });
 
 // ─── Summary ────────────────────────────────────────────────────────────

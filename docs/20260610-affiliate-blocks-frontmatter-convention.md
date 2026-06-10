@@ -169,7 +169,11 @@ affiliate:
 
 ---
 
-## 6. 未來 renderer 實作注意（**列出，不實作**）
+## 6. renderer 實作（**resolver ✅ LANDED pm-11；template / build wiring 仍未實作**）
+
+> **狀態更新（pm-11）**：resolver 層已落地 —— additive helper `deriveRenderedAffiliateBlocks(affiliate, commerceLinks)`（`src/scripts/resolve-affiliate-links.js`）：Blogger-only surface gate（`surfaces` 含 `blogger`，省略預設 `["blogger"]`；`pages` 本 phase 不 render）+ `enabled !== false` + `position ∈ {top,bottom}` + 解析後 `links` ≥1 才 render；每 block links **委派既有** `deriveRenderedAffiliateLinks`（ref→targetUrl 逐字含 `uid1=blog`、omit、不洩 `internalLabel`）；回傳 per-block `{ id, position, heading, disclosure, links }`。`deriveRenderedAffiliateLinks` **未改**（GitHub Pages + legacy Blogger backward-compat）。smoke 14→**23/23**（+9 block case）。**template（`blogger-post-full.ejs`）/ build wiring（`build-blogger.js`）仍未接；GitHub 端完全未動；無 production 遷移 / build / deploy / Blogger repost。**
+
+下方為原始規劃（保留為設計記錄）：
 
 - **Blogger renderer**（`src/views/blogger/blogger-post-full.ejs` + `build-blogger.js`）：當 `blocks[]` 非空 → 迭代 blocks，過濾 `surfaces` 含 `blogger` 且 `enabled`，依 `position` 於正文前（top）/ 後（bottom）渲染；per-block `heading` / `disclosure` / `links`；忽略 legacy `links[]`/`position`（避免重複）。
 - **GitHub Pages renderer**（`src/views/pages/post-detail.ejs` + `build-github.js`）：**維持 legacy-compatible**；本階段**忽略 `blocks[]`**；未來支援 `pages` surface 須**另開 phase + 另做 acceptance**。

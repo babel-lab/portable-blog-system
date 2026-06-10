@@ -97,3 +97,59 @@ export function deriveRenderedAffiliateLinks(affiliate, commerceLinks) {
 
   return rendered;
 }
+
+// deriveRenderedAffiliateBlocks：Blogger dual-block affiliate.blocks[] → renderer-ready per-block 物件[]。
+//   - Phase 20260610-pm-11；per docs/20260610-affiliate-blocks-frontmatter-convention.md §2/§3/§6 + pm-10 §8。
+//   - **additive**：完全不改 deriveRenderedAffiliateLinks（GitHub Pages + legacy Blogger 依賴其 backward-compat）。
+//   - 僅供 **Blogger** surface；本 phase pages surface 一律不 render（surfaces 不含 'blogger' → 跳過該 block）。
+//   - 每 block 之 links resolution **委派既有** deriveRenderedAffiliateLinks（reuse url-backward-compat /
+//     ref→targetUrl 逐字含 uid1=blog / omit missing·not-found·inactive·malformed·KOBO / label safety 不洩 internalLabel）。
+//   - block renderable 條件（全 AND；任一不符 → 跳過，不輸出空殼）：
+//       (a) plain object；(b) enabled !== false（省略視為 enabled）；
+//       (c) surfaces 含 'blogger'（省略預設 ['blogger']；非 array → 不 render）；
+//       (d) position ∈ {top, bottom}；(e) 解析後 links 至少 1 筆。
+//   - 回傳 per-block { id, position, heading, disclosure, links }（僅 renderer 需要欄位；不含 surfaces / enabled /
+//     tracking）。id / heading / disclosure 僅在非空 string 時帶入，否則 undefined（fallback 由 renderer 處理）。
+//   - 不實作 tracking / GA4 / reverse UTM；不改 affiliate URL policy；不 canonicalize。
+export function deriveRenderedAffiliateBlocks(affiliate, commerceLinks) {
+  if (!affiliate || typeof affiliate !== 'object' || Array.isArray(affiliate)) return [];
+  const blocks = affiliate.blocks;
+  if (!Array.isArray(blocks)) return [];
+
+  const rendered = [];
+  for (const block of blocks) {
+    // (a) plain object
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+    // (b) enabled !== false（省略 = enabled）
+    if (block.enabled === false) continue;
+
+    // (c) surface gate：省略 surfaces → 預設 ['blogger']；array 須含 'blogger'；非 array → 不 render
+    const surfaces = block.surfaces;
+    let includesBlogger;
+    if (surfaces === undefined) {
+      includesBlogger = true;
+    } else if (Array.isArray(surfaces)) {
+      includesBlogger = surfaces.includes('blogger');
+    } else {
+      includesBlogger = false;
+    }
+    if (!includesBlogger) continue;
+
+    // (d) position gate
+    const position = block.position;
+    if (position !== 'top' && position !== 'bottom') continue;
+
+    // (e) links：委派既有 per-link resolver（omit / label-safety / url 逐字全部沿用）；至少 1 筆才 render
+    const links = deriveRenderedAffiliateLinks({ links: block.links }, commerceLinks);
+    if (!Array.isArray(links) || links.length === 0) continue;
+
+    rendered.push({
+      id: isNonEmptyString(block.id) ? block.id : undefined,
+      position,
+      heading: isNonEmptyString(block.heading) ? block.heading : undefined,
+      disclosure: isNonEmptyString(block.disclosure) ? block.disclosure : undefined,
+      links,
+    });
+  }
+  return rendered;
+}
