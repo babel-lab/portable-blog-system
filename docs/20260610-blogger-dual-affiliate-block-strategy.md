@@ -80,7 +80,7 @@
 
 | 項目 | 值 |
 | --- | --- |
-| main HEAD = origin/main | `31a7a14`（本 phase commit 後更新）|
+| main HEAD = origin/main | pre-phase baseline 為 `31a7a14`（見 §Baseline）；本 phase docs 落地為 commit `abf82af`；故落地後 main HEAD = origin/main = `abf82af`。|
 | gh-pages HEAD = origin/gh-pages | `2acb5a5`（GitHub Pages LIVE，user-accepted PASS）|
 | we-media Blogger 目標文章 URL | `https://babel-lab.blogspot.com/2026/05/we-media-myself2.html`（user 確認）|
 | GitHub Pages affiliate box | bottom-only，live PASS |
