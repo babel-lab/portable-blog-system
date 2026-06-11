@@ -1,0 +1,16 @@
+<%# Phase 20260611-night-1（N8 第一步）：AdSense article-block partial。
+       接收 { block, ads }。
+         block — resolve-adsense-blocks.js 之 ResolvedBlock（{ id?, anchor, slotKey, slotId, client, order? }）。
+         ads   — 完整 settings.ads 物件。
+       角色：把 resolved block 委派給基底 adsense-slot.ejs（不自帶 ad code、不繞過安全 gate）。
+       default-safe：
+         - block 缺漏 / 非物件 / 無 slotKey → 整段空輸出。
+         - 有 slotKey 但 ads 未啟用 / 無 adsenseClient / slots[slotKey] 空 → adsense-slot 之 3-gate 仍會空輸出。
+       不消費 surfaces / enabled / order（surface + enabled + order 已由 resolver 處理完）。 %>
+<%
+const _block = (typeof block === 'object' && block) ? block : null;
+const _slotKey = _block && typeof _block.slotKey === 'string' && _block.slotKey ? _block.slotKey : null;
+-%>
+<% if (_slotKey) { -%>
+<%- await include('./adsense-slot', { slotKey: _slotKey, ads: typeof ads !== 'undefined' ? ads : null }) %>
+<% } -%>

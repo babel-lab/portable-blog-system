@@ -30,6 +30,7 @@
     "check:images": "node src/scripts/check-image-links.js",
     "smoke:reverse-utm": "node src/scripts/smoke-reverse-utm.js",
     "check:adsense-resolver": "node src/scripts/check-adsense-resolver.js",
+    "check:adsense-article-block": "node src/scripts/check-adsense-article-block.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
