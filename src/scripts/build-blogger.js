@@ -24,6 +24,11 @@ import { resolveTitleTemplate } from './resolve-series-title.js';
 import { applyCrossSiteUtm } from './ga4-url-builder.js';
 // Phase 20260610-am-6：commerce renderer ref resolver（R1）；Blogger 與 GitHub 共用同一 helper。
 import { deriveRenderedAffiliateLinks, deriveRenderedAffiliateBlocks } from './resolve-affiliate-links.js';
+// Phase 20260611-pm-10（Phase C）：AdSense article-block resolver（Blogger surface dry-run wiring）。
+//   - 與 GitHub Pages 共用同一 pure resolver；surface='blogger' → 僅 articleAd6/beforeRelatedLinks（pm-8 policy）resolve。
+//   - articleAd1..5 為 pages-only → blogger surface 回空；ads.enabled=false 時全 {}。
+//   - 本批僅本機 build dry-run wiring，不 deploy / 不重貼 Blogger。
+import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,6 +137,10 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
   //   legacy affiliateLinksRendered wiring 不變；template 在 blocks 非空時改走 blocks 並抑制 legacy box（避免重複）。
   //   GitHub build（build-github.js）不呼叫此 helper → GitHub 端 by construction 維持 legacy-only。
   const affiliateBlocksRendered = deriveRenderedAffiliateBlocks(post.affiliate, settings.commerceLinks);
+  // Phase 20260611-pm-10（Phase C）：Blogger surface AdSense blocks 解析（surface='blogger'）。
+  //   - pm-8 policy：blogger surface 僅 articleAd6/beforeRelatedLinks resolve；其餘 anchor 回空。
+  //   - pure resolver；不洩 internal 欄位；template 端僅在 beforeRelatedLinks anchor 插入。
+  const adsenseBlocksRendered = deriveRenderedAdsenseBlocks(post, settings.ads, 'blogger');
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-full.ejs'),
     {
@@ -143,6 +152,8 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
       otherLinksRendered,
       affiliateLinksRendered,
       affiliateBlocksRendered,
+      adsenseBlocksRendered,
+      ads: settings.ads,
     },
     { async: true },
   );

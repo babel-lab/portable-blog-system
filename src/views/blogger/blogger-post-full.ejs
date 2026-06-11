@@ -19,6 +19,10 @@ const affiliateBlocks = (typeof affiliateBlocksRendered !== 'undefined' && Array
 const hasAffiliateBlocks = affiliateBlocks.length > 0;
 const affiliateTopBlocks = affiliateBlocks.filter(function (b) { return b && b.position === 'top'; });
 const affiliateBottomBlocks = affiliateBlocks.filter(function (b) { return b && b.position === 'bottom'; });
+// Phase 20260611-pm-10（Phase C）：AdSense anchor blocks（Blogger surface）；本批僅插入 beforeRelatedLinks anchor（pm-8 policy：blogger 只啟用 articleAd6）。
+//   - adsenseBlocksRendered 由 build 端以 surface='blogger' 解析；無 / 非 object → {}。
+//   - default-safe：對應 anchor 無 resolved block 時，adsense-anchor partial 整段 zero-byte。
+const _adsAnchors = (typeof adsenseBlocksRendered !== 'undefined' && adsenseBlocksRendered) ? adsenseBlocksRendered : {};
 %>
 <div class="lab-blogger-article">
 
@@ -149,6 +153,9 @@ const affiliateBottomBlocks = affiliateBlocks.filter(function (b) { return b && 
   </aside>
 <% }); -%>
 <% } -%>
+
+  <%# === AdSense anchor: beforeRelatedLinks（Phase 20260611-pm-10 Phase C；Blogger surface；僅 articleAd6 resolve；default-safe zero-byte） === -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['beforeRelatedLinks'], ads: typeof ads !== 'undefined' ? ads : null }) -%>
 
   <%# === Related Links（作者手動指定；相關連結） === -%>
   <%# - per docs/related-links-schema.md §8.2 之預期 markup -%>
