@@ -24,7 +24,7 @@ publishTargets:
     mode: "full"
   blogger:
     enabled: true
-    mode: "summary"
+    mode: "full"
 blocks:
   toc: false
   adsenseTop: true
