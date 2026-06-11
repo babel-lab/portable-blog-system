@@ -417,6 +417,129 @@ check('23 all 14 v1 anchors resolve when given valid block', () => {
   }
 });
 
+// ─── Section 4：default block resolution（N9b）─────────────────────────────
+// settings.ads.defaults.blocks[] 作為 site-wide default article block source。
+// 不輸出 real ids：把 production defaults.blocks 結構（anchor/slotKey/order，非機密）
+// 套到 synthetic client / slot ids 上驗證 resolution。
+
+const SIX_SLOT_KEYS = ['articleAd1', 'articleAd2', 'articleAd3', 'articleAd4', 'articleAd5', 'articleAd6'];
+
+function makeDefaultBlocksSettings(overrides = {}) {
+  const syntheticSlots = { postTop: '', postMiddle: '', postBottom: '', sidebar: '', homeInline: '' };
+  for (const k of SIX_SLOT_KEYS) syntheticSlots[k] = `synthetic-${k}-0000`;
+  return {
+    enabled: true,
+    adsenseClient: 'ca-pub-SYNTHETIC0000000',
+    loader: { blogger: 'theme', pages: 'head' },
+    slots: syntheticSlots,
+    defaults: prodAdsSettings.defaults, // production 6-block policy（anchors/slotKeys only；無 real id）
+    ...overrides,
+  };
+}
+
+// 24. production defaults.blocks shape：6 blocks, slotKey articleAd1..6, anchors in v1 enum
+check('24 production defaults.blocks = 6 blocks, articleAd1..6, valid v1 anchors', () => {
+  const blocks = prodAdsSettings.defaults && prodAdsSettings.defaults.blocks;
+  assert.ok(Array.isArray(blocks), 'defaults.blocks is array');
+  assert.equal(blocks.length, 6, 'exactly 6 default blocks');
+  assert.deepEqual(blocks.map((b) => b.slotKey), SIX_SLOT_KEYS, 'slotKeys are articleAd1..6 in order');
+  for (const b of blocks) {
+    assert.ok(ADSENSE_V1_ANCHORS.includes(b.anchor), `anchor ${b.anchor} in v1 enum`);
+  }
+});
+
+// 25. enabled + synthetic client/slots + post WITHOUT own blocks → 6 default blocks resolve
+check('25 enabled synthetic + no post blocks → 6 default blocks resolve', () => {
+  const ads = makeDefaultBlocksSettings();
+  const post = makePost(undefined); // post 無 adsense → 走 default fallback
+  const out = deriveRenderedAdsenseBlocks(post, ads, 'pages');
+  assert.equal(Object.keys(out).length, 6, '6 anchors resolved from defaults');
+  const resolvedSlotKeys = Object.values(out).flat().map((b) => b.slotKey).sort();
+  assert.deepEqual(resolvedSlotKeys, [...SIX_SLOT_KEYS].sort(), 'all 6 article slot keys resolved');
+  for (const b of Object.values(out).flat()) {
+    assert.equal(b.client, 'ca-pub-SYNTHETIC0000000', 'synthetic client (no real id)');
+    assert.equal(b.slotId, `synthetic-${b.slotKey}-0000`, 'synthetic slot id (no real id)');
+    const policy = prodAdsSettings.defaults.blocks.find((d) => d.slotKey === b.slotKey);
+    assert.equal(b.anchor, policy.anchor, `${b.slotKey} resolves at policy anchor ${policy.anchor}`);
+  }
+});
+
+// 26. defaults present but ads.enabled=false → {}（no-op）
+check('26 defaults present but enabled=false → {}', () => {
+  const ads = makeDefaultBlocksSettings({ enabled: false });
+  assert.ok(isEmptyObject(deriveRenderedAdsenseBlocks(makePost(undefined), ads, 'pages')));
+});
+
+// 27. defaults present but missing client → {}
+check('27 defaults present but adsenseClient empty → {}', () => {
+  const ads = makeDefaultBlocksSettings({ adsenseClient: '' });
+  assert.ok(isEmptyObject(deriveRenderedAdsenseBlocks(makePost(undefined), ads, 'pages')));
+});
+
+// 28. one slot id empty → that default block omitted; others still resolve
+check('28 empty slot id omits that default block only', () => {
+  const slots = { postTop: '', postMiddle: '', postBottom: '', sidebar: '', homeInline: '' };
+  for (const k of SIX_SLOT_KEYS) slots[k] = `synthetic-${k}-0000`;
+  slots.articleAd1 = ''; // empty → articleAd1 block omitted
+  const ads = makeDefaultBlocksSettings({ slots });
+  const out = deriveRenderedAdsenseBlocks(makePost(undefined), ads, 'pages');
+  const resolvedSlotKeys = Object.values(out).flat().map((b) => b.slotKey);
+  assert.ok(!resolvedSlotKeys.includes('articleAd1'), 'articleAd1 omitted (empty slot id)');
+  assert.equal(resolvedSlotKeys.length, 5, 'other 5 default blocks still resolve');
+});
+
+// 29. post-specific blocks override defaults（defaults NOT used when post has own blocks）
+check('29 post-specific blocks take precedence over defaults', () => {
+  const ads = makeDefaultBlocksSettings();
+  const post = makePost({ blocks: [{ id: 'post-own', anchor: 'afterHashtags', slotKey: 'articleAd6' }] });
+  const out = deriveRenderedAdsenseBlocks(post, ads, 'pages');
+  assert.deepEqual(Object.keys(out), ['afterHashtags'], 'only post-specific block resolved');
+  assert.equal(out.afterHashtags[0].id, 'post-own');
+});
+
+// 30. post opt-out (adsense.enabled=false) suppresses even defaults
+check('30 post adsense.enabled=false suppresses defaults', () => {
+  const ads = makeDefaultBlocksSettings();
+  assert.ok(isEmptyObject(deriveRenderedAdsenseBlocks(makePost({ enabled: false }), ads, 'pages')));
+});
+
+// 31. disabled + unknown-anchor default blocks skipped
+check('31 disabled + unknown-anchor default blocks skipped', () => {
+  const ads = makeDefaultBlocksSettings({
+    defaults: {
+      blocks: [
+        { id: 'd-off', enabled: false, anchor: 'afterHeader', slotKey: 'articleAd1' },
+        { id: 'd-bad', anchor: 'afterIntro', slotKey: 'articleAd2' }, // not in v1 enum
+        { id: 'd-ok', anchor: 'beforeHashtags', slotKey: 'articleAd3' },
+      ],
+    },
+  });
+  const out = deriveRenderedAdsenseBlocks(makePost(undefined), ads, 'pages');
+  assert.deepEqual(Object.keys(out), ['beforeHashtags']);
+  assert.equal(out.beforeHashtags[0].id, 'd-ok');
+});
+
+// 32. default-block internal fields (displayName/purpose/notes) do not leak
+check('32 default-block internal fields do not leak to output', () => {
+  const ads = makeDefaultBlocksSettings({
+    defaults: {
+      blocks: [
+        {
+          id: 'd', anchor: 'afterHeader', slotKey: 'articleAd1', surfaces: ['pages'],
+          displayName: 'LEAK-NAME', purpose: 'LEAK-PURPOSE', notes: 'LEAK-NOTES', order: 1,
+        },
+      ],
+    },
+  });
+  const out = deriveRenderedAdsenseBlocks(makePost(undefined), ads, 'pages');
+  const json = JSON.stringify(out);
+  assert.ok(!json.includes('LEAK'), 'no internal field value leaks');
+  assert.deepEqual(
+    new Set(Object.keys(out.afterHeader[0])),
+    new Set(['id', 'anchor', 'slotKey', 'slotId', 'client', 'order']),
+  );
+});
+
 // ─── Summary ────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed / ${failed} failed`);

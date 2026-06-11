@@ -11,7 +11,10 @@
 //   - 對 null / undefined / wrong-shape input → 回傳 `{}`（不 throw、不 null）
 //   - 不消費 legacy `blocks.adsenseTop` / `blocks.adsenseBottom`（既有 EJS L63/L294
 //     之 legacy path 仍維持不變）
-//   - 不消費 `adsSettings.defaults.blocks[]`（N7 不引此 fallback；deferred）
+//   - block source 解析順序（per night-4 §6.2 fallback 設計；N9b 起啟用 defaults fallback）：
+//       1. post-specific：post.adsense.blocks 為非空 array → 用 post blocks（最高優先；既有行為）
+//       2. site default：否則 fallback 至 `adsSettings.defaults.blocks[]`（N9b 落地；N7 曾 deferred）
+//     legacy `blocks.adsenseTop` / `adsenseBottom` flag 路徑為獨立既有 EJS 機制，本 resolver 不涉入
 //   - 不檢查不在 v1 enum 內之 anchor（如 afterIntro / inArticle 等 mid-body
 //     anchor）→ 跳過該 block；validator 已對作者警告
 //   - 不輸出 internal-only 欄位（surfaces / enabled / note 等不能洩漏到 renderer）
@@ -86,13 +89,24 @@ export function deriveRenderedAdsenseBlocks(post, adsSettings, surface) {
   if (!isPlainObject(post)) return {};
 
   const adsense = post.adsense;
-  if (!isPlainObject(adsense)) return {};
 
-  // post-level disable：adsense.enabled === false 完全關閉
-  if (adsense.enabled === false) return {};
+  // post-level disable：adsense.enabled === false 完全關閉（連 site default 也不套用）
+  if (isPlainObject(adsense) && adsense.enabled === false) return {};
 
-  // blocks gate：須為非空 array
-  const blocks = adsense.blocks;
+  // block source 解析（per night-4 §6.2）：
+  //   1. post.adsense.blocks 為非空 array → post-specific override（最高優先）
+  //   2. 否則 fallback 至 adsSettings.defaults.blocks[]（site-wide default policy；N9b）
+  let blocks = null;
+  if (isPlainObject(adsense) && Array.isArray(adsense.blocks) && adsense.blocks.length > 0) {
+    blocks = adsense.blocks;
+  } else {
+    const defaults = adsSettings.defaults;
+    if (isPlainObject(defaults) && Array.isArray(defaults.blocks) && defaults.blocks.length > 0) {
+      blocks = defaults.blocks;
+    }
+  }
+
+  // blocks gate：解析後仍須為非空 array（無 post blocks 且無 default blocks → {}）
   if (!Array.isArray(blocks) || blocks.length === 0) return {};
 
   // 逐 block 解析；不在源頭過濾 invalid，每 block 獨立判斷便於 stable order
