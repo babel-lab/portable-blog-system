@@ -79,7 +79,7 @@
         "id": "article-ad-6",
         "slotKey": "articleAd6",
         "anchor": "beforeRelatedLinks",
-        "surfaces": ["pages"],
+        "surfaces": ["pages", "blogger"],
         "enabled": true,
         "order": 6,
         "displayName": "相關連結前廣告",

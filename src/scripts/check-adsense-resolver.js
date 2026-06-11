@@ -428,10 +428,27 @@ check('21 production ads.config.json post-N9e enabled invariant', () => {
     );
   }
 
-  // (f) Blogger surface：defaults surfaces=['pages'] → {}（GitHub Pages-only enable invariant）
+  // (f) Blogger surface（pm-8 Phase B）：articleAd6 / beforeRelatedLinks default block
+  //     已明確加入 'blogger' surface → blogger surface 只 resolve 該單一底部版位
+  //     （非無條件全開；articleAd1..5 仍 pages-only，見 case 33 negative guard）。
+  const bloggerOut = deriveRenderedAdsenseBlocks(makePost(undefined), prodAdsSettings, 'blogger');
+  assert.deepEqual(
+    Object.keys(bloggerOut),
+    ['beforeRelatedLinks'],
+    'blogger surface resolves only the explicitly allowed beforeRelatedLinks anchor',
+  );
+  assert.equal(bloggerOut.beforeRelatedLinks.length, 1, 'exactly one blogger block resolved');
+  assert.equal(
+    bloggerOut.beforeRelatedLinks[0].slotKey,
+    'articleAd6',
+    'blogger block is the approved articleAd6 bottom slot',
+  );
+
+  // (g) pages-unchanged invariant：加入 blogger surface 後，pages 仍 resolve 同樣 6 blocks
+  //     （articleAd6 之 surfaces 含 'pages' 不變；out 已於 (e) 驗證 == N9D_POLICY）。
   assert.ok(
-    isEmptyObject(deriveRenderedAdsenseBlocks(makePost(undefined), prodAdsSettings, 'blogger')),
-    'blogger surface yields no blocks (pages-only default policy)',
+    out.beforeRelatedLinks && out.beforeRelatedLinks[0].slotKey === 'articleAd6',
+    'pages surface still resolves articleAd6 at beforeRelatedLinks (unchanged by blogger opt-in)',
   );
 });
 
@@ -601,6 +618,26 @@ check('32 default-block internal fields do not leak to output', () => {
     new Set(Object.keys(out.afterHeader[0])),
     new Set(['id', 'anchor', 'slotKey', 'slotId', 'client', 'order']),
   );
+});
+
+// ─── Section 5：Blogger surface Phase B opt-in negative guard（pm-8）──────────
+// 僅 articleAd6 / beforeRelatedLinks 之 default block 獲准 blogger surface；
+// blogger surface 不得 broad-enable articleAd1..5 或任何 non-approved slot/anchor。
+
+// 33. blogger surface does not broadly enable non-approved slots/anchors
+check('33 blogger surface does not broadly enable non-approved slots', () => {
+  const bloggerOut = deriveRenderedAdsenseBlocks(makePost(undefined), prodAdsSettings, 'blogger');
+  // blogger 僅允許 beforeRelatedLinks anchor（articleAd6 之版位）
+  assert.deepEqual(
+    Object.keys(bloggerOut).sort(),
+    ['beforeRelatedLinks'],
+    'blogger resolves only the approved beforeRelatedLinks anchor',
+  );
+  // articleAd1..5 不得出現在 blogger surface（仍 pages-only）
+  const bloggerSlotKeys = Object.values(bloggerOut).flat().map((b) => b.slotKey);
+  for (const k of ['articleAd1', 'articleAd2', 'articleAd3', 'articleAd4', 'articleAd5']) {
+    assert.ok(!bloggerSlotKeys.includes(k), `blogger must not resolve ${k} (pages-only)`);
+  }
 });
 
 // ─── Summary ────────────────────────────────────────────────────────────
