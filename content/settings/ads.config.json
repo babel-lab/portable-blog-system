@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "adsenseClient": "ca-pub-2445077695943759",
   "loader": {
     "blogger": "theme",
