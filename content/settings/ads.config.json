@@ -1,6 +1,6 @@
 {
   "enabled": false,
-  "adsenseClient": "",
+  "adsenseClient": "ca-pub-2445077695943759",
   "loader": {
     "blogger": "theme",
     "pages": "head"
@@ -11,14 +11,81 @@
     "postBottom": "",
     "sidebar": "",
     "homeInline": "",
-    "articleAd1": "",
-    "articleAd2": "",
-    "articleAd3": "",
-    "articleAd4": "",
-    "articleAd5": "",
-    "articleAd6": ""
+    "articleAd1": "7549133677",
+    "articleAd2": "7465373194",
+    "articleAd3": "3751770373",
+    "articleAd4": "7035489397",
+    "articleAd5": "7582284302",
+    "articleAd6": "3892656977"
   },
   "defaults": {
-    "blocks": []
+    "blocks": [
+      {
+        "id": "article-ad-1",
+        "slotKey": "articleAd1",
+        "anchor": "afterHeader",
+        "surfaces": ["pages"],
+        "enabled": true,
+        "order": 1,
+        "displayName": "文章開頭廣告",
+        "purpose": "文章標題 / 導言後、正文前的首個版位",
+        "notes": "最高曝光位；勿與既有 legacy adsenseTop 重疊"
+      },
+      {
+        "id": "article-ad-2",
+        "slotKey": "articleAd2",
+        "anchor": "afterCover",
+        "surfaces": ["pages"],
+        "enabled": true,
+        "order": 2,
+        "displayName": "封面圖後廣告",
+        "purpose": "第一段圖文區塊（封面圖）後",
+        "notes": "afterCover 為 Pages surface 版位"
+      },
+      {
+        "id": "article-ad-3",
+        "slotKey": "articleAd3",
+        "anchor": "afterBookPhoto",
+        "surfaces": ["pages"],
+        "enabled": true,
+        "order": 3,
+        "displayName": "主要圖片區後廣告",
+        "purpose": "漫畫或主要圖片區（book photo）後",
+        "notes": "非書評文章無 book photo 時，resolver 仍 no-op 不破版"
+      },
+      {
+        "id": "article-ad-4",
+        "slotKey": "articleAd4",
+        "anchor": "afterAffiliateTop",
+        "surfaces": ["pages"],
+        "enabled": true,
+        "order": 4,
+        "displayName": "閱讀心得區廣告",
+        "purpose": "閱讀心得正文起點（上方販售框後、心得 body 開頭）",
+        "notes": "閱讀心得前後語意最接近 afterAffiliateTop"
+      },
+      {
+        "id": "article-ad-5",
+        "slotKey": "articleAd5",
+        "anchor": "beforeAffiliateBottom",
+        "surfaces": ["pages"],
+        "enabled": true,
+        "order": 5,
+        "displayName": "書籍資料 / CTA 前廣告",
+        "purpose": "書籍資料或下方販售 CTA 前",
+        "notes": "勿與 affiliate bottom box 視覺打架"
+      },
+      {
+        "id": "article-ad-6",
+        "slotKey": "articleAd6",
+        "anchor": "beforeRelatedLinks",
+        "surfaces": ["pages"],
+        "enabled": true,
+        "order": 6,
+        "displayName": "相關連結前廣告",
+        "purpose": "相關連結 / hashtag 前、文章底部",
+        "notes": "relatedLinks 為相關連結 / hashtag 中較前者；勿與 legacy adsenseBottom 重疊"
+      }
+    ]
   }
 }
