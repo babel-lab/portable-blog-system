@@ -139,8 +139,8 @@
 ## §4 常用驗證指令
 
 ```bash
-# 內容驗證（baseline 目前 0 errors / 69 warnings / 59 posts；
-# overlay 驗證見 §7.0：node src/scripts/validate-content.js --registry-overlay content/validation-fixtures/settings/commerce-c4-c9-overlay.json = 0/70/59）
+# 內容驗證（baseline 目前 0 errors / 94 warnings / 84 posts；
+# overlay 驗證見 §7.0：node src/scripts/validate-content.js --registry-overlay content/validation-fixtures/settings/commerce-c4-c9-overlay.json = 0/101/85）
 npm run validate:content
 
 # GitHub Pages 本機預覽
@@ -203,17 +203,19 @@ npm run check:images
 
 ## §7 最近一次穩定 checkpoint
 
-（更新時點：2026-06-09 am-9；docs-only index sync。當前狀態以 §7.0 為準；§7.1 / §7.2 屬 5/26 與 5/21 之前快照保留，不代表 6/9 狀態）
+（更新時點：2026-06-11 pm-2；docs-only baseline sync。當前狀態以 §7.0 為準；§7.1 / §7.2 屬 5/26 與 5/21 之前快照保留，不代表 6/11 狀態）
 
-### 7.0 當前 checkpoint（2026-06-09）
+### 7.0 當前 checkpoint（2026-06-11）
 
-- source HEAD: `b7d5c14 docs(commerce): plan C9 label override safety`
+- source HEAD: `67c6d6d docs(project): add post-n9 project-wide status checkpoint`
 - branch: `main` / tracking `origin/main` / 與 remote 同步 / working tree clean
 - validate baseline：
-  - normal `npm run validate:content` = **0 errors / 69 warnings / 59 posts**
-  - overlay `node src/scripts/validate-content.js --registry-overlay content/validation-fixtures/settings/commerce-c4-c9-overlay.json` = **0 errors / 70 warnings / 59 posts**
-- commerce registry：empty `[]`（未 seed）；Admin commerce read-only preview + YAML snippet copy helper **已 landed/accepted**（commit `77d9ad8`）；L1 seed candidate intake template **已 landed** 但尚未啟動 L1 seed ladder（registry 仍 empty）
-- C4 / C7 / C8 / C9 commerce content-ref rules + Admin Apply / middleware write / admin-write-cli / renderer activation / production migration / deploy / Blogger repost / GA4 commerce dimension / reverse UTM / pm-26 deploy gate：**全部 dormant**
+  - normal `npm run validate:content` = **0 errors / 94 warnings / 84 posts**
+  - overlay `node src/scripts/validate-content.js --registry-overlay content/validation-fixtures/settings/commerce-c4-c9-overlay.json` = **0 errors / 101 warnings / 85 posts**
+- `npm run check:adsense-resolver` = **33 passed / 0 failed**
+- **AdSense N9 GitHub Pages article ads：repo-side CLOSED / PASS**（詳 `docs/20260611-adsense-n9-closure-checkpoint.md`）
+- commerce registry：**L1 seeded（10 active entries，全 `networkKey: books` / 通路王）**；`we-media-myself2.md` 已 R3 url→ref；commerce L2（新 candidate）仍須 user-provided YAML + explicit approval
+- **最新 project-wide frozen snapshot：`docs/20260611-project-wide-status-checkpoint.md`**（post-N9 frozen state；closed / dormant / blocked / red lines / safe next candidates 之 authoritative 彙整；本 §7.0 不重複內容以防 drift）
 - 2026-06-08 重要 docs（cold-start 可發現性入口）：
   - `docs/20260608-project-wide-status-checkpoint.md`（夜 night-7；frozen state project-wide snapshot；HEAD `5b3177f` 時點）
   - `docs/20260608-commerce-admin-snippet-helper-acceptance-checkpoint.md`（夜 night-5；commit `77d9ad8` Admin YAML snippet copy helper acceptance 存證）
