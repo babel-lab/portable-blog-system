@@ -12,6 +12,7 @@ import { applyCrossSiteUtm } from './ga4-url-builder.js';
 import { loadAdminPosts } from './load-admin-posts.js';
 // Phase 20260610-am-6：commerce renderer ref resolver（R1）；GitHub 與 Blogger 共用同一 helper。
 import { deriveRenderedAffiliateLinks } from './resolve-affiliate-links.js';
+import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -627,6 +628,10 @@ async function main() {
     //   - ref-only 命中 active entry → url = registry targetUrl（逐字，保留 uid1=blog）
     //   - missing / not-found / inactive / malformed ref → omit（不 fabricate；避免 href="undefined"）
     const affiliateLinksRendered = deriveRenderedAffiliateLinks(post.affiliate, settings.commerceLinks);
+    // Phase 20260611-night-2（N8 anchor wiring）：six-slot AdSense article blocks 解析（surface='pages'）。
+    //   - pure resolver；ads.enabled=false 時對任何 post 回 {} → 全 anchor zero-byte（byte-identical）。
+    //   - 不消費 legacy blocks.adsenseTop / adsenseBottom（既有 L63/L294 path 不變）。
+    const adsenseBlocksRendered = deriveRenderedAdsenseBlocks(post, settings.ads, 'pages');
     const detailHtml = await renderPage({
       template: 'pages/post-detail.ejs',
       data: baseData({
@@ -644,6 +649,7 @@ async function main() {
         otherLinksRendered,
         downloadLandingRendered,
         affiliateLinksRendered,
+        adsenseBlocksRendered,
       }),
     });
     await writeText(path.join(PAGES_DIR, 'posts', post.slug, 'index.html'), detailHtml, outputs);

@@ -1,0 +1,10 @@
+<%# Phase 20260611-night-2（N8 anchor wiring）：render 單一 anchor 之全部 resolved AdSense block。
+       接收 blocks（adsenseBlocksRendered[anchor]，即 resolve-adsense-blocks.js 之 ResolvedBlock 陣列或 undefined）與 ads（settings.ads）。
+       角色：對該 anchor 之每個 block 委派 adsense-article-block，再委派 adsense-slot 之三重 gate。
+       default-safe 且 zero-byte：blocks 非陣列或空陣列時整檔零輸出（每行結尾 slurp 換行，控制標籤置於 column 0）。
+       block 已由 resolver 完成 surface / enabled / order / slotId 過濾；本檔不再判斷。
+       本檔 EJS comment 嚴格無 EJS delimiter 字符（避免提前關閉 comment tag）。 -%>
+<% const _blocks = Array.isArray(blocks) ? blocks : []; -%>
+<% for (const _adBlock of _blocks) { -%>
+<div class="lab-container"><%- await include('./adsense-article-block', { block: _adBlock, ads: typeof ads !== 'undefined' ? ads : null }) %></div>
+<% } -%>

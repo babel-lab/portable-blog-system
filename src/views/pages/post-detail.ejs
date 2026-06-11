@@ -7,6 +7,9 @@ const display = view.display || {};
 const detailTitle = display.title || post.title;
 const detailCover = display.cover || post.cover;
 const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
+// Phase 20260611-night-2（N8 anchor wiring）：六區塊 AdSense per-anchor resolved blocks（build 端 deriveRenderedAdsenseBlocks 注入）。
+//   - 缺漏時退回空物件；ads.enabled=false（current production）→ 永遠 {} → 全 anchor zero-byte。
+const _adsAnchors = (typeof adsenseBlocksRendered !== 'undefined' && adsenseBlocksRendered) ? adsenseBlocksRendered : {};
 %>
 <article class="lab-article">
   <header class="lab-article__header lab-container">
@@ -27,6 +30,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
       <% } %>
     </p>
   </header>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterHeader'], ads }) -%>
 
   <% if (detailCover) { %>
   <div class="lab-container">
@@ -39,6 +43,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </div>
   </div>
   <% } %>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterCover'], ads }) -%>
 
   <%# Phase 9-h-e-b：Book Photo 區塊（mirror Blogger 端 post-full.ejs 之 book photo pattern） -%>
   <%# 4 條 AND guard：post.contentKind 為 book-review / post.book 存在 / post.book.showBookPhoto 為 truthy / post.book.coverImage 有值 -%>
@@ -59,6 +64,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </figure>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterBookPhoto'], ads }) -%>
 
   <% if (typeof ads !== 'undefined' && ads && ads.enabled === true && post.blocks && post.blocks.adsenseTop) { %>
   <div class="lab-container">
@@ -90,10 +96,12 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </aside>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterAffiliateTop'], ads }) -%>
 
   <div class="lab-article__body lab-container">
     <%- bodyHtml %>
   </div>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['beforeDownloadBox'], ads }) -%>
 
   <%# Phase 9-h-c-b：教具下載 Box（mirror Blogger 端 post-full.ejs 之 download box） -%>
   <%# 3 條 AND guard：download 存在 / enabled 為 true / fileUrl 有值 -%>
@@ -122,6 +130,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </aside>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterDownloadBox'], ads }) -%>
 
   <%# Phase 20260603-pm-2：下載落地頁 minimal guarded branch（Option D；per docs/20260603-download-landing-page-content-model-decision.md §5 / §7 / §11） -%>
   <%# Phase 20260603-pm-7：改用 build 端 registry-resolved derived object downloadLandingRendered（Option A）；registry empty 時 graceful fallback 到 placeholder -%>
@@ -165,6 +174,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </section>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['beforeAffiliateBottom'], ads }) -%>
 
   <%# Phase 9-h-b-b：聯盟販售連結 Box 後置（mirror Blogger 端 post-full.ejs 之 affiliate bottom） -%>
   <%# 5 條 AND guard：affiliate 存在 / enabled 為 true / links 非空 array / position 存在 / position.bottom 為 true -%>
@@ -187,6 +197,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </aside>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterAffiliateBottom'], ads }) -%>
 
   <%# Phase 9-g-f-b：相關連結（作者手動指定；mirror Blogger 9-g-d-b pattern） -%>
   <%# Phase related-links-ga4-audit：改讀 relatedLinksRendered / otherLinksRendered（含 Blogger cross-link UTM + target/rel） -%>
@@ -202,6 +213,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
         && typeof item.title === 'string' && item.title.trim() !== '';
     });
   -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['beforeRelatedLinks'], ads }) -%>
   <% if (renderableRelated.length > 0) { %>
   <div class="lab-container">
     <aside class="lab-related-links">
@@ -232,6 +244,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </aside>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterRelatedLinks'], ads }) -%>
 
   <%# Phase 9-g-f-b：其他連結（同 lab-related-links 規則，class prefix 改 lab-other-links） -%>
   <%# Phase related-links-ga4-audit：讀 otherLinksRendered；utm_content=other_links -%>
@@ -242,6 +255,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
         && typeof item.title === 'string' && item.title.trim() !== '';
     });
   -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['beforeOtherLinks'], ads }) -%>
   <% if (renderableOther.length > 0) { %>
   <div class="lab-container">
     <aside class="lab-other-links">
@@ -272,6 +286,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </aside>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterOtherLinks'], ads }) -%>
 
   <%# Phase 9-h-d-b：Hashtag 區塊（mirror Blogger 端 post-full.ejs 之 hashtag pattern） -%>
   <%# 4 條 AND guard：post.blocks 存在 / post.blocks.hashtags 為 truthy / post.tags 是 array / post.tags.length 大於 0 -%>
@@ -281,6 +296,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
   <%# 本批不接 normalize-post-output；直接讀 post.tags（mirror Blogger 既有 pattern） -%>
   <%# trim-newline pattern：對無 hashtag 之 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
   <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 9-g-d-c-fix / 9-g-f-b / 9-h-b-b / 9-h-c-b 既有預防經驗） -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['beforeHashtags'], ads }) -%>
   <% if (post.blocks && post.blocks.hashtags && Array.isArray(post.tags) && post.tags.length > 0) { %>
   <div class="lab-container">
     <ul class="lab-hashtags">
@@ -290,6 +306,7 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
     </ul>
   </div>
   <% } -%>
+<%- await include('../ads/adsense-anchor', { blocks: _adsAnchors['afterHashtags'], ads }) -%>
 
   <% if (typeof ads !== 'undefined' && ads && ads.enabled === true && post.blocks && post.blocks.adsenseBottom) { %>
   <div class="lab-container">
