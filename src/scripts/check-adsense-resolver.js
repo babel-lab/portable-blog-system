@@ -67,6 +67,19 @@ function isEmptyObject(o) {
   return o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length === 0;
 }
 
+const SIX_SLOT_KEYS = ['articleAd1', 'articleAd2', 'articleAd3', 'articleAd4', 'articleAd5', 'articleAd6'];
+
+// 正式 production default-block policy（slotKey → anchor，依 N9d checklist top→bottom）。
+// slotKey / anchor / order 屬非機密 policy（非 real slot id），可在測試硬編；real slot id 不可。
+const N9D_POLICY = [
+  ['articleAd1', 'afterHeader'],
+  ['articleAd2', 'afterCover'],
+  ['articleAd3', 'afterBookPhoto'],
+  ['articleAd4', 'afterAffiliateTop'],
+  ['articleAd5', 'beforeAffiliateBottom'],
+  ['articleAd6', 'beforeRelatedLinks'],
+];
+
 // ─── Section 1：in-memory deterministic behavior locks ──────────────────
 
 // 1. ads.enabled=false → {}
@@ -357,17 +370,69 @@ check('20 defensive null/undefined/scalar inputs return {} without throwing', ()
 const ADS_SETTINGS_PATH = fileURLToPath(new URL('../../content/settings/ads.config.json', import.meta.url));
 const prodAdsSettings = JSON.parse(readFileSync(ADS_SETTINGS_PATH, 'utf-8'));
 
-// 21. real production ads.config.json with enabled=false → {} for any post
-check('21 production ads.config.json (enabled=false) → {} regardless of post', () => {
-  assert.equal(prodAdsSettings.enabled, false, 'production ads.config.json must keep enabled=false');
-  const post = makePost({
-    blocks: [
-      { id: 'b1', anchor: 'afterHeader', slotKey: 'articleAd1' },
-      { id: 'b2', anchor: 'beforeHashtags', slotKey: 'articleAd6' },
-    ],
-  });
-  assert.ok(isEmptyObject(deriveRenderedAdsenseBlocks(post, prodAdsSettings, 'blogger')));
-  assert.ok(isEmptyObject(deriveRenderedAdsenseBlocks(post, prodAdsSettings, 'pages')));
+// 21. post-N9e production invariant：ads.config.json 已正式 enable（GitHub Pages-only）。
+//     舊 guard 曾 assert enabled=false；N9e 後正式 baseline 為 enabled=true。
+//     本 case 改檢查「新正式設定完整性」，非無條件放行；一律不列印 full real client / slot id。
+check('21 production ads.config.json post-N9e enabled invariant', () => {
+  // (a) enabled 已正式為 true
+  assert.equal(prodAdsSettings.enabled, true, 'production ads.config.json must be enabled:true post-N9e');
+
+  // (b) adsenseClient present 且非空（不列印值）
+  assert.ok(
+    typeof prodAdsSettings.adsenseClient === 'string' && prodAdsSettings.adsenseClient.trim() !== '',
+    'production adsenseClient must be a non-empty string',
+  );
+
+  // (c) slots.articleAd1..6 present 且非空（present-check only；不列印 full slot id）
+  const slots = prodAdsSettings.slots || {};
+  for (const k of SIX_SLOT_KEYS) {
+    assert.ok(
+      typeof slots[k] === 'string' && slots[k].trim() !== '',
+      `production slot ${k} must be a non-empty string`,
+    );
+  }
+
+  // (d) defaults.blocks[] 須對 articleAd1..6 各有一筆有效 block policy
+  const blocks = (prodAdsSettings.defaults && prodAdsSettings.defaults.blocks) || [];
+  assert.ok(Array.isArray(blocks) && blocks.length === 6, 'defaults.blocks must hold exactly 6 entries');
+  for (const b of blocks) {
+    assert.ok(SIX_SLOT_KEYS.includes(b.slotKey), `block slotKey ${b.slotKey} must be an articleAd1..6 key`);
+    assert.ok(ADSENSE_V1_ANCHORS.includes(b.anchor), `block anchor ${b.anchor} must be a valid v1 anchor`);
+  }
+  // (d1) 依 order ascending 排序後 slotKey/anchor 序列符合 N9d checklist
+  const ordered = [...blocks].sort((a, b2) => (a.order ?? Infinity) - (b2.order ?? Infinity));
+  assert.deepEqual(
+    ordered.map((b) => [b.slotKey, b.anchor]),
+    N9D_POLICY,
+    'defaults.blocks order must match N9d checklist (articleAd1..6 → intended anchors)',
+  );
+  // (d2) anchor 在 post-detail document order（v1 enum index）中亦遞增（top→bottom）
+  const anchorIdx = ordered.map((b) => ADSENSE_V1_ANCHORS.indexOf(b.anchor));
+  for (let i = 1; i < anchorIdx.length; i++) {
+    assert.ok(anchorIdx[i] > anchorIdx[i - 1], 'anchors must be monotonic top→bottom by v1 document order');
+  }
+
+  // (e) 正式 config 實際 resolve：post 無自有 blocks → pages surface 取得 6 default blocks
+  const out = deriveRenderedAdsenseBlocks(makePost(undefined), prodAdsSettings, 'pages');
+  assert.equal(Object.keys(out).length, 6, 'production config resolves 6 default blocks on pages surface');
+  const resolvedPairs = Object.values(out)
+    .flat()
+    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
+    .map((b) => [b.slotKey, b.anchor]);
+  assert.deepEqual(resolvedPairs, N9D_POLICY, 'resolved production blocks match N9d slot/anchor order');
+  for (const b of Object.values(out).flat()) {
+    // resolved slotId 須非空，但不列印值（避免 real slot id 進 output）
+    assert.ok(
+      typeof b.slotId === 'string' && b.slotId.trim() !== '',
+      `resolved ${b.slotKey} slotId must be non-empty`,
+    );
+  }
+
+  // (f) Blogger surface：defaults surfaces=['pages'] → {}（GitHub Pages-only enable invariant）
+  assert.ok(
+    isEmptyObject(deriveRenderedAdsenseBlocks(makePost(undefined), prodAdsSettings, 'blogger')),
+    'blogger surface yields no blocks (pages-only default policy)',
+  );
 });
 
 // 22. simulated 11-slot settings shape supports articleAd1~articleAd6 + retained 5 legacy
@@ -421,8 +486,6 @@ check('23 all 14 v1 anchors resolve when given valid block', () => {
 // settings.ads.defaults.blocks[] 作為 site-wide default article block source。
 // 不輸出 real ids：把 production defaults.blocks 結構（anchor/slotKey/order，非機密）
 // 套到 synthetic client / slot ids 上驗證 resolution。
-
-const SIX_SLOT_KEYS = ['articleAd1', 'articleAd2', 'articleAd3', 'articleAd4', 'articleAd5', 'articleAd6'];
 
 function makeDefaultBlocksSettings(overrides = {}) {
   const syntheticSlots = { postTop: '', postMiddle: '', postBottom: '', sidebar: '', homeInline: '' };
