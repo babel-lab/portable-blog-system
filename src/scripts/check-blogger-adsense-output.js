@@ -90,6 +90,20 @@ const TARGETS = [
       positionAnchor: 'hashtags',
     },
   },
+  {
+    // Phase am-11：第三個 live/manual-verified target（second-post night-1 record）。
+    //   tech-note 簡形態（github 主寫、cross-publish 至 Blogger，bloggerMode flip 為 full）。
+    //   實測 generated HTML 與 daily-reading 同型：0 affiliate / 0 related-links / hashtags anchor。
+    slug: 'github-pages-blog-planning',
+    expect: {
+      articleAd6: 1,
+      articleAd1to5: 0,
+      noindex: 0,
+      affiliateBox: { exact: 0 }, // tech-note：無 affiliate / commerce box
+      relatedLinks: false,
+      positionAnchor: 'hashtags',
+    },
+  },
 ];
 
 function htmlPathFor(slug) {
