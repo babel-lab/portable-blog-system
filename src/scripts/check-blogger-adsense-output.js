@@ -104,6 +104,22 @@ const TARGETS = [
       positionAnchor: 'hashtags',
     },
   },
+  {
+    // Phase pm-1（20260612）：第四個 live/manual-verified target
+    //   （docs/20260612-blogger-adsense-batch-1-reading-notes-manual-verification-record.md；
+    //    Batch 1 expansion #1 live PASS）。
+    //   life-note 最簡形態；實測 generated HTML 與 daily-reading 同型：
+    //   0 affiliate / 0 related-links / hashtags anchor。
+    slug: 'reading-notes-three-questions',
+    expect: {
+      articleAd6: 1,
+      articleAd1to5: 0,
+      noindex: 0,
+      affiliateBox: { exact: 0 }, // 純 body life-note：無 affiliate / commerce box
+      relatedLinks: false,
+      positionAnchor: 'hashtags',
+    },
+  },
 ];
 
 function htmlPathFor(slug) {
