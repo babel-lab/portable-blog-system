@@ -11,6 +11,7 @@ Phase: `20260612-ai-workflow-article-draft-docs-only-a`
 - 依據 = pm-10 candidate plan（`docs/20260612-blogger-batch2-new-low-risk-post-candidates.md`）§E.2 之 P2 候選 `ai-tools-simplify-daily-workflow`。
 - 草稿 tone 參照已落地 life-note `content/blogger/posts/20260612-blog-as-personal-knowledge-base.md` 與 P1 draft（`docs/20260612-blogger-p1-knowledge-base-article-draft.md`）（read-only 參照，未改該檔）。
 - **修訂紀錄**：`20260612-pm-22`（baseline HEAD `ef120b9`）依 pm-21 read-only review 之建議，於「把零散筆記整理成可以繼續用的材料」段補入 1 個具體個人場景（手機備忘錄累積一整週雜記 → 請工具按主題粗分堆 → 自己搬移歸錯的 / 刪掉想不起來的），降低三場景偏抽象、略重疊之感（詳 §E.7）；title / slug / category / tags / 風險定位不變，仍為 docs-only 草稿、未落地 content。
+- **修訂紀錄**：`20260612-pm-24`（baseline HEAD `7b51db5`）依 pm-23 read-only review 之建議，收斂「後來發現，小地方變順更有感」**單一段**——把原本的具體筆記例子（理順筆記 / 雜念分段）改為**概括**敘述（待辦拆小 / 一句話改順 / 念頭先分開放，點到為止不展開），把具體筆記案例完整讓給下一段「把零散筆記整理成可以繼續用的材料」，降低兩段重疊（詳 §E.8）；只動該段、未大改其他段落，title / slug / category / tags / 風險定位不變，仍為 docs-only 草稿、未落地 content。
 
 > ⚠️ 本文件不含 real AdSense client / slot id；引用值一律以 `slotKey`（`articleAd6`）/ anchor key（`beforeRelatedLinks`）表述。real id 僅存於 `content/settings/ads.config.json`。
 
@@ -75,7 +76,7 @@ Baseline 與 user 期望一致（branch=main、HEAD==origin/main==`6efad4d`、wo
 
 ## D. Full article draft
 
-> 以下為**完整文章草稿**（約 1,400 中文字；**pm-22 修訂版**——於「把零散筆記整理成可以繼續用的材料」段補入 1 個具體個人場景，降低通用心得文感）。以 fenced block 呈現，避免污染本 doc 之標題層級；落地時 H1 為文章標題、H2 為段落。語氣：個人觀察、務實、溫和、不誇大；無流量 / 收益 / 排名 / 效率承諾；不背書特定工具；不寫成技術 / prompt 教學；結尾自然、無硬 CTA。
+> 以下為**完整文章草稿**（約 1,400 中文字；**pm-22 + pm-24 修訂版**——pm-22 於「把零散筆記整理成可以繼續用的材料」段補入 1 個具體個人場景；pm-24 收斂「後來發現，小地方變順更有感」段改為概括敘述以降低兩段重疊）。以 fenced block 呈現，避免污染本 doc 之標題層級；落地時 H1 為文章標題、H2 為段落。語氣：個人觀察、務實、溫和、不誇大；無流量 / 收益 / 排名 / 效率承諾；不背書特定工具；不寫成技術 / prompt 教學；結尾自然、無硬 CTA。
 
 ```markdown
 # AI 工具很多，真正有用的是把日常流程變簡單
@@ -88,7 +89,7 @@ Baseline 與 user 期望一致（branch=main、HEAD==origin/main==`6efad4d`、wo
 
 ## 後來發現，小地方變順更有感
 
-真正讓我願意一直用下去的，反而是一些很小的場景。比方說，把一段我自己寫得亂七八糟的筆記，請它幫我理順成比較好讀的樣子；或是把腦袋裡一堆雜念，先丟出來、再請它幫我分成幾個段落。這些事情本來我自己也能做，只是常常因為懶或卡住而拖著。當這些小地方變順了，我一天裡那種「卡卡的」感覺就少了很多。比起做大事，這種小小的順暢反而更有感。
+真正讓我願意一直用下去的，反而是一些很小的場景。它們聽起來都不起眼：把一串待辦拆小一點、把一句怎麼讀都不順的話改順、把混在一起的幾個念頭先分開放——這些事我自己也做得來，只是常常因為懶或卡住就一直拖著。當這些小地方變順了，我一天裡真正有感的，其實是少了很多成本：少一點對著空白發呆的時間、少一點卡在原地的瞬間、也少一點事後還要從頭重整的麻煩。比起拿它去做什麼大事，這種一點一點的順暢，反而更貼近我每天真正需要的。
 
 ## 把零散筆記整理成可以繼續用的材料
 
@@ -170,6 +171,31 @@ Baseline 與 user 期望一致（branch=main、HEAD==origin/main==`6efad4d`、wo
 **是否仍不需要 commerce link**：仍不需要 —— 維持 0 commerce / 0 affiliate；底部僅既有 `articleAd6` slot，無販售區塊；補入之場景未引入任何商品 / 連結。
 
 **是否仍適合下一階段 single-new-file content landing**：仍**初步判斷適合，但須人工 approval** —— 形態最簡、0 commerce / 0 asset / 0 settings drift 不變；補入具體場景後可讀性與真實感更佳。落地仍須 user explicit approval 後另開 single-new-file content phase，本 phase **不**落地。
+
+### E.8 pm-24 微修：收斂了哪一段 + 為何降低重疊
+
+**這次微修收斂了哪一段：**
+
+- 只微修「後來發現，小地方變順更有感」**單一段**（未動其餘段落）。把原本的兩個**具體筆記例子**（「把一段亂七八糟的筆記理順」「把一堆雜念分成幾個段落」）改寫為**概括**敘述：「待辦拆小一點 / 一句不順的話改順 / 把混在一起的念頭先分開放」——點到為止、不展開成完整故事；並把重心放在「少一點空白、少一點卡住、少一點事後重整的成本」這個感受上。
+
+**為什麼減少了與整理筆記段的重疊：**
+
+- pm-23 review 指出，本段原本的「理順筆記 / 雜念分段」例子，與下一段「把零散筆記整理成可以繼續用的材料」（pm-22 已補成完整手機備忘錄場景）在題材上重疊，讀起來像下一段的預告。
+- 收斂後，本段**只負責點出「小流程順一點」這個概念**（承接「不是做大事，而是讓小流程順一點」的主軸），把**具體筆記案例完整讓給下一段**；兩段分工變清楚：本段談感受、下一段給實例。
+
+**為什麼仍然低風險：**
+
+- 概括敘述仍為個人生活情境，**無**醫療 / 投資 / 政治 / 法律 / 誇大 AI 內容。
+- **不指名任何 AI 工具 / 品牌**（仍以「工具」泛稱），**無** affiliate / commerce / 商品連結。
+- **無**任何內部 repo / Claude / phase / commit / HEAD / GitHub / validator / build / deploy 字眼。
+- **無**效率 / 收入 / 流量 / 排名承諾（「少一點卡住」為主觀感受，非量化成效）；**無**「必用 / 最強 / 取代 / 一鍵完成 / 秒懂 / 神器 / 懶人包」誇大詞。
+- title / slug / category（`life-note`）/ tags（`self-growth`）不變 → 0 settings drift 不變；字數仍約 1,400，落在 900–1,500 區間。
+
+**是否仍不需要補圖**：仍不需要 —— 沿用既有 cover placeholder 即可；本段為文字敘述，body 內無需插圖。
+
+**是否仍不需要 commerce link**：仍不需要 —— 維持 0 commerce / 0 affiliate；底部僅既有 `articleAd6` slot，無販售區塊。
+
+**是否仍適合下一階段 single-new-file content landing**：仍**初步判斷適合，但須人工 approval** —— 收斂後六個 H2 場景分布更乾淨、重疊更少；形態最簡、0 commerce / 0 asset / 0 settings drift 不變。落地仍須 user explicit approval 後另開 single-new-file content phase，本 phase **不**落地。
 
 ---
 
