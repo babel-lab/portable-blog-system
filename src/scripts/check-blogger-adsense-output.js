@@ -136,6 +136,22 @@ const TARGETS = [
       positionAnchor: 'hashtags',
     },
   },
+  {
+    // Phase pm-18（20260612）：第六個 live/manual-verified target
+    //   （docs/20260612-blogger-p1-knowledge-base-manual-repost-completion-record.md；
+    //    Batch 2 P1 live PASS，20260612 16:09）。
+    //   life-note 最簡形態；實測 generated HTML 與 daily-reading / reading-notes /
+    //   after-work-writing 同型：0 affiliate / 0 related-links / hashtags anchor（body@48<ad@74<hashtags@88）。
+    slug: 'blog-as-personal-knowledge-base',
+    expect: {
+      articleAd6: 1,
+      articleAd1to5: 0,
+      noindex: 0,
+      affiliateBox: { exact: 0 }, // 純 body life-note：無 affiliate / commerce box
+      relatedLinks: false,
+      positionAnchor: 'hashtags',
+    },
+  },
 ];
 
 function htmlPathFor(slug) {
