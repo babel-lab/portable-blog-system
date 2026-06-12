@@ -10,6 +10,7 @@ Phase: `20260612-ai-workflow-article-draft-docs-only-a`
 - 唯一 mutation：本 doc 自身 + `CLAUDE.md` 極小 ledger sync append。
 - 依據 = pm-10 candidate plan（`docs/20260612-blogger-batch2-new-low-risk-post-candidates.md`）§E.2 之 P2 候選 `ai-tools-simplify-daily-workflow`。
 - 草稿 tone 參照已落地 life-note `content/blogger/posts/20260612-blog-as-personal-knowledge-base.md` 與 P1 draft（`docs/20260612-blogger-p1-knowledge-base-article-draft.md`）（read-only 參照，未改該檔）。
+- **修訂紀錄**：`20260612-pm-22`（baseline HEAD `ef120b9`）依 pm-21 read-only review 之建議，於「把零散筆記整理成可以繼續用的材料」段補入 1 個具體個人場景（手機備忘錄累積一整週雜記 → 請工具按主題粗分堆 → 自己搬移歸錯的 / 刪掉想不起來的），降低三場景偏抽象、略重疊之感（詳 §E.7）；title / slug / category / tags / 風險定位不變，仍為 docs-only 草稿、未落地 content。
 
 > ⚠️ 本文件不含 real AdSense client / slot id；引用值一律以 `slotKey`（`articleAd6`）/ anchor key（`beforeRelatedLinks`）表述。real id 僅存於 `content/settings/ads.config.json`。
 
@@ -74,7 +75,7 @@ Baseline 與 user 期望一致（branch=main、HEAD==origin/main==`6efad4d`、wo
 
 ## D. Full article draft
 
-> 以下為**完整文章草稿**（約 1,250 中文字）。以 fenced block 呈現，避免污染本 doc 之標題層級；落地時 H1 為文章標題、H2 為段落。語氣：個人觀察、務實、溫和、不誇大；無流量 / 收益 / 排名 / 效率承諾；不背書特定工具；不寫成技術 / prompt 教學；結尾自然、無硬 CTA。
+> 以下為**完整文章草稿**（約 1,400 中文字；**pm-22 修訂版**——於「把零散筆記整理成可以繼續用的材料」段補入 1 個具體個人場景，降低通用心得文感）。以 fenced block 呈現，避免污染本 doc 之標題層級；落地時 H1 為文章標題、H2 為段落。語氣：個人觀察、務實、溫和、不誇大；無流量 / 收益 / 排名 / 效率承諾；不背書特定工具；不寫成技術 / prompt 教學；結尾自然、無硬 CTA。
 
 ```markdown
 # AI 工具很多，真正有用的是把日常流程變簡單
@@ -91,7 +92,7 @@ Baseline 與 user 期望一致（branch=main、HEAD==origin/main==`6efad4d`、wo
 
 ## 把零散筆記整理成可以繼續用的材料
 
-我自己最常用的，大概就是整理筆記。平常想到什麼會隨手記，但記下來的東西通常很零散，過幾天再看常常一頭霧水。現在我會把這些零碎的片段丟進工具，請它幫我大致分類、抓出重點，整理成我之後還接得下去的材料。我不會直接拿它整理完的版本當成成品，而是把它當成一個「先粗略歸位」的步驟——東西先被擺到差不多的位置，我再自己決定要留什麼、補什麼。
+我自己最常用的，大概就是整理筆記。前陣子就遇到一次：手機備忘錄裡塞了大概一整週隨手記的東西——幾句在書裡畫線的話、洗澡時突然想到的點子、跟朋友聊天記下的一句提醒，全擠在同一頁，自己回看根本理不出頭緒。我把那一整頁丟進工具，請它先幫我照主題分成幾堆：哪些是關於工作的、哪些是想寫成文章的、哪些只是當下的心情。它分完其實還是有點粗，有幾則被歸錯了堆，也有兩三則我看了半天才想起來當初在說什麼。但有了這個粗略的分堆，我接下來只要把歸錯的搬一搬、把想不起來的刪掉，整理就突然沒那麼讓人卻步了。我不會直接拿它分好的版本當成成品，而是把它當成一個「先粗略歸位」的步驟——東西先被擺到差不多的位置，我再自己決定要留什麼、補什麼。
 
 ## 幫自己跨過卡住的第一步
 
@@ -147,6 +148,28 @@ Baseline 與 user 期望一致（branch=main、HEAD==origin/main==`6efad4d`、wo
 
 - **初步判斷：適合，但須等待人工審稿與明確 approval**。題材低風險、形態最簡（與 6 篇已 live PASS 之 post 中的 life-note 同型）、0 commerce / 0 asset / 0 settings drift；預期落地後 `validate:content` 0 觸發、`build:blogger` 後 dist HTML 恰 1 個 `articleAd6`。
 - **但落地仍須**：user 審閱本草稿文字（特別是「不誇大 AI / 不背書工具」是否到位）→ explicit approval → 另開 single-new-file content phase（per pm-10 §H / am-12 §G/§H acceptance）。本 phase **不**落地。
+
+### E.7 pm-22 修訂：補了哪個具體個人場景 + 為何仍低風險
+
+**這次補了哪個具體個人場景：**
+
+- 在「把零散筆記整理成可以繼續用的材料」段，把原本概括的「平常想到什麼會隨手記、丟進工具大致分類」，改寫成一個**具體小故事**：手機備忘錄裡塞了大約一整週的雜記（書裡畫線的句子、洗澡時想到的點子、跟朋友聊天記下的提醒，全擠在同一頁理不出頭緒）→ 整頁丟進工具請它**按主題粗分成幾堆**（工作 / 想寫成文章 / 當下心情）→ 分完仍有點粗（有幾則歸錯堆、兩三則想不起來當初在說什麼）→ 自己**把歸錯的搬一搬、想不起來的刪掉**。
+- 只改動**這一段**（未動其餘兩段「跨過卡住的第一步」「工具可加速但判斷自留」），避免三段都大改而失焦或過長；解決 pm-21 review 指出的「三場景偏抽象、略有重疊」問題。
+
+**為什麼仍然低風險：**
+
+- 場景為個人筆記整理之生活情境，**無**醫療 / 投資 / 政治 / 法律 / 誇大 AI 內容。
+- **不指名任何 AI 工具 / 品牌**（仍以「工具」泛稱），**無** affiliate / commerce / 商品連結。
+- **無**任何內部 repo / Claude / phase / commit / HEAD / GitHub / validator / build / deploy 字眼（「手機備忘錄」「分堆」皆一般讀者語彙）。
+- 刻意保留「工具分完還是有點粗、會歸錯堆」這類不完美細節，強化「工具輔助、判斷在己」，**未**寫成工具推薦 / 技術教學 / prompt 教學。
+- 全文仍**無**效率 / 收入 / 流量 / 排名承諾；**無**「必用 / 最強 / 取代 / 一鍵完成 / 秒懂 / 神器 / 懶人包」誇大詞。
+- title / slug / category（`life-note`）/ tags（`self-growth`）不變 → 0 settings drift 不變；字數約 1,400，落在 900–1,500 區間。
+
+**是否仍不需要補圖**：仍不需要 —— 沿用既有 cover placeholder 即可；新增場景為文字敘述，body 內無需插圖。
+
+**是否仍不需要 commerce link**：仍不需要 —— 維持 0 commerce / 0 affiliate；底部僅既有 `articleAd6` slot，無販售區塊；補入之場景未引入任何商品 / 連結。
+
+**是否仍適合下一階段 single-new-file content landing**：仍**初步判斷適合，但須人工 approval** —— 形態最簡、0 commerce / 0 asset / 0 settings drift 不變；補入具體場景後可讀性與真實感更佳。落地仍須 user explicit approval 後另開 single-new-file content phase，本 phase **不**落地。
 
 ---
 
