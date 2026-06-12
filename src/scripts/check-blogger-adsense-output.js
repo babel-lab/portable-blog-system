@@ -120,6 +120,22 @@ const TARGETS = [
       positionAnchor: 'hashtags',
     },
   },
+  {
+    // Phase pm-5（20260612）：第五個 live/manual-verified target
+    //   （docs/20260612-blogger-adsense-batch-1-after-work-writing-manual-verification-record.md；
+    //    Batch 1 expansion #2 live PASS）。
+    //   life-note 最簡形態；實測 generated HTML 與 daily-reading / reading-notes 同型：
+    //   0 affiliate / 0 related-links / hashtags anchor（body<ad<hashtags）。
+    slug: 'after-work-writing-time-blocking',
+    expect: {
+      articleAd6: 1,
+      articleAd1to5: 0,
+      noindex: 0,
+      affiliateBox: { exact: 0 }, // 純 body life-note：無 affiliate / commerce box
+      relatedLinks: false,
+      positionAnchor: 'hashtags',
+    },
+  },
 ];
 
 function htmlPathFor(slug) {
