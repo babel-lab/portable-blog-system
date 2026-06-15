@@ -130,6 +130,166 @@ function buildSystemSummary(settings) {
   };
 }
 
+// Phase 20260615-night-5-admin-categories-readonly-usage-counts-a
+//   - read-only category usage aggregator：把每個 categories.json 已定義之 category 對映到目前使用該分類之文章清單摘要
+//   - 同時收集 uncategorized（無 category）與 unknown（使用了未在 categories.json 之 category）兩個 bucket
+//   - 純 derive；不寫檔；不改 frontmatter / settings；不打 API
+//   - 與 validate-content 之 unknown-category / category-site-mismatch warning 為兩個獨立 surface（admin 只摘要分類使用狀態，
+//     不取代 validator；validator 仍是 ready/published 篇之 sourcePath 維度 ground truth）
+//   - sample posts 限額（per-category 10 / unknown 5）避免頁面變得太長；超出時 truncated=true
+//   - sample 中之 status / sourceSite / slug / title 皆來自 admin loader 既有欄位（不另讀檔）
+//
+//   Status breakdown：mirror 既有 admin stats 用之 normalize（ready / draft / published / archived / other）
+//   Cross-site mismatch：當 category.site 為陣列且 post.sourceSite 不在其中時計入
+//                       （與 validator §category-site-mismatch 同概念但 admin 用 sourceSite，不用 post.site
+//                        — admin loader 沒有獨立 site 欄位，sourceSite 為 content/{site}/posts/ 之 site；
+//                        實務上 sourceSite 即為作者意圖之主寫站台）
+const CATEGORY_SAMPLE_LIMIT = 10;
+const UNKNOWN_CATEGORY_SAMPLE_LIMIT = 5;
+const UNCATEGORIZED_SAMPLE_LIMIT = 10;
+
+function normalizeStatusBucket(status) {
+  if (status === 'ready' || status === 'draft' || status === 'published' || status === 'archived') return status;
+  return 'other';
+}
+
+function buildEmptyStatusBreakdown() {
+  return { ready: 0, draft: 0, published: 0, archived: 0, other: 0 };
+}
+
+function toSamplePostEntry(p, opts) {
+  const isMismatch = opts && opts.isMismatch === true;
+  return {
+    slug: typeof p.slug === 'string' ? p.slug : '',
+    title: typeof p.title === 'string' ? p.title : '',
+    status: typeof p.status === 'string' ? p.status : '',
+    sourceSite: typeof p.sourceSite === 'string' ? p.sourceSite : '',
+    draft: p.draft === true,
+    isMismatch,
+  };
+}
+
+function buildCategoryUsage(posts, categoriesArr) {
+  const categories = Array.isArray(categoriesArr) ? categoriesArr : [];
+  // 同一 category entry 可被 post.category 用 id 或 slug 參照；驗證器與 admin 兩處皆採 id-or-slug match
+  const entryMap = new Map();
+  const keyToEntry = new Map(); // 'id:tech-note' / 'slug:tech-note' → entry
+  for (const c of categories) {
+    if (!c || typeof c !== 'object') continue;
+    const id = typeof c.id === 'string' ? c.id : '';
+    const slug = typeof c.slug === 'string' ? c.slug : '';
+    const name = typeof c.name === 'string' ? c.name : '';
+    const site = Array.isArray(c.site) ? c.site.slice(0) : [];
+    if (!id && !slug) continue;
+    const entry = {
+      id, name, slug, site,
+      postCount: 0,
+      statusBreakdown: buildEmptyStatusBreakdown(),
+      siteBreakdown: { github: 0, blogger: 0 },
+      crossSiteMismatchCount: 0,
+      samplePosts: [],
+      truncated: false,
+    };
+    entryMap.set(id || slug, entry);
+    if (id) keyToEntry.set('id:' + id, entry);
+    if (slug) keyToEntry.set('slug:' + slug, entry);
+  }
+
+  // unknown buckets：以原始字串 key 分組（不 normalize；保持作者填寫之原貌）
+  const unknownMap = new Map();
+  let uncategorizedCount = 0;
+  const uncategorizedSamples = [];
+  let uncategorizedTruncated = false;
+
+  let categorizedCount = 0;
+  let unknownCount = 0;
+
+  const arr = Array.isArray(posts) ? posts : [];
+  for (const p of arr) {
+    const raw = typeof p?.category === 'string' ? p.category : '';
+    const cat = raw.trim();
+    if (!cat) {
+      uncategorizedCount++;
+      if (uncategorizedSamples.length < UNCATEGORIZED_SAMPLE_LIMIT) {
+        uncategorizedSamples.push(toSamplePostEntry(p));
+      } else {
+        uncategorizedTruncated = true;
+      }
+      continue;
+    }
+    const entry = keyToEntry.get('id:' + cat) || keyToEntry.get('slug:' + cat);
+    if (entry) {
+      categorizedCount++;
+      entry.postCount += 1;
+      const bucket = normalizeStatusBucket(p.status);
+      entry.statusBreakdown[bucket] += 1;
+      const ss = typeof p.sourceSite === 'string' ? p.sourceSite : '';
+      if (ss === 'github') entry.siteBreakdown.github += 1;
+      else if (ss === 'blogger') entry.siteBreakdown.blogger += 1;
+      const isMismatch = Array.isArray(entry.site) && entry.site.length > 0 && ss && !entry.site.includes(ss);
+      if (isMismatch) entry.crossSiteMismatchCount += 1;
+      if (entry.samplePosts.length < CATEGORY_SAMPLE_LIMIT) {
+        entry.samplePosts.push(toSamplePostEntry(p, { isMismatch }));
+      } else {
+        entry.truncated = true;
+      }
+    } else {
+      unknownCount++;
+      let bucket = unknownMap.get(cat);
+      if (!bucket) {
+        bucket = {
+          key: cat,
+          postCount: 0,
+          statusBreakdown: buildEmptyStatusBreakdown(),
+          samplePosts: [],
+          truncated: false,
+        };
+        unknownMap.set(cat, bucket);
+      }
+      bucket.postCount += 1;
+      bucket.statusBreakdown[normalizeStatusBucket(p.status)] += 1;
+      if (bucket.samplePosts.length < UNKNOWN_CATEGORY_SAMPLE_LIMIT) {
+        bucket.samplePosts.push(toSamplePostEntry(p));
+      } else {
+        bucket.truncated = true;
+      }
+    }
+  }
+
+  const perCategory = Array.from(entryMap.values());
+  // 排序：使用篇數多者前；同數量時以 id 字典序
+  perCategory.sort((a, b) => {
+    if (b.postCount !== a.postCount) return b.postCount - a.postCount;
+    return (a.id || a.slug).localeCompare(b.id || b.slug);
+  });
+  const unusedCategories = perCategory.filter((e) => e.postCount === 0);
+
+  const unknownCategoriesList = Array.from(unknownMap.values()).sort((a, b) => {
+    if (b.postCount !== a.postCount) return b.postCount - a.postCount;
+    return a.key.localeCompare(b.key);
+  });
+
+  return {
+    perCategory,
+    unusedCategories,
+    unknownCategories: unknownCategoriesList,
+    uncategorized: {
+      count: uncategorizedCount,
+      samplePosts: uncategorizedSamples,
+      truncated: uncategorizedTruncated,
+    },
+    totals: {
+      totalPosts: arr.length,
+      categorizedPosts: categorizedCount,
+      uncategorizedPosts: uncategorizedCount,
+      unknownCategoryPosts: unknownCount,
+      definedCategoryCount: perCategory.length,
+      unusedCategoryCount: unusedCategories.length,
+      unknownCategoryKeyCount: unknownCategoriesList.length,
+    },
+  };
+}
+
 async function readJsonSafe(jsonPath) {
   try {
     const txt = await fs.readFile(jsonPath, 'utf-8');
@@ -632,5 +792,10 @@ export async function loadAdminPosts({ settings }) {
   //   - AdSense client / GA4 measurementId 只回 tail4；render 端遮罩，不暴露全值
   //   - 不啟用 Admin Apply / middleware / write route；不寫檔
   const systemSummary = buildSystemSummary(settings);
-  return { posts, commerceLinksPreview, allowedCommerceRoles: ALLOWED_COMMERCE_ROLES, systemSummary };
+  // Phase 20260615-night-5-admin-categories-readonly-usage-counts-a
+  //   - additive read-only categoryUsage（per-category 文章使用統計 + uncategorized / unknown / unused buckets）
+  //   - 依 loadAdminPosts return 之 posts（admin view shape；含 draft / 各 status）derive
+  //   - 不寫檔；不改 frontmatter / settings；不打 API；不取代 validator
+  const categoryUsage = buildCategoryUsage(posts, settings?.categories);
+  return { posts, commerceLinksPreview, allowedCommerceRoles: ALLOWED_COMMERCE_ROLES, systemSummary, categoryUsage };
 }

@@ -822,11 +822,15 @@ async function main() {
         //   - additive read-only systemSummary（site / categories / tags / ads / ga4 / commerce / downloads）
         //   - render 端用 tail4 遮罩 AdSense client / GA4 measurementId；source 不出現全值
         systemSummary: adminData.systemSummary || null,
+        // Phase 20260615-night-5-admin-categories-readonly-usage-counts-a
+        //   - additive read-only categoryUsage（per-category 文章使用統計 + uncategorized / unknown / unused buckets）
+        //   - render 端純摘要顯示；無 Add / Edit / Delete / Apply 互動
+        categoryUsage: adminData.categoryUsage || null,
       },
       { async: true },
     );
     await writeText(path.join(PAGES_DIR, 'admin', 'index.html'), adminHtml, outputs);
-    console.log(`[build-github] admin (dev-mode) rendered: ${adminData.posts.length} posts`);
+    console.log(`[build-github] admin (dev-mode) rendered: ${adminData.posts.length} posts; categoryUsage: ${adminData.categoryUsage ? adminData.categoryUsage.perCategory.length : 0} defined / ${adminData.categoryUsage ? adminData.categoryUsage.unknownCategories.length : 0} unknown / ${adminData.categoryUsage ? adminData.categoryUsage.uncategorized.count : 0} uncategorized post(s)`);
   }
 
   const manifest = {

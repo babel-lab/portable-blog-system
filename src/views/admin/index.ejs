@@ -82,6 +82,49 @@
   .readiness-checklist .ph-done { color: #155724; }
   .readiness-checklist .ph-current { color: #856404; font-weight: 600; }
   .readiness-checklist .ph-pending { color: #999; }
+  /* Phase 20260615-night-5-admin-categories-readonly-usage-counts-a：category usage table + sub-buckets
+     - 全部 read-only；無 button writes；只用既有 admin 顏色 token（不引入新色板）
+     - .cat-usage-table：分類使用統計主表；穩定欄寬 + sticky header（沿用 .scripts-table 視覺風格）
+     - .cat-status-bar：micro bar chart（純 inline-block；不引入 chart lib）
+     - .cat-status-bar 各色：ready / draft / published / archived / other 之 token 對映既有 badge 色
+     - .cat-sample-list：sample posts 折疊列表；inline 不另開頁
+     - .cat-mismatch-callout：cross-site mismatch 警示框；不引導使用者寫入
+     - .cat-bucket-card：uncategorized / unknown / unused 三類資訊卡 */
+  .cat-usage-table { width: 100%; border-collapse: collapse; font-size: 0.85em; background: #fff; margin-top: 0.5rem; }
+  .cat-usage-table th, .cat-usage-table td { padding: 0.4rem 0.55rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  .cat-usage-table th { background: #ececec; font-weight: 600; font-size: 0.92em; }
+  .cat-usage-table tr.is-zero td { background: #fbfbfb; color: #888; }
+  .cat-usage-table .cat-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; color: #1f2d3d; }
+  .cat-usage-table .cat-name { font-weight: 600; }
+  .cat-usage-table .cat-site { white-space: nowrap; }
+  .cat-status-bar { display: inline-flex; align-items: stretch; height: 0.75rem; min-width: 6rem; border: 1px solid #ddd; border-radius: 2px; overflow: hidden; vertical-align: middle; background: #fafafa; }
+  .cat-status-bar > span { display: block; height: 100%; }
+  .cat-status-bar .ss-ready { background: #cce5ff; }
+  .cat-status-bar .ss-draft { background: #fff3cd; }
+  .cat-status-bar .ss-published { background: #c3e6cb; }
+  .cat-status-bar .ss-archived { background: #d3d3d3; }
+  .cat-status-bar .ss-other { background: #f5c6cb; }
+  .cat-status-legend { font-size: 0.78em; color: #666; margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .cat-status-legend .legend-swatch { display: inline-block; width: 0.8rem; height: 0.75rem; vertical-align: middle; margin-right: 0.25rem; border-radius: 2px; border: 1px solid #ddd; }
+  .cat-status-counts { font-size: 0.78em; color: #555; margin-top: 0.15rem; }
+  .cat-sample-list { margin: 0.25rem 0 0; padding-left: 1rem; font-size: 0.78em; color: #555; }
+  .cat-sample-list li { margin: 0.1rem 0; line-height: 1.4; }
+  .cat-sample-list .sample-mismatch { color: #b71c1c; font-weight: 600; }
+  .cat-sample-list .sample-slug { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; color: #1f2d3d; }
+  .cat-sample-toggle { font-size: 0.78em; color: #2c5282; cursor: pointer; user-select: none; background: none; border: none; padding: 0; }
+  .cat-sample-toggle:focus { outline: 1px dashed #2c5282; }
+  .cat-mismatch-callout { background: #f8d7da; border-left: 3px solid #c0392b; color: #721c24; padding: 0.35rem 0.6rem; font-size: 0.78em; border-radius: 2px; margin-top: 0.25rem; }
+  .cat-bucket-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .cat-bucket-card { flex: 1 1 16rem; min-width: 14rem; background: #fafbfc; border: 1px solid #e1e4e8; border-radius: 4px; padding: 0.6rem 0.75rem; font-size: 0.85em; }
+  .cat-bucket-card h3 { margin: 0 0 0.35rem; font-size: 0.92em; color: #1f2d3d; display: flex; align-items: center; gap: 0.4rem; }
+  .cat-bucket-card .bucket-count { font-size: 1.2em; font-weight: 700; color: #2c5282; }
+  .cat-bucket-card .bucket-note { color: #777; font-size: 0.78em; margin-top: 0.35rem; font-style: italic; }
+  .cat-bucket-card.is-warn { background: #fff8e6; border-color: #f0d264; }
+  .cat-bucket-card.is-warn h3 { color: #856404; }
+  .cat-totals-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 0.25rem; }
+  .cat-totals-row .totals-pill { background: #eef3f9; color: #2c5282; padding: 0.2rem 0.55rem; border-radius: 10px; font-size: 0.8em; }
+  .cat-totals-row .totals-pill.warn { background: #fff3cd; color: #856404; }
+  .cat-totals-row .totals-pill strong { font-weight: 700; }
   /* Phase 20260615-night-1-admin-ia-shell-implementation-a：IA nav + dashboard hero + section cards */
   .admin-nav { position: sticky; top: 0; z-index: 10; background: #1f2d3d; border-radius: 4px; margin: 0 0 1rem; padding: 0.4rem 0.6rem; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
   .admin-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
@@ -1321,43 +1364,257 @@
       - 未實作項目以 "planned" 文字 + 灰色清單呈現；不放假按鈕引導誤點 -%>
 
   <%# === Categories（read-only） === -%>
+  <%# Phase 20260615-night-5-admin-categories-readonly-usage-counts-a
+        - 從 sys.categories（registry shape）+ categoryUsage（per-post usage derive）兩個來源組合
+        - 全部 read-only；無 Add / Edit / Delete / Apply 互動
+        - 顯示：per-category postCount / status breakdown / source-site breakdown / cross-site mismatch / sample posts；
+                uncategorized / unknown / unused 三個 sub-bucket；
+                明確標示資料來源 = posts (admin loader) + categories.json
+        - 不取代 validate-content 之 unknown-category / category-site-mismatch warnings；admin 只摘要使用狀態，validator 仍為 ground truth
+        - tag 用量計數仍未實作（須獨立 phase）；此區只擴 categories，標示 tags 未實作避免誤導 -%>
+  <%
+    var catUsage = (typeof categoryUsage === 'object' && categoryUsage) ? categoryUsage : null;
+    var catPer = (catUsage && Array.isArray(catUsage.perCategory)) ? catUsage.perCategory : [];
+    var catUnused = (catUsage && Array.isArray(catUsage.unusedCategories)) ? catUsage.unusedCategories : [];
+    var catUnknown = (catUsage && Array.isArray(catUsage.unknownCategories)) ? catUsage.unknownCategories : [];
+    var catUncat = (catUsage && catUsage.uncategorized) ? catUsage.uncategorized : { count: 0, samplePosts: [], truncated: false };
+    var catTotals = (catUsage && catUsage.totals) ? catUsage.totals : null;
+    var catMismatchCategoryCount = catPer.filter(function(e) { return e.crossSiteMismatchCount > 0; }).length;
+  %>
   <section class="admin-section" aria-labelledby="categories-h">
     <h2 id="categories">Categories &amp; Tags <span class="section-tag tag-readonly">read-only</span></h2>
-    <p class="section-lede">來自 <code>content/settings/categories.json</code> / <code>content/settings/tags.json</code>。文章 frontmatter 之 <code>category</code> / <code>tags</code> 必須使用此處已登錄之 id / slug。本區無新增 / 編輯按鈕；增刪請手改 JSON，再 <code>npm run validate:content</code>。</p>
+    <p class="section-lede">
+      資料來源 = <code>content/settings/categories.json</code>（registry）+ admin loader 掃 <code>content/{github,blogger}/posts/*.md</code> 之 <code>frontmatter.category</code> 反向統計。
+      下表為「目前各分類被多少文章使用」之 read-only 摘要；不取代 <code>npm run validate:content</code> 之 <code>unknown-category</code> / <code>category-site-mismatch</code> 警示（validator 仍為 ground truth）。
+      本區無 Add / Edit / Delete / Save / Apply 按鈕；增刪分類請手改 <code>categories.json</code> + <code>npm run validate:content</code>。
+    </p>
+
     <div class="surface-grid">
       <div class="surface-card">
-        <h3>Categories</h3>
+        <h3>Categories registry</h3>
         <dl>
-          <dt>total</dt><dd><%= sys && sys.categories ? sys.categories.total : 0 %></dd>
+          <dt>定義數</dt><dd><%= sys && sys.categories ? sys.categories.total : 0 %></dd>
           <dt>github surface</dt><dd><%= sys && sys.categories ? sys.categories.bySite.github : 0 %></dd>
           <dt>blogger surface</dt><dd><%= sys && sys.categories ? sys.categories.bySite.blogger : 0 %></dd>
         </dl>
       </div>
       <div class="surface-card">
-        <h3>Tags</h3>
+        <h3>Tags registry</h3>
         <dl>
-          <dt>total</dt><dd><%= sys && sys.tags ? sys.tags.total : 0 %></dd>
+          <dt>定義數</dt><dd><%= sys && sys.tags ? sys.tags.total : 0 %></dd>
           <dt>github surface</dt><dd><%= sys && sys.tags ? sys.tags.bySite.github : 0 %></dd>
           <dt>blogger surface</dt><dd><%= sys && sys.tags ? sys.tags.bySite.blogger : 0 %></dd>
         </dl>
+        <p class="surface-note">⏳ 用量計數 / 未使用偵測 / cross-site mismatch — 仍未實作（須另開 phase）。</p>
       </div>
     </div>
-    <% if (sys && sys.categories && Array.isArray(sys.categories.list) && sys.categories.list.length > 0) { %>
-    <table class="scripts-table" style="margin-top: 0.6rem;">
-      <thead><tr><th>id</th><th>name</th><th>slug</th><th>site</th></tr></thead>
+
+    <% if (catTotals) { %>
+    <div class="cat-totals-row" aria-label="categories totals">
+      <span class="totals-pill"><strong><%= catTotals.totalPosts %></strong> 篇文章（含 draft）</span>
+      <span class="totals-pill"><strong><%= catTotals.categorizedPosts %></strong> 已分類</span>
+      <% if (catTotals.uncategorizedPosts > 0) { %>
+        <span class="totals-pill warn"><strong><%= catTotals.uncategorizedPosts %></strong> uncategorized</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> uncategorized</span>
+      <% } %>
+      <% if (catTotals.unknownCategoryPosts > 0) { %>
+        <span class="totals-pill warn"><strong><%= catTotals.unknownCategoryPosts %></strong> unknown category</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> unknown category</span>
+      <% } %>
+      <% if (catTotals.unusedCategoryCount > 0) { %>
+        <span class="totals-pill warn"><strong><%= catTotals.unusedCategoryCount %></strong> unused defined</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> unused defined</span>
+      <% } %>
+      <% if (catMismatchCategoryCount > 0) { %>
+        <span class="totals-pill warn"><strong><%= catMismatchCategoryCount %></strong> cross-site mismatch</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> cross-site mismatch</span>
+      <% } %>
+    </div>
+    <% } %>
+
+    <h3 style="margin: 0.75rem 0 0.25rem; font-size: 0.95em; color: #1f2d3d;">Per-category usage</h3>
+    <% if (catPer.length === 0) { %>
+      <p class="empty">categories.json 未定義任何 category。</p>
+    <% } else { %>
+    <table class="cat-usage-table" aria-label="per category usage table">
+      <thead>
+        <tr>
+          <th style="width: 9rem;">id / slug</th>
+          <th style="width: 10rem;">name</th>
+          <th style="width: 9rem;">allowed sites</th>
+          <th style="width: 5.5rem; text-align: right;">posts</th>
+          <th>status breakdown</th>
+          <th style="width: 9rem;">by source site</th>
+          <th>sample posts</th>
+        </tr>
+      </thead>
       <tbody>
-        <% sys.categories.list.forEach(function(c) { %>
-          <tr>
-            <td><code><%= c.id %></code></td>
-            <td><%= c.name %></td>
-            <td class="mono"><%= c.slug %></td>
-            <td><% c.site.forEach(function(s) { %><span class="badge b-info"><%= s %></span><% }); %></td>
+        <% catPer.forEach(function(c) { %>
+          <% var total = c.postCount; var sb = c.statusBreakdown; %>
+          <tr class="<%= total === 0 ? 'is-zero' : '' %>">
+            <td>
+              <div><code class="cat-id"><%= c.id %></code></div>
+              <% if (c.slug && c.slug !== c.id) { %><div class="text-muted" style="font-size: 0.82em;">slug: <code class="cat-id"><%= c.slug %></code></div><% } %>
+            </td>
+            <td><span class="cat-name"><%= c.name || '(no name)' %></span></td>
+            <td class="cat-site">
+              <% if (Array.isArray(c.site) && c.site.length > 0) { %>
+                <% c.site.forEach(function(s) { %><span class="badge b-info"><%= s %></span><% }); %>
+              <% } else { %>
+                <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td style="text-align: right; font-weight: 700; color: <%= total === 0 ? '#999' : '#2c5282' %>;">
+              <%= total %>
+            </td>
+            <td>
+              <% if (total === 0) { %>
+                <span class="text-muted">—</span>
+              <% } else { %>
+                <span class="cat-status-bar" aria-label="status breakdown: ready <%= sb.ready %> · draft <%= sb.draft %> · published <%= sb.published %> · archived <%= sb.archived %> · other <%= sb.other %>">
+                  <% if (sb.ready > 0)     { %><span class="ss-ready"     title="ready <%= sb.ready %>"         style="flex: <%= sb.ready %> 0 0"></span><% } %>
+                  <% if (sb.draft > 0)     { %><span class="ss-draft"     title="draft <%= sb.draft %>"         style="flex: <%= sb.draft %> 0 0"></span><% } %>
+                  <% if (sb.published > 0) { %><span class="ss-published" title="published <%= sb.published %>" style="flex: <%= sb.published %> 0 0"></span><% } %>
+                  <% if (sb.archived > 0)  { %><span class="ss-archived"  title="archived <%= sb.archived %>"   style="flex: <%= sb.archived %> 0 0"></span><% } %>
+                  <% if (sb.other > 0)     { %><span class="ss-other"     title="other <%= sb.other %>"         style="flex: <%= sb.other %> 0 0"></span><% } %>
+                </span>
+                <div class="cat-status-counts">
+                  ready <%= sb.ready %> · draft <%= sb.draft %> · published <%= sb.published %><% if (sb.archived > 0) { %> · archived <%= sb.archived %><% } %><% if (sb.other > 0) { %> · other <%= sb.other %><% } %>
+                </div>
+              <% } %>
+            </td>
+            <td>
+              <% if (total === 0) { %>
+                <span class="text-muted">—</span>
+              <% } else { %>
+                <div>github <%= c.siteBreakdown.github %> · blogger <%= c.siteBreakdown.blogger %></div>
+                <% if (c.crossSiteMismatchCount > 0) { %>
+                  <div class="cat-mismatch-callout" title="此分類之 allowed sites=<%= Array.isArray(c.site) ? c.site.join(',') : '' %>；下列文章之 sourceSite 不在其中。詳細請看 npm run validate:content 之 category-site-mismatch warning。">
+                    ⚠ <%= c.crossSiteMismatchCount %> 篇 cross-site mismatch
+                  </div>
+                <% } %>
+              <% } %>
+            </td>
+            <td>
+              <% if (total === 0) { %>
+                <span class="text-muted empty">(unused — registry 已定義但無文章使用)</span>
+              <% } else if (Array.isArray(c.samplePosts) && c.samplePosts.length > 0) { %>
+                <ul class="cat-sample-list">
+                  <% c.samplePosts.forEach(function(p) { %>
+                    <li>
+                      <% if (p.isMismatch) { %><span class="sample-mismatch">⚠ </span><% } %>
+                      <% if (p.draft || p.status === 'draft') { %><span class="badge b-draft" style="font-size: 0.7em;">draft</span><% } %>
+                      <% if (p.status === 'ready') { %><span class="badge b-ready" style="font-size: 0.7em;">ready</span><% } %>
+                      <% if (p.status === 'published') { %><span class="badge b-published" style="font-size: 0.7em;">published</span><% } %>
+                      <span class="sample-slug"><%= p.slug || '(no-slug)' %></span>
+                      <% if (p.title) { %><span class="text-muted"> — <%= p.title %></span><% } %>
+                      <span class="text-muted" style="font-size: 0.9em;"> · src:<%= p.sourceSite %></span>
+                    </li>
+                  <% }); %>
+                </ul>
+                <% if (c.truncated) { %>
+                  <p class="text-muted" style="font-size: 0.78em; margin: 0.15rem 0 0;">… 還有 <%= total - c.samplePosts.length %> 篇未列（依 admin sort 序）</p>
+                <% } %>
+              <% } %>
+            </td>
           </tr>
         <% }); %>
       </tbody>
     </table>
+
+    <div class="cat-status-legend" aria-label="status color legend">
+      <span><span class="legend-swatch ss-ready" style="background: #cce5ff;"></span>ready</span>
+      <span><span class="legend-swatch ss-draft" style="background: #fff3cd;"></span>draft</span>
+      <span><span class="legend-swatch ss-published" style="background: #c3e6cb;"></span>published</span>
+      <span><span class="legend-swatch ss-archived" style="background: #d3d3d3;"></span>archived</span>
+      <span><span class="legend-swatch ss-other" style="background: #f5c6cb;"></span>other（未知 status）</span>
+    </div>
     <% } %>
-    <p class="surface-note" style="margin-top: 0.5rem;">⏳ 未實作：tag 用量計數、未使用 tag 偵測、跨 site mismatch 紅綠燈、編輯 UI。</p>
+
+    <%# === sub-buckets：uncategorized / unknown / unused === -%>
+    <div class="cat-bucket-grid">
+      <div class="cat-bucket-card <%= catUncat.count > 0 ? 'is-warn' : '' %>">
+        <h3>Uncategorized posts</h3>
+        <div class="bucket-count"><%= catUncat.count %></div>
+        <% if (catUncat.count === 0) { %>
+          <p class="bucket-note">所有文章皆有填 <code>category</code>。</p>
+        <% } else { %>
+          <ul class="cat-sample-list">
+            <% catUncat.samplePosts.forEach(function(p) { %>
+              <li>
+                <% if (p.draft || p.status === 'draft') { %><span class="badge b-draft" style="font-size: 0.7em;">draft</span><% } %>
+                <% if (p.status === 'ready') { %><span class="badge b-ready" style="font-size: 0.7em;">ready</span><% } %>
+                <% if (p.status === 'published') { %><span class="badge b-published" style="font-size: 0.7em;">published</span><% } %>
+                <span class="sample-slug"><%= p.slug || '(no-slug)' %></span>
+                <% if (p.title) { %><span class="text-muted"> — <%= p.title %></span><% } %>
+                <span class="text-muted" style="font-size: 0.9em;"> · src:<%= p.sourceSite %></span>
+              </li>
+            <% }); %>
+          </ul>
+          <% if (catUncat.truncated) { %>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.15rem 0 0;">… 還有 <%= catUncat.count - catUncat.samplePosts.length %> 篇未列。</p>
+          <% } %>
+          <p class="bucket-note">這些文章 frontmatter 之 <code>category</code> 為空。Admin 不自動補；請手動編輯 .md frontmatter。</p>
+        <% } %>
+      </div>
+
+      <div class="cat-bucket-card <%= catUnknown.length > 0 ? 'is-warn' : '' %>">
+        <h3>Unknown category usage</h3>
+        <div class="bucket-count"><%= catUnknown.length %> key / <%= catTotals ? catTotals.unknownCategoryPosts : 0 %> 篇</div>
+        <% if (catUnknown.length === 0) { %>
+          <p class="bucket-note">所有文章之 <code>category</code> 皆在 <code>categories.json</code> 內定義。</p>
+        <% } else { %>
+          <% catUnknown.forEach(function(u) { %>
+            <div style="margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px dashed #f0d264;">
+              <div><code class="cat-id"><%= u.key %></code> <span class="badge b-missing" style="font-size: 0.7em;">unknown</span> <span class="text-muted">· <%= u.postCount %> 篇</span></div>
+              <ul class="cat-sample-list">
+                <% u.samplePosts.forEach(function(p) { %>
+                  <li>
+                    <% if (p.draft || p.status === 'draft') { %><span class="badge b-draft" style="font-size: 0.7em;">draft</span><% } %>
+                    <% if (p.status === 'ready') { %><span class="badge b-ready" style="font-size: 0.7em;">ready</span><% } %>
+                    <% if (p.status === 'published') { %><span class="badge b-published" style="font-size: 0.7em;">published</span><% } %>
+                    <span class="sample-slug"><%= p.slug || '(no-slug)' %></span>
+                    <% if (p.title) { %><span class="text-muted"> — <%= p.title %></span><% } %>
+                    <span class="text-muted" style="font-size: 0.9em;"> · src:<%= p.sourceSite %></span>
+                  </li>
+                <% }); %>
+              </ul>
+              <% if (u.truncated) { %>
+                <p class="text-muted" style="font-size: 0.78em; margin: 0.15rem 0 0;">… 還有 <%= u.postCount - u.samplePosts.length %> 篇未列。</p>
+              <% } %>
+            </div>
+          <% }); %>
+          <p class="bucket-note">這些 category 未在 <code>categories.json</code> 定義 — 對應 validator 之 <code>unknown-category</code> warning。Admin 不自動修；請新增 categories.json 條目或修正 frontmatter。</p>
+        <% } %>
+      </div>
+
+      <div class="cat-bucket-card <%= catUnused.length > 0 ? 'is-warn' : '' %>">
+        <h3>Unused defined categories</h3>
+        <div class="bucket-count"><%= catUnused.length %></div>
+        <% if (catUnused.length === 0) { %>
+          <p class="bucket-note">所有已定義之 category 皆有至少 1 篇文章使用。</p>
+        <% } else { %>
+          <ul class="cat-sample-list" style="font-size: 0.85em;">
+            <% catUnused.forEach(function(c) { %>
+              <li><code class="cat-id"><%= c.id %></code> — <%= c.name || '(no name)' %> · <span class="text-muted">site: <% if (Array.isArray(c.site) && c.site.length > 0) { %><%= c.site.join(', ') %><% } else { %>—<% } %></span></li>
+            <% }); %>
+          </ul>
+          <p class="bucket-note">這些 category 在 <code>categories.json</code> 已登錄但目前 0 篇文章使用；可考慮新增文章、保留作未來用途、或從 registry 移除。Admin 不自動修。</p>
+        <% } %>
+      </div>
+    </div>
+
+    <p style="margin: 0.6rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 仍未實作：</p>
+    <ul class="planned-list">
+      <li>tag 用量計數 / 未使用 tag 偵測 / cross-site mismatch（本 phase 只擴 categories；tags 待獨立 phase）</li>
+      <li>category / tag 編輯 UI（不開放；增刪請手改 <code>categories.json</code> / <code>tags.json</code> + <code>npm run validate:content</code>）</li>
+      <li>per-post category fix 一鍵修正（不開放；admin 不寫入文章 frontmatter）</li>
+      <li>validator warning 計數 mirror（per-post 計數仍 deferred；以 <code>npm run validate:content</code> 為 ground truth）</li>
+    </ul>
   </section>
 
   <%# === Blogger Export（read-only） === -%>
