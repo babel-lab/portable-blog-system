@@ -314,3 +314,5 @@ const _adsAnchors = (typeof adsenseBlocksRendered !== 'undefined' && adsenseBloc
   </div>
   <% } %>
 </article>
+<%# Phase 20260615-am-2：文章底部導覽（上一篇 / 下一篇 / 回首頁）；獨立 partial，置於 </article> 之外，不在文章正文內。 -%>
+<%- await include('../layout/article-bottom-nav', { post: post, prevPost: (typeof prevPost !== 'undefined' ? prevPost : null), nextPost: (typeof nextPost !== 'undefined' ? nextPost : null), basePath: basePath }) -%>

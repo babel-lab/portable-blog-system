@@ -1,0 +1,32 @@
+<%# Phase 20260615-am-2：GitHub Pages 文章底部導覽（上一篇 / 下一篇 / 回首頁）。 -%>
+<%# 獨立 partial；由 post-detail.ejs 於 </article> 之後 include；不寫入文章正文 markdown/html 內。 -%>
+<%# GA4：沿用既有 data-ga4-event / data-ga4-param-* convention（src/js/modules/link-tracker.js 之 delegated listener）。 -%>
+<%#   - 不新增第三套 event family；重用既有 family B 之 click_other_link，靠 params 區分 article bottom nav。 -%>
+<%#   - nav_direction = previous / next / home，供 GA4 後台分辨使用者從哪個方向點出。 -%>
+<%# prevPost / nextPost 由 build-github.js 依 posts（date desc, slug asc）排序推導：較舊一篇為 prev、較新一篇為 next。 -%>
+<%#   - 第一篇（最新）無較新 → nextPost null；最後一篇（最舊）無較舊 → prevPost null；缺值對應 link 不渲染。 -%>
+<%#   - home link 永遠渲染；所有 href / target_url 皆由實際 slug 推導，無 href="undefined" 風險。 -%>
+<%# 本 EJS comment 嚴格不含 EJS delimiter 字符（mirror 既有 affiliate / related-links / hashtag 預防經驗）。 -%>
+<%
+  const _abnPrev = (typeof prevPost !== 'undefined' && prevPost && prevPost.slug) ? prevPost : null;
+  const _abnNext = (typeof nextPost !== 'undefined' && nextPost && nextPost.slug) ? nextPost : null;
+  const _abnSlug = (typeof post !== 'undefined' && post && post.slug) ? post.slug : '';
+  const _abnHomeUrl = basePath + '/';
+-%>
+<nav class="lab-prev-next lab-article-bottom-nav" aria-label="文章導覽">
+  <% if (_abnPrev) { const _abnPrevUrl = basePath + '/posts/' + _abnPrev.slug + '/'; %>
+  <a class="lab-prev-next__prev lab-article-bottom-nav__link lab-article-bottom-nav__link--prev" href="<%= _abnPrevUrl %>" data-ga4-event="click_other_link" data-ga4-param-surface="github_pages" data-ga4-param-click_area="article_bottom_nav" data-ga4-param-nav_direction="previous" data-ga4-param-post_slug="<%= _abnSlug %>" data-ga4-param-target_slug="<%= _abnPrev.slug %>" data-ga4-param-target_url="<%= _abnPrevUrl %>" data-ga4-param-link_label="<%= _abnPrev.title %>">
+    <span class="lab-prev-next__label">上一篇</span>
+    <span class="lab-prev-next__title"><%= _abnPrev.title %></span>
+  </a>
+  <% } %>
+  <% if (_abnNext) { const _abnNextUrl = basePath + '/posts/' + _abnNext.slug + '/'; %>
+  <a class="lab-prev-next__next lab-article-bottom-nav__link lab-article-bottom-nav__link--next" href="<%= _abnNextUrl %>" data-ga4-event="click_other_link" data-ga4-param-surface="github_pages" data-ga4-param-click_area="article_bottom_nav" data-ga4-param-nav_direction="next" data-ga4-param-post_slug="<%= _abnSlug %>" data-ga4-param-target_slug="<%= _abnNext.slug %>" data-ga4-param-target_url="<%= _abnNextUrl %>" data-ga4-param-link_label="<%= _abnNext.title %>">
+    <span class="lab-prev-next__label">下一篇</span>
+    <span class="lab-prev-next__title"><%= _abnNext.title %></span>
+  </a>
+  <% } %>
+  <a class="lab-prev-next__home lab-article-bottom-nav__link lab-article-bottom-nav__link--home" href="<%= _abnHomeUrl %>" data-ga4-event="click_other_link" data-ga4-param-surface="github_pages" data-ga4-param-click_area="article_bottom_nav" data-ga4-param-nav_direction="home" data-ga4-param-post_slug="<%= _abnSlug %>" data-ga4-param-target_slug="home" data-ga4-param-target_url="<%= _abnHomeUrl %>" data-ga4-param-link_label="回首頁">
+    <span class="lab-prev-next__label">回首頁</span>
+  </a>
+</nav>

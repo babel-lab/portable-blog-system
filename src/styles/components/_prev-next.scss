@@ -2,11 +2,19 @@
 
 .lab-prev-next { display: flex; flex-wrap: wrap; gap: var(--lab-space-4); margin-top: var(--lab-space-8); }
 .lab-prev-next__prev,
-.lab-prev-next__next { flex: 1 1 16rem; min-width: 0; display: flex; flex-direction: column; gap: var(--lab-space-1); padding: var(--lab-space-4); border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-md); background: var(--lab-color-background); color: var(--lab-color-text); text-decoration: none; }
+.lab-prev-next__next,
+.lab-prev-next__home { flex: 1 1 16rem; min-width: 0; display: flex; flex-direction: column; gap: var(--lab-space-1); padding: var(--lab-space-4); border: 1px solid var(--lab-color-border); border-radius: var(--lab-radius-md); background: var(--lab-color-background); color: var(--lab-color-text); text-decoration: none; }
 .lab-prev-next__next { text-align: right; }
+.lab-prev-next__home { flex-basis: 100%; text-align: center; justify-content: center; }
 .lab-prev-next__prev:hover,
-.lab-prev-next__next:hover { border-color: var(--lab-color-primary); background: var(--lab-color-surface); }
+.lab-prev-next__next:hover,
+.lab-prev-next__home:hover { border-color: var(--lab-color-primary); background: var(--lab-color-surface); }
 .lab-prev-next__prev:focus-visible,
-.lab-prev-next__next:focus-visible { @include mx.lab-focus-ring; }
+.lab-prev-next__next:focus-visible,
+.lab-prev-next__home:focus-visible { @include mx.lab-focus-ring; }
 .lab-prev-next__label { font-size: var(--lab-font-size-sm); color: var(--lab-color-muted); font-weight: var(--lab-font-weight-semibold); }
 .lab-prev-next__title { font-size: var(--lab-font-size-base); font-weight: var(--lab-font-weight-semibold); color: var(--lab-color-text); }
+
+// Phase 20260615-am-2：文章底部導覽（上一篇 / 下一篇 / 回首頁）。
+//   沿用 .lab-prev-next flex 版面；wrapper 加 lab-article-bottom-nav class 供語意 / grep 辨識。
+.lab-article-bottom-nav { /* 版面繼承 .lab-prev-next；本 hook 保留供未來微調 */ }

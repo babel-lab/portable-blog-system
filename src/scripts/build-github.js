@@ -613,8 +613,18 @@ async function main() {
   });
   await writeText(path.join(PAGES_DIR, 'posts', 'index.html'), listHtml, outputs);
 
-  for (const post of githubPosts.posts) {
+  const orderedPosts = githubPosts.posts;
+  for (const [postIndex, post] of orderedPosts.entries()) {
     const bodyHtml = renderBody(post.body || '');
+    // Phase 20260615-am-2：文章底部導覽 prev/next 推導。
+    //   - orderedPosts 已於 load-github-posts.js 排序為 date desc, slug asc（index 0 為最新）。
+    //   - 上一篇（較舊）= orderedPosts[index+1]；下一篇（較新）= orderedPosts[index-1]。
+    //   - 第一篇（最新）無較新 → nextPost null；最後一篇（最舊）無較舊 → prevPost null。
+    //   - 僅取 slug / title；缺值回傳 null，partial 端不渲染對應 link（避免 href="undefined"）。
+    const olderPost = orderedPosts[postIndex + 1];
+    const newerPost = orderedPosts[postIndex - 1];
+    const prevPost = olderPost ? { slug: olderPost.slug, title: olderPost.title } : null;
+    const nextPost = newerPost ? { slug: newerPost.slug, title: newerPost.title } : null;
     // Phase related-links-ga4-audit：對每篇 post 預處理 relatedLinks / otherLinks
     //   - 對 Blogger cross-link 注入 GA4 UTM + 強制 target=_blank + 合併 rel
     //   - 非 Blogger 連結 / 同站連結維持 EJS 預設邏輯（item.target / item.rel 為 null）
@@ -650,6 +660,9 @@ async function main() {
         downloadLandingRendered,
         affiliateLinksRendered,
         adsenseBlocksRendered,
+        // Phase 20260615-am-2：文章底部導覽 prev/next（home link 由 partial 端永遠渲染）。
+        prevPost,
+        nextPost,
       }),
     });
     await writeText(path.join(PAGES_DIR, 'posts', post.slug, 'index.html'), detailHtml, outputs);
