@@ -1400,6 +1400,25 @@
       本區無 Add / Edit / Delete / Save / Apply 按鈕；增刪分類 / 標籤請手改 <code>categories.json</code> / <code>tags.json</code> + <code>npm run validate:content</code>。
     </p>
 
+    <%# Phase 20260616-am-3-admin-suggested-fix-readonly-ui-docs-cross-link-implementation-a：
+        - read-only governance docs cross-link callout（切片 1：最低風險）
+        - 明示治理訊號 read-only；不自動修改文章 / registry / 不自動套用任何修正
+        - 列出兩份治理 docs 路徑 + dev-time 相對 href（/admin/ → ../docs/）
+        - 不引入 form / button / input / select / textarea / fetch
+        - 不含 per-post prescription（「應改為 X」）字樣 -%>
+    <aside class="admin-governance-note" aria-label="governance docs cross-link" style="margin: 0.5rem 0 0.75rem; padding: 0.55rem 0.8rem; background: #f4f7fb; border-left: 3px solid #6c7a89; border-radius: 4px; font-size: 0.86em; line-height: 1.55;">
+      <p style="margin: 0;">
+        <strong>讀法說明：</strong>下列各區（per-category / per-tag usage、uncategorized / unknown / unused / untagged sub-buckets、cross-site mismatch）皆為治理訊號，<strong>read-only</strong>。Admin 不會自動修改文章 frontmatter、不會自動修改 <code>categories.json</code> / <code>tags.json</code>、不會自動套用任何修正。請先閱讀治理文件，再由人眼決定是否另開修正 phase。
+      </p>
+      <p style="margin: 0.3rem 0 0;">
+        <strong>治理文件：</strong>
+        <a href="../docs/20260615-admin-content-taxonomy-governance-preanalysis.md" rel="noopener"><code>docs/20260615-admin-content-taxonomy-governance-preanalysis.md</code></a>
+        （taxonomy 治理規則、五維度分析、decision options、status / surface 分級）·
+        <a href="../docs/20260616-admin-suggested-fix-readonly-ui-preanalysis.md" rel="noopener"><code>docs/20260616-admin-suggested-fix-readonly-ui-preanalysis.md</code></a>
+        （本區 suggested-fix UI 顯示哲學、L1–L4 分級、UI contract 紅線）
+      </p>
+    </aside>
+
     <div class="surface-grid">
       <div class="surface-card">
         <h3>Categories registry</h3>
