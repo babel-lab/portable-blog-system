@@ -32,6 +32,11 @@ import { buildActiveSourceOptions } from './active-source-keys.js';
 //   - read-only helper for commerce selector / registry preview UI（per docs/20260608-commerce-admin-selector-*.md）
 //   - 只讀 production settings.commerceLinks；只輸出 safe 欄位；不啟用 Admin Apply / middleware / admin-write-cli
 import { buildCommerceLinkPreviewOptions, ALLOWED_COMMERCE_ROLES } from './active-commerce-links.js';
+// Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a
+//   - 重用既有 AdSense resolver 推導 per-post 可解析 block 數（pages / blogger 各一）
+//   - 純函式；nullable input 一律回 {}；不 mutate post / settings；不打外部 API
+//   - 不修改 resolver 本身；不改 ads.config.json；不改 GA4 設定
+import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
 
 const SITES = ['github', 'blogger'];
 
@@ -234,6 +239,48 @@ function extractLinkItemsForAdmin(arr) {
   });
 }
 
+// Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a
+//   - 依 fm.seo.indexing 判斷該文章對搜尋引擎之 indexable 狀態（純 derive；不打 robots.txt / sitemap）
+//   - VALID_SEO_INDEXING（mirror validate-content.js §33 之 enum）：'index' | 'noindex-follow' | 'noindex-nofollow'
+//   - 缺欄位或非 string → 視為 'unknown'（不假設預設值；UI 顯示 unknown 而非「indexable」以免誤導）
+//   - 不重新實作 build-github.js §293 之 robots meta precedence；admin 只摘要 source-of-truth 結果
+function deriveSeoIndexingStatus(fm) {
+  if (!fm || typeof fm !== 'object') return { value: '', indexable: null, source: 'no-frontmatter' };
+  const seo = fm.seo;
+  if (!seo || typeof seo !== 'object' || Array.isArray(seo)) {
+    // 無 seo block → 採 build-github 之 default 行為（per docs/seo-indexing-rules.md §3 fallback）
+    return { value: '', indexable: true, source: 'default' };
+  }
+  const v = typeof seo.indexing === 'string' ? seo.indexing : '';
+  if (v === 'index') return { value: v, indexable: true, source: 'frontmatter.seo.indexing' };
+  if (v === 'noindex-follow' || v === 'noindex-nofollow') {
+    return { value: v, indexable: false, source: 'frontmatter.seo.indexing' };
+  }
+  if (v === '') return { value: '', indexable: true, source: 'default' };
+  // 不合法值 → 不猜；validator 會以 invalid-seo-indexing warning 提示作者
+  return { value: v, indexable: null, source: 'frontmatter.seo.indexing (invalid value)' };
+}
+
+// Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a
+//   - 純 derive；呼叫既有 deriveRenderedAdsenseBlocks 對單 post + surface 算可解析 block 數
+//   - resolver 對 null / wrong shape 一律回 {}；本 helper 只回 number（block count）
+//   - 不 leak slot id / client id；只回 count
+//   - resolver 全域 gate：settings.ads.enabled 必須為 true；否則回 {} → count = 0
+function countResolvedAdsenseBlocks(post, adsSettings, surface) {
+  try {
+    const map = deriveRenderedAdsenseBlocks(post, adsSettings, surface);
+    if (!map || typeof map !== 'object') return 0;
+    let n = 0;
+    for (const key of Object.keys(map)) {
+      const arr = map[key];
+      if (Array.isArray(arr)) n += arr.length;
+    }
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
 function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, sourceOptions) {
   const slug = typeof fm.slug === 'string' ? fm.slug : '';
   const githubBase = (settings?.site?.githubSiteUrl || '').replace(/\/+$/, '');
@@ -349,6 +396,98 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
     note: validateDescription(typeof fb.note === 'string' ? fb.note : ''),
   };
 
+  // Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a
+  //   - 6 組 readiness derive（content / nav / GA4 / AdSense / validation / timestamp）
+  //   - 全部 read-only；不寫檔；不打 API；不抓 GA4 / AdSense 後台；不重寫 validator
+  //   - source 一律明示（'frontmatter' / 'frontmatter.seo.indexing' / 'settings.ads' / 'settings.ga4'
+  //     / 'resolve-adsense-blocks.js' / 'template-level' / 'deferred'）
+  //   - 不在此處硬編 real id；ID 從 settings 讀，render 端遮罩
+  //   - SEO indexable 判斷見 deriveSeoIndexingStatus（mirror build-github 之 robots precedence）
+  const seoIndexing = deriveSeoIndexingStatus(fm);
+  const adsSettings = settings?.ads || {};
+  const ga4Settings = settings?.ga4 || {};
+
+  // content readiness（純摘要既有欄位；不新增 schema）
+  const contentReadiness = {
+    titleExists: typeof fm.title === 'string' && fm.title.trim() !== '',
+    slugExists: slug !== '',
+    contentKindExists: contentKind !== '',
+    statusValue: typeof fm.status === 'string' ? fm.status : '',
+    draftFlag: fm.draft === true,
+    categoryExists: category !== '',
+    tagCount: tags.length,
+  };
+
+  // navigation readiness（明示只能保證模板層級；無 live GA4 點擊驗證來源）
+  //   - 模板層級 ready：build-github.js post-detail.ejs 已含 prev / next / home / GA4 attr（N8 anchor wiring landed）
+  //   - perPostLiveVerified：除非有既有文件支持，否則一律 false（不偽稱已驗）
+  //   - eligibleForNav：post.publishTargets.github.enabled === true（有 GitHub Pages 渲染目標）才可能被
+  //     列為 prev / next 候選；其他情況顯示「not eligible」
+  const navReadiness = {
+    templateLevel: 'ready',
+    perPostLiveVerified: false,
+    eligibleForNav: github.enabled === true,
+    source: 'template-level (build-github.js post-detail.ejs)',
+    note: 'GA4 點擊事件實際送達須以 GA4 後台 / DebugView / Exploration 驗證；admin 不抓 GA4 報表',
+  };
+
+  // GA4 readiness（純 static config / markup 層級；不打 GA4 API；不抓報表）
+  //   - configEnabled / hasMeasurementId / measurementIdTail4 來自 settings.ga4（已 systemSummary 暴露 tail4）
+  //   - surfaceIndexable：seo.indexing != 'noindex-*' && publishTargets.github.enabled
+  //     （noindex 文章仍可載 GA4 tracker；此欄純粹標示「是否被搜尋引擎收錄」之 readiness）
+  //   - eventsRegistered：events 註冊清單長度
+  //   - perPostEventReceived：'unknown'（不查 GA4；不假設）
+  const ga4Readiness = {
+    configEnabled: ga4Settings.enabled === true,
+    hasMeasurementId: typeof ga4Settings.measurementId === 'string' && ga4Settings.measurementId !== '',
+    measurementIdTail4: safeTail4(typeof ga4Settings.measurementId === 'string' ? ga4Settings.measurementId : ''),
+    eventsRegistered: Array.isArray(ga4Settings.events) ? ga4Settings.events.length : 0,
+    surfaceIndexable: seoIndexing.indexable,
+    seoIndexingValue: seoIndexing.value,
+    seoIndexingSource: seoIndexing.source,
+    perPostEventReceived: 'unknown',
+    source: 'static-config (settings.ga4 + frontmatter.seo.indexing)',
+    note: 'ADMIN 不打 GA4 API、不抓報表；GA4 P1 article bottom nav 已於 docs/20260615-ga4-article-bottom-nav-p1-report-verified-resume-blog-build.md 驗證',
+  };
+
+  // AdSense readiness（per-post）
+  //   - 呼叫 deriveRenderedAdsenseBlocks(post-shape, settings.ads, surface) 算每 surface 可解析 block 數
+  //   - resolver 全域 gate（per resolve-adsense-blocks.js）：
+  //       ads.enabled !== true / adsenseClient 空 / slots 非 plain object / surface 非 'pages'|'blogger'
+  //         → 全部回 {}，count = 0
+  //   - post-shape 只需 { adsense: fm.adsense }；resolver 不依賴其他欄位
+  //   - 不暴露 client / slot id；只回 number
+  const postShapeForResolver = { adsense: fm?.adsense };
+  const adsenseReadiness = {
+    configEnabled: adsSettings.enabled === true,
+    hasClient: typeof adsSettings.adsenseClient === 'string' && adsSettings.adsenseClient !== '',
+    pagesBlockCount: countResolvedAdsenseBlocks(postShapeForResolver, adsSettings, 'pages'),
+    bloggerBlockCount: countResolvedAdsenseBlocks(postShapeForResolver, adsSettings, 'blogger'),
+    postLevelEnabled: !(fm?.adsense && fm.adsense.enabled === false),
+    overrideSource: (fm?.adsense && Array.isArray(fm.adsense.blocks) && fm.adsense.blocks.length > 0)
+      ? 'post.adsense.blocks'
+      : (Array.isArray(adsSettings?.defaults?.blocks) && adsSettings.defaults.blocks.length > 0
+        ? 'settings.ads.defaults.blocks'
+        : 'none'),
+    source: 'resolve-adsense-blocks.js (read-only; not deploying)',
+    note: '此為 build-time resolver 之預期結果；live 廣告是否填充屬 AdSense 端，admin 不抓後台',
+  };
+
+  // Validation per-post warning aggregation：deferred
+  //   - 原因：validate:content 主入口走 src/scripts/load-posts.js 之 post-shape；
+  //     admin 之 loadAdminPosts 為獨立 loader（含 draft / fixture / 全 status）；
+  //     兩 loader 路徑表示法不同（loadAdminPosts 用 path.resolve(mdPath) 絕對路徑；
+  //     validateContent 內部 issue.sourcePath 為相對路徑）；
+  //     對齊兩端 / 改 validator 為 per-post API 屬獨立 phase，不在本 phase 範圍。
+  //   - 不在 admin 內 re-run validator（避免 double-run、loader-drift、效能、誤差）。
+  //   - UI 顯示 'deferred'；docs 紀錄理由。
+  const validationReadiness = {
+    perPostWarningCount: 'deferred',
+    reason: 'validate-content uses load-posts.js post-shape with relative sourcePath; admin loader uses absolute path; cross-loader join deferred',
+    source: 'deferred',
+    aggregateCommand: 'npm run validate:content',
+  };
+
   // Phase 20260521-pm-57: Admin platform routing read-only derived 欄位
   //   per docs/admin-platform-routing-extension-plan.md §3.1 之 B1 cheap derived
   //   - canonicalTarget / platformUrl / gaHostname / githubStatus
@@ -438,6 +577,14 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
     //   - 不啟用 actual write path；本 phase 僅 preview
     seoValidation,
     fbValidation,
+    // Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a
+    //   - 6 組 readiness 物件（每組附 source / note 欄位明示限制）
+    //   - 不在 EJS 端組裝；不暴露 real id；不偽稱已驗證
+    contentReadiness,
+    navReadiness,
+    ga4Readiness,
+    adsenseReadiness,
+    validationReadiness,
   };
 }
 

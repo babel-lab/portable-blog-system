@@ -492,6 +492,15 @@
   <%# Phase 20260615-night-1-admin-ia-shell-implementation-a：Posts section anchor + 介紹 -%>
   <h2 id="posts" style="margin: 1.5rem 0 0.5rem; font-size: 1.1rem; color: #1f2d3d; border-bottom: 1px solid #ddd; padding-bottom: 0.35rem;">Posts <span class="section-tag tag-readonly">read-only</span></h2>
   <p class="section-lede" style="color: #555; font-size: 0.88em; margin: 0 0 0.75rem;">列出 <code>content/{github,blogger}/posts/*.md</code> 之全部文章（含 draft）。可搜尋 / 篩選 / 排序；點 row 展開 detail。本表不提供新增 / 編輯 / 刪除 / 發布按鈕；任何寫入路徑仍只有 CLI（<code>npm run admin:write</code>，目前對 content dormant）。</p>
+  <%# Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a：generation timestamp banner
+      - 顯示本次 admin render 之 builtAt（ISO 8601，由 build-github 傳入）
+      - 不寫入 source / production content；不 commit .cache / dist；本欄純頁面 metadata
+      - 重新整理 dev server 會重跑 predev 並更新此 timestamp -%>
+  <p class="text-muted" style="font-size: 0.82em; margin: -0.5rem 0 0.75rem;">
+    <strong>generatedAt / lastDerivedAt：</strong>
+    <span class="mono"><%= builtAt %></span>
+    · 本次 admin 頁所有 derived 欄位皆於此時間從 frontmatter / settings 推導；重新整理 dev server（<code>npm run dev</code>）會重新 derive。
+  </p>
 
   <% if (posts.length === 0) { %>
     <p class="empty">無 posts 可顯示（content/{github,blogger}/posts/*.md 為空）</p>
@@ -681,6 +690,21 @@
           <span class="badge <%= p.completeness.url === 'ok' ? 'b-ok' : 'b-missing' %>">URL <%= p.completeness.url %></span><br>
           <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span><br>
           <span class="badge <%= p.completeness.fbPublished === 'ok' ? 'b-ok' : 'b-missing' %>" title="FB disabled 或文章尚未 published → ok；文章已 published 且 FB enabled=true 且 fbPostUrl 空 → missing">FB pub <%= p.completeness.fbPublished %></span>
+          <%# Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a：compact readiness badges
+              - 只是既有 derived 物件之短摘要；點 row 展開可見 full detail 與 source / note
+              - title attr 明示「derived；查 detail 看 source」-%>
+          <br><span class="text-muted" style="font-size: 0.74em; display: inline-block; margin-top: 0.25rem;">readiness ▾</span><br>
+          <% var arPages = (p.adsenseReadiness && p.adsenseReadiness.pagesBlockCount) || 0; %>
+          <% var arBlogger = (p.adsenseReadiness && p.adsenseReadiness.bloggerBlockCount) || 0; %>
+          <% var ga4Indexable = p.ga4Readiness && p.ga4Readiness.surfaceIndexable; %>
+          <span class="badge <%= arPages > 0 ? 'b-ok' : 'b-info' %>" title="settings-resolved AdSense blocks on pages surface (derived)">ads:pages <%= arPages %></span>
+          <span class="badge <%= arBlogger > 0 ? 'b-ok' : 'b-info' %>" title="settings-resolved AdSense blocks on blogger surface (derived)">ads:blogger <%= arBlogger %></span><br>
+          <% if (ga4Indexable === true) { %><span class="badge b-ok" title="seo.indexing implies indexable">idx ok</span>
+          <% } else if (ga4Indexable === false) { %><span class="badge b-info" title="seo.indexing = noindex-*">noindex</span>
+          <% } else { %><span class="badge b-missing" title="seo.indexing invalid or unknown">idx ?</span><% } %>
+          <% if (p.navReadiness && p.navReadiness.eligibleForNav) { %><span class="badge b-ok" title="github.enabled=true → eligible for prev/next on GitHub Pages">nav eligible</span>
+          <% } else { %><span class="badge b-info" title="github.enabled=false → not eligible for GitHub Pages prev/next">nav n/a</span><% } %>
+          <span class="badge b-info" title="per-post validation aggregation deferred; run npm run validate:content">warn def.</span>
         </td>
         <td class="col-urls">
           <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a></div><% } %>
@@ -767,6 +791,166 @@
             </dl>
             <p class="text-muted" style="font-size: 0.82em; margin: 0.25rem 0 0;">
               注：本 section 為 Admin read-only derived 顯示；不代表 sitemap / build / deploy 之實際審核結果。per <code>docs/admin-platform-routing-extension-plan.md</code>；不含 utmPreviewUrl（屬 pm-60 候選）/ platformMigrationNote（schema 未引入）。
+            </p>
+          </div>
+
+          <%# Phase 20260615-night-3-admin-posts-index-readonly-derive-fields-a：Readiness 集中區
+              - 五個 sub-block：Content / Navigation / GA4 / AdSense / Validation
+              - 全部 read-only derived；不寫檔；不打 GA4·AdSense API；不重寫 validator
+              - 不放 Apply / Save / Edit / Publish 按鈕；不偽稱已 live verified -%>
+          <div class="detail-section">
+            <h3>Readiness <span class="section-tag tag-readonly" style="font-size: 0.7em;">read-only · derived</span></h3>
+            <p class="text-muted" style="font-size: 0.85em; margin: 0.1rem 0 0.5rem;">
+              本區為 admin loader 從 frontmatter / settings 推導之 read-only 狀態快照；只反映 build-time
+              可預期結果，<strong>不代表</strong> live deploy / Blogger / AdSense / GA4 後台之實際狀況。
+              每個欄位皆附 source 與 note。
+            </p>
+
+            <%# --- Content readiness --- %>
+            <h4 style="font-size: 0.9em; margin: 0.4rem 0 0.2rem; color: #2c3e50;">Content readiness <span class="text-muted" style="font-size: 0.78em;">(derived)</span></h4>
+            <dl class="detail-grid">
+              <dt>title</dt>
+              <dd>
+                <% if (p.contentReadiness && p.contentReadiness.titleExists) { %><span class="badge b-ok">present</span><% } else { %><span class="badge b-missing">missing</span><% } %>
+              </dd>
+              <dt>slug</dt>
+              <dd>
+                <% if (p.contentReadiness && p.contentReadiness.slugExists) { %><span class="badge b-ok">present</span> <span class="mono"><%= p.slug %></span><% } else { %><span class="badge b-missing">missing</span><% } %>
+              </dd>
+              <dt>contentKind</dt>
+              <dd>
+                <% if (p.contentReadiness && p.contentReadiness.contentKindExists) { %><span class="badge b-info"><%= p.contentKind %></span><% } else { %><span class="badge b-missing">missing</span><% } %>
+              </dd>
+              <dt>status / draft</dt>
+              <dd>
+                <% var srv = (p.contentReadiness && p.contentReadiness.statusValue) || ''; %>
+                <% if (srv === 'ready') { %><span class="badge b-ready">ready</span>
+                <% } else if (srv === 'draft' || (p.contentReadiness && p.contentReadiness.draftFlag)) { %><span class="badge b-draft">draft</span>
+                <% } else if (srv === 'published') { %><span class="badge b-published">published</span>
+                <% } else if (srv === 'archived') { %><span class="badge b-info">archived</span>
+                <% } else { %><span class="badge b-missing"><%= srv || 'no status' %></span><% } %>
+              </dd>
+              <dt>category / tags</dt>
+              <dd>
+                <% if (p.contentReadiness && p.contentReadiness.categoryExists) { %><span class="badge b-info"><%= p.category %></span><% } else { %><span class="badge b-missing">no category</span><% } %>
+                <span class="badge <%= (p.contentReadiness && p.contentReadiness.tagCount > 0) ? 'b-info' : 'b-missing' %>"><%= (p.contentReadiness && p.contentReadiness.tagCount) || 0 %> tag(s)</span>
+              </dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">source: frontmatter (title / slug / contentKind / status / draft / category / tags)</p>
+
+            <%# --- Navigation readiness --- %>
+            <h4 style="font-size: 0.9em; margin: 0.6rem 0 0.2rem; color: #2c3e50;">Navigation readiness <span class="text-muted" style="font-size: 0.78em;">(derived · template-level)</span></h4>
+            <dl class="detail-grid">
+              <dt>template-level nav</dt>
+              <dd>
+                <% if (p.navReadiness && p.navReadiness.templateLevel === 'ready') { %>
+                  <span class="badge b-ok">template-level ready</span>
+                <% } else { %>
+                  <span class="badge b-missing">unknown</span>
+                <% } %>
+              </dd>
+              <dt>eligible for prev/next (this post)</dt>
+              <dd>
+                <% if (p.navReadiness && p.navReadiness.eligibleForNav) { %>
+                  <span class="badge b-ok">eligible</span>
+                  <span class="text-muted" style="font-size: 0.82em;">(publishTargets.github.enabled = true)</span>
+                <% } else { %>
+                  <span class="badge b-info">not eligible</span>
+                  <span class="text-muted" style="font-size: 0.82em;">(publishTargets.github.enabled = false → 不會出現在 GitHub Pages prev/next 候選)</span>
+                <% } %>
+              </dd>
+              <dt>per-post live GA4 verified</dt>
+              <dd>
+                <span class="badge b-info">no</span>
+                <span class="text-muted" style="font-size: 0.82em;">admin 不抓 GA4 後台；live 事件須以 GA4 DebugView / Exploration 確認</span>
+              </dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">source: <%= (p.navReadiness && p.navReadiness.source) || '(unknown)' %>；note: <%= (p.navReadiness && p.navReadiness.note) || '' %></p>
+
+            <%# --- GA4 readiness (static config only) --- %>
+            <h4 style="font-size: 0.9em; margin: 0.6rem 0 0.2rem; color: #2c3e50;">GA4 readiness <span class="text-muted" style="font-size: 0.78em;">(derived · static-config)</span></h4>
+            <dl class="detail-grid">
+              <dt>ga4.enabled (global)</dt>
+              <dd>
+                <% if (p.ga4Readiness && p.ga4Readiness.configEnabled) { %><span class="badge b-ok">true</span><% } else { %><span class="badge b-missing">false</span><% } %>
+              </dd>
+              <dt>measurementId</dt>
+              <dd class="mono">
+                <% if (p.ga4Readiness && p.ga4Readiness.hasMeasurementId) { %>G-…<%= p.ga4Readiness.measurementIdTail4 %><% } else { %><span class="empty">(none)</span><% } %>
+                <span class="text-muted" style="font-size: 0.78em;">(masked tail4)</span>
+              </dd>
+              <dt>events registered</dt>
+              <dd><%= (p.ga4Readiness && p.ga4Readiness.eventsRegistered) || 0 %></dd>
+              <dt>surface indexable</dt>
+              <dd>
+                <% if (p.ga4Readiness && p.ga4Readiness.surfaceIndexable === true) { %>
+                  <span class="badge b-ok">indexable</span>
+                <% } else if (p.ga4Readiness && p.ga4Readiness.surfaceIndexable === false) { %>
+                  <span class="badge b-info">noindex</span>
+                <% } else { %>
+                  <span class="badge b-missing">unknown</span>
+                <% } %>
+                <% if (p.ga4Readiness && p.ga4Readiness.seoIndexingValue) { %>
+                  <span class="text-muted mono" style="font-size: 0.78em;">(seo.indexing = <%= p.ga4Readiness.seoIndexingValue %>)</span>
+                <% } %>
+              </dd>
+              <dt>per-post event received</dt>
+              <dd>
+                <span class="badge b-info">unknown</span>
+                <span class="text-muted" style="font-size: 0.82em;">admin 不打 GA4 API / 不抓報表</span>
+              </dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
+              source: <%= (p.ga4Readiness && p.ga4Readiness.source) || '(unknown)' %>；
+              note: <%= (p.ga4Readiness && p.ga4Readiness.note) || '' %>
+            </p>
+
+            <%# --- AdSense readiness (per-post, two surfaces) --- %>
+            <h4 style="font-size: 0.9em; margin: 0.6rem 0 0.2rem; color: #2c3e50;">AdSense readiness <span class="text-muted" style="font-size: 0.78em;">(derived · resolve-adsense-blocks.js)</span></h4>
+            <dl class="detail-grid">
+              <dt>ads.enabled (global)</dt>
+              <dd>
+                <% if (p.adsenseReadiness && p.adsenseReadiness.configEnabled) { %><span class="badge b-ok">true</span><% } else { %><span class="badge b-info">false</span><% } %>
+                <% if (p.adsenseReadiness && p.adsenseReadiness.hasClient) { %>
+                  <span class="text-muted" style="font-size: 0.78em;">(client present · masked)</span>
+                <% } else { %>
+                  <span class="text-muted" style="font-size: 0.78em;">(client missing)</span>
+                <% } %>
+              </dd>
+              <dt>post-level adsense</dt>
+              <dd>
+                <% if (p.adsenseReadiness && p.adsenseReadiness.postLevelEnabled) { %><span class="badge b-ok">not opted out</span><% } else { %><span class="badge b-info">opted out (post.adsense.enabled=false)</span><% } %>
+              </dd>
+              <dt>block source</dt>
+              <dd class="mono"><%= (p.adsenseReadiness && p.adsenseReadiness.overrideSource) || 'none' %></dd>
+              <dt>resolved blocks · pages</dt>
+              <dd>
+                <% var pc = (p.adsenseReadiness && p.adsenseReadiness.pagesBlockCount) || 0; %>
+                <span class="badge <%= pc > 0 ? 'b-ok' : 'b-info' %>"><%= pc %> block(s)</span>
+              </dd>
+              <dt>resolved blocks · blogger</dt>
+              <dd>
+                <% var bc = (p.adsenseReadiness && p.adsenseReadiness.bloggerBlockCount) || 0; %>
+                <span class="badge <%= bc > 0 ? 'b-ok' : 'b-info' %>"><%= bc %> block(s)</span>
+              </dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
+              source: <%= (p.adsenseReadiness && p.adsenseReadiness.source) || '(unknown)' %>；
+              note: <%= (p.adsenseReadiness && p.adsenseReadiness.note) || '' %>。
+              real client / slot id 只存於 <code>content/settings/ads.config.json</code>；本頁不顯示。
+            </p>
+
+            <%# --- Validation readiness (deferred) --- %>
+            <h4 style="font-size: 0.9em; margin: 0.6rem 0 0.2rem; color: #2c3e50;">Validation warnings <span class="text-muted" style="font-size: 0.78em;">(deferred)</span></h4>
+            <dl class="detail-grid">
+              <dt>per-post warning count</dt>
+              <dd>
+                <span class="badge b-info">deferred</span>
+                <span class="text-muted" style="font-size: 0.82em;">使用 <code><%= (p.validationReadiness && p.validationReadiness.aggregateCommand) || 'npm run validate:content' %></code> 取得整體結果</span>
+              </dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
+              deferred 原因：<%= (p.validationReadiness && p.validationReadiness.reason) || '' %>。
             </p>
           </div>
 
