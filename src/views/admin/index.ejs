@@ -82,6 +82,38 @@
   .readiness-checklist .ph-done { color: #155724; }
   .readiness-checklist .ph-current { color: #856404; font-weight: 600; }
   .readiness-checklist .ph-pending { color: #999; }
+  /* Phase 20260615-night-1-admin-ia-shell-implementation-a：IA nav + dashboard hero + section cards */
+  .admin-nav { position: sticky; top: 0; z-index: 10; background: #1f2d3d; border-radius: 4px; margin: 0 0 1rem; padding: 0.4rem 0.6rem; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .admin-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+  .admin-nav a { color: #e6edf3; text-decoration: none; font-size: 0.82em; padding: 0.25rem 0.55rem; border-radius: 3px; display: inline-block; }
+  .admin-nav a:hover { background: #314357; color: #fff; }
+  .admin-nav a:focus { outline: 2px solid #58a6ff; outline-offset: 1px; }
+  .admin-section { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 1rem 1.25rem; margin: 1rem 0; }
+  .admin-section > h2 { margin: 0 0 0.5rem; font-size: 1.1rem; color: #1f2d3d; border-bottom: 1px solid #e1e4e8; padding-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .admin-section > h2 .section-tag { font-size: 0.7em; font-weight: 500; padding: 1px 7px; border-radius: 10px; }
+  .admin-section > p.section-lede { color: #555; font-size: 0.88em; margin: 0.25rem 0 0.75rem; line-height: 1.55; }
+  .section-tag.tag-readonly { background: #d4edda; color: #155724; }
+  .section-tag.tag-planned { background: #fff3cd; color: #856404; }
+  .section-tag.tag-live { background: #cce5ff; color: #004085; }
+  .section-tag.tag-dormant { background: #e2e3e5; color: #383d41; }
+  .surface-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .surface-card { flex: 1 1 14rem; min-width: 12rem; background: #fafbfc; border: 1px solid #e1e4e8; border-radius: 4px; padding: 0.6rem 0.75rem; font-size: 0.88em; }
+  .surface-card h3 { margin: 0 0 0.35rem; font-size: 0.95em; color: #1f2d3d; display: flex; align-items: center; gap: 0.4rem; }
+  .surface-card dl { margin: 0; display: grid; grid-template-columns: 8.5rem 1fr; row-gap: 0.15rem; column-gap: 0.5rem; font-size: 0.85em; }
+  .surface-card dt { color: #57606a; }
+  .surface-card dd { margin: 0; color: #1f2d3d; word-break: break-all; }
+  .surface-card .surface-note { margin: 0.4rem 0 0; color: #777; font-size: 0.78em; font-style: italic; }
+  .planned-list { margin: 0; padding-left: 1.1rem; color: #555; font-size: 0.85em; line-height: 1.6; }
+  .planned-list li::marker { color: #999; }
+  .system-def { background: #f3f7fc; border-left: 3px solid #2c5282; padding: 0.5rem 0.75rem; font-size: 0.88em; line-height: 1.6; margin: 0 0 0.75rem; color: #1f2d3d; }
+  .system-def code { background: #e3ecf7; padding: 1px 4px; border-radius: 2px; font-size: 0.92em; }
+  .scripts-table { width: 100%; border-collapse: collapse; font-size: 0.85em; background: #fff; }
+  .scripts-table th, .scripts-table td { padding: 0.35rem 0.55rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  .scripts-table th { background: #ececec; font-weight: 600; }
+  .scripts-table code { background: #f3f4f6; padding: 1px 4px; border-radius: 2px; }
+  .settings-files { columns: 2 12rem; column-gap: 1.25rem; font-size: 0.85em; margin: 0; padding-left: 1.1rem; }
+  .settings-files li { break-inside: avoid; }
+  .settings-files code { background: #f3f4f6; padding: 0 3px; border-radius: 2px; }
 </style>
 </head>
 <body>
@@ -92,7 +124,28 @@
     </small>
   </div>
 
-  <h1>Posts (read-only)</h1>
+  <%# Phase 20260615-night-1-admin-ia-shell-implementation-a：IA nav（in-page anchor 導覽；無 router、無外連） -%>
+  <nav class="admin-nav" aria-label="Admin sections">
+    <ul>
+      <li><a href="#dashboard">Dashboard</a></li>
+      <li><a href="#posts">Posts</a></li>
+      <li><a href="#categories">Categories</a></li>
+      <li><a href="#blogger-export">Blogger Export</a></li>
+      <li><a href="#github-pages">GitHub Pages</a></li>
+      <li><a href="#adsense">AdSense</a></li>
+      <li><a href="#ga4">GA4 / Analytics</a></li>
+      <li><a href="#commerce">Commerce / Affiliate</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#system-checks">System checks</a></li>
+    </ul>
+  </nav>
+
+  <%
+    var sys = (typeof systemSummary === 'object' && systemSummary) ? systemSummary : null;
+    var siteName = (sys && sys.site && sys.site.siteName) ? sys.site.siteName : 'Portable Blog System';
+  %>
+
+  <h1 id="dashboard">Admin (read-only) — <%= siteName %></h1>
 
   <div class="admin-meta">
     <strong>產生時間：</strong><span class="mono"><%= builtAt %></span> |
@@ -194,6 +247,113 @@
     <div class="stat-card" title="計數 GitHub enabled=true 且 previewUrl 為空之文章（completeness.github === 'missing'；通常為 slug 缺漏）；幫助直接定位需補 slug / preview URL 之文章。per Phase 20260523-night-admin-b3"><strong><%= missingGithubUrl %></strong>Missing GitHub URL</div>
   </div>
 
+  <%# Phase 20260615-night-1-admin-ia-shell-implementation-a：Dashboard hero — system 定位 + surface readiness 概覽
+      - 純 read-only；不引導使用者以為已可從 ADMIN 寫文 / 發布 / 重貼 Blogger / 推 deploy
+      - AdSense client / GA4 measurementId 只顯示遮罩 tail4；source 不寫死任何 real id -%>
+  <%
+    var bloggerEnabledLocal = 0, githubEnabledLocal = 0;
+    var bloggerByMode = { full: 0, summary: 0, 'redirect-card': 0, other: 0 };
+    var bloggerPublishedUrlCount = 0, githubPreviewUrlCount = 0;
+    var contentKindMap = {};
+    posts.forEach(function(p) {
+      if (p.blogger && p.blogger.enabled) {
+        bloggerEnabledLocal++;
+        var m = p.blogger.mode || 'other';
+        if (m === 'full' || m === 'summary' || m === 'redirect-card') bloggerByMode[m]++;
+        else bloggerByMode.other++;
+        if (p.blogger.publishedUrl) bloggerPublishedUrlCount++;
+      }
+      if (p.github && p.github.enabled) {
+        githubEnabledLocal++;
+        if (p.github.previewUrl) githubPreviewUrlCount++;
+      }
+      if (p.contentKind) contentKindMap[p.contentKind] = (contentKindMap[p.contentKind] || 0) + 1;
+    });
+    var contentKindList = Object.keys(contentKindMap).sort();
+  %>
+
+  <section class="admin-section" aria-labelledby="dashboard-h">
+    <h2 id="dashboard-h">Dashboard <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="system-def">
+      <strong>系統定位：</strong>本機 Markdown + JSON 設定 → 產生 GitHub Pages 靜態站（自動 build / deploy）+ Blogger 文章 HTML（<strong>手動複製貼到 Blogger</strong> 後台）。
+      ADMIN 為「<strong>系統狀態檢視入口</strong>」<strong>，不是</strong>後台 CMS：不在此新增 / 編輯 / 刪除 / 發布文章；不寫入 <code>content/</code> 或 <code>content/settings/</code>；不觸發 build；不重貼 Blogger；不 deploy。
+    </p>
+    <p class="section-lede">下方概覽 5 個輸出 / 追蹤面（Blogger、GitHub Pages、AdSense、GA4、Commerce/Affiliate）之 read-only 狀態。詳細管理請至各對應區塊（透過上方 nav 跳轉）。</p>
+    <div class="surface-grid">
+      <div class="surface-card">
+        <h3>📘 Blogger 站 <span class="section-tag tag-live">live</span></h3>
+        <dl>
+          <dt>publishTargets enabled</dt><dd><%= bloggerEnabledLocal %> 篇</dd>
+          <dt>mode breakdown</dt><dd>full <%= bloggerByMode.full %> / summary <%= bloggerByMode.summary %> / redirect-card <%= bloggerByMode['redirect-card'] %><% if (bloggerByMode.other) { %> / other <%= bloggerByMode.other %><% } %></dd>
+          <dt>已回填 publishedUrl</dt><dd><%= bloggerPublishedUrlCount %> / <%= bloggerEnabledLocal %></dd>
+          <dt>站台 URL</dt><dd class="mono"><%= sys && sys.site ? sys.site.bloggerSiteUrl : '' %></dd>
+        </dl>
+        <p class="surface-note">發布流程為手動：build:blogger 產 HTML → 人工貼到 Blogger 後台 → 回填 publishedUrl。</p>
+      </div>
+
+      <div class="surface-card">
+        <h3>🐙 GitHub Pages 站 <span class="section-tag tag-live">live</span></h3>
+        <dl>
+          <dt>publishTargets enabled</dt><dd><%= githubEnabledLocal %> 篇</dd>
+          <dt>已有 previewUrl</dt><dd><%= githubPreviewUrlCount %> / <%= githubEnabledLocal %></dd>
+          <dt>站台 URL</dt><dd class="mono"><%= sys && sys.site ? sys.site.githubSiteUrl : '' %></dd>
+        </dl>
+        <p class="surface-note">build:github → vite build → dist/ → portable-blog-deploy clone sync → push gh-pages。ADMIN 不觸發 build。</p>
+      </div>
+
+      <div class="surface-card">
+        <h3>💰 AdSense <% if (sys && sys.ads && sys.ads.enabled) { %><span class="section-tag tag-live">enabled</span><% } else { %><span class="section-tag tag-dormant">disabled</span><% } %></h3>
+        <% if (sys && sys.ads) { %>
+        <dl>
+          <dt>master enabled</dt><dd><%= sys.ads.enabled ? 'true' : 'false' %></dd>
+          <dt>adsenseClient</dt><dd class="mono"><% if (sys.ads.hasClient) { %>ca-pub-…<%= sys.ads.clientTail4 %><% } else { %><span class="empty">(none)</span><% } %></dd>
+          <dt>non-empty slots</dt><dd><%= sys.ads.nonEmptySlotCount %></dd>
+          <dt>default blocks</dt><dd><%= sys.ads.defaultBlocksEnabledCount %> / <%= sys.ads.defaultBlocksCount %> enabled</dd>
+          <dt>loader</dt><dd>pages: <%= sys.ads.loaderPages || '—' %> · blogger: <%= sys.ads.loaderBlogger || '—' %></dd>
+        </dl>
+        <% } %>
+        <p class="surface-note">real client / slot id 只存 <code>ads.config.json</code>；ADMIN 以 tail4 遮罩顯示。</p>
+      </div>
+
+      <div class="surface-card">
+        <h3>📊 GA4 / Analytics <% if (sys && sys.ga4 && sys.ga4.enabled) { %><span class="section-tag tag-live">enabled</span><% } else { %><span class="section-tag tag-dormant">disabled</span><% } %></h3>
+        <% if (sys && sys.ga4) { %>
+        <dl>
+          <dt>enabled</dt><dd><%= sys.ga4.enabled ? 'true' : 'false' %></dd>
+          <dt>measurementId</dt><dd class="mono"><% if (sys.ga4.hasMeasurementId) { %>G-…<%= sys.ga4.measurementIdTail4 %><% } else { %><span class="empty">(none)</span><% } %></dd>
+          <dt>events 註冊</dt><dd><%= sys.ga4.eventsCount %> 個</dd>
+        </dl>
+        <% } %>
+        <p class="surface-note">P1 article bottom nav 已驗證（20260615）。報表分析請進 GA4 後台；ADMIN 不打 GA4 API。</p>
+      </div>
+
+      <div class="surface-card">
+        <h3>🛒 Commerce / Affiliate <% if (sys && sys.commerce && sys.commerce.registrySize > 0) { %><span class="section-tag tag-live">seeded</span><% } else { %><span class="section-tag tag-dormant">empty</span><% } %></h3>
+        <% if (sys && sys.commerce) { %>
+        <dl>
+          <dt>registry size</dt><dd><%= sys.commerce.registrySize %></dd>
+          <dt>active entries</dt><dd><%= sys.commerce.activeCount %></dd>
+          <dt>affiliate networks</dt><dd><%= sys.commerce.affiliateNetworksCount %></dd>
+        </dl>
+        <% } %>
+        <p class="surface-note">紅線：永不含 token / credential。詳見下方 Commerce / Affiliate 區塊。</p>
+      </div>
+
+      <div class="surface-card">
+        <h3>📚 Content kinds</h3>
+        <dl>
+          <% if (contentKindList.length === 0) { %>
+            <dt class="text-muted">—</dt><dd class="text-muted">無</dd>
+          <% } else { %>
+            <% contentKindList.forEach(function(k) { %><dt><%= k %></dt><dd><%= contentKindMap[k] %> 篇</dd><% }); %>
+          <% } %>
+          <dt>categories</dt><dd><%= sys && sys.categories ? sys.categories.total : 0 %> 個</dd>
+          <dt>tags</dt><dd><%= sys && sys.tags ? sys.tags.total : 0 %> 個</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
   <%# Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
       registry-global read-only commerce links / affiliate references preview
       per docs/20260608-commerce-admin-selector-preanalysis.md §6 / §10
@@ -211,7 +371,7 @@
     var commerceRoles = (typeof allowedCommerceRoles !== 'undefined' && Array.isArray(allowedCommerceRoles))
       ? allowedCommerceRoles : [];
   %>
-  <section style="margin: 1.5rem 0; padding: 1rem 1.25rem; border: 1px solid #c5d6e8; border-radius: 4px; background: #f3f7fc;">
+  <section id="commerce" style="margin: 1.5rem 0; padding: 1rem 1.25rem; border: 1px solid #c5d6e8; border-radius: 4px; background: #f3f7fc;">
     <h3 style="margin-top: 0; color: #2c5282; border-bottom: 1px solid #c5d6e8; padding-bottom: 0.4rem;">commerce links / affiliate references preview (read-only)</h3>
     <p class="text-muted" style="font-size: 0.85em; line-height: 1.6;">
       🔒 Read-only preview — no Admin Apply · no registry write · no markdown write · no middleware · no admin-write-cli.
@@ -328,6 +488,10 @@
     </div>
     <% } %>
   </section>
+
+  <%# Phase 20260615-night-1-admin-ia-shell-implementation-a：Posts section anchor + 介紹 -%>
+  <h2 id="posts" style="margin: 1.5rem 0 0.5rem; font-size: 1.1rem; color: #1f2d3d; border-bottom: 1px solid #ddd; padding-bottom: 0.35rem;">Posts <span class="section-tag tag-readonly">read-only</span></h2>
+  <p class="section-lede" style="color: #555; font-size: 0.88em; margin: 0 0 0.75rem;">列出 <code>content/{github,blogger}/posts/*.md</code> 之全部文章（含 draft）。可搜尋 / 篩選 / 排序；點 row 展開 detail。本表不提供新增 / 編輯 / 刪除 / 發布按鈕；任何寫入路徑仍只有 CLI（<code>npm run admin:write</code>，目前對 content dormant）。</p>
 
   <% if (posts.length === 0) { %>
     <p class="empty">無 posts 可顯示（content/{github,blogger}/posts/*.md 為空）</p>
@@ -967,6 +1131,253 @@
     <strong>邊界：</strong>本頁屬 read-only；無 form / 無 button writes；不會寫入任何 source 檔案。<br>
     <strong>規格：</strong>詳見 <code>docs/admin-1-readonly-preflight.md</code> / <code>docs/admin-mvp-pre-analysis.md</code>。
   </div>
+
+  <%# Phase 20260615-night-1-admin-ia-shell-implementation-a：以下為 IA shell 新增之 read-only 區塊
+      - 全部 read-only；沒有任何 Apply / Save / Submit / Edit / Delete / Publish 互動
+      - 未實作項目以 "planned" 文字 + 灰色清單呈現；不放假按鈕引導誤點 -%>
+
+  <%# === Categories（read-only） === -%>
+  <section class="admin-section" aria-labelledby="categories-h">
+    <h2 id="categories">Categories &amp; Tags <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="section-lede">來自 <code>content/settings/categories.json</code> / <code>content/settings/tags.json</code>。文章 frontmatter 之 <code>category</code> / <code>tags</code> 必須使用此處已登錄之 id / slug。本區無新增 / 編輯按鈕；增刪請手改 JSON，再 <code>npm run validate:content</code>。</p>
+    <div class="surface-grid">
+      <div class="surface-card">
+        <h3>Categories</h3>
+        <dl>
+          <dt>total</dt><dd><%= sys && sys.categories ? sys.categories.total : 0 %></dd>
+          <dt>github surface</dt><dd><%= sys && sys.categories ? sys.categories.bySite.github : 0 %></dd>
+          <dt>blogger surface</dt><dd><%= sys && sys.categories ? sys.categories.bySite.blogger : 0 %></dd>
+        </dl>
+      </div>
+      <div class="surface-card">
+        <h3>Tags</h3>
+        <dl>
+          <dt>total</dt><dd><%= sys && sys.tags ? sys.tags.total : 0 %></dd>
+          <dt>github surface</dt><dd><%= sys && sys.tags ? sys.tags.bySite.github : 0 %></dd>
+          <dt>blogger surface</dt><dd><%= sys && sys.tags ? sys.tags.bySite.blogger : 0 %></dd>
+        </dl>
+      </div>
+    </div>
+    <% if (sys && sys.categories && Array.isArray(sys.categories.list) && sys.categories.list.length > 0) { %>
+    <table class="scripts-table" style="margin-top: 0.6rem;">
+      <thead><tr><th>id</th><th>name</th><th>slug</th><th>site</th></tr></thead>
+      <tbody>
+        <% sys.categories.list.forEach(function(c) { %>
+          <tr>
+            <td><code><%= c.id %></code></td>
+            <td><%= c.name %></td>
+            <td class="mono"><%= c.slug %></td>
+            <td><% c.site.forEach(function(s) { %><span class="badge b-info"><%= s %></span><% }); %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% } %>
+    <p class="surface-note" style="margin-top: 0.5rem;">⏳ 未實作：tag 用量計數、未使用 tag 偵測、跨 site mismatch 紅綠燈、編輯 UI。</p>
+  </section>
+
+  <%# === Blogger Export（read-only） === -%>
+  <section class="admin-section" aria-labelledby="blogger-export-h">
+    <h2 id="blogger-export">Blogger Export <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="section-lede">Blogger 站採「<strong>本機產 HTML → 人工貼到 Blogger 後台</strong>」流程；ADMIN 不執行 build:blogger、不開 Blogger 後台、不重貼。</p>
+    <div class="surface-grid">
+      <div class="surface-card">
+        <h3>publishTargets.blogger</h3>
+        <dl>
+          <dt>enabled posts</dt><dd><%= bloggerEnabledLocal %></dd>
+          <dt>mode: full</dt><dd><%= bloggerByMode.full %></dd>
+          <dt>mode: summary</dt><dd><%= bloggerByMode.summary %></dd>
+          <dt>mode: redirect-card</dt><dd><%= bloggerByMode['redirect-card'] %></dd>
+          <dt>有 publishedUrl</dt><dd><%= bloggerPublishedUrlCount %> / <%= bloggerEnabledLocal %></dd>
+        </dl>
+      </div>
+      <div class="surface-card">
+        <h3>產出位置</h3>
+        <dl>
+          <dt>build script</dt><dd><code>npm run build:blogger</code></dd>
+          <dt>HTML / meta</dt><dd class="mono">dist-blogger/posts/&lt;slug&gt;/</dd>
+          <dt>theme CSS</dt><dd class="mono">dist-blogger/theme/</dd>
+          <dt>guard</dt><dd><code>check:blogger-adsense-output</code>（6-target）</dd>
+        </dl>
+        <p class="surface-note">產出皆 git-ignored。重貼仍須手動 + theme CSS gate + 備份。</p>
+      </div>
+    </div>
+    <p style="margin: 0.5rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 未實作：</p>
+    <ul class="planned-list">
+      <li>per-post copy-helper / publish-checklist 一鍵打開（目前需手動到 <code>dist-blogger/posts/&lt;slug&gt;/copy-helper.txt</code>）</li>
+      <li>Blogger 後台 published URL 一鍵回填 UI（須開 admin write 路徑；目前 dormant）</li>
+      <li>per-post repost readiness flag（live-verified / pending repost / never reposted）</li>
+      <li>per-post AdSense 是否實際渲染（已有 guard 但未集成至 ADMIN per-post detail）</li>
+    </ul>
+  </section>
+
+  <%# === GitHub Pages（read-only） === -%>
+  <section class="admin-section" aria-labelledby="github-pages-h">
+    <h2 id="github-pages">GitHub Pages <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="section-lede">GitHub Pages 站為靜態站，可本機 <code>npm run dev</code> 預覽、<code>npm run build</code> 產出 <code>dist/</code>，再經 <code>portable-blog-deploy</code> sync 至 <code>gh-pages</code>。ADMIN 不執行 build / deploy。</p>
+    <div class="surface-grid">
+      <div class="surface-card">
+        <h3>publishTargets.github</h3>
+        <dl>
+          <dt>enabled posts</dt><dd><%= githubEnabledLocal %></dd>
+          <dt>有 previewUrl</dt><dd><%= githubPreviewUrlCount %> / <%= githubEnabledLocal %></dd>
+        </dl>
+      </div>
+      <div class="surface-card">
+        <h3>產出 / Deploy</h3>
+        <dl>
+          <dt>dev</dt><dd><code>npm run dev</code></dd>
+          <dt>build</dt><dd><code>npm run build</code> → <code>dist/</code></dd>
+          <dt>sitemap</dt><dd><code>npm run build:sitemap</code></dd>
+          <dt>deploy</dt><dd>portable-blog-deploy → gh-pages</dd>
+        </dl>
+      </div>
+    </div>
+    <p style="margin: 0.5rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 未實作：</p>
+    <ul class="planned-list">
+      <li>最後一次 build / deploy 時間與 commit 顯示</li>
+      <li>sitemap.xml / robots.txt 內容預覽</li>
+      <li>per-post canonical / 404 偵測 / broken-link 報告整合</li>
+      <li>一鍵觸發 build / deploy 按鈕（不會在 ADMIN 內提供；保留 CLI 觸發）</li>
+    </ul>
+  </section>
+
+  <%# === AdSense（read-only，masked） === -%>
+  <section class="admin-section" aria-labelledby="adsense-h">
+    <h2 id="adsense">AdSense <% if (sys && sys.ads && sys.ads.enabled) { %><span class="section-tag tag-live">enabled</span><% } else { %><span class="section-tag tag-dormant">disabled</span><% } %> <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="section-lede">real client / slot id 只儲存於 <code>content/settings/ads.config.json</code>，本頁僅以 tail4 遮罩顯示。<strong>不要</strong>在本頁貼上完整 client / slot id。master kill-switch 由 <code>ads.enabled</code> 控制。</p>
+    <% if (sys && sys.ads) { %>
+    <div class="surface-grid">
+      <div class="surface-card">
+        <h3>主開關</h3>
+        <dl>
+          <dt>ads.enabled</dt><dd><%= sys.ads.enabled ? 'true' : 'false' %></dd>
+          <dt>adsenseClient</dt><dd class="mono"><% if (sys.ads.hasClient) { %>ca-pub-…<%= sys.ads.clientTail4 %><% } else { %><span class="empty">(none)</span><% } %></dd>
+          <dt>loader.pages</dt><dd><%= sys.ads.loaderPages || '—' %></dd>
+          <dt>loader.blogger</dt><dd><%= sys.ads.loaderBlogger || '—' %></dd>
+        </dl>
+      </div>
+      <div class="surface-card">
+        <h3>Slot / blocks</h3>
+        <dl>
+          <dt>non-empty slots</dt><dd><%= sys.ads.nonEmptySlotCount %></dd>
+          <dt>default blocks 定義</dt><dd><%= sys.ads.defaultBlocksCount %></dd>
+          <dt>default blocks enabled</dt><dd><%= sys.ads.defaultBlocksEnabledCount %></dd>
+        </dl>
+        <p class="surface-note">resolver / EJS partial chain 已 live；per-post anchor 渲染由 <code>resolve-adsense-blocks.js</code> 決定。</p>
+      </div>
+    </div>
+    <% } %>
+    <p style="margin: 0.5rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 未實作：</p>
+    <ul class="planned-list">
+      <li>per-post resolved blocks count / surface（須在 loader 跑 resolver；本 phase 不接）</li>
+      <li>AdSense 後台收益 / impression / policy warning 顯示（屬 GA4·AdSense Console；不在此 mirror）</li>
+      <li>slot 命名變更 UI（直接改 <code>ads.config.json</code>，validator 把關）</li>
+    </ul>
+  </section>
+
+  <%# === GA4 / Analytics（read-only，masked） === -%>
+  <section class="admin-section" aria-labelledby="ga4-h">
+    <h2 id="ga4">GA4 / Analytics <% if (sys && sys.ga4 && sys.ga4.enabled) { %><span class="section-tag tag-live">enabled</span><% } else { %><span class="section-tag tag-dormant">disabled</span><% } %> <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="section-lede">measurementId 以 tail4 遮罩顯示；ADMIN 不打 GA4 API、不抓報表、不顯示真實流量。GA4 P1 article bottom nav 已驗證（20260615）。</p>
+    <% if (sys && sys.ga4) { %>
+    <div class="surface-grid">
+      <div class="surface-card">
+        <h3>主開關</h3>
+        <dl>
+          <dt>ga4.enabled</dt><dd><%= sys.ga4.enabled ? 'true' : 'false' %></dd>
+          <dt>measurementId</dt><dd class="mono"><% if (sys.ga4.hasMeasurementId) { %>G-…<%= sys.ga4.measurementIdTail4 %><% } else { %><span class="empty">(none)</span><% } %></dd>
+          <dt>events 註冊</dt><dd><%= sys.ga4.eventsCount %> 個</dd>
+        </dl>
+      </div>
+      <div class="surface-card">
+        <h3>events 清單</h3>
+        <% if (sys.ga4.events.length === 0) { %>
+          <p class="empty">無</p>
+        <% } else { %>
+          <p style="margin: 0.2rem 0 0; font-size: 0.85em;">
+            <% sys.ga4.events.forEach(function(ev) { %><code style="margin: 0 0.15rem 0.25rem 0; display: inline-block;"><%= ev %></code><% }); %>
+          </p>
+        <% } %>
+      </div>
+    </div>
+    <% } %>
+    <p style="margin: 0.5rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 未實作：</p>
+    <ul class="planned-list">
+      <li>per-post GA4 tracking readiness（indexable + measurementId present + nav 有 prev/next/home）</li>
+      <li>custom dimensions / parameter registry 顯示</li>
+      <li>GA4 後台連結 / Realtime / Exploration 預設組合（屬 GA4 後台，不在 ADMIN）</li>
+    </ul>
+  </section>
+
+  <%# === Settings（read-only） === -%>
+  <section class="admin-section" aria-labelledby="settings-h">
+    <h2 id="settings">Settings <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="section-lede">所有站台設定集中於 <code>content/settings/</code> 之 JSON 檔。ADMIN 不提供編輯 UI；增刪請手改 JSON，再 <code>npm run validate:content</code> 把關。</p>
+    <ul class="settings-files">
+      <li><code>site.config.json</code> — 站名 / 作者 / 站台 URL</li>
+      <li><code>themes.json</code> — 主題定義</li>
+      <li><code>categories.json</code> — 分類 registry</li>
+      <li><code>tags.json</code> — 標籤 registry</li>
+      <li><code>series.json</code> — series registry</li>
+      <li><code>ads.config.json</code> — AdSense 設定（real id）</li>
+      <li><code>ga4.config.json</code> — GA4 measurementId / events</li>
+      <li><code>seo.config.json</code> — SEO 預設</li>
+      <li><code>navigation.json</code> — 導覽結構</li>
+      <li><code>sidebar.config.json</code> — 側欄</li>
+      <li><code>footer.config.json</code> — Footer</li>
+      <li><code>social-links.json</code> — 社群連結</li>
+      <li><code>promotion.config.json</code> — FB / UTM</li>
+      <li><code>affiliate-networks.json</code> — 聯盟通路 registry</li>
+      <li><code>commerce-links.json</code> — commerce link entries（紅線）</li>
+      <li><code>link-rules.json</code> — 連結處理規則</li>
+      <li><code>link-sources.json</code> — sourceKey registry（optional）</li>
+      <li><code>download-assets.json</code> — 下載素材 registry（empty）</li>
+      <li><code>download-forms.json</code> — 下載表單 registry（empty）</li>
+    </ul>
+    <p class="surface-note" style="margin-top: 0.6rem;">⏳ 未實作：JSON 編輯 UI、schema 視覺化、欄位 picker；目前直接以文字編輯器修改 JSON 為主。</p>
+  </section>
+
+  <%# === System checks（read-only） === -%>
+  <section class="admin-section" aria-labelledby="system-checks-h">
+    <h2 id="system-checks">System checks / Validation <span class="section-tag tag-readonly">read-only</span></h2>
+    <p class="section-lede">內容 / 連結 / AdSense 等驗證皆走 CLI。ADMIN 不執行 check；以下列出可手動跑的 script。</p>
+    <table class="scripts-table">
+      <thead><tr><th>script</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><code>npm run validate:content</code></td><td>content frontmatter / commerce ref / download ref / settings shape（warning-only baseline）</td></tr>
+        <tr><td><code>npm run check:links</code></td><td>broken-link 檢查（內外連）</td></tr>
+        <tr><td><code>npm run check:images</code></td><td>image link 檢查</td></tr>
+        <tr><td><code>npm run check:adsense-resolver</code></td><td>AdSense resolver 純函式 smoke</td></tr>
+        <tr><td><code>npm run check:adsense-article-block</code></td><td>article block partial smoke</td></tr>
+        <tr><td><code>npm run check:adsense-anchor-wiring</code></td><td>anchor wiring smoke</td></tr>
+        <tr><td><code>npm run check:blogger-adsense-output</code></td><td>實際 Blogger HTML AdSense 輸出 guard</td></tr>
+        <tr><td><code>npm run smoke:reverse-utm</code></td><td>reverse UTM smoke（Blogger→GitHub）</td></tr>
+        <tr><td><code>npm run report:build</code></td><td>build 報告匯出</td></tr>
+        <tr><td><code>npm run report:drafts</code></td><td>draft 文章報告</td></tr>
+        <tr><td><code>npm run report:missing-tags</code></td><td>缺 tag 報告</td></tr>
+        <tr><td><code>npm run report:urls</code></td><td>published URL 報告</td></tr>
+      </tbody>
+    </table>
+    <p style="margin: 0.5rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 未實作：</p>
+    <ul class="planned-list">
+      <li>最近一次 validate / check 結果 mirror 至 ADMIN（須建立 report 持久化）</li>
+      <li>per-post warning 計數 / 點擊跳轉</li>
+      <li>script 一鍵觸發按鈕（保留 CLI 觸發；ADMIN 不執行子程序）</li>
+    </ul>
+  </section>
+
+  <%# === Not implemented: write-path（read-only summary） === -%>
+  <section class="admin-section" aria-labelledby="write-h" style="background: #fffbe6; border-color: #f0d264;">
+    <h2 id="write" style="color: #856404; border-bottom-color: #f0d264;">Write path <span class="section-tag tag-dormant">dormant</span></h2>
+    <p class="section-lede" style="color: #5a4900;">本 phase <strong>不</strong>啟用任何 browser 寫入。目前 ADMIN 全頁 read-only：無新增 / 編輯 / 刪除 / 發布 / 重貼 / deploy 按鈕。</p>
+    <ul class="planned-list" style="color: #5a4900;">
+      <li>browser 直接寫檔 — <strong>不開放</strong>（須另開 middleware safety preanalysis）</li>
+      <li>CLI gated write — 已存在但對 content dormant（<code>npm run admin:write</code>；status 限 draft + clean git + whitelist + atomic）</li>
+      <li>FB sidecar / SEO dry-run editor — client-side preview only，Apply button 永遠 disabled（既有實作）</li>
+      <li>commerce snippet helper — 純文字輸出可手動複製到 frontmatter（既有實作）</li>
+    </ul>
+  </section>
 
   <% if (posts.length > 0) { %>
   <script>

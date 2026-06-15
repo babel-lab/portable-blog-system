@@ -35,6 +35,96 @@ import { buildCommerceLinkPreviewOptions, ALLOWED_COMMERCE_ROLES } from './activ
 
 const SITES = ['github', 'blogger'];
 
+// Phase 20260615-night-1-admin-ia-shell-implementation-a
+//   - read-only systemSummary：把分散在 settings.* 之全站狀態彙整成可在 ADMIN dashboard 顯示的 read-only 摘要
+//   - 不暴露 AdSense real client / slot id 全值（呼叫端可以 last4 mask；本 helper 只回 4-char tail）
+//   - 不暴露任何 commerce token / credential / merchant secret
+//   - 純 derived；不寫檔；不打外部 API；不算 cross-post resolver；不 mutate settings
+function safeTail4(s) {
+  if (typeof s !== 'string' || s.length === 0) return '';
+  return s.slice(-4);
+}
+
+function buildSystemSummary(settings) {
+  const site = settings?.site || {};
+  const categories = Array.isArray(settings?.categories) ? settings.categories : [];
+  const tags = Array.isArray(settings?.tags) ? settings.tags : [];
+  const ads = settings?.ads || {};
+  const ga4 = settings?.ga4 || {};
+  const commerceLinks = Array.isArray(settings?.commerceLinks) ? settings.commerceLinks : [];
+  const affiliateNetworks = Array.isArray(settings?.affiliateNetworks) ? settings.affiliateNetworks : [];
+  const linkSources = Array.isArray(settings?.linkSources?.sources) ? settings.linkSources.sources : [];
+  const downloadAssets = Array.isArray(settings?.downloadAssets?.assets) ? settings.downloadAssets.assets : [];
+  const downloadForms = Array.isArray(settings?.downloadForms?.forms) ? settings.downloadForms.forms : [];
+
+  const adsSlots = ads?.slots || {};
+  const defaultBlocks = Array.isArray(ads?.defaults?.blocks) ? ads.defaults.blocks : [];
+  const nonEmptySlotCount = Object.values(adsSlots).filter((v) => typeof v === 'string' && v !== '').length;
+
+  // category / tag site usage counts（純 derive，不對 site 寫死順序；只列 github / blogger 兩 surface）
+  function countBySite(arr) {
+    let g = 0, b = 0;
+    for (const it of arr) {
+      const s = Array.isArray(it?.site) ? it.site : [];
+      if (s.includes('github')) g++;
+      if (s.includes('blogger')) b++;
+    }
+    return { github: g, blogger: b };
+  }
+
+  return {
+    site: {
+      siteName: typeof site.siteName === 'string' ? site.siteName : '',
+      author: typeof site.author === 'string' ? site.author : '',
+      language: typeof site.language === 'string' ? site.language : '',
+      description: typeof site.description === 'string' ? site.description : '',
+      githubSiteUrl: typeof site.githubSiteUrl === 'string' ? site.githubSiteUrl : '',
+      bloggerSiteUrl: typeof site.bloggerSiteUrl === 'string' ? site.bloggerSiteUrl : '',
+    },
+    categories: {
+      total: categories.length,
+      bySite: countBySite(categories),
+      list: categories.map((c) => ({
+        id: typeof c.id === 'string' ? c.id : '',
+        name: typeof c.name === 'string' ? c.name : '',
+        slug: typeof c.slug === 'string' ? c.slug : '',
+        site: Array.isArray(c.site) ? c.site : [],
+      })),
+    },
+    tags: {
+      total: tags.length,
+      bySite: countBySite(tags),
+    },
+    ads: {
+      enabled: ads.enabled === true,
+      hasClient: typeof ads.adsenseClient === 'string' && ads.adsenseClient !== '',
+      clientTail4: safeTail4(typeof ads.adsenseClient === 'string' ? ads.adsenseClient : ''),
+      nonEmptySlotCount,
+      defaultBlocksCount: defaultBlocks.length,
+      defaultBlocksEnabledCount: defaultBlocks.filter((b) => b && b.enabled === true).length,
+      loaderPages: typeof ads?.loader?.pages === 'string' ? ads.loader.pages : '',
+      loaderBlogger: typeof ads?.loader?.blogger === 'string' ? ads.loader.blogger : '',
+    },
+    ga4: {
+      enabled: ga4.enabled === true,
+      hasMeasurementId: typeof ga4.measurementId === 'string' && ga4.measurementId !== '',
+      measurementIdTail4: safeTail4(typeof ga4.measurementId === 'string' ? ga4.measurementId : ''),
+      eventsCount: Array.isArray(ga4.events) ? ga4.events.length : 0,
+      events: Array.isArray(ga4.events) ? ga4.events.slice(0) : [],
+    },
+    commerce: {
+      registrySize: commerceLinks.length,
+      activeCount: commerceLinks.filter((c) => c && c.active !== false).length,
+      affiliateNetworksCount: affiliateNetworks.length,
+    },
+    downloads: {
+      assetsCount: downloadAssets.length,
+      formsCount: downloadForms.length,
+    },
+    linkSourcesCount: linkSources.length,
+  };
+}
+
 async function readJsonSafe(jsonPath) {
   try {
     const txt = await fs.readFile(jsonPath, 'utf-8');
@@ -390,5 +480,10 @@ export async function loadAdminPosts({ settings }) {
   // Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
   //   - additive read-only context；既有 { posts } consumer 不受影響
   //   - allowedCommerceRoles = C8 enum mirror（authoring guidance；role 仍 recommended-but-optional；C7 deferred）
-  return { posts, commerceLinksPreview, allowedCommerceRoles: ALLOWED_COMMERCE_ROLES };
+  // Phase 20260615-night-1-admin-ia-shell-implementation-a
+  //   - additive read-only systemSummary（site / categories / tags / ads / ga4 / commerce / downloads）
+  //   - AdSense client / GA4 measurementId 只回 tail4；render 端遮罩，不暴露全值
+  //   - 不啟用 Admin Apply / middleware / write route；不寫檔
+  const systemSummary = buildSystemSummary(settings);
+  return { posts, commerceLinksPreview, allowedCommerceRoles: ALLOWED_COMMERCE_ROLES, systemSummary };
 }

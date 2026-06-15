@@ -818,6 +818,10 @@ async function main() {
         //   - 不啟用 Admin Apply / middleware / write route；render 端純顯示
         commerceLinksPreview: adminData.commerceLinksPreview || { rows: [], count: 0 },
         allowedCommerceRoles: adminData.allowedCommerceRoles || [],
+        // Phase 20260615-night-1-admin-ia-shell-implementation-a
+        //   - additive read-only systemSummary（site / categories / tags / ads / ga4 / commerce / downloads）
+        //   - render 端用 tail4 遮罩 AdSense client / GA4 measurementId；source 不出現全值
+        systemSummary: adminData.systemSummary || null,
       },
       { async: true },
     );
