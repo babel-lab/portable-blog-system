@@ -826,11 +826,15 @@ async function main() {
         //   - additive read-only categoryUsage（per-category 文章使用統計 + uncategorized / unknown / unused buckets）
         //   - render 端純摘要顯示；無 Add / Edit / Delete / Apply 互動
         categoryUsage: adminData.categoryUsage || null,
+        // Phase 20260615-night-7-admin-tags-readonly-usage-counts-a
+        //   - additive read-only tagUsage（per-tag 文章使用統計 + untagged / unknown / unused buckets）
+        //   - render 端純摘要顯示；無 Add / Edit / Delete / Apply 互動
+        tagUsage: adminData.tagUsage || null,
       },
       { async: true },
     );
     await writeText(path.join(PAGES_DIR, 'admin', 'index.html'), adminHtml, outputs);
-    console.log(`[build-github] admin (dev-mode) rendered: ${adminData.posts.length} posts; categoryUsage: ${adminData.categoryUsage ? adminData.categoryUsage.perCategory.length : 0} defined / ${adminData.categoryUsage ? adminData.categoryUsage.unknownCategories.length : 0} unknown / ${adminData.categoryUsage ? adminData.categoryUsage.uncategorized.count : 0} uncategorized post(s)`);
+    console.log(`[build-github] admin (dev-mode) rendered: ${adminData.posts.length} posts; categoryUsage: ${adminData.categoryUsage ? adminData.categoryUsage.perCategory.length : 0} defined / ${adminData.categoryUsage ? adminData.categoryUsage.unknownCategories.length : 0} unknown / ${adminData.categoryUsage ? adminData.categoryUsage.uncategorized.count : 0} uncategorized post(s); tagUsage: ${adminData.tagUsage ? adminData.tagUsage.perTag.length : 0} defined / ${adminData.tagUsage ? adminData.tagUsage.unknownTags.length : 0} unknown / ${adminData.tagUsage ? adminData.tagUsage.untagged.count : 0} untagged post(s)`);
   }
 
   const manifest = {

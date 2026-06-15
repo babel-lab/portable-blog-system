@@ -290,6 +290,144 @@ function buildCategoryUsage(posts, categoriesArr) {
   };
 }
 
+// Phase 20260615-night-7-admin-tags-readonly-usage-counts-a
+//   - read-only tag usage aggregator：把每個 tags.json 已定義之 tag 對映到目前使用該 tag 之文章清單摘要
+//   - mirror buildCategoryUsage 之結構，差異：
+//       * tag 為 array（一篇文章可有多個 tag），同篇文章對同 tag 不重複計（per-post 內 dedupe）
+//       * untagged = 文章 frontmatter.tags 為空陣列或缺欄位
+//       * unknown tag = 文章使用了未在 tags.json 之 tag key
+//       * 一篇文章若同時用了 known + unknown tag，會同時出現在 known tag 之 sample 與 unknown bucket 之 sample
+//   - 純 derive；不寫檔；不改 frontmatter / settings；不打 API
+//   - 與 validate-content 之 unknown-tag / tag-site-mismatch warning 為兩個獨立 surface（admin 只摘要使用狀態，
+//     不取代 validator；validator 仍為 ground truth）
+//   - 共用 CATEGORY_SAMPLE_LIMIT / UNKNOWN_CATEGORY_SAMPLE_LIMIT / UNCATEGORIZED_SAMPLE_LIMIT 常數
+//     （tag 與 category 一致，避免 admin 頁面變得過長）
+function buildTagUsage(posts, tagsArr) {
+  const tags = Array.isArray(tagsArr) ? tagsArr : [];
+  const entryMap = new Map();
+  const keyToEntry = new Map();
+  for (const t of tags) {
+    if (!t || typeof t !== 'object') continue;
+    const id = typeof t.id === 'string' ? t.id : '';
+    const slug = typeof t.slug === 'string' ? t.slug : '';
+    const name = typeof t.name === 'string' ? t.name : '';
+    const site = Array.isArray(t.site) ? t.site.slice(0) : [];
+    if (!id && !slug) continue;
+    const entry = {
+      id, name, slug, site,
+      postCount: 0,
+      statusBreakdown: buildEmptyStatusBreakdown(),
+      siteBreakdown: { github: 0, blogger: 0 },
+      crossSiteMismatchCount: 0,
+      samplePosts: [],
+      truncated: false,
+    };
+    entryMap.set(id || slug, entry);
+    if (id) keyToEntry.set('id:' + id, entry);
+    if (slug) keyToEntry.set('slug:' + slug, entry);
+  }
+
+  const unknownMap = new Map();
+  let untaggedCount = 0;
+  const untaggedSamples = [];
+  let untaggedTruncated = false;
+  let postWithUnknownTagCount = 0;
+
+  const arr = Array.isArray(posts) ? posts : [];
+  for (const p of arr) {
+    const rawTags = Array.isArray(p?.tags) ? p.tags : [];
+    if (rawTags.length === 0) {
+      untaggedCount++;
+      if (untaggedSamples.length < UNCATEGORIZED_SAMPLE_LIMIT) {
+        untaggedSamples.push(toSamplePostEntry(p));
+      } else {
+        untaggedTruncated = true;
+      }
+      continue;
+    }
+
+    // per-post dedupe：同篇若意外重複列同 tag，只計一次
+    const seen = new Set();
+    let hasUnknown = false;
+    for (const tRaw of rawTags) {
+      if (typeof tRaw !== 'string') continue;
+      const tag = tRaw.trim();
+      if (!tag || seen.has(tag)) continue;
+      seen.add(tag);
+      const entry = keyToEntry.get('id:' + tag) || keyToEntry.get('slug:' + tag);
+      if (entry) {
+        entry.postCount += 1;
+        const bucket = normalizeStatusBucket(p.status);
+        entry.statusBreakdown[bucket] += 1;
+        const ss = typeof p.sourceSite === 'string' ? p.sourceSite : '';
+        if (ss === 'github') entry.siteBreakdown.github += 1;
+        else if (ss === 'blogger') entry.siteBreakdown.blogger += 1;
+        const isMismatch = Array.isArray(entry.site) && entry.site.length > 0 && ss && !entry.site.includes(ss);
+        if (isMismatch) entry.crossSiteMismatchCount += 1;
+        if (entry.samplePosts.length < CATEGORY_SAMPLE_LIMIT) {
+          entry.samplePosts.push(toSamplePostEntry(p, { isMismatch }));
+        } else {
+          entry.truncated = true;
+        }
+      } else {
+        hasUnknown = true;
+        let bucket = unknownMap.get(tag);
+        if (!bucket) {
+          bucket = {
+            key: tag,
+            postCount: 0,
+            statusBreakdown: buildEmptyStatusBreakdown(),
+            samplePosts: [],
+            truncated: false,
+          };
+          unknownMap.set(tag, bucket);
+        }
+        bucket.postCount += 1;
+        bucket.statusBreakdown[normalizeStatusBucket(p.status)] += 1;
+        if (bucket.samplePosts.length < UNKNOWN_CATEGORY_SAMPLE_LIMIT) {
+          bucket.samplePosts.push(toSamplePostEntry(p));
+        } else {
+          bucket.truncated = true;
+        }
+      }
+    }
+    if (hasUnknown) postWithUnknownTagCount++;
+  }
+
+  const perTag = Array.from(entryMap.values());
+  perTag.sort((a, b) => {
+    if (b.postCount !== a.postCount) return b.postCount - a.postCount;
+    return (a.id || a.slug).localeCompare(b.id || b.slug);
+  });
+  const unusedTags = perTag.filter((e) => e.postCount === 0);
+
+  const unknownTagsList = Array.from(unknownMap.values()).sort((a, b) => {
+    if (b.postCount !== a.postCount) return b.postCount - a.postCount;
+    return a.key.localeCompare(b.key);
+  });
+
+  const taggedPostCount = arr.length - untaggedCount;
+  return {
+    perTag,
+    unusedTags,
+    unknownTags: unknownTagsList,
+    untagged: {
+      count: untaggedCount,
+      samplePosts: untaggedSamples,
+      truncated: untaggedTruncated,
+    },
+    totals: {
+      totalPosts: arr.length,
+      taggedPosts: taggedPostCount,
+      untaggedPosts: untaggedCount,
+      postWithUnknownTagCount,
+      definedTagCount: perTag.length,
+      unusedTagCount: unusedTags.length,
+      unknownTagKeyCount: unknownTagsList.length,
+    },
+  };
+}
+
 async function readJsonSafe(jsonPath) {
   try {
     const txt = await fs.readFile(jsonPath, 'utf-8');
@@ -797,5 +935,10 @@ export async function loadAdminPosts({ settings }) {
   //   - 依 loadAdminPosts return 之 posts（admin view shape；含 draft / 各 status）derive
   //   - 不寫檔；不改 frontmatter / settings；不打 API；不取代 validator
   const categoryUsage = buildCategoryUsage(posts, settings?.categories);
-  return { posts, commerceLinksPreview, allowedCommerceRoles: ALLOWED_COMMERCE_ROLES, systemSummary, categoryUsage };
+  // Phase 20260615-night-7-admin-tags-readonly-usage-counts-a
+  //   - additive read-only tagUsage（per-tag 文章使用統計 + untagged / unknown / unused buckets）
+  //   - 依 loadAdminPosts return 之 posts（admin view shape；含 draft / 各 status）derive
+  //   - 不寫檔；不改 frontmatter / settings；不打 API；不取代 validator
+  const tagUsage = buildTagUsage(posts, settings?.tags);
+  return { posts, commerceLinksPreview, allowedCommerceRoles: ALLOWED_COMMERCE_ROLES, systemSummary, categoryUsage, tagUsage };
 }

@@ -173,6 +173,7 @@
       <li><a href="#dashboard">Dashboard</a></li>
       <li><a href="#posts">Posts</a></li>
       <li><a href="#categories">Categories</a></li>
+      <li><a href="#tags">Tags</a></li>
       <li><a href="#blogger-export">Blogger Export</a></li>
       <li><a href="#github-pages">GitHub Pages</a></li>
       <li><a href="#adsense">AdSense</a></li>
@@ -1363,15 +1364,17 @@
       - 全部 read-only；沒有任何 Apply / Save / Submit / Edit / Delete / Publish 互動
       - 未實作項目以 "planned" 文字 + 灰色清單呈現；不放假按鈕引導誤點 -%>
 
-  <%# === Categories（read-only） === -%>
-  <%# Phase 20260615-night-5-admin-categories-readonly-usage-counts-a
-        - 從 sys.categories（registry shape）+ categoryUsage（per-post usage derive）兩個來源組合
+  <%# === Categories & Tags（read-only） === -%>
+  <%# Phase 20260615-night-5 / night-7-admin-tags-readonly-usage-counts-a
+        - 從 sys.categories / sys.tags（registry shape）+ categoryUsage / tagUsage（per-post usage derive）四個來源組合
         - 全部 read-only；無 Add / Edit / Delete / Apply 互動
-        - 顯示：per-category postCount / status breakdown / source-site breakdown / cross-site mismatch / sample posts；
-                uncategorized / unknown / unused 三個 sub-bucket；
-                明確標示資料來源 = posts (admin loader) + categories.json
-        - 不取代 validate-content 之 unknown-category / category-site-mismatch warnings；admin 只摘要使用狀態，validator 仍為 ground truth
-        - tag 用量計數仍未實作（須獨立 phase）；此區只擴 categories，標示 tags 未實作避免誤導 -%>
+        - Categories 顯示：per-category postCount / status breakdown / source-site breakdown / cross-site mismatch / sample posts；
+                           uncategorized / unknown / unused 三個 sub-bucket
+        - Tags 顯示：per-tag postCount / status breakdown / source-site breakdown / cross-site mismatch / sample posts；
+                     untagged / unknown / unused 三個 sub-bucket（per-tag 與 per-category 共用 CSS class，不引入新 token）
+        - 明確標示資料來源 = posts (admin loader) + categories.json + tags.json
+        - 不取代 validate-content 之 unknown-category / category-site-mismatch / unknown-tag / tag-site-mismatch warnings；
+          admin 只摘要使用狀態，validator 仍為 ground truth -%>
   <%
     var catUsage = (typeof categoryUsage === 'object' && categoryUsage) ? categoryUsage : null;
     var catPer = (catUsage && Array.isArray(catUsage.perCategory)) ? catUsage.perCategory : [];
@@ -1380,13 +1383,21 @@
     var catUncat = (catUsage && catUsage.uncategorized) ? catUsage.uncategorized : { count: 0, samplePosts: [], truncated: false };
     var catTotals = (catUsage && catUsage.totals) ? catUsage.totals : null;
     var catMismatchCategoryCount = catPer.filter(function(e) { return e.crossSiteMismatchCount > 0; }).length;
+    // Phase 20260615-night-7-admin-tags-readonly-usage-counts-a
+    var tagUsageLocal = (typeof tagUsage === 'object' && tagUsage) ? tagUsage : null;
+    var tagPer = (tagUsageLocal && Array.isArray(tagUsageLocal.perTag)) ? tagUsageLocal.perTag : [];
+    var tagUnused = (tagUsageLocal && Array.isArray(tagUsageLocal.unusedTags)) ? tagUsageLocal.unusedTags : [];
+    var tagUnknown = (tagUsageLocal && Array.isArray(tagUsageLocal.unknownTags)) ? tagUsageLocal.unknownTags : [];
+    var tagUntag = (tagUsageLocal && tagUsageLocal.untagged) ? tagUsageLocal.untagged : { count: 0, samplePosts: [], truncated: false };
+    var tagTotals = (tagUsageLocal && tagUsageLocal.totals) ? tagUsageLocal.totals : null;
+    var tagMismatchTagCount = tagPer.filter(function(e) { return e.crossSiteMismatchCount > 0; }).length;
   %>
   <section class="admin-section" aria-labelledby="categories-h">
     <h2 id="categories">Categories &amp; Tags <span class="section-tag tag-readonly">read-only</span></h2>
     <p class="section-lede">
-      資料來源 = <code>content/settings/categories.json</code>（registry）+ admin loader 掃 <code>content/{github,blogger}/posts/*.md</code> 之 <code>frontmatter.category</code> 反向統計。
-      下表為「目前各分類被多少文章使用」之 read-only 摘要；不取代 <code>npm run validate:content</code> 之 <code>unknown-category</code> / <code>category-site-mismatch</code> 警示（validator 仍為 ground truth）。
-      本區無 Add / Edit / Delete / Save / Apply 按鈕；增刪分類請手改 <code>categories.json</code> + <code>npm run validate:content</code>。
+      資料來源 = <code>content/settings/categories.json</code> / <code>content/settings/tags.json</code>（registry）+ admin loader 掃 <code>content/{github,blogger}/posts/*.md</code> 之 <code>frontmatter.category</code> / <code>frontmatter.tags</code> 反向統計。
+      下表為「目前各分類 / 標籤被多少文章使用」之 read-only 摘要；不取代 <code>npm run validate:content</code> 之 <code>unknown-category</code> / <code>category-site-mismatch</code> / <code>unknown-tag</code> / <code>tag-site-mismatch</code> 警示（validator 仍為 ground truth）。
+      本區無 Add / Edit / Delete / Save / Apply 按鈕；增刪分類 / 標籤請手改 <code>categories.json</code> / <code>tags.json</code> + <code>npm run validate:content</code>。
     </p>
 
     <div class="surface-grid">
@@ -1405,7 +1416,7 @@
           <dt>github surface</dt><dd><%= sys && sys.tags ? sys.tags.bySite.github : 0 %></dd>
           <dt>blogger surface</dt><dd><%= sys && sys.tags ? sys.tags.bySite.blogger : 0 %></dd>
         </dl>
-        <p class="surface-note">⏳ 用量計數 / 未使用偵測 / cross-site mismatch — 仍未實作（須另開 phase）。</p>
+        <p class="surface-note">用量計數 / 未使用偵測 / cross-site mismatch 見下方 Per-tag usage（本區無編輯 UI）。</p>
       </div>
     </div>
 
@@ -1608,11 +1619,214 @@
       </div>
     </div>
 
+    <%# === Tags usage（read-only；Phase 20260615-night-7-admin-tags-readonly-usage-counts-a） === -%>
+    <%# 共用 .cat-usage-table / .cat-status-bar / .cat-sample-list / .cat-bucket-card / .cat-totals-row CSS（不引入新 class）-%>
+    <hr style="margin: 1.25rem 0 0.5rem; border: 0; border-top: 1px dashed #e1e4e8;">
+    <h3 id="tags" style="margin: 0.5rem 0 0.25rem; font-size: 0.95em; color: #1f2d3d;">Tags — Per-tag usage</h3>
+    <p style="font-size: 0.82em; color: #555; margin: 0 0 0.5rem;">
+      derived from posts (admin loader) + <code>tags.json</code>；同篇文章可使用多個 tag，下表 <code>posts</code> 欄為「該 tag 被多少篇文章使用」（per-post dedupe）。
+    </p>
+
+    <% if (tagTotals) { %>
+    <div class="cat-totals-row" aria-label="tags totals">
+      <span class="totals-pill"><strong><%= tagTotals.totalPosts %></strong> 篇文章（含 draft）</span>
+      <span class="totals-pill"><strong><%= tagTotals.taggedPosts %></strong> 有 tag</span>
+      <% if (tagTotals.untaggedPosts > 0) { %>
+        <span class="totals-pill warn"><strong><%= tagTotals.untaggedPosts %></strong> untagged</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> untagged</span>
+      <% } %>
+      <% if (tagTotals.postWithUnknownTagCount > 0) { %>
+        <span class="totals-pill warn"><strong><%= tagTotals.postWithUnknownTagCount %></strong> 篇有 unknown tag</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> 篇有 unknown tag</span>
+      <% } %>
+      <% if (tagTotals.unknownTagKeyCount > 0) { %>
+        <span class="totals-pill warn"><strong><%= tagTotals.unknownTagKeyCount %></strong> unknown tag key</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> unknown tag key</span>
+      <% } %>
+      <% if (tagTotals.unusedTagCount > 0) { %>
+        <span class="totals-pill warn"><strong><%= tagTotals.unusedTagCount %></strong> unused defined</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> unused defined</span>
+      <% } %>
+      <% if (tagMismatchTagCount > 0) { %>
+        <span class="totals-pill warn"><strong><%= tagMismatchTagCount %></strong> cross-site mismatch</span>
+      <% } else { %>
+        <span class="totals-pill"><strong>0</strong> cross-site mismatch</span>
+      <% } %>
+    </div>
+    <% } %>
+
+    <% if (tagPer.length === 0) { %>
+      <p class="empty">tags.json 未定義任何 tag。</p>
+    <% } else { %>
+    <table class="cat-usage-table" aria-label="per tag usage table">
+      <thead>
+        <tr>
+          <th style="width: 9rem;">id / slug</th>
+          <th style="width: 10rem;">name</th>
+          <th style="width: 9rem;">allowed sites</th>
+          <th style="width: 5.5rem; text-align: right;">posts</th>
+          <th>status breakdown</th>
+          <th style="width: 9rem;">by source site</th>
+          <th>sample posts</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% tagPer.forEach(function(t) { %>
+          <% var total = t.postCount; var sb = t.statusBreakdown; %>
+          <tr class="<%= total === 0 ? 'is-zero' : '' %>">
+            <td>
+              <div><code class="cat-id"><%= t.id %></code></div>
+              <% if (t.slug && t.slug !== t.id) { %><div class="text-muted" style="font-size: 0.82em;">slug: <code class="cat-id"><%= t.slug %></code></div><% } %>
+            </td>
+            <td><span class="cat-name"><%= t.name || '(no name)' %></span></td>
+            <td class="cat-site">
+              <% if (Array.isArray(t.site) && t.site.length > 0) { %>
+                <% t.site.forEach(function(s) { %><span class="badge b-info"><%= s %></span><% }); %>
+              <% } else { %>
+                <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td style="text-align: right; font-weight: 700; color: <%= total === 0 ? '#999' : '#2c5282' %>;">
+              <%= total %>
+            </td>
+            <td>
+              <% if (total === 0) { %>
+                <span class="text-muted">—</span>
+              <% } else { %>
+                <span class="cat-status-bar" aria-label="status breakdown: ready <%= sb.ready %> · draft <%= sb.draft %> · published <%= sb.published %> · archived <%= sb.archived %> · other <%= sb.other %>">
+                  <% if (sb.ready > 0)     { %><span class="ss-ready"     title="ready <%= sb.ready %>"         style="flex: <%= sb.ready %> 0 0"></span><% } %>
+                  <% if (sb.draft > 0)     { %><span class="ss-draft"     title="draft <%= sb.draft %>"         style="flex: <%= sb.draft %> 0 0"></span><% } %>
+                  <% if (sb.published > 0) { %><span class="ss-published" title="published <%= sb.published %>" style="flex: <%= sb.published %> 0 0"></span><% } %>
+                  <% if (sb.archived > 0)  { %><span class="ss-archived"  title="archived <%= sb.archived %>"   style="flex: <%= sb.archived %> 0 0"></span><% } %>
+                  <% if (sb.other > 0)     { %><span class="ss-other"     title="other <%= sb.other %>"         style="flex: <%= sb.other %> 0 0"></span><% } %>
+                </span>
+                <div class="cat-status-counts">
+                  ready <%= sb.ready %> · draft <%= sb.draft %> · published <%= sb.published %><% if (sb.archived > 0) { %> · archived <%= sb.archived %><% } %><% if (sb.other > 0) { %> · other <%= sb.other %><% } %>
+                </div>
+              <% } %>
+            </td>
+            <td>
+              <% if (total === 0) { %>
+                <span class="text-muted">—</span>
+              <% } else { %>
+                <div>github <%= t.siteBreakdown.github %> · blogger <%= t.siteBreakdown.blogger %></div>
+                <% if (t.crossSiteMismatchCount > 0) { %>
+                  <div class="cat-mismatch-callout" title="此 tag 之 allowed sites=<%= Array.isArray(t.site) ? t.site.join(',') : '' %>；下列文章之 sourceSite 不在其中。詳細請看 npm run validate:content 之 tag-site-mismatch warning。">
+                    ⚠ <%= t.crossSiteMismatchCount %> 篇 cross-site mismatch
+                  </div>
+                <% } %>
+              <% } %>
+            </td>
+            <td>
+              <% if (total === 0) { %>
+                <span class="text-muted empty">(unused — registry 已定義但無文章使用)</span>
+              <% } else if (Array.isArray(t.samplePosts) && t.samplePosts.length > 0) { %>
+                <ul class="cat-sample-list">
+                  <% t.samplePosts.forEach(function(p) { %>
+                    <li>
+                      <% if (p.isMismatch) { %><span class="sample-mismatch">⚠ </span><% } %>
+                      <% if (p.draft || p.status === 'draft') { %><span class="badge b-draft" style="font-size: 0.7em;">draft</span><% } %>
+                      <% if (p.status === 'ready') { %><span class="badge b-ready" style="font-size: 0.7em;">ready</span><% } %>
+                      <% if (p.status === 'published') { %><span class="badge b-published" style="font-size: 0.7em;">published</span><% } %>
+                      <span class="sample-slug"><%= p.slug || '(no-slug)' %></span>
+                      <% if (p.title) { %><span class="text-muted"> — <%= p.title %></span><% } %>
+                      <span class="text-muted" style="font-size: 0.9em;"> · src:<%= p.sourceSite %></span>
+                    </li>
+                  <% }); %>
+                </ul>
+                <% if (t.truncated) { %>
+                  <p class="text-muted" style="font-size: 0.78em; margin: 0.15rem 0 0;">… 還有 <%= total - t.samplePosts.length %> 篇未列（依 admin sort 序）</p>
+                <% } %>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% } %>
+
+    <%# === Tags sub-buckets：untagged / unknown / unused === -%>
+    <div class="cat-bucket-grid">
+      <div class="cat-bucket-card <%= tagUntag.count > 0 ? 'is-warn' : '' %>">
+        <h3>Untagged posts</h3>
+        <div class="bucket-count"><%= tagUntag.count %></div>
+        <% if (tagUntag.count === 0) { %>
+          <p class="bucket-note">所有文章 frontmatter 之 <code>tags</code> 均有至少 1 個 tag。</p>
+        <% } else { %>
+          <ul class="cat-sample-list">
+            <% tagUntag.samplePosts.forEach(function(p) { %>
+              <li>
+                <% if (p.draft || p.status === 'draft') { %><span class="badge b-draft" style="font-size: 0.7em;">draft</span><% } %>
+                <% if (p.status === 'ready') { %><span class="badge b-ready" style="font-size: 0.7em;">ready</span><% } %>
+                <% if (p.status === 'published') { %><span class="badge b-published" style="font-size: 0.7em;">published</span><% } %>
+                <span class="sample-slug"><%= p.slug || '(no-slug)' %></span>
+                <% if (p.title) { %><span class="text-muted"> — <%= p.title %></span><% } %>
+                <span class="text-muted" style="font-size: 0.9em;"> · src:<%= p.sourceSite %></span>
+              </li>
+            <% }); %>
+          </ul>
+          <% if (tagUntag.truncated) { %>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.15rem 0 0;">… 還有 <%= tagUntag.count - tagUntag.samplePosts.length %> 篇未列。</p>
+          <% } %>
+          <p class="bucket-note">這些文章 frontmatter 之 <code>tags</code> 為空或缺欄位。Admin 不自動補；請手動編輯 .md frontmatter。</p>
+        <% } %>
+      </div>
+
+      <div class="cat-bucket-card <%= tagUnknown.length > 0 ? 'is-warn' : '' %>">
+        <h3>Unknown tag usage</h3>
+        <div class="bucket-count"><%= tagUnknown.length %> key / <%= tagTotals ? tagTotals.postWithUnknownTagCount : 0 %> 篇受影響</div>
+        <% if (tagUnknown.length === 0) { %>
+          <p class="bucket-note">所有文章使用之 tag 皆在 <code>tags.json</code> 內定義。</p>
+        <% } else { %>
+          <% tagUnknown.forEach(function(u) { %>
+            <div style="margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px dashed #f0d264;">
+              <div><code class="cat-id"><%= u.key %></code> <span class="badge b-missing" style="font-size: 0.7em;">unknown</span> <span class="text-muted">· <%= u.postCount %> 篇使用</span></div>
+              <ul class="cat-sample-list">
+                <% u.samplePosts.forEach(function(p) { %>
+                  <li>
+                    <% if (p.draft || p.status === 'draft') { %><span class="badge b-draft" style="font-size: 0.7em;">draft</span><% } %>
+                    <% if (p.status === 'ready') { %><span class="badge b-ready" style="font-size: 0.7em;">ready</span><% } %>
+                    <% if (p.status === 'published') { %><span class="badge b-published" style="font-size: 0.7em;">published</span><% } %>
+                    <span class="sample-slug"><%= p.slug || '(no-slug)' %></span>
+                    <% if (p.title) { %><span class="text-muted"> — <%= p.title %></span><% } %>
+                    <span class="text-muted" style="font-size: 0.9em;"> · src:<%= p.sourceSite %></span>
+                  </li>
+                <% }); %>
+              </ul>
+              <% if (u.truncated) { %>
+                <p class="text-muted" style="font-size: 0.78em; margin: 0.15rem 0 0;">… 還有 <%= u.postCount - u.samplePosts.length %> 篇未列。</p>
+              <% } %>
+            </div>
+          <% }); %>
+          <p class="bucket-note">這些 tag 未在 <code>tags.json</code> 定義 — 對應 validator 之 <code>unknown-tag</code> warning。Admin 不自動修；請新增 tags.json 條目或修正 frontmatter。</p>
+        <% } %>
+      </div>
+
+      <div class="cat-bucket-card <%= tagUnused.length > 0 ? 'is-warn' : '' %>">
+        <h3>Unused defined tags</h3>
+        <div class="bucket-count"><%= tagUnused.length %></div>
+        <% if (tagUnused.length === 0) { %>
+          <p class="bucket-note">所有已定義之 tag 皆有至少 1 篇文章使用。</p>
+        <% } else { %>
+          <ul class="cat-sample-list" style="font-size: 0.85em;">
+            <% tagUnused.forEach(function(t) { %>
+              <li><code class="cat-id"><%= t.id %></code> — <%= t.name || '(no name)' %> · <span class="text-muted">site: <% if (Array.isArray(t.site) && t.site.length > 0) { %><%= t.site.join(', ') %><% } else { %>—<% } %></span></li>
+            <% }); %>
+          </ul>
+          <p class="bucket-note">這些 tag 在 <code>tags.json</code> 已登錄但目前 0 篇文章使用；可考慮新增文章、保留作未來用途、或從 registry 移除。Admin 不自動修。</p>
+        <% } %>
+      </div>
+    </div>
+
     <p style="margin: 0.6rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 仍未實作：</p>
     <ul class="planned-list">
-      <li>tag 用量計數 / 未使用 tag 偵測 / cross-site mismatch（本 phase 只擴 categories；tags 待獨立 phase）</li>
       <li>category / tag 編輯 UI（不開放；增刪請手改 <code>categories.json</code> / <code>tags.json</code> + <code>npm run validate:content</code>）</li>
-      <li>per-post category fix 一鍵修正（不開放；admin 不寫入文章 frontmatter）</li>
+      <li>per-post category / tag 一鍵修正（不開放；admin 不寫入文章 frontmatter）</li>
+      <li>unused defined / unknown 一鍵移除或對映建議（不開放；維持人工決策）</li>
       <li>validator warning 計數 mirror（per-post 計數仍 deferred；以 <code>npm run validate:content</code> 為 ground truth）</li>
     </ul>
   </section>
