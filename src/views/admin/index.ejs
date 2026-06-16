@@ -994,17 +994,65 @@
               real client / slot id 只存於 <code>content/settings/ads.config.json</code>；本頁不顯示。
             </p>
 
-            <%# --- Validation readiness (deferred) --- %>
-            <h4 style="font-size: 0.9em; margin: 0.6rem 0 0.2rem; color: #2c3e50;">Validation warnings <span class="text-muted" style="font-size: 0.78em;">(deferred)</span></h4>
-            <dl class="detail-grid">
-              <dt>per-post warning count</dt>
-              <dd>
-                <span class="badge b-info">deferred</span>
-                <span class="text-muted" style="font-size: 0.82em;">使用 <code><%= (p.validationReadiness && p.validationReadiness.aggregateCommand) || 'npm run validate:content' %></code> 取得整體結果</span>
-              </dd>
-            </dl>
+            <%# --- Validation warnings (read-only consume of .cache/data/validation-report.json) ---
+                Phase 20260616-admin-validation-report-detail-panel-readonly-consume-implementation-a：
+                - 只讀 admin loader 注入之 p.validationReport（join validate:content reporter output；pm-14 §D）
+                - report 缺檔 → 尚未產生；status-excluded（draft/archived，不在 validator universe）→ 未驗證（非 0）
+                - matched → errorCount/warningCount/byClass/issue 簡列；ready/published 無 issue → 0 warnings(clean)
+                - read-only：無 form/button/input/select/textarea/onclick/fetch；不修法、不 per-post prescription
+                - 不取代 validator（ground truth 仍 npm run validate:content）；report 為 git-ignored cache（asOf 時點） -%>
+            <% var vr = p.validationReport || { reportAvailable: false, state: 'no-report', asOf: null }; %>
+            <h4 style="font-size: 0.9em; margin: 0.6rem 0 0.2rem; color: #2c3e50;">Validation warnings <span class="text-muted" style="font-size: 0.78em;">(read-only · validate:content report)</span></h4>
+            <% if (!vr.reportAvailable || vr.state === 'no-report') { %>
+              <dl class="detail-grid">
+                <dt>report</dt>
+                <dd>
+                  <span class="badge b-info">尚未產生</span>
+                  <span class="text-muted" style="font-size: 0.82em;">執行 <code>npm run report:validation</code> 後重新整理本頁</span>
+                </dd>
+              </dl>
+            <% } else if (vr.state === 'status-excluded') { %>
+              <dl class="detail-grid">
+                <dt>狀態</dt>
+                <dd>
+                  <span class="badge b-info">未驗證</span>
+                  <span class="text-muted" style="font-size: 0.82em;">status=<%= vr.status || '' %>（draft/archived 不在 validator universe〔ready/published〕；非 0 warnings）</span>
+                </dd>
+              </dl>
+            <% } else if (vr.state === 'clean') { %>
+              <dl class="detail-grid">
+                <dt>warnings</dt>
+                <dd>
+                  <span class="badge b-ok">0 warnings ✓</span>
+                  <span class="text-muted" style="font-size: 0.82em;">此文章未列於 report（ready/published 且無 issue）</span>
+                </dd>
+              </dl>
+            <% } else if (vr.state === 'matched') { %>
+              <dl class="detail-grid">
+                <dt>errors / warnings</dt>
+                <dd>
+                  <span class="badge <%= (vr.errorCount > 0) ? 'b-missing' : 'b-warn' %>"><%= vr.errorCount %> error / <%= vr.warningCount %> warning</span>
+                </dd>
+                <dt>byClass</dt>
+                <dd>
+                  <% var bc = vr.byClass || {}; var bcKeys = Object.keys(bc).filter(function (k) { return (bc[k] || 0) > 0; }); %>
+                  <% if (bcKeys.length === 0) { %>
+                    <span class="text-muted">—</span>
+                  <% } else { %>
+                    <% bcKeys.forEach(function (k) { %><span class="badge b-warn" style="margin-right: 0.25rem;"><%= k %> × <%= bc[k] %></span><% }); %>
+                  <% } %>
+                </dd>
+                <dt>issues（<%= vr.issueCount %>）</dt>
+                <dd>
+                  <% (vr.issues || []).forEach(function (it) { %>
+                    <div style="font-size: 0.82em;"><span class="text-muted">[<%= it.severity %>]</span> <code><%= it.type %></code> <span class="text-muted">· <%= it.class %></span></div>
+                  <% }); %>
+                </dd>
+              </dl>
+            <% } %>
             <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
-              deferred 原因：<%= (p.validationReadiness && p.validationReadiness.reason) || '' %>。
+              <% if (vr.asOf) { %>report asOf：<%= vr.asOf %>（git-ignored cache，可能過時；validator 為 ground truth）。<% } else { %>validator 為 ground truth：<code>npm run validate:content</code>。<% } %>
+              Admin 只顯示，不自動修；如要更新報表請重跑 <code>npm run report:validation</code>。
             </p>
           </div>
 

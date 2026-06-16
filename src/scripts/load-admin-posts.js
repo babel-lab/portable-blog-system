@@ -7,6 +7,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import fg from 'fast-glob';
 import matter from 'gray-matter';
 // Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI（per docs/20260527-admin-write-phase-3-dry-run-ui-preanalysis.md §6.2 方案 A）
@@ -39,6 +40,14 @@ import { buildCommerceLinkPreviewOptions, ALLOWED_COMMERCE_ROLES } from './activ
 import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
 
 const SITES = ['github', 'blogger'];
+
+// Phase 20260616-admin-validation-report-detail-panel-readonly-consume-implementation-a：
+//   read-only consume of the git-ignored validation report cache produced by
+//   report-validation.js (`npm run report:validation`). Join contract per pm-14 §D.
+//   - PROJECT_ROOT derived from this file location → admin absolute sourcePath normalises
+//     to the SAME repo-relative posix key the validator emits (load-posts.js toRelative).
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const VALIDATION_REPORT_PATH = path.join(PROJECT_ROOT, '.cache', 'data', 'validation-report.json');
 
 // Phase 20260615-night-1-admin-ia-shell-implementation-a
 //   - read-only systemSummary：把分散在 settings.* 之全站狀態彙整成可在 ADMIN dashboard 顯示的 read-only 摘要
@@ -1017,6 +1026,78 @@ export function aggregatePostGovernanceSignals(signals) {
   };
 }
 
+// Phase 20260616-admin-validation-report-detail-panel-readonly-consume-implementation-a：
+//   read-only load of the git-ignored validation report cache. Missing / unreadable /
+//   malformed → { available:false } so the Admin page NEVER crashes (per requirement 2).
+//   Does NOT re-run the validator and does NOT change the reporter schema.
+async function loadValidationReportContext() {
+  try {
+    const raw = await fs.readFile(VALIDATION_REPORT_PATH, 'utf8');
+    const report = JSON.parse(raw);
+    const byKey = new Map();
+    if (Array.isArray(report?.bySourcePath)) {
+      for (const entry of report.bySourcePath) {
+        if (entry && typeof entry.normalizedKey === 'string') byKey.set(entry.normalizedKey, entry);
+      }
+    }
+    return {
+      available: true,
+      asOf: typeof report?.asOf === 'string' ? report.asOf : null,
+      byKey,
+    };
+  } catch {
+    // ENOENT (report not generated) or parse error → graceful unavailable; no crash.
+    return { available: false, asOf: null, byKey: new Map() };
+  }
+}
+
+// admin absolute sourcePath → repo-relative posix join key (mirror load-posts.js toRelative; pm-14 §D.1).
+function toNormalizedKey(absPath) {
+  return path.relative(PROJECT_ROOT, absPath).split(path.sep).join('/');
+}
+
+// Pure: decide the per-post validation display state from the report context + post status (pm-14 §D.2).
+//   Exported for the smoke guard. Read-only / additive; never mutates inputs.
+//   - report unavailable                          → 'no-report'      (UI: 尚未產生 report)
+//   - status outside validator universe (ready/published) → 'status-excluded' (UI: 未驗證；NOT 0 warnings)
+//   - matched report entry                         → 'matched'        (counts / byClass / brief issues)
+//   - ready/published, no entry, report present    → 'clean'          (0 warnings as of report.asOf)
+export function derivePostValidationReport(ctx, status) {
+  const available = !!(ctx && ctx.available);
+  const asOf = ctx && typeof ctx.asOf === 'string' ? ctx.asOf : null;
+  const entry = ctx ? ctx.entry : null;
+  if (!available) {
+    return { reportAvailable: false, state: 'no-report', asOf: null };
+  }
+  const isVisible = status === 'ready' || status === 'published';
+  if (!isVisible) {
+    return { reportAvailable: true, state: 'status-excluded', asOf, status: typeof status === 'string' ? status : '' };
+  }
+  if (entry) {
+    const wc = typeof entry.warningCount === 'number' && Number.isFinite(entry.warningCount) ? entry.warningCount : 0;
+    const ec = typeof entry.errorCount === 'number' && Number.isFinite(entry.errorCount) ? entry.errorCount : 0;
+    const byClass = entry.byClass && typeof entry.byClass === 'object' ? entry.byClass : {};
+    const issues = Array.isArray(entry.issues)
+      ? entry.issues.map((i) => ({
+          type: typeof i.type === 'string' ? i.type : '',
+          class: typeof i.class === 'string' ? i.class : 'unknown',
+          severity: i.severity === 'error' ? 'error' : 'warning',
+        }))
+      : [];
+    return {
+      reportAvailable: true,
+      state: 'matched',
+      asOf,
+      warningCount: wc,
+      errorCount: ec,
+      byClass,
+      issueCount: issues.length,
+      issues,
+    };
+  }
+  return { reportAvailable: true, state: 'clean', asOf, warningCount: 0, errorCount: 0 };
+}
+
 export async function loadAdminPosts({ settings }) {
   const posts = [];
   // Phase 20260601-am-3 sourceKey Admin selector source implementation
@@ -1054,6 +1135,10 @@ export async function loadAdminPosts({ settings }) {
   //   - sourceSite-based mismatch（同 buildCategoryUsage / buildTagUsage 之 admin 慣例）
   const catGovernanceLookup = buildTaxonomyLookup(settings?.categories);
   const tagGovernanceLookup = buildTaxonomyLookup(settings?.tags);
+  // Phase 20260616-admin-validation-report-detail-panel-readonly-consume-implementation-a：
+  //   - 載入一次 validation report context（read-only；缺檔 graceful unavailable，不 crash）
+  //   - per-post join：admin 絕對 sourcePath → repo-relative posix key → report entry（pm-14 §D）
+  const validationReportCtx = await loadValidationReportContext();
   for (const p of posts) {
     p.governanceSignals = derivePostGovernanceSignals(p, catGovernanceLookup, tagGovernanceLookup);
     // Phase 20260616-admin-validator-per-post-aggregation-implementation-a：
@@ -1061,6 +1146,16 @@ export async function loadAdminPosts({ settings }) {
     //   - 僅整理上方 governanceSignals（既有 derived signal），不重跑 validator / 不 join validator warnings
     //   - 既有 view 忽略本欄位 → backout cost = 0
     p.governanceAggregation = aggregatePostGovernanceSignals(p.governanceSignals);
+    // Phase 20260616 validation report read-only consume：additive per-post validationReport
+    //   - 僅 join 既有 report cache；不重跑 validator / 不改 reporter schema / 不修法
+    p.validationReport = derivePostValidationReport(
+      {
+        available: validationReportCtx.available,
+        asOf: validationReportCtx.asOf,
+        entry: validationReportCtx.byKey.get(toNormalizedKey(p.sourcePath)) || null,
+      },
+      p.status,
+    );
   }
   // Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
   //   - additive read-only context；既有 { posts } consumer 不受影響

@@ -36,6 +36,7 @@
     "check:blogger-adsense-output": "node src/scripts/check-blogger-adsense-output.js",
     "check:admin-governance-aggregation": "node src/scripts/check-admin-governance-aggregation.js",
     "check:validation-report": "node src/scripts/check-validation-report.js",
+    "check:admin-validation-consume": "node src/scripts/check-admin-validation-consume.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
