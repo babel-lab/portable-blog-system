@@ -759,6 +759,7 @@
               - 只顯示計數；不含 per-post prescription（「應改為 X」）；展開 row 看 Governance signals section -%>
           <% var govSum = (p.governanceSignals && p.governanceSignals.signalSum) || 0; %>
           <br><span class="badge <%= govSum > 0 ? 'b-warn' : 'b-ok' %>" title="taxonomy governance signals (derived, read-only)：unknown tag/category + cross-site mismatch 合計；展開查看明細。Admin 不自動修。"><% if (govSum > 0) { %>gov: <%= govSum %><% } else { %>gov ✓<% } %></span>
+        </td>
         <td class="col-urls">
           <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a></div><% } %>
           <% if (p.github.previewUrl) { %><div class="mono">🐙 <a href="<%= p.github.previewUrl %>" target="_blank" rel="noopener noreferrer"><%= p.github.previewUrl %></a></div><% } %>
