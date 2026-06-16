@@ -44,7 +44,8 @@ const CROSS_POST_TYPES = new Set(['duplicate-slug', 'series-number-duplicate']);
 
 // §C.2 byClass canonical key set (stable shape; download/book/series fold into frontmatter
 // for v1 per §C.4, so their keys stay 0 — kept for forward-compat / schema stability).
-const BY_CLASS_KEYS = [
+// Exported (read-only) so the smoke guard can assert the key set without re-declaring it.
+export const BY_CLASS_KEYS = [
   'taxonomy',
   'commerce',
   'adsense',
@@ -61,7 +62,7 @@ const BY_CLASS_KEYS = [
  * Order matters: blogger is checked before frontmatter so `invalid-publish-target-mode`
  * (a blogger rule starting with `invalid-`) is not swallowed by the frontmatter `invalid-*` rule.
  */
-function classifyRuleClass(type) {
+export function classifyRuleClass(type) {
   const t = String(type || '');
   if (/^(unknown-category|category-site-mismatch|unknown-tag|tag-site-mismatch)$/.test(t)) {
     return 'taxonomy';
@@ -90,7 +91,7 @@ function classifyRuleClass(type) {
  * Order: fixtures first (a fixture path lives under content/validation-fixtures/, not
  * content/settings/), then settings, else post.
  */
-function classifyKind(sourcePath) {
+export function classifyKind(sourcePath) {
   const p = String(sourcePath || '');
   if (p.includes('content/validation-fixtures/')) return 'fixture';
   if (p.includes('content/settings/')) return 'settings';
@@ -105,8 +106,9 @@ function emptyByClass() {
 
 /**
  * Build the §C report envelope from a validateContent() result (pure transform).
+ * Exported (read-only) so the smoke guard can exercise it on synthetic input.
  */
-function buildReport(result, { asOf }) {
+export function buildReport(result, { asOf }) {
   const issues = Array.isArray(result.issues) ? result.issues : [];
 
   // Group by sourcePath, preserving first-seen order (mirrors printIssues Map ordering).
@@ -218,7 +220,12 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error('[report-validation] failed:', err);
-  process.exit(1);
-});
+// Only run the (I/O-performing, cache-writing) entrypoint when invoked as a script.
+// When imported (e.g. by the smoke guard), exports are loaded without side effects.
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+if (isMain) {
+  main().catch((err) => {
+    console.error('[report-validation] failed:', err);
+    process.exit(1);
+  });
+}
