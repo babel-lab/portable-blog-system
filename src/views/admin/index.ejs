@@ -1043,6 +1043,41 @@
                 <% } else { %><span class="badge b-ok">no</span><% } %>
               </dd>
             </dl>
+
+            <%# Phase 20260616-admin-governance-aggregation-detail-panel-readonly-ui-implementation-a：
+                - additive read-only governanceAggregation summary（接 loader 已 derive 之 p.governanceAggregation；pm-4）
+                - 與上方 raw 4-signal dl 同源（皆衍生自 governanceSignals）；保留 raw dl 不刪、不改語意
+                - 純唯讀：無 button / input / form / onclick / handler / filter / badge-link / write path
+                - 非 validator warning count；validator warnings 仍 deferred（見上方 Validation warnings 區段）
+                - empty（hasSignals false / signals[] 空）→ 正向 fallback，不 render error
+                - 沿用既有 class（.detail-grid / .badge / .b-warn / .b-ok / .text-muted）+ 既有 inline-style 排版慣例，不新增 CSS -%>
+            <% var ga = (p.governanceAggregation && typeof p.governanceAggregation === 'object') ? p.governanceAggregation : { hasSignals: false, totalSignalCount: 0, byClass: {}, signals: [] }; %>
+            <% var gaSignals = Array.isArray(ga.signals) ? ga.signals : []; %>
+            <% var gaByClass = (ga.byClass && typeof ga.byClass === 'object') ? ga.byClass : {}; %>
+            <% var gaCrossSite = gaSignals.filter(function (s) { return s && typeof s.type === 'string' && s.type.indexOf('cross-site-mismatch') === 0; }).reduce(function (a, s) { return a + (Number(s.count) || 0); }, 0); %>
+            <h4 style="font-size: 0.9em; margin: 0.6rem 0 0.2rem; color: #2c3e50;">Aggregation summary <span class="text-muted" style="font-size: 0.78em;">(read-only · derived; same-source)</span></h4>
+            <dl class="detail-grid">
+              <dt>hasSignals</dt>
+              <dd><span class="badge <%= ga.hasSignals ? 'b-warn' : 'b-ok' %>"><%= ga.hasSignals ? 'yes' : 'no' %></span></dd>
+              <dt>totalSignalCount</dt>
+              <dd><span class="badge <%= (ga.totalSignalCount || 0) > 0 ? 'b-warn' : 'b-ok' %>"><%= ga.totalSignalCount || 0 %></span></dd>
+              <dt>byClass · taxonomy</dt>
+              <dd>
+                <span class="badge <%= (gaByClass.taxonomy || 0) > 0 ? 'b-warn' : 'b-ok' %>"><%= gaByClass.taxonomy || 0 %></span>
+                <span class="text-muted" style="font-size: 0.82em;">其中 cross-site mismatch：<%= gaCrossSite %></span>
+              </dd>
+            </dl>
+            <% if (gaSignals.length > 0) { %>
+              <p style="margin: 0.1rem 0 0.3rem; font-size: 0.85em;"><span class="text-muted">signals（固定順序 type · class × count）：</span>
+                <% gaSignals.forEach(function (s) { %><span class="badge b-warn" style="margin-right: 0.3rem;"><%= s.type %> · <%= s.class %> × <%= s.count %></span><% }); %>
+              </p>
+            <% } else { %>
+              <p style="margin: 0.1rem 0 0.3rem; font-size: 0.85em;"><span class="badge b-ok">無治理訊號</span> <span class="text-muted">signals[] 為空。</span></p>
+            <% } %>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0.4rem;">
+              此 summary 來自既有 per-post <code>governanceSignals</code> / <code>governanceAggregation</code>（同源；含 draft / 所有 status），<strong>非 validator warning count</strong>，不代表 <code>validationReadiness</code> 已完成；validator warnings 仍 <strong>deferred</strong>（見上方 Validation warnings 區段）。
+            </p>
+
             <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
               source: admin loader（<code>derivePostGovernanceSignals</code>；含 draft / 所有 status；以 sourceSite 判斷 site mismatch）。
               <strong>Admin 不自動修</strong>；請手改 frontmatter / <code>tags.json</code> / <code>categories.json</code> 後執行 <code>npm run validate:content</code>。
