@@ -1124,7 +1124,7 @@
               <p style="margin: 0.1rem 0 0.3rem; font-size: 0.85em;"><span class="badge b-ok">無治理訊號</span> <span class="text-muted">signals[] 為空。</span></p>
             <% } %>
             <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0.4rem;">
-              此 summary 來自既有 per-post <code>governanceSignals</code> / <code>governanceAggregation</code>（同源；含 draft / 所有 status），<strong>非 validator warning count</strong>，不代表 <code>validationReadiness</code> 已完成；validator warnings 仍 <strong>deferred</strong>（見上方 Validation warnings 區段）。
+              此 summary 來自既有 per-post <code>governanceSignals</code> / <code>governanceAggregation</code>（同源；含 draft / 所有 status），<strong>非 validator warning count</strong>；validator warnings 改由上方 Validation warnings 區段<strong>讀取 <code>validate:content</code> 之 generated report</strong>（<code>.cache/data/validation-report.json</code>，read-only consume）呈現（見上方區段）。
             </p>
 
             <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
