@@ -33,6 +33,7 @@
     "check:adsense-article-block": "node src/scripts/check-adsense-article-block.js",
     "check:adsense-anchor-wiring": "node src/scripts/check-adsense-anchor-wiring.js",
     "check:blogger-adsense-output": "node src/scripts/check-blogger-adsense-output.js",
+    "check:admin-governance-aggregation": "node src/scripts/check-admin-governance-aggregation.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },

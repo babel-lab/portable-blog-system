@@ -970,6 +970,53 @@ function derivePostGovernanceSignals(post, catLookup, tagLookup) {
   };
 }
 
+// Phase 20260616-admin-validator-per-post-aggregation-implementation-a：
+//   - additive read-only per-post governance signal aggregation（純函式）
+//   - 把既有 derivePostGovernanceSignals 之 5 欄位 governanceSignals 整理成「可被 Admin
+//     read-only UI 直接列舉」之 deterministic 結構（signals[] + byClass + total）
+//   - 資料來源僅 = 既有 per-post governanceSignals（taxonomy 概念：unknown tag / category +
+//     cross-site mismatch tag / category）。不重新定義規則、不重跑 validator、不 join validator warnings。
+//     per-post validator warning aggregation 仍 deferred（見 toAdminView validationReadiness）；
+//     本欄位呈現的是 governance signal（admin universe，含 draft），不可誤稱為 validator warning count。
+//   - 不寫檔；不打 API；不改 frontmatter / settings；不引入 per-post 修法建議（prescription）；warning-only / read-only。
+//   - Deterministic 保證：
+//       * signal 列舉順序固定（GOVERNANCE_SIGNAL_ORDER 常數；與 post 順序、Map 走訪順序無關）
+//       * count 由既有欄位直接取值（純值；無隨機 / 無時間依賴 / 無外部 I/O）
+//       * 只列 count > 0 之 signal（穩定過濾）；totalSignalCount 由各 count 相加（不依賴 signalSum，交叉檢核用）
+const GOVERNANCE_SIGNAL_ORDER = [
+  { type: 'unknown-tag', class: 'taxonomy', field: 'unknownTagCount', kind: 'count' },
+  { type: 'unknown-category', class: 'taxonomy', field: 'unknownCategoryFlag', kind: 'flag' },
+  { type: 'cross-site-mismatch-tag', class: 'taxonomy', field: 'crossSiteMismatchTagCount', kind: 'count' },
+  { type: 'cross-site-mismatch-category', class: 'taxonomy', field: 'crossSiteMismatchCategoryFlag', kind: 'flag' },
+];
+
+export function aggregatePostGovernanceSignals(signals) {
+  const s = signals && typeof signals === 'object' ? signals : {};
+  const list = [];
+  const byClass = {};
+  let total = 0;
+  for (const def of GOVERNANCE_SIGNAL_ORDER) {
+    const rawVal = s[def.field];
+    let count;
+    if (def.kind === 'flag') {
+      count = rawVal === true ? 1 : 0;
+    } else {
+      count = (typeof rawVal === 'number' && Number.isFinite(rawVal) && rawVal > 0) ? Math.floor(rawVal) : 0;
+    }
+    if (count > 0) {
+      list.push({ type: def.type, class: def.class, count });
+      byClass[def.class] = (byClass[def.class] || 0) + count;
+      total += count;
+    }
+  }
+  return {
+    hasSignals: total > 0,
+    totalSignalCount: total,
+    byClass,
+    signals: list,
+  };
+}
+
 export async function loadAdminPosts({ settings }) {
   const posts = [];
   // Phase 20260601-am-3 sourceKey Admin selector source implementation
@@ -1009,6 +1056,11 @@ export async function loadAdminPosts({ settings }) {
   const tagGovernanceLookup = buildTaxonomyLookup(settings?.tags);
   for (const p of posts) {
     p.governanceSignals = derivePostGovernanceSignals(p, catGovernanceLookup, tagGovernanceLookup);
+    // Phase 20260616-admin-validator-per-post-aggregation-implementation-a：
+    //   - additive read-only per-post governanceAggregation（純函式 derive；每 post 1 物件）
+    //   - 僅整理上方 governanceSignals（既有 derived signal），不重跑 validator / 不 join validator warnings
+    //   - 既有 view 忽略本欄位 → backout cost = 0
+    p.governanceAggregation = aggregatePostGovernanceSignals(p.governanceSignals);
   }
   // Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
   //   - additive read-only context；既有 { posts } consumer 不受影響
