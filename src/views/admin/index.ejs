@@ -35,6 +35,10 @@
   .b-published { background: #c3e6cb; color: #0a3622; }
   .b-info { background: #e2e3e5; color: #383d41; }
   .b-tag { background: #e6f0ff; color: #003366; }
+  /* Phase 20260616-am-1-admin-suggested-fix-l2-readonly-ui-implementation-a：
+     governance signal warn 級別（黃色；同 totals-pill.warn / b-draft 色票）。
+     刻意不重用 b-missing（紅色）→ 避免暗示 build block / error；只表「人眼可判斷之治理訊號」。 */
+  .b-warn { background: #fff3cd; color: #856404; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; word-break: break-all; }
   .text-muted { color: #999; }
   .empty { color: #999; font-style: italic; }
@@ -749,7 +753,12 @@
           <% if (p.navReadiness && p.navReadiness.eligibleForNav) { %><span class="badge b-ok" title="github.enabled=true → eligible for prev/next on GitHub Pages">nav eligible</span>
           <% } else { %><span class="badge b-info" title="github.enabled=false → not eligible for GitHub Pages prev/next">nav n/a</span><% } %>
           <span class="badge b-info" title="per-post validation aggregation deferred; run npm run validate:content">warn def.</span>
-        </td>
+          <%# Phase 20260616-am-1-admin-suggested-fix-l2-readonly-ui-implementation-a：
+              - per-post governance signal 摘要 badge（read-only；loader 已 derive 之 p.governanceSignals.signalSum）
+              - signalSum > 0 → b-warn（黃；人眼可判斷之治理訊號）；= 0 → b-ok（皆已對齊）
+              - 只顯示計數；不含 per-post prescription（「應改為 X」）；展開 row 看 Governance signals section -%>
+          <% var govSum = (p.governanceSignals && p.governanceSignals.signalSum) || 0; %>
+          <br><span class="badge <%= govSum > 0 ? 'b-warn' : 'b-ok' %>" title="taxonomy governance signals (derived, read-only)：unknown tag/category + cross-site mismatch 合計；展開查看明細。Admin 不自動修。"><% if (govSum > 0) { %>gov: <%= govSum %><% } else { %>gov ✓<% } %></span>
         <td class="col-urls">
           <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a></div><% } %>
           <% if (p.github.previewUrl) { %><div class="mono">🐙 <a href="<%= p.github.previewUrl %>" target="_blank" rel="noopener noreferrer"><%= p.github.previewUrl %></a></div><% } %>
@@ -995,6 +1004,54 @@
             </dl>
             <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
               deferred 原因：<%= (p.validationReadiness && p.validationReadiness.reason) || '' %>。
+            </p>
+          </div>
+
+          <%# Phase 20260616-am-1-admin-suggested-fix-l2-readonly-ui-implementation-a：
+              - additive per-post Governance signals section（read-only；接 loader 已 derive 之 p.governanceSignals）
+              - 只列計數 / flag + sample 訊號；不含 per-post prescription（「應改為 X」）；不含 form / button / input / select / textarea / fetch
+              - 含 anti-write 一句話 + 治理 docs cross-link（沿用 slice-1 / bucket-note 樣板）
+              - empty state（signalSum===0）→ 正向確認「皆已對齊」
+              - source 明示 admin loader（含 draft / 所有 status）vs validator（ready/published）範圍差異 -%>
+          <div class="detail-section">
+            <h3>Governance signals <span class="section-tag tag-readonly" style="font-size: 0.7em;">read-only · derived</span></h3>
+            <% var gs = p.governanceSignals || { unknownTagCount: 0, unknownCategoryFlag: false, crossSiteMismatchTagCount: 0, crossSiteMismatchCategoryFlag: false, signalSum: 0 }; %>
+            <% if ((gs.signalSum || 0) === 0) { %>
+              <p style="margin: 0.1rem 0 0.4rem;"><span class="badge b-ok">✓ 皆已對齊</span> <span class="text-muted" style="font-size: 0.85em;">本篇 tags / category 皆在 registry 內，且 site 與 sourceSite 對齊；無 unknown / cross-site mismatch 訊號。</span></p>
+            <% } else { %>
+              <p style="margin: 0.1rem 0 0.4rem;"><span class="badge b-warn">⚠️ <%= gs.signalSum %> 個治理訊號</span> <span class="text-muted" style="font-size: 0.85em;">下列為人眼可判斷之 taxonomy 訊號；Admin 不自動修。</span></p>
+            <% } %>
+            <dl class="detail-grid">
+              <dt>unknown tag(s)</dt>
+              <dd>
+                <% if ((gs.unknownTagCount || 0) > 0) { %><span class="badge b-warn"><%= gs.unknownTagCount %></span> <span class="text-muted" style="font-size: 0.82em;">tag 未在 <code>tags.json</code> 定義</span>
+                <% } else { %><span class="badge b-ok">0</span><% } %>
+              </dd>
+              <dt>unknown category</dt>
+              <dd>
+                <% if (gs.unknownCategoryFlag) { %><span class="badge b-warn">yes</span> <span class="text-muted" style="font-size: 0.82em;">category 未在 <code>categories.json</code> 定義</span>
+                <% } else { %><span class="badge b-ok">no</span><% } %>
+              </dd>
+              <dt>cross-site mismatch · tag(s)</dt>
+              <dd>
+                <% if ((gs.crossSiteMismatchTagCount || 0) > 0) { %><span class="badge b-warn"><%= gs.crossSiteMismatchTagCount %></span> <span class="text-muted" style="font-size: 0.82em;">tag.site 不含本文 sourceSite（<%= p.sourceSite %>）</span>
+                <% } else { %><span class="badge b-ok">0</span><% } %>
+              </dd>
+              <dt>cross-site mismatch · category</dt>
+              <dd>
+                <% if (gs.crossSiteMismatchCategoryFlag) { %><span class="badge b-warn">yes</span> <span class="text-muted" style="font-size: 0.82em;">category.site 不含本文 sourceSite（<%= p.sourceSite %>）</span>
+                <% } else { %><span class="badge b-ok">no</span><% } %>
+              </dd>
+            </dl>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
+              source: admin loader（<code>derivePostGovernanceSignals</code>；含 draft / 所有 status；以 sourceSite 判斷 site mismatch）。
+              <strong>Admin 不自動修</strong>；請手改 frontmatter / <code>tags.json</code> / <code>categories.json</code> 後執行 <code>npm run validate:content</code>。
+              validator 範圍為 ready / published（過濾 draft）→ 與本區（含 draft）計數可能不對齊，屬設計。
+            </p>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.2rem 0 0;">
+              治理決策參考：
+              <a href="../docs/20260615-admin-content-taxonomy-governance-preanalysis.md" rel="noopener"><code>docs/20260615-admin-content-taxonomy-governance-preanalysis.md</code></a> ·
+              <a href="../docs/20260616-admin-suggested-fix-readonly-ui-preanalysis.md" rel="noopener"><code>docs/20260616-admin-suggested-fix-readonly-ui-preanalysis.md</code></a>
             </p>
           </div>
 
