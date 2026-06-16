@@ -1230,8 +1230,11 @@
           <%# - 12 個欄位：enabled / status / postUrl / postedAt / postId / campaign / audience / title / titleEn / hashtags / imageUrl / note -%>
           <%# - hashtags 採 textarea 一行一個；split by \n 後 normalize + JSON.stringify 比對 -%>
           <%# - inline style 避免動 <style> block；視覺用藍色 tint 與既有黃色 SEO dry-run 區分 -%>
-          <div class="detail-section fb-dry-run-section" data-post-idx="<%= idx %>" style="border: 2px dashed #6c8ebf; background: #f0f4fa; padding: 0.75rem; border-radius: 4px; margin-top: 0.75rem;">
-            <h3 style="color: #2c5282; border-bottom: 1px solid #c5d6e8;">FB Sidecar Dry-run Editor</h3>
+          <%# Phase 20260616-admin-detail-panel-collapsible-sections-implementation-a (R1)：
+              低頻 dry-run editor 改 native details/summary（預設收合）降低單篇 detail panel 展開高度；
+              純 presentation grouping，不改資料 / 不改 JS（class fb-dry-run-section 保留→既有 querySelector 不變）。 -%>
+          <details class="detail-section fb-dry-run-section" data-post-idx="<%= idx %>" style="border: 2px dashed #6c8ebf; background: #f0f4fa; padding: 0.75rem; border-radius: 4px; margin-top: 0.75rem;">
+            <summary style="cursor: pointer;"><h3 style="display: inline; border-bottom: none; color: #2c5282;">FB Sidecar Dry-run Editor</h3></summary>
             <p style="background: #d6e4f5; border: 1px solid #6c8ebf; padding: 0.4rem 0.6rem; border-radius: 3px; margin: 0.25rem 0; font-weight: 600; color: #2c5282; font-size: 0.85em;">⚠️ Dry-run only. No file will be written. 這只是 dry-run 預覽，不會寫入任何 .fb.md 檔案。需要的話請手動複製結果。</p>
             <p style="font-size: 0.82em; color: #555; margin: 0.25rem 0 0.5rem;">支援 12 個欄位（enabled / status / postUrl / postedAt / postId / campaign / audience / title / titleEn / hashtags / imageUrl / note）；read-only preview；無 form submit / 無 fs API / 無 fetch。實際寫入留待 FB-P5-c phase；當前請手動編輯 .fb.md。</p>
             <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
@@ -1286,7 +1289,7 @@
                 Apply FB (disabled — Phase 3 dry-run only)
               </button>
             </div>
-          </div>
+          </details>
 
           <div class="detail-section">
             <h3>Related / other links</h3>
@@ -1310,8 +1313,9 @@
           <% var rItems = Array.isArray(p.relatedLinksItems) ? p.relatedLinksItems : []; %>
           <% var oItems = Array.isArray(p.otherLinksItems) ? p.otherLinksItems : []; %>
           <% if (rItems.length > 0 || oItems.length > 0) { %>
-          <div class="detail-section" style="border: 2px dashed #6c8ebf; background: #f0f4fa; padding: 0.75rem; border-radius: 4px; margin-top: 0.75rem;">
-            <h3 style="color: #2c5282; border-bottom: 1px solid #c5d6e8;">sourceKey selector preview (read-only / dry-run)</h3>
+          <%# Phase 20260616 R1：sourceKey selector dry-run preview 改 native details/summary（預設收合）；presentation-only。 -%>
+          <details class="detail-section" style="border: 2px dashed #6c8ebf; background: #f0f4fa; padding: 0.75rem; border-radius: 4px; margin-top: 0.75rem;">
+            <summary style="cursor: pointer;"><h3 style="display: inline; border-bottom: none; color: #2c5282;">sourceKey selector preview (read-only / dry-run)</h3></summary>
             <p style="background: #d6e4f5; border: 1px solid #6c8ebf; padding: 0.4rem 0.6rem; border-radius: 3px; margin: 0.25rem 0; font-weight: 600; color: #2c5282; font-size: 0.85em;">
               🔒 Read-only preview — selector 為 disabled；無 Apply / 無 form submit / 無 fs write；未來 Admin write 啟用須走 <code>docs/admin-2-write-pre-analysis.md</code> §15.F prerequisites + user explicit approval。
             </p>
@@ -1362,7 +1366,7 @@
             <p class="text-muted" style="font-size: 0.78em; margin: 0.5rem 0 0;">
               注：本 phase 不啟用 source-inactive validation rule（per preanalysis §6 / §11.3）；inactive source 引用當前仍由既有 <code>source-key-not-found</code> rule 捕捉。selector 純顯示概念；frontmatter 寫入屬獨立未來 phase（per <code>docs/admin-2-write-pre-analysis.md</code> §15.F）。
             </p>
-          </div>
+          </details>
           <% } %>
 
           <div class="detail-section">
@@ -1464,8 +1468,9 @@
               - 顯示 Phase 2 ✅ / Phase 3 🔄 / Phase 4 ⏸ / Phase 5 ⏸ / Step 6 sourceKey ⏸
               - 不引導 user 點任何 button；純 visibility stub
               - 全 post 共用同樣文字；server-side render 至每篇 detail panel -%>
-          <div class="detail-section">
-            <h3>Future write readiness checklist</h3>
+          <%# Phase 20260616 R1：static future-write checklist（long list）改 native details/summary（預設收合）；presentation-only。 -%>
+          <details class="detail-section">
+            <summary style="cursor: pointer;"><h3 style="display: inline; border-bottom: none;">Future write readiness checklist</h3></summary>
             <div class="readiness-checklist">
               <ul>
                 <li class="ph-done">✅ Phase 2 safe-write helpers landed（<code>5bcdd02</code>；71/71 self-test pass）</li>
@@ -1475,12 +1480,13 @@
                 <li class="ph-pending">⏸ Step 6 sourceKey Admin selector（blocked by future Admin write / UI phases；per <code>docs/admin-2-write-pre-analysis.md</code> §15.F prerequisites）</li>
               </ul>
             </div>
-          </div>
+          </details>
 
-          <div class="detail-section">
-            <h3>Source path</h3>
+          <%# Phase 20260616 R1：source path（secondary metadata）改 native details/summary（預設收合）；presentation-only。 -%>
+          <details class="detail-section">
+            <summary style="cursor: pointer;"><h3 style="display: inline; border-bottom: none;">Source path</h3></summary>
             <p class="mono" style="margin: 0;"><%= p.sourcePath %></p>
-          </div>
+          </details>
         </td>
       </tr>
       <% }); %>
