@@ -893,6 +893,83 @@ function getSortTime(value) {
   return Number.isNaN(t) ? 0 : t;
 }
 
+// Phase 20260616-am-5-admin-suggested-fix-loader-derive-implementation-a：
+//   - additive read-only governance lookup helper
+//   - 建構 registry → { id / slug / site[] } Map（'id:KEY' / 'slug:KEY' 二鍵）
+//   - 純函式；不寫檔；不打 API；不改 settings；mirror buildCategoryUsage / buildTagUsage 之 admin 慣例
+function buildTaxonomyLookup(arr) {
+  const map = new Map();
+  if (!Array.isArray(arr)) return map;
+  for (const e of arr) {
+    if (!e || typeof e !== 'object') continue;
+    const id = typeof e.id === 'string' ? e.id : '';
+    const slug = typeof e.slug === 'string' ? e.slug : '';
+    const site = Array.isArray(e.site) ? e.site.slice(0) : [];
+    if (!id && !slug) continue;
+    const entry = { id, slug, site };
+    if (id) map.set('id:' + id, entry);
+    if (slug) map.set('slug:' + slug, entry);
+  }
+  return map;
+}
+
+// Phase 20260616-am-5-admin-suggested-fix-loader-derive-implementation-a：
+//   - additive read-only post.governanceSignals 純函式 derive
+//   - 五欄位 contract（count / boolean 純值）：
+//       unknownTagCount: number               — registry 找不到對應 id / slug 之 tag 數
+//       unknownCategoryFlag: boolean          — registry 找不到對應 id / slug 之 category（非空時）
+//       crossSiteMismatchTagCount: number     — tag.site 不含本文 sourceSite 之 tag 數
+//       crossSiteMismatchCategoryFlag: boolean — category.site 不含本文 sourceSite
+//       signalSum: number                     — 上四項合計（boolean 算 1）
+//   - 本切片只新增 derive 欄位；不改 EJS / view；既有 view 忽略本欄位 → backout cost = 0
+//   - 不寫檔；不打 API；不改 frontmatter / registry / settings；不引入修法建議或 per-post prescription
+//   - sourceSite-based mismatch（同 buildCategoryUsage / buildTagUsage 之 admin 慣例；非 validator 之 post.site）
+//   - uncategorized（post.category 空）/ untagged（post.tags 空）不計入本欄位（屬既有 bucket 計數責任）
+function derivePostGovernanceSignals(post, catLookup, tagLookup) {
+  const sourceSite = typeof post?.sourceSite === 'string' ? post.sourceSite : '';
+
+  // category signals
+  const rawCat = typeof post?.category === 'string' ? post.category.trim() : '';
+  let unknownCategoryFlag = false;
+  let crossSiteMismatchCategoryFlag = false;
+  if (rawCat) {
+    const ce = catLookup.get('id:' + rawCat) || catLookup.get('slug:' + rawCat);
+    if (!ce) {
+      unknownCategoryFlag = true;
+    } else if (sourceSite && Array.isArray(ce.site) && ce.site.length > 0 && !ce.site.includes(sourceSite)) {
+      crossSiteMismatchCategoryFlag = true;
+    }
+  }
+
+  // tag signals
+  let unknownTagCount = 0;
+  let crossSiteMismatchTagCount = 0;
+  const tagsArr = Array.isArray(post?.tags) ? post.tags : [];
+  for (const t of tagsArr) {
+    const raw = typeof t === 'string' ? t.trim() : '';
+    if (!raw) continue;
+    const te = tagLookup.get('id:' + raw) || tagLookup.get('slug:' + raw);
+    if (!te) {
+      unknownTagCount += 1;
+    } else if (sourceSite && Array.isArray(te.site) && te.site.length > 0 && !te.site.includes(sourceSite)) {
+      crossSiteMismatchTagCount += 1;
+    }
+  }
+
+  const signalSum = unknownTagCount
+    + (unknownCategoryFlag ? 1 : 0)
+    + crossSiteMismatchTagCount
+    + (crossSiteMismatchCategoryFlag ? 1 : 0);
+
+  return {
+    unknownTagCount,
+    unknownCategoryFlag,
+    crossSiteMismatchTagCount,
+    crossSiteMismatchCategoryFlag,
+    signalSum,
+  };
+}
+
 export async function loadAdminPosts({ settings }) {
   const posts = [];
   // Phase 20260601-am-3 sourceKey Admin selector source implementation
@@ -922,6 +999,17 @@ export async function loadAdminPosts({ settings }) {
     if (tb !== ta) return tb - ta;
     return (b.id || '').localeCompare(a.id || '');
   });
+  // Phase 20260616-am-5-admin-suggested-fix-loader-derive-implementation-a：
+  //   - additive read-only post.governanceSignals derive（5 欄位純函式；每 post 1 物件）
+  //   - 用既有 settings.categories / settings.tags registry；不打 API；不寫檔
+  //   - 不改 EJS / view；既有 view 忽略本欄位 → backout cost = 0
+  //   - 不引入修法建議、不引入 per-post prescription、不引入 write hint
+  //   - sourceSite-based mismatch（同 buildCategoryUsage / buildTagUsage 之 admin 慣例）
+  const catGovernanceLookup = buildTaxonomyLookup(settings?.categories);
+  const tagGovernanceLookup = buildTaxonomyLookup(settings?.tags);
+  for (const p of posts) {
+    p.governanceSignals = derivePostGovernanceSignals(p, catGovernanceLookup, tagGovernanceLookup);
+  }
   // Phase 20260608 commerce-admin-selector-readonly-preview-implementation-a
   //   - additive read-only context；既有 { posts } consumer 不受影響
   //   - allowedCommerceRoles = C8 enum mirror（authoring guidance；role 仍 recommended-but-optional；C7 deferred）
