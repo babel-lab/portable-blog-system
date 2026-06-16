@@ -1448,6 +1448,31 @@
     var tagUntag = (tagUsageLocal && tagUsageLocal.untagged) ? tagUsageLocal.untagged : { count: 0, samplePosts: [], truncated: false };
     var tagTotals = (tagUsageLocal && tagUsageLocal.totals) ? tagUsageLocal.totals : null;
     var tagMismatchTagCount = tagPer.filter(function(e) { return e.crossSiteMismatchCount > 0; }).length;
+    // Phase 20260616-am-4-admin-governance-summary-card-implementation-a：
+    //   - view 端 reduce over posts[].governanceSignals（loader am-5 已 derive 五欄位）
+    //   - 不改 loader / 不新增 summary object；沿用既有 posts.forEach 聚合慣例（L251 / L306 / L1442 / L1450）
+    //   - 主軸 net-new rollup：govPostsWithSignals / govSignalTotal（任何既有 totals 皆無此統一 per-post rollup）
+    //   - post-level cross-site mismatch：補既有 catMismatchCategoryCount / tagMismatchTagCount（key-level）之 post-level 視角
+    //   - unknown tag/category posts：與 tagUsage.totals.postWithUnknownTagCount / categoryUsage.totals.unknownCategoryPosts 同源（文案標明）
+    var govPostsTotal = Array.isArray(posts) ? posts.length : 0;
+    var govPostsWithSignals = 0;
+    var govSignalTotal = 0;
+    var govPostsUnknownTag = 0;
+    var govPostsUnknownCategory = 0;
+    var govPostsMismatchTag = 0;
+    var govPostsMismatchCategory = 0;
+    if (Array.isArray(posts)) {
+      posts.forEach(function(p) {
+        var g = (p && p.governanceSignals) ? p.governanceSignals : {};
+        var sum = g.signalSum || 0;
+        if (sum > 0) govPostsWithSignals++;
+        govSignalTotal += sum;
+        if ((g.unknownTagCount || 0) > 0) govPostsUnknownTag++;
+        if (g.unknownCategoryFlag === true) govPostsUnknownCategory++;
+        if ((g.crossSiteMismatchTagCount || 0) > 0) govPostsMismatchTag++;
+        if (g.crossSiteMismatchCategoryFlag === true) govPostsMismatchCategory++;
+      });
+    }
   %>
   <section class="admin-section" aria-labelledby="categories-h">
     <h2 id="categories">Categories &amp; Tags <span class="section-tag tag-readonly">read-only</span></h2>
@@ -1475,6 +1500,55 @@
         （本區 suggested-fix UI 顯示哲學、L1–L4 分級、UI contract 紅線）
       </p>
     </aside>
+
+    <%# Phase 20260616-am-4-admin-governance-summary-card-implementation-a：
+        - read-only governance summary card（Option B：Categories & Tags section 前方）
+        - 資料 = view 端 reduce over posts[].governanceSignals（不改 loader / 不新增 summary object）
+        - 主軸 = 統一 per-post rollup（posts with signals / total signal count）= net-new（既有 totals 皆無）
+        - 含 post-level cross-site mismatch（補 key-level catMismatchCategoryCount / tagMismatchTagCount 之新視角）
+        - unknown tag / unknown category posts：與下方 key-level totals 同源 → 文案標明，不誤導為新問題
+        - read-only only：無 form / button / input / select / textarea / fetch / onclick；無 per-post prescription；
+          warn 一級不暗示 build blocker；healthy empty-state 不過度承諾
+        - 沿用既有 .surface-card / .cat-totals-row / .totals-pill(.warn) class（零新 CSS） -%>
+    <div class="surface-card" aria-label="governance summary" style="margin: 0 0 0.85rem; background: #fbfdff;">
+      <h3>🏷️ 內容治理摘要 / Governance summary <span class="section-tag tag-readonly" style="font-size: 0.7em;">read-only · derived</span></h3>
+      <p class="surface-note" style="margin: 0 0 0.5rem;">
+        全站 <strong>per-post</strong> 治理訊號 rollup（彙整自各文章之 <code>governanceSignals</code>，含 draft / 全 status）。
+        此為「<strong>有幾篇文章</strong>帶治理訊號」之 post-level 視角；下方各區之 totals 為 per-category / per-tag 之 <strong>key-level</strong> 統計，兩者維度不同、彼此互補。
+        本卡為 read-only 摘要，<strong>逐篇明細仍以 Posts index 之 gov badge 與 detail panel 之 Governance signals section 為準</strong>。
+      </p>
+      <div class="cat-totals-row" aria-label="governance summary totals">
+        <span class="totals-pill"><strong><%= govPostsTotal %></strong> 篇文章檢視（含 draft）</span>
+        <% if (govPostsWithSignals > 0) { %>
+          <span class="totals-pill warn"><strong><%= govPostsWithSignals %></strong> 篇有治理訊號</span>
+          <span class="totals-pill warn"><strong><%= govSignalTotal %></strong> 治理訊號總數</span>
+        <% } else { %>
+          <span class="totals-pill"><strong>0</strong> 篇有治理訊號</span>
+          <span class="totals-pill"><strong>0</strong> 治理訊號總數</span>
+        <% } %>
+        <% if (govPostsMismatchTag > 0) { %>
+          <span class="totals-pill warn"><strong><%= govPostsMismatchTag %></strong> 篇 cross-site mismatch · tag</span>
+        <% } else { %>
+          <span class="totals-pill"><strong>0</strong> 篇 cross-site mismatch · tag</span>
+        <% } %>
+        <% if (govPostsMismatchCategory > 0) { %>
+          <span class="totals-pill warn"><strong><%= govPostsMismatchCategory %></strong> 篇 cross-site mismatch · category</span>
+        <% } else { %>
+          <span class="totals-pill"><strong>0</strong> 篇 cross-site mismatch · category</span>
+        <% } %>
+      </div>
+      <p class="surface-note" style="margin: 0.4rem 0 0;">
+        <% if (govPostsUnknownTag > 0 || govPostsUnknownCategory > 0) { %>
+          其中 <strong><%= govPostsUnknownTag %></strong> 篇含 unknown tag、<strong><%= govPostsUnknownCategory %></strong> 篇 unknown category
+          （此兩項與下方 per-tag / per-category 區之 <code>postWithUnknownTagCount</code> / <code>unknown category</code> totals <strong>同源</strong>，僅維度視角不同，非另一組新問題）。
+        <% } else { %>
+          ✓ 目前 admin 資料集（含 draft）未偵測到 unknown tag / unknown category / cross-site mismatch 治理訊號。此僅反映現況快照，不代表全站永久正確。
+        <% } %>
+      </p>
+      <p class="surface-note" style="margin: 0.4rem 0 0; color: #6c7a89;">
+        治理訊號為 <strong>read-only 人眼提示</strong>，<strong>非 build blocker</strong>（<code>npm run validate:content</code> 對 production 仍 0 error）；Admin 不會自動修改文章 frontmatter / <code>categories.json</code> / <code>tags.json</code>。是否調整由人眼判斷後另開 phase；validator 仍為 ground truth。
+      </p>
+    </div>
 
     <div class="surface-grid">
       <div class="surface-card">
