@@ -1396,8 +1396,11 @@
           </div>
           <% } %>
 
-          <div class="detail-section dry-run-section" data-post-idx="<%= idx %>">
-            <h3>Dry-run edit (no write)</h3>
+          <%# Phase 20260617-am-admin-seo-dryrun-details-collapse-implementation-a：
+              低頻 SEO dry-run editor 改 native details/summary（預設收合）；mirror R1 / FB sidecar pattern；
+              純 presentation grouping，不改資料 / 不改 JS（class dry-run-section 保留→既有 querySelectorAll 不變）。 -%>
+          <details class="detail-section dry-run-section" data-post-idx="<%= idx %>">
+            <summary style="cursor: pointer;"><h3 style="display: inline; border-bottom: none;">Dry-run edit (no write)</h3></summary>
             <p class="dry-run-warning">⚠️ Dry-run only. No file will be written. 此功能僅計算 + 顯示變更差異；任何實際寫入請以 VS Code + git workflow 處理。</p>
             <p style="font-size: 0.82em; color: #555; margin: 0.25rem 0 0.5rem;">支援欄位（per <code>docs/admin-2-write-pre-analysis.md</code> §4.1 safe editable subset）：description / searchDescription / titleEn / coverAlt</p>
             <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
@@ -1461,7 +1464,7 @@
                 Apply (disabled — Phase 3 dry-run only)
               </button>
             </div>
-          </div>
+          </details>
 
           <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
               - Future write readiness checklist；per Phase 3 pre-analysis §4.4
