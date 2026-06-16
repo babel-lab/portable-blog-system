@@ -26,6 +26,7 @@
     "report:urls": "node src/scripts/report-published-urls.js",
     "report:series": "node src/scripts/report-series.js",
     "report:book": "node src/scripts/report-book.js",
+    "report:validation": "node src/scripts/report-validation.js",
     "check:links": "node src/scripts/check-broken-links.js",
     "check:images": "node src/scripts/check-image-links.js",
     "smoke:reverse-utm": "node src/scripts/smoke-reverse-utm.js",
