@@ -623,6 +623,15 @@
           <% }); %>
         </optgroup>
         <% } %>
+        <%# Phase 20260617-am-admin-validator-state-filter-chip-list-implementation-a：
+            minimal Phase B v1 — 4 個 read-only validation filter；對齊 row data-validation-state；
+            純消費 p.validationReport（pm-18）；不引 per-post prescription / 不引 auto-fix。 -%>
+        <optgroup label="validation">
+          <option value="validation:issues">validation: issues (errors &gt; 0 或 warnings &gt; 0)</option>
+          <option value="validation:clean">validation: clean (matched &amp; 0/0)</option>
+          <option value="validation:excluded">validation: excluded (draft/archived；不在 validator universe)</option>
+          <option value="validation:no-report">validation: no report (report 缺檔 / 不可用)</option>
+        </optgroup>
       </select>
     </label>
     <%# Phase 20260522-night-3-d: basic sort dropdown；3 選項；default publishedAt desc 對齊 loader 初始排序 -%>
@@ -656,6 +665,21 @@
       <% posts.forEach(function(p, idx) {
         const searchBlob = [p.title, p.titleEn, p.slug, p.category, p.id, ...(p.tags || [])].join(' ').toLowerCase();
         const statusVal = (p.status === 'ready' || p.status === 'draft' || p.status === 'published') ? p.status : 'other';
+        // Phase 20260617-am-admin-validator-state-filter-chip-list-implementation-a：
+        //   - 純消費 p.validationReport.state（pm-18 loader derive；不重算 rule；不混 governance）
+        //   - matched + (errorCount>0 || warningCount>0) → 'issues'
+        //   - matched + 0/0（理論上不發生，pm-18 derive 在 entry 缺時走 'clean'）→ defensive 視為 'clean'
+        //   - status-excluded → 'excluded'；no-report → 'no-report'；clean → 'clean'；unexpected → 'unknown'
+        const vrState = (p.validationReport && p.validationReport.state) || 'no-report';
+        let validationStateAttr;
+        if (vrState === 'no-report') validationStateAttr = 'no-report';
+        else if (vrState === 'status-excluded') validationStateAttr = 'excluded';
+        else if (vrState === 'clean') validationStateAttr = 'clean';
+        else if (vrState === 'matched') {
+          const ec = (p.validationReport && p.validationReport.errorCount) || 0;
+          const wc = (p.validationReport && p.validationReport.warningCount) || 0;
+          validationStateAttr = (ec > 0 || wc > 0) ? 'issues' : 'clean';
+        } else validationStateAttr = 'unknown';
       %>
       <tr class="post-row"
           data-idx="<%= idx %>"
@@ -676,6 +700,7 @@
           data-published-at="<%= p.publishedAt || '' %>"
           data-updated-at="<%= p.updatedAt || p.publishedAt || '' %>"
           data-fb-posted-at="<%= p.fbPostedAt || '' %>"
+          data-validation-state="<%= validationStateAttr %>"
           data-title="<%= p.title || '' %>">
         <td>
           <% if (p.title) { %><strong><%= p.title %></strong><% } else { %><span class="empty">(empty)</span><% } %>
@@ -2329,6 +2354,8 @@
           case 'sourceSite': return row.dataset.sourceSite === val;
           // Phase 20260523-pm-5-admin-a2-fb-badge-filter-optgroup-a: fbBadge filter（per docs/admin-overview-audit-20260523.md §10.1 A2）；對齊 row data-fb-badge；4 well-known values
           case 'fbBadge': return row.dataset.fbBadge === val;
+          // Phase 20260617-am-admin-validator-state-filter-chip-list-implementation-a: validation filter（4 態 read-only）；對齊 row data-validation-state；純比對既有 derived 字串，無 rule 重算
+          case 'validation': return row.dataset.validationState === val;
           case 'completeness':
             // val 形如 "seo-missing" / "fb-missing" / "url-missing" / "categoryTags-missing"
             if (val === 'seo-missing') return row.dataset.seo === 'missing';
