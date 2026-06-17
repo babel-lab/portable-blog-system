@@ -752,7 +752,25 @@
           <% } else { %><span class="badge b-missing" title="seo.indexing invalid or unknown">idx ?</span><% } %>
           <% if (p.navReadiness && p.navReadiness.eligibleForNav) { %><span class="badge b-ok" title="github.enabled=true → eligible for prev/next on GitHub Pages">nav eligible</span>
           <% } else { %><span class="badge b-info" title="github.enabled=false → not eligible for GitHub Pages prev/next">nav n/a</span><% } %>
-          <span class="badge b-info" title="per-post validation aggregation deferred; run npm run validate:content">warn def.</span>
+          <%# Phase 20260617-am-admin-validator-warning-badge-list-implementation-a：
+              替換既有 warn def. placeholder 為 5 態 read-only validator warning badge；
+              純消費 p.validationReport（pm-18 loader derive；report=git-ignored cache，validator 為 ground truth）；
+              零 loader / reporter / validator 變更；不混 governance signals（gov badge 獨立）；
+              不重算 rule；不 prescription；不 filter chip。 -%>
+          <% var vr = p.validationReport || { reportAvailable: false, state: 'no-report', asOf: null }; %>
+          <% if (!vr.reportAvailable || vr.state === 'no-report') { %>
+            <span class="badge b-info" title="validation report 尚未產生或不可用；執行 npm run report:validation 後重整；warn ? 非 0 warnings">warn ?</span>
+          <% } else if (vr.state === 'status-excluded') { %>
+            <span class="badge b-info" title="status=<%= vr.status || '' %> 不在 validator universe〔ready/published〕；warn n/a 非 0 warnings">warn n/a</span>
+          <% } else if (vr.state === 'clean') { %>
+            <span class="badge b-ok" title="0 validator warnings (clean as of <%= vr.asOf || 'report' %>)；source: report-validation cache；validator 為 ground truth">warn ✓</span>
+          <% } else if (vr.state === 'matched' && (vr.errorCount || 0) > 0) { %>
+            <span class="badge b-missing" title="<%= vr.errorCount %> errors / <%= vr.warningCount %> warnings (as of <%= vr.asOf || 'report' %>)；source: report-validation cache；validator 為 ground truth；展開查看 byClass / issues">err <%= vr.errorCount %> warn <%= vr.warningCount %></span>
+          <% } else if (vr.state === 'matched') { %>
+            <span class="badge b-warn" title="<%= vr.warningCount %> validator warnings (as of <%= vr.asOf || 'report' %>)；source: report-validation cache；展開查看 byClass / issues">warn <%= vr.warningCount %></span>
+          <% } else { %>
+            <span class="badge b-info" title="unknown validationReport state — defensive fallback">warn ?</span>
+          <% } %>
           <%# Phase 20260616-am-1-admin-suggested-fix-l2-readonly-ui-implementation-a：
               - per-post governance signal 摘要 badge（read-only；loader 已 derive 之 p.governanceSignals.signalSum）
               - signalSum > 0 → b-warn（黃；人眼可判斷之治理訊號）；= 0 → b-ok（皆已對齊）
