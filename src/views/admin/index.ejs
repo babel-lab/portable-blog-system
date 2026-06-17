@@ -1514,7 +1514,7 @@
                   - 此 button 屬視覺 shell；Admin UI Apply 維持 disabled。actual write 僅由 terminal-only CLI（admin-write-cli）執行，已於核准之 draft description 編輯實證，每次仍須 Dean explicit approval -%>
               <button type="button" class="apply-disabled" disabled aria-disabled="true"
                       title="Admin UI 不寫入：此為 dry-run only。實際寫入僅由 terminal-only CLI（admin-write-cli）執行，已於核准之 draft description 編輯實證；Admin UI Apply 維持 disabled，瀏覽器寫入 / middleware / API 未啟用，每次寫入仍須 Dean explicit approval。">
-                Apply (disabled — Phase 3 dry-run only)
+                Apply (disabled — dry-run preview only; actual write remains terminal-only)
               </button>
             </div>
           </details>
@@ -1530,7 +1530,7 @@
             <div class="readiness-checklist">
               <ul>
                 <li class="ph-done">✅ Phase 2 safe-write helpers landed（<code>5bcdd02</code>；71/71 self-test pass）</li>
-                <li class="ph-current">🔄 Phase 3 dry-run UI（current phase；validator preview + disabled Apply button）</li>
+                <li class="ph-done">✅ Phase 3 dry-run UI landed（preview-only；validator preview + disabled Admin UI Apply button）</li>
                 <li class="ph-pending">⏸ Phase 4 Vite dev middleware / write route preanalysis（not started）</li>
                 <li class="ph-done">✅ Terminal-only CLI write path（<code>admin-write-cli</code>）已實證：核准之 draft <code>description</code> 編輯（兩次 accepted）；Admin UI Apply 仍 disabled、瀏覽器寫入 / middleware / API 未啟用；每次 actual write 仍須 Dean explicit approval + 終端機執行</li>
                 <li class="ph-pending">⏸ Step 6 sourceKey Admin selector（blocked by future Admin write / UI phases；per <code>docs/admin-2-write-pre-analysis.md</code> §15.F prerequisites）</li>
