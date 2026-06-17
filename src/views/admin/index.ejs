@@ -550,6 +550,19 @@
     · 本次 admin 頁所有 derived 欄位皆於此時間從 frontmatter / settings 推導；重新整理 dev server（<code>npm run dev</code>）會重新 derive。
   </p>
 
+  <%# Phase 20260617-am-admin-r3-health-legend-missing-fields-dedup-implementation-a:
+      Legend Opt-A —— page-level health vocabulary legend（只此 1 處，不在每篇 detail panel ×11 重複）。
+      區分 ground truth（validator/report）vs admin derived read-only hint；不寫「自動修正」/「應改為 X」；沿用既有 .admin-governance-note class（零新 CSS）。 -%>
+  <aside class="admin-governance-note" aria-label="health vocabulary legend" style="margin: 0 0 0.85rem; padding: 0.55rem 0.8rem; background: #f4f7fb; border-left: 3px solid #6c7a89; border-radius: 4px; font-size: 0.86em; line-height: 1.55;">
+    <p style="margin: 0;"><strong>健康訊號讀法（read-only）：</strong></p>
+    <ul style="margin: 0.3rem 0 0; padding-left: 1.2rem;">
+      <li><strong>Validation warnings</strong>（detail panel → Readiness）：來自 <code>npm run validate:content</code> 之 report，為 validator / report <strong>ground truth</strong>（僅掃 ready/published；draft 顯「未驗證」非 0）。</li>
+      <li><strong>Completeness / Missing fields</strong>：admin loader 依 frontmatter / settings 推導之 <strong>read-only 提示</strong>，<strong>不等於 build blocker</strong>。</li>
+      <li><strong>Governance signals</strong>（<code>gov</code> badge）：taxonomy 治理推導之 <strong>read-only 提示</strong>，<strong>不等於 validator warning 計數</strong>（universe 不同：governance 含 draft；validator 僅 ready/published）。</li>
+    </ul>
+    <p style="margin: 0.3rem 0 0; color: #6c7a89;">Admin 不自動修改文章 / <code>categories.json</code> / <code>tags.json</code>；是否調整由人眼判斷後另開 phase。<code>npm run validate:content</code> 仍為 ground truth。</p>
+  </aside>
+
   <% if (posts.length === 0) { %>
     <p class="empty">無 posts 可顯示（content/{github,blogger}/posts/*.md 為空）</p>
   <% } else { %>
@@ -1423,21 +1436,18 @@
               <span class="badge <%= p.completeness.categoryTags === 'ok' ? 'b-ok' : 'b-missing' %>">cat/tags <%= p.completeness.categoryTags %></span>
               <span class="badge <%= p.completeness.fbPublished === 'ok' ? 'b-ok' : 'b-missing' %>">FB pub <%= p.completeness.fbPublished %></span>
             </div>
-          </div>
-
-          <% if (p.missingFields && p.missingFields.length > 0) { %>
-          <div class="detail-section">
-            <h3>Missing fields（建議補齊）</h3>
+            <%# Phase 20260617-am-admin-r3-health-legend-missing-fields-dedup-implementation-a:
+                Opt-2 dedup —— Missing fields 併入本 Completeness summary section（移除原獨立 .detail-section，detail panel 少 1 段）；
+                保留 missing / 齊全 兩分支資訊；不改 p.completeness / p.missingFields data shape；沿用既有 class（零新 CSS）。 -%>
+            <% if (p.missingFields && p.missingFields.length > 0) { %>
+            <p style="margin: 0.5rem 0 0.2rem; font-size: 0.85em; color: #555;">缺漏 / 建議補齊欄位（admin derived read-only hint，非 build blocker）：</p>
             <div class="completeness-summary">
               <% p.missingFields.forEach(function(f) { %><span class="badge b-missing"><%= f %></span><% }); %>
             </div>
+            <% } else { %>
+            <p style="margin: 0.5rem 0 0;"><span class="badge b-ok">所有檢查欄位齊全</span></p>
+            <% } %>
           </div>
-          <% } else { %>
-          <div class="detail-section">
-            <h3>Missing fields</h3>
-            <p style="margin: 0;"><span class="badge b-ok">所有檢查欄位齊全</span></p>
-          </div>
-          <% } %>
 
           <%# Phase 20260617-am-admin-seo-dryrun-details-collapse-implementation-a：
               低頻 SEO dry-run editor 改 native details/summary（預設收合）；mirror R1 / FB sidecar pattern；
