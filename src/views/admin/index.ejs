@@ -1706,6 +1706,11 @@
       </div>
     </div>
 
+    <%# Phase 20260617-night-admin-categories-tags-collapsible-split-implementation-a:
+        presentation-only — Categories 用量群包進原生 <details>（預設 open，資訊不被藏，使用者可手動收合縮短 section）。
+        零 data / loader / validator / report 變更；summary 僅複述既有子標題語意，不引入新資料判斷。 -%>
+    <details open class="cat-tags-group" style="margin: 0.5rem 0 0;">
+      <summary style="cursor: pointer; font-weight: 600; color: #1f2d3d;">Categories 用量明細 — per-category usage · uncategorized · unknown category · unused（read-only）</summary>
     <% if (catTotals) { %>
     <div class="cat-totals-row" aria-label="categories totals">
       <span class="totals-pill"><strong><%= catTotals.totalPosts %></strong> 篇文章（含 draft）</span>
@@ -1905,9 +1910,16 @@
       </div>
     </div>
 
+    </details>
+
     <%# === Tags usage（read-only；Phase 20260615-night-7-admin-tags-readonly-usage-counts-a） === -%>
     <%# 共用 .cat-usage-table / .cat-status-bar / .cat-sample-list / .cat-bucket-card / .cat-totals-row CSS（不引入新 class）-%>
     <hr style="margin: 1.25rem 0 0.5rem; border: 0; border-top: 1px dashed #e1e4e8;">
+    <%# Phase 20260617-night-admin-categories-tags-collapsible-split-implementation-a:
+        Tags 用量群包進原生 <details>（預設 open）；保留 <h3 id="tags"> 供 nav #tags 錨點，
+        details 內元素被 hash 命中時由本檔尾之 openHashDetails() 自動展開祖先 details。 -%>
+    <details open class="cat-tags-group" style="margin: 0.5rem 0 0;">
+      <summary style="cursor: pointer; font-weight: 600; color: #1f2d3d;">Tags 用量明細 — per-tag usage · untagged · unknown tag · unused（read-only）</summary>
     <h3 id="tags" style="margin: 0.5rem 0 0.25rem; font-size: 0.95em; color: #1f2d3d;">Tags — Per-tag usage</h3>
     <p style="font-size: 0.82em; color: #555; margin: 0 0 0.5rem;">
       derived from posts (admin loader) + <code>tags.json</code>；同篇文章可使用多個 tag，下表 <code>posts</code> 欄為「該 tag 被多少篇文章使用」（per-post dedupe）。
@@ -2107,6 +2119,7 @@
         <% } %>
       </div>
     </div>
+    </details>
 
     <p style="margin: 0.6rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 仍未實作：</p>
     <ul class="planned-list">
@@ -2734,5 +2747,32 @@
     })();
   </script>
   <% } %>
+
+  <%# Phase 20260617-night-admin-categories-tags-collapsible-split-implementation-a:
+      最小、隔離之 client script —— 當 location.hash 指向某 <details> 內部元素（如 nav #tags 在使用者手動收合 Tags 群後），
+      自動展開其祖先 <details>，確保錨點跳轉不會落入收合區而「找不到」。
+      只讀 location.hash + 設定 details.open；不碰 filter / search / sort / detail-panel toggle 任何邏輯。 -%>
+  <script>
+    (function () {
+      function openHashDetails() {
+        var h = location.hash;
+        if (!h || h.length < 2) return;
+        var el;
+        try { el = document.getElementById(decodeURIComponent(h.slice(1))); } catch (e) { return; }
+        if (!el) return;
+        var d = el.closest ? el.closest('details') : null;
+        while (d) {
+          d.open = true;
+          d = (d.parentElement && d.parentElement.closest) ? d.parentElement.closest('details') : null;
+        }
+      }
+      window.addEventListener('hashchange', openHashDetails);
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', openHashDetails);
+      } else {
+        openHashDetails();
+      }
+    })();
+  </script>
 </body>
 </html>
