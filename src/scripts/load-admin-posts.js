@@ -826,6 +826,11 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
   return {
     sourceSite: siteName,
     sourcePath: mdPath,
+    // Phase 20260617-night-phase2-admin-ui-static-payload-preview-implementation-a:
+    //   - additive read-only repo-relative posix path（mirror toNormalizedKey 之 pm-14 §D.1 慣例）
+    //   - 用途：Admin UI static payload preview 之 targetRel 來源（server-side derive；不可 client 端字串拼湊）
+    //   - 不啟用任何寫入；preview-only；deterministic（pure 函式 + absolute path normalisation）
+    sourceRel: toNormalizedKey(mdPath),
     id: typeof fm.id === 'string' ? fm.id : '',
     title: typeof fm.title === 'string' ? fm.title : '',
     titleEn,

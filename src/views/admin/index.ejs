@@ -86,6 +86,19 @@
   .readiness-checklist .ph-done { color: #155724; }
   .readiness-checklist .ph-current { color: #856404; font-weight: 600; }
   .readiness-checklist .ph-pending { color: #999; }
+  /* Phase 20260617-night-phase2-admin-ui-static-payload-preview-implementation-a:
+     - .payload-preview-section：dry-run editor 內之 nested <details> 收合區（預設 closed，不擾主面板高度）
+     - 純前端字串組裝；無 fetch / fs / XHR / form submit；無 copy 按鈕（本切片）
+     - PREVIEW ONLY：textarea 為 readonly；command preview 為 <pre><code>；皆無觸發路徑 */
+  .payload-preview-section { margin-top: 0.5rem; background: #fff; border: 1px solid #f0d264; border-radius: 3px; padding: 0.4rem 0.6rem; }
+  .payload-preview-section > summary { cursor: pointer; font-size: 0.85em; font-weight: 600; color: #856404; }
+  .payload-preview-body { margin-top: 0.4rem; }
+  .payload-preview-body label { display: block; font-size: 0.78em; color: #555; margin: 0.4rem 0 0.15rem; font-weight: 600; }
+  .payload-preview-body textarea.payload-json-output { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78em; padding: 0.3rem 0.4rem; border: 1px solid #bbb; border-radius: 3px; background: #fafafa; resize: vertical; }
+  .payload-preview-body pre.payload-cmd-output { margin: 0; padding: 0.3rem 0.4rem; border: 1px solid #bbb; border-radius: 3px; background: #fafafa; font-size: 0.78em; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .payload-preview-compute { padding: 0.25rem 0.6rem; border: 1px solid #856404; background: #ffeb99; border-radius: 3px; cursor: pointer; font-size: 0.78em; font-weight: 600; color: #856404; }
+  .payload-preview-compute:hover { background: #f0d264; }
+  .payload-preview-status { font-size: 0.78em; color: #555; margin-left: 0.5rem; }
   /* Phase 20260615-night-5-admin-categories-readonly-usage-counts-a：category usage table + sub-buckets
      - 全部 read-only；無 button writes；只用既有 admin 顏色 token（不引入新色板）
      - .cat-usage-table：分類使用統計主表；穩定欄寬 + sticky header（沿用 .scripts-table 視覺風格）
@@ -1508,6 +1521,37 @@
                 </table>
                 <p class="dry-run-warning" style="margin-top: 0.5rem;">⚠️ Dry-run only. No file will be written. 若要實際寫入：VS Code 編輯 source 檔 + <code>git diff</code> + <code>git commit</code>。</p>
               </div>
+              <%# Phase 20260617-night-phase2-admin-ui-static-payload-preview-implementation-a：
+                  - 靜態 payload preview（PREVIEW ONLY）—— 純前端字串組裝
+                  - mirror 既有 commerce snippet helper / SEO dry-run viewer：readonly textarea + pre/code
+                  - 預設收合（native details；mirror R1 / FB sidecar pattern）；不擾主 detail panel 高度
+                  - targetRel 由 server-side 提供 safe relative path（p.sourceRel；mirror toNormalizedKey 之 pm-14 §D.1 慣例）
+                  - payload 預設 dryRun:true；command 預設無 --apply；deterministic key 順序（無 timestamp / 隨機）
+                  - 無 fetch / fs / XHR / form submit / Apply 觸發；無 copy 按鈕（本切片）
+                  - 每次 actual write 仍須 Dean explicit approval + terminal-only CLI（admin-write-cli）執行 -%>
+              <details class="payload-preview-section" data-post-idx="<%= idx %>" data-source-rel="<%= p.sourceRel %>">
+                <summary>Static payload preview（PREVIEW ONLY — 不執行任何寫入）</summary>
+                <div class="payload-preview-body">
+                  <p class="dry-run-warning" style="margin: 0.25rem 0 0.4rem;">⚠️ PREVIEW ONLY · 靜態 payload 預覽 · 不寫任何檔案 · 複製不構成核准。實際寫入僅由終端機 CLI（<code>admin-write-cli</code>）執行，每次仍須 Dean explicit approval。</p>
+                  <p style="font-size: 0.78em; color: #555; margin: 0 0 0.4rem;">推導來源：上方既有 dry-run editor 之 current value（<code>data-current</code>，server-side 逐字）+ new value textarea。Preview 僅在此面板呈現，不送出、不寫檔、不複製。</p>
+                  <p style="font-size: 0.78em; color: #555; margin: 0 0 0.4rem;">field：
+                    <select class="payload-preview-field">
+                      <option value="description">description</option>
+                      <option value="searchDescription">searchDescription</option>
+                      <option value="titleEn">titleEn</option>
+                      <option value="coverAlt">coverAlt</option>
+                    </select>
+                    <button type="button" class="payload-preview-compute">Compute payload preview</button>
+                    <span class="payload-preview-status" aria-live="polite"></span>
+                  </p>
+                  <label>targetRel（server-side safe relative path；read-only）</label>
+                  <pre class="payload-cmd-output payload-target-rel-output"><code><%= p.sourceRel %></code></pre>
+                  <label>Payload JSON（dryRun:true；no <code>dryRun:false</code> by default）</label>
+                  <textarea class="payload-json-output" readonly rows="9" spellcheck="false" aria-label="admin write payload preview (dry-run)" placeholder="點上方「Compute payload preview」以產生靜態 payload 預覽（不寫檔）"></textarea>
+                  <label>Command preview（dry-run；無 <code>--apply</code>）</label>
+                  <pre class="payload-cmd-output"><code class="payload-cmd-text">點上方按鈕產生 command 預覽（不執行）</code></pre>
+                </div>
+              </details>
               <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
                   - disabled Apply button；無 click handler；aria-disabled；明確 title tooltip
                   - 即使有人移除 disabled，亦無 fetch / fs / safeWrite caller 可觸發
@@ -2552,6 +2596,44 @@
           changedCount.textContent = changed;
           result.hidden = false;
         });
+
+        // Phase 20260617-night-phase2-admin-ui-static-payload-preview-implementation-a:
+        //   - 靜態 payload preview compute handler；純前端字串組裝；無 fetch / fs / XHR / form submit
+        //   - 同 section 內讀 .dry-run-old-value[data-current] + .dry-run-form textarea[data-input]
+        //   - 固定 key 順序：targetRel → field → expectedOldValue → newValue → dryRun（恆 true）
+        //   - command 預設無 --apply；payload 預設無 dryRun:false
+        //   - 同輸入恆同輸出；無時間戳 / 隨機值 / 序號
+        //   - 不複製、不送出；亦不自動執行（user 須手動點 Compute）
+        var payloadPanel = section.querySelector('.payload-preview-section');
+        if (payloadPanel) {
+          var payloadCompute = payloadPanel.querySelector('.payload-preview-compute');
+          var payloadFieldSel = payloadPanel.querySelector('.payload-preview-field');
+          var payloadJsonOut = payloadPanel.querySelector('.payload-json-output');
+          var payloadCmdOut = payloadPanel.querySelector('.payload-cmd-text');
+          var payloadStatus = payloadPanel.querySelector('.payload-preview-status');
+          if (payloadCompute && payloadFieldSel && payloadJsonOut && payloadCmdOut) {
+            payloadCompute.addEventListener('click', function () {
+              var targetRel = payloadPanel.dataset.sourceRel || '';
+              var fieldName = payloadFieldSel.value || 'description';
+              var oldCell = section.querySelector('[data-field="' + fieldName + '"]');
+              var input = section.querySelector('[data-input="' + fieldName + '"]');
+              var oldVal = oldCell ? (oldCell.dataset.current || '') : '';
+              var newVal = input ? (input.value || '') : '';
+              // Deterministic key order；payload 本體不含時間戳 / 隨機值；dryRun 恆 true。
+              var jsonStr = '{\n'
+                + '  "targetRel": ' + JSON.stringify(targetRel) + ',\n'
+                + '  "field": ' + JSON.stringify(fieldName) + ',\n'
+                + '  "expectedOldValue": ' + JSON.stringify(oldVal) + ',\n'
+                + '  "newValue": ' + JSON.stringify(newVal) + ',\n'
+                + '  "dryRun": true\n'
+                + '}';
+              payloadJsonOut.value = jsonStr;
+              // Command preview：固定字串；無 --apply；無 dryRun:false。
+              payloadCmdOut.textContent = 'node src/scripts/admin-write-cli.js --payload=<temp.json>';
+              if (payloadStatus) payloadStatus.textContent = 'preview generated (no write)';
+            });
+          }
+        }
       });
 
       // Phase 20260520-fb-p5-b: FB sidecar dry-run editor handlers
