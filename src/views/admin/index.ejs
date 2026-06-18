@@ -99,6 +99,12 @@
   .payload-preview-compute { padding: 0.25rem 0.6rem; border: 1px solid #856404; background: #ffeb99; border-radius: 3px; cursor: pointer; font-size: 0.78em; font-weight: 600; color: #856404; }
   .payload-preview-compute:hover { background: #f0d264; }
   .payload-preview-status { font-size: 0.78em; color: #555; margin-left: 0.5rem; }
+  /* Phase 20260618-am-admin-k7: payload preview copy buttons（clipboard-only；無 write path） */
+  .payload-copy-btn { margin-top: 0.3rem; padding: 0.2rem 0.55rem; border: 1px solid #856404; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.76em; font-weight: 600; color: #856404; }
+  .payload-copy-btn:hover:not(:disabled) { background: #f0d264; }
+  .payload-copy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .payload-copy-note { font-size: 0.76em; color: #a06a00; font-weight: 600; margin: 0.4rem 0 0.15rem; }
+  .payload-copy-status { font-size: 0.78em; color: #555; margin-left: 0.5rem; }
   /* Phase 20260615-night-5-admin-categories-readonly-usage-counts-a：category usage table + sub-buckets
      - 全部 read-only；無 button writes；只用既有 admin 顏色 token（不引入新色板）
      - .cat-usage-table：分類使用統計主表；穩定欄寬 + sticky header（沿用 .scripts-table 視覺風格）
@@ -1548,8 +1554,11 @@
                   <pre class="payload-cmd-output payload-target-rel-output"><code><%= p.sourceRel %></code></pre>
                   <label>Payload JSON（dryRun:true；no <code>dryRun:false</code> by default）</label>
                   <textarea class="payload-json-output" readonly rows="9" spellcheck="false" aria-label="admin write payload preview (dry-run)" placeholder="點上方「Compute payload preview」以產生靜態 payload 預覽（不寫檔）"></textarea>
+                  <div><button type="button" class="payload-copy-btn payload-copy-json" disabled aria-disabled="true">Copy payload JSON</button></div>
                   <label>Command preview（dry-run；無 <code>--apply</code>）</label>
                   <pre class="payload-cmd-output"><code class="payload-cmd-text">點上方按鈕產生 command 預覽（不執行）</code></pre>
+                  <div><button type="button" class="payload-copy-btn payload-copy-cmd" disabled aria-disabled="true">Copy command</button></div>
+                  <p class="payload-copy-note">複製不構成核准 / Copy does not approve · 所複製內容恆為 dry-run preview（<code>dryRun:true</code>；無 <code>--apply</code>；無 <code>dryRun:false</code>）。<span class="payload-copy-status" aria-live="polite"></span></p>
                 </div>
               </details>
               <%# Phase 20260527-night-9 Admin Write Infra Phase 3b dry-run-only UI
@@ -2552,6 +2561,37 @@
         div.textContent = s == null ? '' : String(s);
         return div.innerHTML;
       }
+      // Phase 20260618-am-admin-k7: payload preview clipboard helper（local；clipboard-only）
+      // mirror 既有 commerce snippet helper 之 navigator.clipboard.writeText → execCommand('copy') fallback。
+      // 純前端：無 fetch / XHR / fs.writeFile / spawn / child_process / form submit / write path。
+      // fallback 用 off-DOM transient textarea（append → select → execCommand('copy') → remove），不改任何既有元素值。
+      function payloadCopyText(text, statusEl) {
+        function showStatus(msg, isErr) {
+          if (!statusEl) return;
+          statusEl.textContent = msg;
+          statusEl.style.color = isErr ? '#a00' : '#080';
+          setTimeout(function () { if (statusEl.textContent === msg) statusEl.textContent = ''; }, 2000);
+        }
+        if (!text) { showStatus('尚無內容可複製（請先 Compute）', true); return; }
+        function fallbackCopy() {
+          var tmp = document.createElement('textarea');
+          tmp.value = text;
+          tmp.setAttribute('readonly', 'readonly');
+          tmp.style.position = 'absolute';
+          tmp.style.left = '-9999px';
+          document.body.appendChild(tmp);
+          tmp.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          document.body.removeChild(tmp);
+          showStatus(ok ? '已複製 (Copied)' : '複製失敗，請手動選取後 Ctrl+C', !ok);
+        }
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(text).then(function () { showStatus('已複製 (Copied)', false); }).catch(function () { fallbackCopy(); });
+        } else {
+          fallbackCopy();
+        }
+      }
       var drySections = document.querySelectorAll('.dry-run-section');
       drySections.forEach(function (section) {
         section.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -2611,6 +2651,17 @@
           var payloadJsonOut = payloadPanel.querySelector('.payload-json-output');
           var payloadCmdOut = payloadPanel.querySelector('.payload-cmd-text');
           var payloadStatus = payloadPanel.querySelector('.payload-preview-status');
+          // Phase 20260618-am-admin-k7: copy buttons（clipboard-only；preview convenience；無 write path）
+          var payloadCopyJson = payloadPanel.querySelector('.payload-copy-json');
+          var payloadCopyCmd = payloadPanel.querySelector('.payload-copy-cmd');
+          var payloadCopyStatus = payloadPanel.querySelector('.payload-copy-status');
+          function setPayloadCopyEnabled(enabled) {
+            [payloadCopyJson, payloadCopyCmd].forEach(function (b) {
+              if (!b) return;
+              b.disabled = !enabled;
+              b.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+            });
+          }
           if (payloadCompute && payloadFieldSel && payloadJsonOut && payloadCmdOut) {
             payloadCompute.addEventListener('click', function () {
               var targetRel = payloadPanel.dataset.sourceRel || '';
@@ -2631,6 +2682,20 @@
               // Command preview：固定字串；無 --apply；無 dryRun:false。
               payloadCmdOut.textContent = 'node src/scripts/admin-write-cli.js --payload=<temp.json>';
               if (payloadStatus) payloadStatus.textContent = 'preview generated (no write)';
+              setPayloadCopyEnabled(true);
+            });
+          }
+          // 複製為純前端 clipboard 操作；複製不構成核准；所複製內容恆為 dry-run preview（dryRun:true；無 --apply）。
+          if (payloadCopyJson) {
+            payloadCopyJson.addEventListener('click', function () {
+              if (payloadCopyJson.disabled) return;
+              payloadCopyText(payloadJsonOut.value || '', payloadCopyStatus);
+            });
+          }
+          if (payloadCopyCmd) {
+            payloadCopyCmd.addEventListener('click', function () {
+              if (payloadCopyCmd.disabled) return;
+              payloadCopyText(payloadCmdOut.textContent || '', payloadCopyStatus);
             });
           }
         }
