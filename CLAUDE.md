@@ -285,7 +285,7 @@ production-post warnings = 0；94 / 101 warnings 全來自 `content/validation-f
 | R1 detail panel collapsible sections（4 低頻 sections）+ browser-PASS | ✅ |
 | Posts table `<td>` closure 7/7 平衡 | ✅ |
 | Static payload preview（dev-mode-only；preview-only；no write path） | ✅ landed + dual-accepted（source `f873ec2` + browser-PASS 2026-06-17；write path dormant；preflight record `docs/20260618-am-admin-phase2-static-payload-preview-preflight-record.md`） |
-| K7 copy buttons（clipboard-only；preview convenience；no write path） | ✅ landed + read-only acceptance（source `efaa774` single-file additive；clipboard-only `writeText`+`execCommand('copy')` fallback；Apply remains disabled；record `docs/20260618-am-admin-k7-copy-buttons-acceptance-record.md`；browser-PASS optional 未做） |
+| K7 copy buttons（clipboard-only；preview convenience；no write path） | ✅ landed + read-only acceptance（source `efaa774` single-file additive；clipboard-only `writeText`+`execCommand('copy')` fallback；Apply remains disabled；record `docs/20260618-am-admin-k7-copy-buttons-acceptance-record.md`；browser-PASS ✅ user-evidence `docs/20260618-am-admin-k7-copy-buttons-browser-pass-record.md`〔Dean 本機 2026-06-18 10:48–11:04 localhost:5173/admin/#posts：兩按鈕可見 / clipboard 為 dryRun:true preview / command 無 --apply / warning「複製不構成核准」/ 已複製 status / 點按無 Network request / Apply disabled / Dean 未執行 CLI / repo 測後 clean 無 untracked〕） |
 | ADMIN stage checkpoint | ✅ idle freeze |
 
 ADMIN 線目前 **idle freeze**。後續 session **不主動推進**以下（各須獨立 phase + user explicit approval）：
