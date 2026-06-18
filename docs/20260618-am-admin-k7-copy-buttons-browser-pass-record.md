@@ -46,6 +46,16 @@
 
 > ⚠️ Dev server 由 Dean 自行於本機啟動以供本機觀察；本 phase 不視為由 Claude 起 dev server，亦不 build / deploy。
 
+### 3.1 Evidence source
+
+本 record 之全部證據來源為 **Dean-provided**，計三類：
+
+1. **Dean 提供之截圖**（screenshots）—— Admin static payload preview block、兩個 copy 按鈕、UI warning 文字、`已複製 (Copied)` status、DevTools Network 無新 request。
+2. **Dean 貼上之 clipboard 結果**（pasted clipboard results）—— `Copy payload JSON` 之 dry-run JSON（§4.2）與 `Copy command` 之固定 CLI 字串（§4.3）。
+3. **Dean 之 repo-level 終端機檢查**（repo-level terminal checks）—— `git status --short --untracked-files=all` / `git ls-files --others --exclude-standard` 皆無輸出 + 遞迴檔名搜尋（§5）。
+
+Claude **未**獨立取得任何瀏覽器 / filesystem 證據；本檔為對上述 Dean-provided 證據之記錄。證明範圍以 §5 wording 約束為準（repo-level，非 whole-machine / production filesystem proof）。
+
 ---
 
 ## 4. Browser evidence（Dean observed）
