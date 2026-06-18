@@ -2611,6 +2611,13 @@
           var fields = ['description', 'searchDescription', 'titleEn', 'coverAlt'];
           var changed = 0;
           var html = '';
+          // Phase 20260618-am-admin-k8-field-auto-switch-implementation-a:
+          //   - 在既有 changed loop 內順手記錄「第一個有變動的欄位」（純 local 變數；無 global state）
+          //   - loop 結束後若有 changed field 且同 section 內存在 .payload-preview-field select，
+          //     將 selector 切到該欄位（field auto-follow）；無 changed field 時 selector 不動
+          //   - 不改 payload JSON / command / dryRun:true；不 auto-open / 不 auto-compute；
+          //     不動 Apply（仍 disabled）；不碰 copy buttons（仍須 user 點 Compute 後才 enable）
+          var firstChangedField = null;
           fields.forEach(function (name) {
             var oldCell = section.querySelector('[data-field="' + name + '"]');
             var input = section.querySelector('[data-input="' + name + '"]');
@@ -2624,6 +2631,7 @@
               statusClass = 'status-changed';
               statusText = 'changed';
               changed++;
+              if (firstChangedField === null) firstChangedField = name;
             }
             html += '<tr>'
               + '<td class="mono">' + escapeHtml(name) + '</td>'
@@ -2635,6 +2643,12 @@
           diffRows.innerHTML = html;
           changedCount.textContent = changed;
           result.hidden = false;
+          // field auto-follow：僅在有 changed field 時切換 selector；selector 值屬已知 4 欄位才設定。
+          var payloadFieldSelect = section.querySelector('.payload-preview-field');
+          if (firstChangedField && payloadFieldSelect
+              && Array.prototype.slice.call(payloadFieldSelect.options).some(function (option) { return option.value === firstChangedField; })) {
+            payloadFieldSelect.value = firstChangedField;
+          }
         });
 
         // Phase 20260617-night-phase2-admin-ui-static-payload-preview-implementation-a:
