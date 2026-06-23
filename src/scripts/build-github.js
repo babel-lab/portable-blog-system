@@ -15,6 +15,9 @@ import { deriveRenderedAffiliateLinks } from './resolve-affiliate-links.js';
 import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
 // Phase 20260623-pm-sp3：special page-type → robots precedence helper（純函式；SP-3）。
 import { resolvePostDetailRobots } from './page-type-robots.js';
+// Phase 20260623-pm-sp4a：站內列表 includeInListings selector（純函式；SP-4a）。
+//   預設一律 include → 既有 listing 輸出 byte-identical。
+import { shouldIncludeInListings } from './include-in-listings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -583,10 +586,20 @@ async function main() {
 
   await writeText(path.join(ASSETS_DIR, 'entry.js'), ENTRY_JS, outputs);
 
+  // Phase 20260623-pm-sp4a：站內列表面共用之 includeInListings 過濾清單。
+  //   - 來源 githubPosts.posts 已於 load-github-posts.js 排序（date desc, slug asc）。
+  //   - shouldIncludeInListings 預設一律 true → SP-4a 下 listingPosts 與 githubPosts.posts
+  //     等長、同序、同物件 reference → home / post-list / category / tag / prev-next 輸出 byte-identical。
+  //   - 只有未來顯式 includeInListings: false 之 post 才會自此清單移除（SP-4b 路徑）。
+  //   - ⚠️ post-detail 頁仍對「全部」githubPosts.posts 生成（見下方 loop），確保未列入 listing
+  //     之頁仍可訪問（gated/download 之「noindex 但可訪問」狀態）；listing 過濾不影響 detail 生成。
+  //   - posts.json（postsOutput）維持全量輸出，不套 listing 過濾（屬資料匯出，非 listing surface）。
+  const listingPosts = githubPosts.posts.filter((p) => shouldIncludeInListings(p));
+
   const homeHtml = await renderPage({
     template: 'pages/home.ejs',
     data: baseData({
-      posts: githubPosts.posts,
+      posts: listingPosts,
       title: settings.site.siteName,
       description: settings.site.description,
       seo: buildSeoForHome({ settings }),
@@ -597,7 +610,7 @@ async function main() {
   const listHtml = await renderPage({
     template: 'pages/post-list.ejs',
     data: baseData({
-      posts: githubPosts.posts,
+      posts: listingPosts,
       title: `文章列表 | ${settings.site.siteName}`,
       description: `${settings.site.siteName} 文章列表`,
       seo: buildSeoForPostList({ settings }),
@@ -605,18 +618,32 @@ async function main() {
   });
   await writeText(path.join(PAGES_DIR, 'posts', 'index.html'), listHtml, outputs);
 
-  const orderedPosts = githubPosts.posts;
-  for (const [postIndex, post] of orderedPosts.entries()) {
+  // Phase 20260623-pm-sp4a：prev/next 鏈僅由 listingPosts（已套 includeInListings 過濾）推導。
+  //   - 預先以 post 物件 reference 為 key 建 nav map（不以 slug 為 key，避免 slug 衝突時誤判；
+  //     load-github-posts.js 對 slug 衝突僅 warning 不去重）。
+  //   - listingPosts 與 githubPosts.posts 共用同一批 post 物件 reference（filter 不 clone）。
+  //   - SP-4a 下 listingPosts === githubPosts.posts（全 true、同序、同 reference）→ 每篇 post 之
+  //     prev/next 與原 positional 推導逐字相同 → byte-identical。
+  //   - 未列入 listing 之 post（未來 SP-4b）：nav map 無其 entry → prev/next 皆 null（脫離前後篇鏈），
+  //     但其 detail 頁仍生成（loop 仍跑全量 githubPosts.posts）。
+  const listingNavByPost = new Map();
+  for (const [listingIndex, p] of listingPosts.entries()) {
+    const older = listingPosts[listingIndex + 1];
+    const newer = listingPosts[listingIndex - 1];
+    listingNavByPost.set(p, {
+      prevPost: older ? { slug: older.slug, title: older.title } : null,
+      nextPost: newer ? { slug: newer.slug, title: newer.title } : null,
+    });
+  }
+
+  for (const post of githubPosts.posts) {
     const bodyHtml = renderBody(post.body || '');
-    // Phase 20260615-am-2：文章底部導覽 prev/next 推導。
-    //   - orderedPosts 已於 load-github-posts.js 排序為 date desc, slug asc（index 0 為最新）。
-    //   - 上一篇（較舊）= orderedPosts[index+1]；下一篇（較新）= orderedPosts[index-1]。
-    //   - 第一篇（最新）無較新 → nextPost null；最後一篇（最舊）無較舊 → prevPost null。
+    // Phase 20260615-am-2 / 20260623-pm-sp4a：文章底部導覽 prev/next。
+    //   - 由 listingNavByPost 取得（listing 鏈相鄰篇；未列入 listing 之 post 回 null/null）。
     //   - 僅取 slug / title；缺值回傳 null，partial 端不渲染對應 link（避免 href="undefined"）。
-    const olderPost = orderedPosts[postIndex + 1];
-    const newerPost = orderedPosts[postIndex - 1];
-    const prevPost = olderPost ? { slug: olderPost.slug, title: olderPost.title } : null;
-    const nextPost = newerPost ? { slug: newerPost.slug, title: newerPost.title } : null;
+    const nav = listingNavByPost.get(post) || { prevPost: null, nextPost: null };
+    const prevPost = nav.prevPost;
+    const nextPost = nav.nextPost;
     // Phase related-links-ga4-audit：對每篇 post 預處理 relatedLinks / otherLinks
     //   - 對 Blogger cross-link 注入 GA4 UTM + 強制 target=_blank + 合併 rel
     //   - 非 Blogger 連結 / 同站連結維持 EJS 預設邏輯（item.target / item.rel 為 null）
@@ -669,8 +696,10 @@ async function main() {
     settings.tags.find((t) => t.slug === ref) ||
     null;
 
+  // Phase 20260623-pm-sp4a：category / tag 分組亦由 listingPosts 派生（套 includeInListings 過濾）。
+  //   SP-4a 下 listingPosts === githubPosts.posts → 各分類/標籤計數與分組 byte-identical。
   const categoryMap = new Map();
-  for (const post of githubPosts.posts) {
+  for (const post of listingPosts) {
     if (!post.category) continue;
     const cat = findCategory(post.category);
     if (!cat) continue;
@@ -710,7 +739,7 @@ async function main() {
   await writeText(path.join(PAGES_DIR, 'categories', 'index.html'), categoryListHtml, outputs);
 
   const tagMap = new Map();
-  for (const post of githubPosts.posts) {
+  for (const post of listingPosts) {
     for (const ref of post.tags || []) {
       const t = findTag(ref);
       if (!t) continue;
