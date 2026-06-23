@@ -238,5 +238,108 @@ check('platformPolicy: per-platform safe summary projected', () => {
   assert.equal(hasWarning(v, 'page-platform-policy-invalid-type'), false);
 });
 
+// --- 9. SP-9a：platformPolicy effective hint (display-only) ---
+//   committed binding：本批僅顯示 effective；**永不**改變 robots / listing / sitemap / canonical /
+//   feeds / Blogger guidance / live output 行為（SP-9b / SP-9c 才會接，仍 dormant）。
+check('SP-9a: recognized platform + explicit override → effective populated, source override', () => {
+  const v = derivePageMetadataView({
+    contentKind: 'post',
+    platformPolicy: { github: { indexing: 'noindex-follow', includeInListings: false } },
+  });
+  const g = v.platformPolicy.platforms.find((p) => p.name === 'github');
+  assert.equal(g.recognized, true);
+  assert.equal(g.secretLike, false);
+  assert.equal(g.effectiveIndexing.value, 'noindex-follow');
+  assert.equal(g.effectiveIndexing.source, 'override');
+  assert.equal(g.effectiveIncludeInListings.value, false);
+  assert.equal(g.effectiveIncludeInListings.source, 'override');
+});
+
+check('SP-9a: inherit leaf → effective null, source inherit, topLevelFallback exposed', () => {
+  const v = derivePageMetadataView({
+    contentKind: 'post',
+    seo: { indexing: 'noindex-follow' },
+    includeInListings: false,
+    platformPolicy: { blogger: { indexing: 'inherit', includeInListings: 'inherit' } },
+  });
+  const b = v.platformPolicy.platforms.find((p) => p.name === 'blogger');
+  assert.equal(b.recognized, true);
+  assert.equal(b.effectiveIndexing.value, null);
+  assert.equal(b.effectiveIndexing.source, 'inherit');
+  // topLevelFallback derived from effective robots (noindex, follow → noindex-follow)
+  assert.equal(b.effectiveIndexing.topLevelFallback, 'noindex-follow');
+  assert.equal(b.effectiveIncludeInListings.source, 'inherit');
+  assert.equal(b.effectiveIncludeInListings.topLevelFallback, false);
+});
+
+check('SP-9a: absent leaf → source absent, topLevelFallback still exposed', () => {
+  const v = derivePageMetadataView({
+    contentKind: 'post',
+    platformPolicy: { future: { canonical: 'inherit', note: 'reserved' } },
+  });
+  const f = v.platformPolicy.platforms.find((p) => p.name === 'future');
+  assert.equal(f.effectiveIndexing.source, 'absent');
+  assert.equal(f.effectiveIndexing.topLevelFallback, 'index'); // default 'index, follow' → 'index'
+  assert.equal(f.effectiveIncludeInListings.source, 'absent');
+  assert.equal(f.effectiveIncludeInListings.topLevelFallback, true); // default listing true
+});
+
+check('SP-9a: invalid leaf (non-enum indexing) → source invalid, value null', () => {
+  const v = derivePageMetadataView({
+    contentKind: 'post',
+    platformPolicy: { github: { indexing: 'sometimes' } },
+  });
+  const g = v.platformPolicy.platforms.find((p) => p.name === 'github');
+  assert.equal(g.effectiveIndexing.value, null);
+  assert.equal(g.effectiveIndexing.source, 'invalid');
+});
+
+check('SP-9a: unrecognized platform key (wordpress) → recognized false, source unrecognized-platform', () => {
+  const v = derivePageMetadataView({
+    contentKind: 'post',
+    platformPolicy: { wordpress: { indexing: 'index', includeInListings: true } },
+  });
+  const w = v.platformPolicy.platforms.find((p) => p.name === 'wordpress');
+  assert.equal(w.recognized, false);
+  assert.equal(w.effectiveIndexing.source, 'unrecognized-platform');
+  // raw 仍顯示原值（policy 未認可，但供作者除錯）
+  assert.equal(w.indexing, 'index');
+  assert.equal(w.includeInListings, true);
+  // effective 不推導
+  assert.equal(w.effectiveIndexing.value, null);
+  assert.equal(w.effectiveIncludeInListings.value, null);
+});
+
+check('SP-9a secret-safety: suspicious platform key (token) → secretLike true, value never echoed', () => {
+  const v = derivePageMetadataView({
+    contentKind: 'post',
+    platformPolicy: { token: { indexing: 'noindex-follow' } },
+  });
+  const t = v.platformPolicy.platforms.find((p) => p.name === 'token');
+  assert.equal(t.secretLike, true);
+  assert.equal(t.recognized, false);
+  // raw / effective 一律空 / null（不讀 sub）
+  assert.equal(t.indexing, '');
+  assert.equal(t.includeInListings, null);
+  assert.equal(t.effectiveIndexing.source, 'secret');
+  assert.equal(t.effectiveIncludeInListings.source, 'secret');
+  // 整個 view JSON 不含 secret leaf 'noindex-follow' from suspicious platform
+  //   （注意：頂層 seo 沒有 noindex-follow；本 case 確認 secret platform 之 leaf 不被讀）
+  const ser = JSON.stringify(v);
+  assert.equal(ser.includes('noindex-follow'), false);
+});
+
+check('SP-9a: pageType-driven robots fallback (utility_hidden) propagates to inherit hint', () => {
+  const v = derivePageMetadataView({
+    contentKind: 'post',
+    pageType: 'utility_hidden',
+    platformPolicy: { github: { indexing: 'inherit' } },
+  });
+  const g = v.platformPolicy.platforms.find((p) => p.name === 'github');
+  assert.equal(g.effectiveIndexing.source, 'inherit');
+  // utility_hidden → 'noindex, nofollow' → 'noindex-nofollow'
+  assert.equal(g.effectiveIndexing.topLevelFallback, 'noindex-nofollow');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

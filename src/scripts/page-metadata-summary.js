@@ -25,6 +25,11 @@
 import { resolvePostDetailRobots, derivePageTypeRobots } from './page-type-robots.js';
 import { resolveIncludeInListings } from './include-in-listings.js';
 import { resolveIncludeInSitemap, isSitemapEligible } from './include-in-sitemap.js';
+// SP-9a：platformPolicy per-platform effective lookup（display-only / no build consumption）
+//   per docs/20260624-am-sp9a-platform-policy-effective-derive-helper.md
+//   仍 read-only：本投影只供 Admin summary 顯示；**不**接入 robots / listing / sitemap / canonical /
+//   Blogger guidance / GitHub Pages live output（SP-9b / SP-9c 才會接，且仍 dormant 待 Dean 批准）。
+import { derivePlatformPolicyEffective as derivePlatformPolicyEffectiveExternal } from './platform-policy-effective.js';
 
 // SP-2 鎖定之 pageType 封閉列舉（snake_case；mirror validate-content.js VALID_PAGE_TYPE）
 const VALID_PAGE_TYPE = new Set([
@@ -73,6 +78,16 @@ const GATED_SAFE_STRING_KEYS = ['mechanism', 'postSubmitResource'];
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+// SP-9a（display-only）：將 effective robots meta 字串映射回 per-platform leaf 之合法 enum，
+//   用於 platformPolicy inherit / absent leaf 顯示「會 fallback 到頂層的什麼」。
+//   無法對應時回 null（不猜）。
+function mapRobotsToIndexingEnum(robots) {
+  if (robots === 'index, follow') return 'index';
+  if (robots === 'noindex, follow') return 'noindex-follow';
+  if (robots === 'noindex, nofollow') return 'noindex-nofollow';
+  return null;
 }
 
 // raw include flag → 顯示用 label（不解讀，僅描述作者實填值）。
@@ -154,21 +169,80 @@ function deriveGatedDownloadSafe(gated) {
 
 /**
  * platformPolicy 之 safe 摘要（per-platform indexing / includeInListings；read-only）。
- *   platformPolicy 子欄位 shape validator 屬 deferred（SP-7/SP-8）；此處僅顯示已存在之 primitive 值。
+ *   platformPolicy 子欄位 shape validator 屬 SP-2 / SP-8 既有規則；此處僅顯示已存在之 primitive 值。
+ *
+ * SP-9a 擴充（source-light / display-only / no build consumption）：
+ *   - 既有 raw 欄位 `indexing` / `includeInListings` 完全保留（既有 EJS 引用不破）。
+ *   - 新增 `recognized` / `secretLike`（per-platform；mirror platform-policy-effective.js）。
+ *   - 新增 `effectiveIndexing` / `effectiveIncludeInListings`：
+ *       { value, source, topLevelFallback }
+ *     source = 'override' / 'inherit' / 'absent' / 'invalid' / 'secret' / 'unrecognized-platform'
+ *     topLevelFallback = inherit / absent 時建議的頂層 fallback（**僅供顯示**；不接 build 端）。
+ *
+ * 🔴 仍 display-only：本投影**永不**用於 robots / listing / sitemap / canonical / feeds / Blogger guidance
+ *    決策；SP-9b / SP-9c 才會接，且當前 dormant。
  *
  * @param {*} pp fm.platformPolicy
- * @returns {{ present: boolean, isObject: boolean, platforms: Array<{name:string, indexing:string, includeInListings:(boolean|null)}> }}
+ * @param {object} fallbacks 頂層 fallback context（display-only）
+ *   - indexingFallback: top-level seo.indexing 規則化值（'index' / 'noindex-follow' / 'noindex-nofollow' / null）
+ *   - listingFallback : top-level includeInListings 之 effective（boolean）
+ * @returns {{ present: boolean, isObject: boolean, platforms: Array<object> }}
  */
-function derivePlatformPolicySafe(pp) {
+function derivePlatformPolicySafe(pp, fallbacks) {
   const out = { present: pp !== undefined, isObject: false, platforms: [] };
   if (!isPlainObject(pp)) return out;
   out.isObject = true;
+
+  // SP-9a：委派 derivePlatformPolicyEffective 取得 per-platform recognized / secretLike / effective 資料。
+  //   為了不重複實作 inherit / override / invalid / secret / unrecognized 之語意中心，這裡
+  //   走純函式合併：用相同 keys 順序，將 effective 資料覆蓋 raw 投影（既有 raw 欄位仍保留）。
+  const effective = derivePlatformPolicyEffectiveExternal({ platformPolicy: pp });
+  const effByName = new Map();
+  for (const e of effective.platforms) effByName.set(e.name, e);
+
+  const indexingFallback =
+    fallbacks && typeof fallbacks.indexingFallback === 'string' ? fallbacks.indexingFallback : null;
+  const listingFallback =
+    fallbacks && typeof fallbacks.listingFallback === 'boolean' ? fallbacks.listingFallback : null;
+
   for (const name of Object.keys(pp)) {
     const sub = pp[name];
-    const entry = { name, indexing: '', includeInListings: null };
+    const entry = {
+      name,
+      // 既有欄位（不刪、不改語意；既有 EJS 引用仍可用）
+      indexing: '',
+      includeInListings: null,
+      // SP-9a additive 欄位
+      recognized: false,
+      secretLike: false,
+      effectiveIndexing: { value: null, source: 'absent', topLevelFallback: indexingFallback },
+      effectiveIncludeInListings: { value: null, source: 'absent', topLevelFallback: listingFallback },
+    };
     if (isPlainObject(sub)) {
       if (typeof sub.indexing === 'string') entry.indexing = sub.indexing;
       if (typeof sub.includeInListings === 'boolean') entry.includeInListings = sub.includeInListings;
+    }
+
+    // 套用 effective 投影（SP-9a 委派；secret-safe，不讀 value）
+    const eff = effByName.get(name);
+    if (eff) {
+      entry.recognized = eff.recognized;
+      entry.secretLike = eff.secretLike;
+      entry.effectiveIndexing = {
+        value: eff.indexing.effective,
+        source: eff.indexing.source,
+        topLevelFallback: indexingFallback,
+      };
+      entry.effectiveIncludeInListings = {
+        value: eff.includeInListings.effective,
+        source: eff.includeInListings.source,
+        topLevelFallback: listingFallback,
+      };
+      // secret platform key：raw 不顯示（mirror eff 之 raw 空字串契約；防 EJS 誤秀 SECRET 子物件）
+      if (eff.secretLike) {
+        entry.indexing = '';
+        entry.includeInListings = null;
+      }
     }
     out.platforms.push(entry);
   }
@@ -295,7 +369,15 @@ export function derivePageMetadataView(fm) {
   const sitemapEffective = resolveIncludeInSitemap(safeFm);
 
   const gated = deriveGatedDownloadSafe(safeFm.gatedDownload);
-  const platformPolicy = derivePlatformPolicySafe(safeFm.platformPolicy);
+  // SP-9a：頂層 fallback context（display-only）—— inherit / absent leaf 顯示「會 fallback 到頂層的什麼」。
+  //   - indexingFallback：將 effective 'index, follow' / 'noindex, follow' / 'noindex, nofollow' 還原為
+  //     SP-9a per-platform effective leaf 之合法 enum（'index' / 'noindex-follow' / 'noindex-nofollow'）；
+  //     legacy contentKind:download 與 pageType 推導之頂層 effective 也照映射；無法對應 enum 時為 null。
+  //   - listingFallback：頂層 includeInListings 之 effective（boolean），等同 SP-4a resolveIncludeInListings。
+  const platformPolicy = derivePlatformPolicySafe(safeFm.platformPolicy, {
+    indexingFallback: mapRobotsToIndexingEnum(robotsValue),
+    listingFallback: listingEffective,
+  });
   const warnings = derivePageTypeWarnings(safeFm);
 
   return {

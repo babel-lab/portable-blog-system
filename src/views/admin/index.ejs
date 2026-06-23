@@ -1207,13 +1207,76 @@
               </dd>
               <dt>平台覆寫 / Platform policy</dt>
               <dd>
+                <%# SP-9a：display-only effective hint。raw 顯示 + effective hint 分兩行。
+                    🔴 仍是顯示用：本欄之 effective 值**不**影響 robots / listing / sitemap / canonical /
+                       feeds / Blogger guidance / live output。Blogger Google Form gated download 仍須
+                       Blogger 後台人工 noindex。真消費屬 SP-9b / SP-9c（dormant 待 Dean 批准）。 -%>
                 <% if (!pmPp.present) { %>
                   <span class="text-muted">— (全平台沿用頂層值)</span>
                 <% } else if (!pmPp.isObject) { %>
                   <span class="badge b-warn">型別非法</span> <span class="text-muted" style="font-size: 0.82em;">(validator 以 page-platform-policy-invalid-type warn)</span>
                 <% } else { %>
+                  <p class="text-muted" style="font-size: 0.78em; margin: 0 0 0.25rem;">
+                    raw = 作者原填值；effective = SP-9a 解析後預期值（<strong>display-only</strong>；目前**不**改 robots / listing / sitemap / canonical / feeds / Blogger guidance 任一輸出；真消費屬 SP-9b/9c，dormant）。
+                  </p>
                   <% pmPp.platforms.forEach(function (pf) { %>
-                    <div style="font-size: 0.82em;"><span class="badge b-info"><%= pf.name %></span> <span class="text-muted">indexing: <%= pf.indexing || '—' %> · listings: <%= (pf.includeInListings === null) ? '—' : pf.includeInListings %></span></div>
+                    <% var pfEi = pf.effectiveIndexing || { value: null, source: 'absent', topLevelFallback: null }; %>
+                    <% var pfEl = pf.effectiveIncludeInListings || { value: null, source: 'absent', topLevelFallback: null }; %>
+                    <% var nameBadgeClass = pf.secretLike ? 'b-warn' : (pf.recognized ? 'b-info' : 'b-warn'); %>
+                    <div style="font-size: 0.82em; margin-bottom: 0.35rem;">
+                      <span class="badge <%= nameBadgeClass %>"><%= pf.name %></span>
+                      <% if (pf.secretLike) { %>
+                        <span class="text-muted" style="font-size: 0.95em;">⚠️ 平台 key 命中敏感名單；value 不顯示 / 不應入 repo（SP-8 warn）。</span>
+                      <% } else if (!pf.recognized) { %>
+                        <span class="text-muted" style="font-size: 0.95em;">⚠️ 非建議 platform key（建議 github / blogger / future；SP-8 warn）。raw 仍列出供除錯，effective 不推導。</span>
+                      <% } %>
+                      <%# indexing 行：raw + effective hint -%>
+                      <div style="margin-left: 1rem;">
+                        <span class="text-muted">indexing</span>
+                        <span class="text-muted">· raw: </span><code><%= pf.indexing || '—' %></code>
+                        <span class="text-muted">· effective: </span>
+                        <% if (pfEi.source === 'override') { %>
+                          <span class="badge b-info"><%= pfEi.value %></span>
+                          <span class="text-muted">(override)</span>
+                        <% } else if (pfEi.source === 'inherit') { %>
+                          <span class="badge b-info">inherit → <%= pfEi.topLevelFallback || '—' %></span>
+                          <span class="text-muted">(top-level fallback)</span>
+                        <% } else if (pfEi.source === 'invalid') { %>
+                          <span class="badge b-warn">invalid</span>
+                          <span class="text-muted">(validator warn；不推導)</span>
+                        <% } else if (pfEi.source === 'secret') { %>
+                          <span class="badge b-warn">secret</span>
+                          <span class="text-muted">(不讀 value)</span>
+                        <% } else if (pfEi.source === 'unrecognized-platform') { %>
+                          <span class="badge b-warn">— (platform 未認可)</span>
+                        <% } else { %>
+                          <span class="text-muted">— (未填，沿用頂層 <%= pfEi.topLevelFallback || '—' %>)</span>
+                        <% } %>
+                      </div>
+                      <%# includeInListings 行 -%>
+                      <div style="margin-left: 1rem;">
+                        <span class="text-muted">includeInListings</span>
+                        <span class="text-muted">· raw: </span><code><%= (pf.includeInListings === null) ? '—' : pf.includeInListings %></code>
+                        <span class="text-muted">· effective: </span>
+                        <% if (pfEl.source === 'override') { %>
+                          <span class="badge b-info"><%= pfEl.value %></span>
+                          <span class="text-muted">(override)</span>
+                        <% } else if (pfEl.source === 'inherit') { %>
+                          <span class="badge b-info">inherit → <%= (pfEl.topLevelFallback === null) ? '—' : pfEl.topLevelFallback %></span>
+                          <span class="text-muted">(top-level fallback)</span>
+                        <% } else if (pfEl.source === 'invalid') { %>
+                          <span class="badge b-warn">invalid</span>
+                          <span class="text-muted">(validator warn；不推導)</span>
+                        <% } else if (pfEl.source === 'secret') { %>
+                          <span class="badge b-warn">secret</span>
+                          <span class="text-muted">(不讀 value)</span>
+                        <% } else if (pfEl.source === 'unrecognized-platform') { %>
+                          <span class="badge b-warn">— (platform 未認可)</span>
+                        <% } else { %>
+                          <span class="text-muted">— (未填，沿用頂層 <%= (pfEl.topLevelFallback === null) ? '—' : pfEl.topLevelFallback %>)</span>
+                        <% } %>
+                      </div>
+                    </div>
                   <% }); %>
                 <% } %>
               </dd>
