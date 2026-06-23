@@ -176,6 +176,96 @@ check('20 redirect_canonical + canonical missing → page-redirect-canonical-mis
   assert.deepEqual(types(pageIssues({ pageType: 'redirect_canonical' })), ['page-redirect-canonical-missing-target']);
 });
 
+// ─── SP-8：platformPolicy 巢狀 shallow shape sub-rules（warning-only；additive）─────────
+//   per docs/20260623-pm-sp8-platform-policy-shape-validator.md
+//   - 只在 platformPolicy 為 plain object 時評估；missing / 非 object → 走 SP-2 rule 3（不變）
+//   - 全部 severity 'warning'（pageIssues helper 已對所有 page-* issue 斷言 warning）
+
+check('21 platformPolicy minimal valid object → 0 SP-2/SP-8 warning', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { github: { indexing: 'inherit' } } })), []);
+});
+
+check('22 platformPolicy full valid (github/blogger/future, all fields) → 0 warning', () => {
+  const out = pageIssues({
+    platformPolicy: {
+      github: { indexing: 'index', includeInListings: true, includeInSitemap: false, includeInFeeds: 'inherit', canonical: 'https://example.com/x', note: 'ok' },
+      blogger: { indexing: 'noindex-nofollow', includeInListings: false },
+      future: { indexing: 'inherit', canonical: 'inherit' },
+    },
+  });
+  assert.deepEqual(types(out), []);
+});
+
+check('23 unknown platform key → page-platform-policy-unknown-platform', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { wordpress: { indexing: 'inherit' } } })), ['page-platform-policy-unknown-platform']);
+});
+
+check('24 platform entry not object (string) → page-platform-policy-platform-invalid-type only', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { github: 'noindex' } })), ['page-platform-policy-platform-invalid-type']);
+});
+
+check('25 unknown nested key → page-platform-policy-unknown-field', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { github: { priority: 'high' } } })), ['page-platform-policy-unknown-field']);
+});
+
+check('26 invalid indexing value → page-platform-policy-indexing-invalid', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { github: { indexing: 'sometimes' } } })), ['page-platform-policy-indexing-invalid']);
+});
+
+check('27 invalid include flag value (string) → page-platform-policy-flag-invalid', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { blogger: { includeInListings: 'maybe' } } })), ['page-platform-policy-flag-invalid']);
+});
+
+check('28 include flag = "inherit" → no flag-invalid warning', () => {
+  const out = pageIssues({ platformPolicy: { github: { includeInListings: 'inherit', includeInSitemap: true, includeInFeeds: false } } });
+  assert.ok(!types(out).includes('page-platform-policy-flag-invalid'));
+  assert.deepEqual(types(out), []);
+});
+
+check('29 invalid canonical (number) → page-platform-policy-canonical-invalid', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { github: { canonical: 123 } } })), ['page-platform-policy-canonical-invalid']);
+});
+
+check('30 canonical "inherit" and canonical URL string → no canonical-invalid warning', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { github: { canonical: 'inherit' }, blogger: { canonical: 'https://example.com/y' } } })), []);
+});
+
+check('31 empty canonical string → page-platform-policy-canonical-invalid', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { github: { canonical: '   ' } } })), ['page-platform-policy-canonical-invalid']);
+});
+
+check('32 invalid note type (number) → page-platform-policy-note-invalid', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: { future: { note: 2026 } } })), ['page-platform-policy-note-invalid']);
+});
+
+check('33 suspicious top-level platform key (token) → suspicious-field, value not echoed', () => {
+  const out = pageIssues({ platformPolicy: { token: 'SECRET-TOP-VALUE' } });
+  assert.deepEqual(types(out), ['page-platform-policy-suspicious-field']);
+  assert.ok(!out[0].value.includes('SECRET-TOP-VALUE'), 'must not echo the disallowed value');
+  assert.ok(out[0].value.includes('token'), 'should name the field');
+});
+
+check('34 suspicious nested key (apiKey) → suspicious-field, value not echoed, no type check', () => {
+  const out = pageIssues({ platformPolicy: { github: { apiKey: 'SECRET-NESTED-VALUE' } } });
+  assert.deepEqual(types(out), ['page-platform-policy-suspicious-field']);
+  assert.ok(!out[0].value.includes('SECRET-NESTED-VALUE'), 'must not echo the disallowed value');
+  assert.ok(out[0].value.includes('apiKey'), 'should name the field');
+});
+
+check('35 nested object beyond shallow platform object → page-platform-policy-nested-object-deferred (not recursed)', () => {
+  const out = pageIssues({ platformPolicy: { github: { indexing: { deep: 'x' } } } });
+  assert.deepEqual(types(out), ['page-platform-policy-nested-object-deferred']);
+});
+
+check('36 platformPolicy non-object (string) → SP-2 rule 3 unchanged, no SP-8 sub-rule', () => {
+  assert.deepEqual(types(pageIssues({ platformPolicy: 'blogger' })), ['page-platform-policy-invalid-type']);
+});
+
+check('37 unknown platform key with invalid nested value → both warnings (independent)', () => {
+  const out = pageIssues({ platformPolicy: { wordpress: { indexing: 'sometimes' } } });
+  assert.deepEqual(types(out), ['page-platform-policy-indexing-invalid', 'page-platform-policy-unknown-platform']);
+});
+
 // ─── summary ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

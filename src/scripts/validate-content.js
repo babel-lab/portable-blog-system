@@ -114,6 +114,34 @@ const GATED_DOWNLOAD_DISALLOWED_KEYS = new Set([
   'respondents',
 ]);
 
+// Phase 20260623-pm-sp8：platformPolicy 巢狀 shallow shape 列舉（warning-only；additive；只在 SP-2 之
+//   page-platform-policy-invalid-type 不觸發時，即 platformPolicy 為 plain object 時，才評估這些子規則）。
+//   - per docs/20260623-pm-sp8-platform-policy-shape-validator.md + SP-8 spec
+//   - 維持「shallow」：platformPolicy → platform object（一層）→ leaf 值；不 recurse 進 leaf 之巢狀 object
+//     （避免遞迴掃進可能含 secret 的 value；巢狀 object 一律標 deferred，不展開）。
+//   - 仍 warning-only：所有命中皆 severity 'warning'，缺省 / missing platformPolicy → 0 觸發。
+const PLATFORM_POLICY_PLATFORM_KEYS = new Set(['github', 'blogger', 'future']);
+const PLATFORM_POLICY_NESTED_KEYS = new Set([
+  'indexing',
+  'includeInListings',
+  'includeInSitemap',
+  'includeInFeeds',
+  'canonical',
+  'note',
+]);
+const PLATFORM_POLICY_INDEXING_VALUES = new Set([
+  'inherit',
+  'index',
+  'noindex-follow',
+  'noindex-nofollow',
+]);
+// includeInListings / includeInSitemap / includeInFeeds 之合法值：'inherit' | true | false
+const PLATFORM_POLICY_FLAG_KEYS = new Set(['includeInListings', 'includeInSitemap', 'includeInFeeds']);
+// 巢狀 typeof helper（與既有規則 message 慣例一致：null / array / primitive typeof）
+function describeTypeof(value) {
+  return value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+}
+
 // Phase 8-b-6：sidecar / frontmatter 欄位衝突 warning 之欄位清單
 //   採 presence-only 檢查（兩邊都有同名欄位即 warn，不比較值）；
 //   sidecar 不存在或 sidecar data 缺漏時略過該 sidecar 之檢查。
@@ -1401,8 +1429,10 @@ function validateAdsSettings(settings, issues) {
   }
 }
 
-// validatePageTypeMetadata：special page-type / indexing metadata 檢查（warning-only；SP-2）
+// validatePageTypeMetadata：special page-type / indexing metadata 檢查（warning-only；SP-2 + SP-8）
 //   - per docs/20260623-special-page-types-indexing-metadata-preanalysis.md §2/§3/§4/§5.3 + SP-2 spec
+//   - SP-8（additive）：platformPolicy 為 plain object 時，加做巢狀 shallow shape 子規則（見下方 SP-8 區塊）；
+//     missing platformPolicy 仍 0 觸發；非 object 仍只走 SP-2 rule 3（page-platform-policy-invalid-type）
 //   - 全部 warning（嚴禁 error）；所有欄位 optional：缺省（含整批欄位皆缺）→ 0 觸發 → 既有 post 不受影響
 //   - **只在欄位 present 且 problematic 時觸發**；missing pageType 不警（spec 明示）
 //   - 完全不消費於 build / render / listing / sitemap / Blogger / GitHub Pages / Admin（SP-3+ 才接）
@@ -1459,6 +1489,135 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
         post.platformPolicy === null ? 'null' : Array.isArray(post.platformPolicy) ? 'array' : typeof post.platformPolicy
       } (must be object)`,
     });
+  }
+
+  // SP-8（additive；只在 platformPolicy 為 plain object 時評估，故與 SP-2 rule 3 互斥、不重疊）：
+  //   platformPolicy 巢狀 shallow shape 檢查（全 warning-only）。
+  //   - 一律「shallow」掃描：platform key 一層 + 每個 platform object 內之 nested key 一層；
+  //     不 recurse 進 leaf 之巢狀 object（避免掃進可能含 secret 的 value）。
+  //   - suspicious secret-like key（key 名稱命中 GATED_DOWNLOAD_DISALLOWED_KEYS）：只報「欄位名」、不 echo value。
+  if (isPlainObject(post.platformPolicy)) {
+    const policy = post.platformPolicy;
+    for (const platformKey of Object.keys(policy)) {
+      // (8) top-level platform key 名稱看似 secret/token → warning（不 echo value；不再對該 entry 做 shape 檢查）
+      if (GATED_DOWNLOAD_DISALLOWED_KEYS.has(platformKey.toLowerCase())) {
+        issues.push({
+          severity: 'warning',
+          type: 'page-platform-policy-suspicious-field',
+          sourcePath,
+          value: `platformPolicy.${platformKey} looks like a secret / token / response / private-permission field; do not store it in repo frontmatter`,
+        });
+        continue;
+      }
+      // (1) 非建議 platform key → warning（github / blogger / future）；仍續做 entry shape 檢查
+      if (!PLATFORM_POLICY_PLATFORM_KEYS.has(platformKey)) {
+        issues.push({
+          severity: 'warning',
+          type: 'page-platform-policy-unknown-platform',
+          sourcePath,
+          value: `platformPolicy.${platformKey} is not a recommended platform key (github / blogger / future)`,
+        });
+      }
+      const platformEntry = policy[platformKey];
+      // (2) platform entry 非 plain object → warning（不 recurse；deferred 之巢狀偵測由各 leaf 判斷）
+      if (!isPlainObject(platformEntry)) {
+        issues.push({
+          severity: 'warning',
+          type: 'page-platform-policy-platform-invalid-type',
+          sourcePath,
+          value: `platformPolicy.${platformKey} typeof=${describeTypeof(platformEntry)} (must be object)`,
+        });
+        continue;
+      }
+      for (const nestedKey of Object.keys(platformEntry)) {
+        // (8) nested key 名稱看似 secret/token → warning（不 echo value；不對該 leaf 再做型別檢查）
+        if (GATED_DOWNLOAD_DISALLOWED_KEYS.has(nestedKey.toLowerCase())) {
+          issues.push({
+            severity: 'warning',
+            type: 'page-platform-policy-suspicious-field',
+            sourcePath,
+            value: `platformPolicy.${platformKey}.${nestedKey} looks like a secret / token / response / private-permission field; do not store it in repo frontmatter`,
+          });
+          continue;
+        }
+        const nestedVal = platformEntry[nestedKey];
+        // (3) 非建議 nested key → warning；不 recurse 進其 value（可能含 secret）
+        if (!PLATFORM_POLICY_NESTED_KEYS.has(nestedKey)) {
+          issues.push({
+            severity: 'warning',
+            type: 'page-platform-policy-unknown-field',
+            sourcePath,
+            value: `platformPolicy.${platformKey}.${nestedKey} is not a recommended field (indexing / includeInListings / includeInSitemap / includeInFeeds / canonical / note)`,
+          });
+          continue;
+        }
+        // (9) 建議 nested key 但 value 為巢狀 object / array（超出 shallow platform object）→ deferred warning，不 recurse
+        if (nestedVal !== null && typeof nestedVal === 'object') {
+          issues.push({
+            severity: 'warning',
+            type: 'page-platform-policy-nested-object-deferred',
+            sourcePath,
+            value: `platformPolicy.${platformKey}.${nestedKey} is a nested ${describeTypeof(nestedVal)}; deep shape validation is deferred (value not recursed)`,
+          });
+          continue;
+        }
+        // (4) indexing 值非合法列舉 → warning
+        if (nestedKey === 'indexing') {
+          const ok = typeof nestedVal === 'string' && PLATFORM_POLICY_INDEXING_VALUES.has(nestedVal);
+          if (!ok) {
+            issues.push({
+              severity: 'warning',
+              type: 'page-platform-policy-indexing-invalid',
+              sourcePath,
+              value:
+                typeof nestedVal === 'string'
+                  ? `platformPolicy.${platformKey}.indexing="${nestedVal}" (must be inherit / index / noindex-follow / noindex-nofollow)`
+                  : `platformPolicy.${platformKey}.indexing typeof=${describeTypeof(nestedVal)} (must be a string enum)`,
+            });
+          }
+        }
+        // (5) includeInListings / includeInSitemap / includeInFeeds 值非 inherit|true|false → warning
+        else if (PLATFORM_POLICY_FLAG_KEYS.has(nestedKey)) {
+          const ok = nestedVal === true || nestedVal === false || nestedVal === 'inherit';
+          if (!ok) {
+            issues.push({
+              severity: 'warning',
+              type: 'page-platform-policy-flag-invalid',
+              sourcePath,
+              value:
+                typeof nestedVal === 'string'
+                  ? `platformPolicy.${platformKey}.${nestedKey}="${nestedVal}" (must be inherit / true / false)`
+                  : `platformPolicy.${platformKey}.${nestedKey} typeof=${describeTypeof(nestedVal)} (must be inherit / true / false)`,
+            });
+          }
+        }
+        // (6) canonical 非 string（含 'inherit'）或為空字串 → warning（不 echo canonical 值本身）
+        else if (nestedKey === 'canonical') {
+          const ok = typeof nestedVal === 'string' && nestedVal.trim() !== '';
+          if (!ok) {
+            issues.push({
+              severity: 'warning',
+              type: 'page-platform-policy-canonical-invalid',
+              sourcePath,
+              value: `platformPolicy.${platformKey}.canonical ${
+                typeof nestedVal === 'string' ? 'is empty' : `typeof=${describeTypeof(nestedVal)}`
+              } (must be a non-empty string or "inherit")`,
+            });
+          }
+        }
+        // (7) note 非 string → warning
+        else if (nestedKey === 'note') {
+          if (typeof nestedVal !== 'string') {
+            issues.push({
+              severity: 'warning',
+              type: 'page-platform-policy-note-invalid',
+              sourcePath,
+              value: `platformPolicy.${platformKey}.note typeof=${describeTypeof(nestedVal)} (must be a string)`,
+            });
+          }
+        }
+      }
+    }
   }
 
   // 4. gatedDownload present 但非 plain object → warning
