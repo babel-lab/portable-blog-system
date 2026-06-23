@@ -38,6 +38,11 @@ import { buildCommerceLinkPreviewOptions, ALLOWED_COMMERCE_ROLES } from './activ
 //   - 純函式；nullable input 一律回 {}；不 mutate post / settings；不打外部 API
 //   - 不修改 resolver 本身；不改 ads.config.json；不改 GA4 設定
 import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
+// Phase 20260623-pm-sp7a-admin-readonly-page-metadata-summary-a
+//   - read-only special page-type / indexing metadata 投影（SP-7a；per docs/20260623-pm-sp7-*.md §E/§G）
+//   - 純函式；委派既有 SP-3/4a/5a helper + mirror SP-2 validator warning；不啟用 write path
+//   - 只投影 gatedDownload / platformPolicy 之 safe 欄位；不洩 secret / token / 表單回覆 / 私有 URL
+import { derivePageMetadataView } from './page-metadata-summary.js';
 
 const SITES = ['github', 'blogger'];
 
@@ -823,6 +828,14 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
     ? 'disabled'
     : (github.previewUrl ? 'rendered' : 'pending');
 
+  // Phase 20260623-pm-sp7a-admin-readonly-page-metadata-summary-a
+  //   - additive read-only special page-type / indexing metadata 投影（SP-7a）
+  //   - 委派既有 SP-3/4a/5a helper（robots / listing / sitemap）+ mirror SP-2 validator warning
+  //   - 缺省欄位 → default / current behavior（非 error）；gatedDownload / platformPolicy 只投影 safe 欄位
+  //   - 既有 view 忽略本欄位 → backout cost = 0（mirror governanceSignals 之 additive 慣例）
+  //   - 不啟用 write path；不改 frontmatter；validator（validate:content）仍為 ground truth
+  const pageMetadata = derivePageMetadataView(fm);
+
   return {
     sourceSite: siteName,
     sourcePath: mdPath,
@@ -897,6 +910,9 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
     ga4Readiness,
     adsenseReadiness,
     validationReadiness,
+    // Phase 20260623-pm-sp7a-admin-readonly-page-metadata-summary-a
+    //   - read-only special page-type / indexing metadata 投影（pure derive；§E/§G）
+    pageMetadata,
   };
 }
 

@@ -1131,6 +1131,106 @@
             </p>
           </div>
 
+          <%# Phase 20260623-pm-sp7a-admin-readonly-page-metadata-summary-a：
+              - additive read-only「Page metadata / 頁面中繼設定」collapsible section（接 loader 已 derive 之 p.pageMetadata）
+              - 純顯示：<dl> + badge；無 input / select / textarea / Apply / button / onclick / fetch / form / 任何 write path
+              - effective 值委派既有 SP-3/4a/5a helper（robots / listing / sitemap）；warning mirror SP-2 validator
+              - 缺省欄位 → 顯示 default / current behavior（非 error）；不進 Missing metadata banner
+              - gatedDownload / platformPolicy 只顯示 safe 欄位（mechanism / postSubmitResource / 平台名+indexing/listings）；
+                **永不**顯示 secret / token / 表單回覆 / 私有 URL（loader 端已只投影 safe 欄位）
+              - <details> 預設 closed；summary 顯示 effective 一行（索引 · 列表 · sitemap）+ 任何 warning badge
+              - validator（npm run validate:content）仍為 ground truth；本區 warning 為 read-only mirror 提示 -%>
+          <% var pm = p.pageMetadata || {}; %>
+          <% var pmPt = pm.pageType || { raw: '', present: false, valid: null, label: 'article (default)' }; %>
+          <% var pmSeo = pm.seoIndexing || { value: '', indexable: null, source: '' }; %>
+          <% var pmRobots = pm.robots || { value: 'index, follow', source: 'default' }; %>
+          <% var pmList = pm.includeInListings || { rawLabel: 'auto', effective: true }; %>
+          <% var pmMap = pm.includeInSitemap || { rawLabel: 'auto', effective: true, eligible: true }; %>
+          <% var pmFeeds = pm.includeInFeeds || { rawLabel: 'auto', hasConsumer: false }; %>
+          <% var pmGated = pm.gatedDownload || { present: false, isObject: false, mechanism: '', postSubmitResource: '', suspiciousKeys: [] }; %>
+          <% var pmPp = pm.platformPolicy || { present: false, isObject: false, platforms: [] }; %>
+          <% var pmWarn = Array.isArray(pm.warnings) ? pm.warnings : []; %>
+          <% var pmIdxLabel = (pmSeo.indexable === true) ? '可收錄' : (pmSeo.indexable === false ? '不收錄' : '未知'); %>
+          <details class="detail-section">
+            <summary style="cursor: pointer;">
+              <h3 style="display: inline; border-bottom: none;">Page metadata / 頁面中繼設定 <span class="section-tag tag-readonly" style="font-size: 0.7em;">read-only · derived</span></h3>
+              <span class="text-muted" style="font-size: 0.82em;">[索引: <%= pmIdxLabel %> · 列表: <%= pmList.effective ? '顯示' : '隱藏' %> · sitemap: <%= pmMap.effective ? '納入' : '排除' %>]</span>
+              <% pmWarn.forEach(function (w) { %><span class="badge b-warn" style="margin-left: 0.25rem;">⚠️ <%= w.badge %></span><% }); %>
+            </summary>
+            <p class="text-muted" style="font-size: 0.85em; margin: 0.3rem 0 0.5rem;">
+              本區為 admin loader 從 frontmatter 推導之 read-only 索引/列表政策快照；effective 值委派
+              既有 page-type-robots / include-in-listings / include-in-sitemap helper，<strong>不</strong>由 Admin 另算。
+              缺省欄位顯示 default / current behavior（非告警）。
+            </p>
+            <dl class="detail-grid">
+              <dt>頁面類型 / Page type</dt>
+              <dd>
+                <span class="badge <%= (pmPt.valid === false) ? 'b-warn' : 'b-info' %>"><%= pmPt.label %></span>
+                <% if (pmPt.valid === false) { %><span class="text-muted" style="font-size: 0.82em;">(非合法列舉值；validator 以 page-type-invalid warn)</span><% } else if (!pmPt.present) { %><span class="text-muted" style="font-size: 0.82em;">(缺省視為一般文章)</span><% } %>
+              </dd>
+              <dt>搜尋引擎索引 / Indexing</dt>
+              <dd>
+                <span class="badge <%= (pmSeo.indexable === true) ? 'b-ok' : (pmSeo.indexable === false ? 'b-info' : 'b-missing') %>"><%= pmIdxLabel %></span>
+                <span class="text-muted mono" style="font-size: 0.78em;">(seo.indexing = <%= pmSeo.value || '—' %>, source: <%= pmSeo.source %>)</span>
+              </dd>
+              <dt>robots meta (effective)</dt>
+              <dd>
+                <span class="badge <%= (pmRobots.value === 'index, follow') ? 'b-ok' : 'b-info' %>"><%= pmRobots.value %></span>
+                <span class="text-muted" style="font-size: 0.78em;">(source: <%= pmRobots.source %>)</span>
+              </dd>
+              <dt>顯示於列表 / Listings</dt>
+              <dd>
+                <span class="badge <%= pmList.effective ? 'b-ok' : 'b-info' %>"><%= pmList.effective ? '顯示' : '隱藏' %></span>
+                <span class="text-muted" style="font-size: 0.78em;">raw: <%= pmList.rawLabel %> → effective: <%= pmList.effective %></span>
+              </dd>
+              <dt>加入 sitemap / Sitemap</dt>
+              <dd>
+                <span class="badge <%= pmMap.effective ? 'b-ok' : 'b-info' %>"><%= pmMap.effective ? '納入' : '排除' %></span>
+                <span class="text-muted" style="font-size: 0.78em;">raw: <%= pmMap.rawLabel %> → effective: <%= pmMap.effective %></span>
+                <% if (!pmMap.eligible) { %><br><span class="text-muted" style="font-size: 0.78em;">(legacy contentKind:download / noindex safety；與 listing 正交)</span><% } %>
+              </dd>
+              <dt>加入 feeds / Feeds</dt>
+              <dd>
+                <span class="badge b-info"><%= pmFeeds.rawLabel %></span>
+                <span class="text-muted" style="font-size: 0.78em;">(feed 未啟用 · no consumer)</span>
+              </dd>
+              <dt>受控下載 / Gated download</dt>
+              <dd>
+                <% if (!pmGated.present) { %>
+                  <span class="text-muted">—</span>
+                <% } else { %>
+                  <span class="badge b-info">gated download</span>
+                  <% if (pmGated.mechanism) { %><span class="text-muted" style="font-size: 0.78em;">mechanism: <%= pmGated.mechanism %></span><% } %>
+                  <% if (pmGated.postSubmitResource) { %><span class="text-muted" style="font-size: 0.78em;">· resource: <%= pmGated.postSubmitResource %></span><% } %>
+                  <% if (pmGated.suspiciousKeys && pmGated.suspiciousKeys.length > 0) { %><br><span class="badge b-warn">敏感 key: <%= pmGated.suspiciousKeys.join(', ') %></span> <span class="text-muted" style="font-size: 0.78em;">(只列 key 名；value 不顯示／不應入 repo)</span><% } %>
+                <% } %>
+              </dd>
+              <dt>平台覆寫 / Platform policy</dt>
+              <dd>
+                <% if (!pmPp.present) { %>
+                  <span class="text-muted">— (全平台沿用頂層值)</span>
+                <% } else if (!pmPp.isObject) { %>
+                  <span class="badge b-warn">型別非法</span> <span class="text-muted" style="font-size: 0.82em;">(validator 以 page-platform-policy-invalid-type warn)</span>
+                <% } else { %>
+                  <% pmPp.platforms.forEach(function (pf) { %>
+                    <div style="font-size: 0.82em;"><span class="badge b-info"><%= pf.name %></span> <span class="text-muted">indexing: <%= pf.indexing || '—' %> · listings: <%= (pf.includeInListings === null) ? '—' : pf.includeInListings %></span></div>
+                  <% }); %>
+                <% } %>
+              </dd>
+              <% if (pmWarn.length > 0) { %>
+              <dt>危險組合 / Warnings</dt>
+              <dd>
+                <% pmWarn.forEach(function (w) { %><div style="font-size: 0.82em;"><span class="badge b-warn"><%= w.badge %></span> <code><%= w.type %></code> <span class="text-muted">· <%= w.message %></span></div><% }); %>
+              </dd>
+              <% } %>
+            </dl>
+            <p class="text-muted" style="font-size: 0.78em; margin: 0.1rem 0 0;">
+              source: frontmatter + page-type-robots / include-in-listings / include-in-sitemap helpers。
+              note: read-only 推導快照；Admin 不修改 frontmatter；warning 為 SP-2 validator 之 mirror，
+              ground truth 為 <code>npm run validate:content</code>。
+            </p>
+          </details>
+
           <%# Phase 20260616-am-1-admin-suggested-fix-l2-readonly-ui-implementation-a：
               - additive per-post Governance signals section（read-only；接 loader 已 derive 之 p.governanceSignals）
               - 只列計數 / flag + sample 訊號；不含 per-post prescription（「應改為 X」）；不含 form / button / input / select / textarea / fetch
