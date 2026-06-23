@@ -1636,7 +1636,7 @@ export function validateContent({ posts, settings }) {
   // Phase 20260610-night-8（N6a）：ads settings shape validation（warning-only；post loop 外；僅檢一次）
   //   - per docs/20260610-night-4-...-preanalysis.md §5 + night-7 preflight §8.1
   //   - 11 條 shape rules；defaults.blocks[] per-block 由 N6b 補（本 phase 不做 recursion / helper refactor）
-  //   - production target ads.config.json shape 須 0 警告（normal 0/104/94、overlay 0/101/85 不變）
+  //   - production target ads.config.json shape 須 0 警告（normal 0/104/94、overlay 0/111/95 不變）
   validateAdsSettings(settings, issues);
 
   // Phase 20260610-night-6：valid AdSense slot key set（derived from current settings.ads.slots; warning-only）
