@@ -8,7 +8,7 @@
 //        不讀檔、不依賴 content / settings；鎖 §C schema 形狀 + §C.4 class 對映 +
 //        §C.3 bucket / §D.2 cross-post 分流邏輯。
 //     B. real-report assertions——讀已生成之 `.cache/data/validation-report.json`，
-//        驗 envelope 形狀 + totals 與 validate:content baseline 一致（0/94/84）+ per-entry shape。
+//        驗 envelope 形狀 + totals 與 validate:content baseline 一致（0/104/94）+ per-entry shape。
 //
 // 約束（mirror src/scripts/check-admin-governance-aggregation.js 慣例）：
 //   - zero new dependency（僅 node:assert / node:fs / node:path / node:url）
@@ -34,7 +34,7 @@ const REPORT_PATH = path.join(PROJECT_ROOT, '.cache', 'data', 'validation-report
 
 // validate:content documented baseline (CLAUDE.md「當前 baseline」). This guard intentionally
 // pins these so a future drift forces a conscious baseline update rather than silently passing.
-const BASELINE = { errorCount: 0, warningCount: 94, issuePostCount: 84 };
+const BASELINE = { errorCount: 0, warningCount: 104, issuePostCount: 94 };
 
 const ASOF = '2026-01-01T00:00:00.000Z';
 
@@ -238,7 +238,7 @@ if (existsSync(REPORT_PATH)) {
     assert.ok(report.buckets && Array.isArray(report.buckets.settings) && Array.isArray(report.buckets.fixtures) && Array.isArray(report.buckets.crossPost));
   });
 
-  check('B2 totals match validate:content baseline (0/94/84)', () => {
+  check('B2 totals match validate:content baseline (0/104/94)', () => {
     assert.equal(report.totals.errorCount, BASELINE.errorCount, 'errorCount');
     assert.equal(report.totals.warningCount, BASELINE.warningCount, 'warningCount');
     assert.equal(report.totals.issuePostCount, BASELINE.issuePostCount, 'issuePostCount');

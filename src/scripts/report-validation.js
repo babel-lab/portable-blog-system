@@ -77,7 +77,7 @@ export function classifyRuleClass(type) {
     return 'blogger';
   }
   if (
-    /^(missing-|invalid-|long-|empty-tags|body-leading-h1|contentkind-and-type-conflict|related-links-|book-|series-|download-|duplicate-slug)/.test(
+    /^(missing-|invalid-|long-|empty-tags|body-leading-h1|contentkind-and-type-conflict|related-links-|book-|series-|download-|page-|duplicate-slug)/.test(
       t,
     )
   ) {
