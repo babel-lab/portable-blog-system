@@ -61,6 +61,59 @@ const VALID_COMMERCE_LINK_ROLE = new Set(['primary', 'alternate', 'official', 'p
 //   - 用於 related-links-entry-kind-invalid 規則之檢查
 const VALID_LINK_KIND = new Set(['internal', 'external']);
 
+// Phase 20260623-pm-sp2：special page-type / indexing metadata 列舉與常數（warning-only；SP-2）
+//   - per docs/20260623-special-page-types-indexing-metadata-preanalysis.md §2 / §3 / §4 + SP-2 spec
+//   - frontmatter 欄位 `pageType` 為**內容語意維度**（IA 角色），與 build-github.js 內部 render-time
+//     區域變數 `pageType`（home/post-detail/post-list/404/design-system）為**兩個獨立概念**，互不推導、
+//     互不消費。validate-content.js 本身無同名變數，讀 post.pageType 為單純 property access，無命名衝突。
+//   - 列舉值採 SP-2 spec 明示之 snake_case（與 preanalysis §3 之 hyphen 命名不同；以 spec 為準）。
+//   - SP-2 為純 validation layer：build / render / listing / sitemap / Blogger / GitHub Pages / Admin
+//     一律**不消費**這些欄位（SP-3 以後才接 build precedence；本 phase 嚴禁）。
+const VALID_PAGE_TYPE = new Set([
+  'article',
+  'static_page',
+  'download',
+  'gated_download',
+  'landing',
+  'utility_hidden',
+  'redirect_canonical',
+  'platform_special',
+]);
+// includeIn* boolean override 三欄（per preanalysis §2.3 / §2.4 / §2.5）
+const PAGE_INCLUDE_FLAGS = ['includeInListings', 'includeInSitemap', 'includeInFeeds'];
+// seo.indexing 之 noindex 家族（用於 noindex × include 之正交危險組合偵測；per preanalysis §4 / §5.3）
+const PAGE_NOINDEX_INDEXING = new Set(['noindex-follow', 'noindex-nofollow']);
+// gatedDownload 描述子之 disallowed key 名單（**僅比對 key 名稱、不檢查 value 內容**，避免 value-based
+//   heuristic 之 false positive；對齊 commerce R15 suspicious-secret-token 之 defer 理由）。
+//   - 命中 = 作者把 secret / token / 表單回覆資料 / 私有下載權限放進 repo frontmatter → warning。
+//   - 合法欄位（mechanism / formEmbedUrl / postSubmitResource，per preanalysis §2.8）不在名單，無誤判。
+//   - value-based 「direct private download URL」偵測屬 deferred（red-line grep scan 另行處理）。
+const GATED_DOWNLOAD_DISALLOWED_KEYS = new Set([
+  'token',
+  'accesstoken',
+  'access_token',
+  'refreshtoken',
+  'refresh_token',
+  'secret',
+  'clientsecret',
+  'client_secret',
+  'password',
+  'passwd',
+  'apikey',
+  'api_key',
+  'authorization',
+  'bearer',
+  'sessionid',
+  'session_id',
+  'drivefolderid',
+  'drive_folder_id',
+  'folderid',
+  'responses',
+  'responsedata',
+  'response_data',
+  'respondents',
+]);
+
 // Phase 8-b-6：sidecar / frontmatter 欄位衝突 warning 之欄位清單
 //   採 presence-only 檢查（兩邊都有同名欄位即 warn，不比較值）；
 //   sidecar 不存在或 sidecar data 缺漏時略過該 sidecar 之檢查。
@@ -1348,6 +1401,159 @@ function validateAdsSettings(settings, issues) {
   }
 }
 
+// validatePageTypeMetadata：special page-type / indexing metadata 檢查（warning-only；SP-2）
+//   - per docs/20260623-special-page-types-indexing-metadata-preanalysis.md §2/§3/§4/§5.3 + SP-2 spec
+//   - 全部 warning（嚴禁 error）；所有欄位 optional：缺省（含整批欄位皆缺）→ 0 觸發 → 既有 post 不受影響
+//   - **只在欄位 present 且 problematic 時觸發**；missing pageType 不警（spec 明示）
+//   - 完全不消費於 build / render / listing / sitemap / Blogger / GitHub Pages / Admin（SP-3+ 才接）
+//   - message 對 gatedDownload 只報「欄位名」不 echo value（避免洩漏；mirror C6 / C9 不 echo 慣例）
+//   - 內部不使用名為 pageType 之變數（避免與 build-github render var 概念混淆）；讀 post.pageType 為 property
+function validatePageTypeMetadata(post, sourcePath, issues) {
+  if (!post || typeof post !== 'object') return;
+
+  // 取 effective seo.indexing（僅當 seo 為 plain object 且 indexing 為 string 時有值；否則 null）
+  //   - seo 非 plain object / indexing 非 string 之錯誤由既有 invalid-seo-block / invalid-seo-indexing 處理
+  const seo = post.seo;
+  const seoIndexing =
+    isPlainObject(seo) && typeof seo.indexing === 'string' ? seo.indexing : null;
+  const isNoindex = seoIndexing !== null && PAGE_NOINDEX_INDEXING.has(seoIndexing);
+
+  // 1. pageType present 但非合法列舉值（含非 string）→ warning（missing 不觸發）
+  const frontmatterPageType = post.pageType;
+  const pageTypeIsValid =
+    typeof frontmatterPageType === 'string' && VALID_PAGE_TYPE.has(frontmatterPageType);
+  if (frontmatterPageType !== undefined && !pageTypeIsValid) {
+    issues.push({
+      severity: 'warning',
+      type: 'page-type-invalid',
+      sourcePath,
+      value:
+        typeof frontmatterPageType === 'string'
+          ? `pageType="${frontmatterPageType}"`
+          : `pageType typeof=${
+              frontmatterPageType === null ? 'null' : Array.isArray(frontmatterPageType) ? 'array' : typeof frontmatterPageType
+            }`,
+    });
+  }
+
+  // 2. includeInListings / includeInSitemap / includeInFeeds present 但非 boolean → warning（per 欄位）
+  for (const flag of PAGE_INCLUDE_FLAGS) {
+    const v = post[flag];
+    if (v !== undefined && typeof v !== 'boolean') {
+      issues.push({
+        severity: 'warning',
+        type: 'page-include-flag-invalid-type',
+        sourcePath,
+        value: `${flag} typeof=${v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v} (must be boolean)`,
+      });
+    }
+  }
+
+  // 3. platformPolicy present 但非 plain object → warning
+  if (post.platformPolicy !== undefined && !isPlainObject(post.platformPolicy)) {
+    issues.push({
+      severity: 'warning',
+      type: 'page-platform-policy-invalid-type',
+      sourcePath,
+      value: `platformPolicy typeof=${
+        post.platformPolicy === null ? 'null' : Array.isArray(post.platformPolicy) ? 'array' : typeof post.platformPolicy
+      } (must be object)`,
+    });
+  }
+
+  // 4. gatedDownload present 但非 plain object → warning
+  const gated = post.gatedDownload;
+  const gatedIsObject = isPlainObject(gated);
+  if (gated !== undefined && !gatedIsObject) {
+    issues.push({
+      severity: 'warning',
+      type: 'page-gated-download-invalid-type',
+      sourcePath,
+      value: `gatedDownload typeof=${
+        gated === null ? 'null' : Array.isArray(gated) ? 'array' : typeof gated
+      } (must be object)`,
+    });
+  }
+
+  // 10. gatedDownload 描述子含 disallowed key（secret / token / 表單回覆 / 私有權限）→ warning
+  //   - 僅比對 key 名稱（case-insensitive），不檢查 value（避免 false positive；value-based URL 偵測 deferred）
+  //   - message 只列 disallowed key 名，**不** echo 任何 value
+  if (gatedIsObject) {
+    for (const k of Object.keys(gated)) {
+      if (GATED_DOWNLOAD_DISALLOWED_KEYS.has(k.toLowerCase())) {
+        issues.push({
+          severity: 'warning',
+          type: 'page-gated-download-suspicious-field',
+          sourcePath,
+          value: `gatedDownload.${k} looks like a secret / token / response / private-permission field; do not store it in repo frontmatter`,
+        });
+      }
+    }
+  }
+
+  // 以下交叉規則僅在 pageType 為合法列舉值時對 pageType-specific 條件評估（5/6/9）；
+  //   正交組合（7/8）只依 seo.indexing × includeIn*，與 pageType 是否合法無關。
+
+  // 5. pageType = gated_download 且 seo.indexing = index → warning（最高風險：搜尋引擎略過閘門/前導頁）
+  if (frontmatterPageType === 'gated_download' && seoIndexing === 'index') {
+    issues.push({
+      severity: 'warning',
+      type: 'page-gated-download-indexed',
+      sourcePath,
+      value: 'pageType=gated_download with seo.indexing=index (gated/download page should not be indexed)',
+    });
+  }
+
+  // 6. pageType = gated_download 且 includeInListings = true → warning
+  if (frontmatterPageType === 'gated_download' && post.includeInListings === true) {
+    issues.push({
+      severity: 'warning',
+      type: 'page-gated-download-in-listings',
+      sourcePath,
+      value: 'pageType=gated_download with includeInListings=true (gated/download page should not appear in listings)',
+    });
+  }
+
+  // 7. seo.indexing = noindex-* 且 includeInSitemap = true → warning（正交危險組合）
+  if (isNoindex && post.includeInSitemap === true) {
+    issues.push({
+      severity: 'warning',
+      type: 'page-noindex-in-sitemap',
+      sourcePath,
+      value: `seo.indexing="${seoIndexing}" with includeInSitemap=true (noindex page should not be in sitemap)`,
+    });
+  }
+
+  // 8. seo.indexing = noindex-* 且 includeInListings = true → warning（正交危險組合）
+  if (isNoindex && post.includeInListings === true) {
+    issues.push({
+      severity: 'warning',
+      type: 'page-noindex-in-listings',
+      sourcePath,
+      value: `seo.indexing="${seoIndexing}" with includeInListings=true (noindex page may mislead users into a non-indexed page)`,
+    });
+  }
+
+  // 9. pageType = redirect_canonical 但無明確 canonical 目標 → warning
+  //   - repo 既有 canonical 欄位慣例（'auto' / explicit URL；invalid-canonical 規則已存在）→ 可實作，不 defer
+  //   - 純跳轉/canonical 載體頁之 canonical 必須 explicit（不可缺、不可空、不可 'auto'）；per preanalysis §2.6 / §5.3
+  if (frontmatterPageType === 'redirect_canonical') {
+    const canonical = post.canonical;
+    const canonicalMissing =
+      canonical === undefined ||
+      canonical === null ||
+      (typeof canonical === 'string' && (canonical.trim() === '' || canonical.trim() === 'auto'));
+    if (canonicalMissing) {
+      issues.push({
+        severity: 'warning',
+        type: 'page-redirect-canonical-missing-target',
+        sourcePath,
+        value: 'pageType=redirect_canonical requires an explicit canonical target URL (not missing / empty / "auto")',
+      });
+    }
+  }
+}
+
 export function validateContent({ posts, settings }) {
   const issues = [];
 
@@ -2125,6 +2331,12 @@ export function validateContent({ posts, settings }) {
       //   - 0 production posts 用 adsense.blocks[] → 0 production 觸發（fixture-isolated）
       //   - 不報 legacy blocks.adsenseTop / adsenseBottom 與 adsense.blocks[] coexistence
       validateAdsenseBlocks(post.adsense, sourcePath, issues, validAdsenseSlotKeySet);
+
+      // Phase 20260623-pm-sp2：special page-type / indexing metadata 檢查（warning-only；SP-2）
+      //   - 沿用既有 schema-consistency 規則之 ready/published gate（mirror invalid-seo-indexing / commerce / adsense）
+      //   - 全 optional 欄位；缺省 → 0 觸發；production 0 篇用這些欄位 → 0 production 觸發（fixture-isolated）
+      //   - 純 validation layer：不消費於 build / render / listing / sitemap / Blogger / GitHub Pages（SP-3+ 才接）
+      validatePageTypeMetadata(post, sourcePath, issues);
     }
 
     if (post.category) {
