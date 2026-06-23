@@ -13,6 +13,8 @@ import { loadAdminPosts } from './load-admin-posts.js';
 // Phase 20260610-am-6：commerce renderer ref resolver（R1）；GitHub 與 Blogger 共用同一 helper。
 import { deriveRenderedAffiliateLinks } from './resolve-affiliate-links.js';
 import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
+// Phase 20260623-pm-sp3：special page-type → robots precedence helper（純函式；SP-3）。
+import { resolvePostDetailRobots } from './page-type-robots.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -290,25 +292,15 @@ function buildSeoForPostDetail({ settings, post }) {
     modifiedTime: post.updated || post.date || null,
     keywords: Array.isArray(post.tags) && post.tags.length > 0 ? post.tags : null,
   };
-  // Phase 20260520-seo-2：robots meta precedence（per docs/seo-indexing-rules.md §3 / §6 SEO-2）
-  //   優先序：
-  //     1. post.seo.indexing (explicit；本批新增)
-  //     2. contentKind === 'download' fallback (SEO-1；既有)
-  //     3. default 'index, follow'（由 commonSeo spread 提供）
-  //   非法 seo.indexing 值由 validate-content.js 之 invalid-seo-indexing 規則 (warning) 偵測；
-  //   build 端對未匹配之值不主動 fallback，沿用 SEO-1 / default 行為
-  const seoIndexing = post.seo && typeof post.seo.indexing === 'string' ? post.seo.indexing : null;
-  if (seoIndexing === 'index') {
-    seo.robots = 'index, follow';
-  } else if (seoIndexing === 'noindex-follow') {
-    seo.robots = 'noindex, follow';
-  } else if (seoIndexing === 'noindex-nofollow') {
-    seo.robots = 'noindex, nofollow';
-  } else if (post.contentKind === 'download') {
-    // Phase 20260520-seo-1 fallback：contentKind=download 視為導流漏斗後段頁
-    //   - 保留 follow 以維持外向連結 PageRank flow（per docs/seo-indexing-rules.md §3 / §4）
-    seo.robots = 'noindex, follow';
-  }
+  // robots meta precedence（per docs/seo-indexing-rules.md §3 / §6 SEO-2 + SP-3 page-type）
+  //   優先序（高 → 低；完整邏輯抽至純函式 resolvePostDetailRobots）：
+  //     1. post.seo.indexing (explicit；SEO-2)
+  //     2. contentKind === 'download' fallback (SEO-1；既有，不可被 pageType 放寬)
+  //     3. frontmatter pageType 推導 (SP-3；缺省/未知值不推導)
+  //     4. default（沿用 commonSeo spread 之 seo.robots = 'index, follow'）
+  //   非法 seo.indexing / pageType 值由 validate-content.js warning 規則偵測；
+  //   build 端對未匹配之值不主動 fallback，缺省輸出與 SP-3 前 byte-identical。
+  seo.robots = resolvePostDetailRobots(post, seo.robots);
   if (canonicalUrl) {
     // Phase 9-g-g-c: isPartOf 採最保守 site/blog 層級（per docs/phase-9g-g-pre-plan.md §5）
     //   - @type=Blog（schema.org 標準）；@id / url 依 post.primaryPlatform 指向對應平台 blog 首頁
