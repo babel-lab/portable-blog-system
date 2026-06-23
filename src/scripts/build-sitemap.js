@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadSettings } from './load-settings.js';
 import { loadGithubPosts } from './load-github-posts.js';
+import { shouldIncludeInSitemap } from './include-in-sitemap.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,14 +122,16 @@ function buildEntries({ base, posts, categoryMap, tagMap, buildIso }) {
 
   // 3. post-detail（draft 已由 loadPosts 過濾）
   // Phase 20260520-seo-2：sitemap inclusion precedence（per docs/seo-indexing-rules.md §3 / §6 SEO-2）
-  //   優先序：
+  //   優先序（既有 safety；逐字封裝於 include-in-sitemap.js `isSitemapEligible`）：
   //     1. post.seo.indexing (explicit)：'index' → include / 'noindex-*' → exclude
   //     2. contentKind === 'download' fallback (SEO-1) → exclude
   //     3. default → include
+  // Phase 20260623-pm-sp5a：在既有 safety 之後疊加 optional 顯式 `includeInSitemap` override
+  //   （`shouldIncludeInSitemap`）。safety 永遠優先；override 只能再排除（=== false），
+  //   不得把 noindex / download 頁強塞進 sitemap。缺省 → 既有行為 byte-identical。
+  //   與 listing inclusion 正交（不讀 includeInListings）。
   for (const post of posts) {
-    const seoIndexing = post.seo && typeof post.seo.indexing === 'string' ? post.seo.indexing : null;
-    if (seoIndexing === 'noindex-follow' || seoIndexing === 'noindex-nofollow') continue;
-    if (seoIndexing !== 'index' && post.contentKind === 'download') continue;
+    if (!shouldIncludeInSitemap(post)) continue;
     const lastmod = post.updated || post.date || null;
     entries.push({ loc: `${base}/posts/${post.slug}/`, lastmod });
   }
