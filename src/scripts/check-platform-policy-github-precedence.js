@@ -355,13 +355,18 @@ check('C.3 normal post + policy includeInListings true → true（no-op）', () 
   );
 });
 
-// C.4 contentKind:download + policy includeInListings true → true（與 robots / sitemap 正交）
-check('C.4 contentKind:download + policy includeInListings true → true（正交；不耦合 robots/sitemap safety）', () => {
+// C.4 contentKind:download + policy includeInListings true → false
+//   Slice 2 update（per docs/20260624-special-page-slice2-listing-selector-optin-landing-record.md）：
+//     - selector flip 後 contentKind=download 預設 exclude（policy true 仍 no-op，**不放寬** default-exclude；
+//       SP-9b precedence 不變；只有 top-level includeInListings:true 才能 opt-in 回 listing）。
+//     - 本 case 仍驗證「policy true 為 no-op」之 SP-9b 不變式，只是 default 自 SP-4a 既有 include 改為
+//       Slice 2 之 download-special-page default-exclude。
+check('C.4 contentKind:download + policy includeInListings true → false（policy true 仍 no-op；Slice 2 default-exclude 不被放寬）', () => {
   assert.equal(
     shouldIncludeInListings(
       post({ contentKind: 'download', platformPolicy: policy({ includeInListings: true }) }),
     ),
-    true,
+    false,
   );
 });
 
@@ -401,11 +406,19 @@ check('C.8 policy inherit / invalid / absent → true（既有行為）', () => 
   assert.equal(shouldIncludeInListings(post()), true);
 });
 
-// C.9 platformPolicy 缺省 → byte-identical 既有 SP-4a 行為
-check('C.9 no platformPolicy → 既有 SP-4a 行為 byte-identical', () => {
+// C.9 platformPolicy 缺省 → 既有 SP-4a 行為（normal post byte-identical）+ Slice 2 download-special-page default-exclude
+//   per docs/20260624-special-page-slice2-listing-selector-optin-landing-record.md：
+//     - normal post 缺省仍 include（byte-identical SP-4a）
+//     - top-level includeInListings:false 仍永遠 exclude（最高優先）
+//     - contentKind:download 缺省 includeInListings 改為 Slice 2 default-exclude（false）
+check('C.9 no platformPolicy → normal post byte-identical + Slice 2 download-special-page default-exclude', () => {
   assert.equal(shouldIncludeInListings(post()), true);
   assert.equal(shouldIncludeInListings(post({ includeInListings: false })), false);
-  assert.equal(shouldIncludeInListings(post({ contentKind: 'download' })), true);
+  assert.equal(shouldIncludeInListings(post({ contentKind: 'download' })), false);
+  assert.equal(
+    shouldIncludeInListings(post({ contentKind: 'download', includeInListings: true })),
+    true,
+  );
 });
 
 // C.10 secretLike nested key → 不讀 value

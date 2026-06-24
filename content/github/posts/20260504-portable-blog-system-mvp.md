@@ -37,6 +37,13 @@ canonical: "auto"
 seo:
   indexing: "noindex-follow"
 
+# Phase 20260624-night Slice 2 backfill：listing intent = keep
+#   per docs/20260624-special-page-slice2-listing-selector-optin-landing-record.md
+#   - selector flip 後 contentKind=download 預設不入 listing；本 post Dean 已決定保留 → 顯式 true 對抗 default-exclude
+#   - 仍維持 seo.indexing=noindex-follow（noindex 但保留站內可見性；屬 docs/20260624-...-preanalysis.md §1.4 之
+#     「noindex + in-listings」合法但罕見組合，由 rule 8 page-noindex-in-listings 提示作者覺察）
+includeInListings: true
+
 publishTargets:
   github:
     enabled: true
