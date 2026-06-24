@@ -133,8 +133,8 @@ Notes:
 
 ### D.1 Report frame
 
-- Date range: **(start not captured in observation) … to 2026-06-24** — start date not
-  provided by Dean in this observation; recorded as not-captured (not guessed).
+- Date range: **2026-06-22 … to 2026-06-24** (per Dean's GA4 Explore screenshot;
+  start date confirmed in a 2026-06-24 follow-up correction).
 - Columns/dimensions visible in the report: `event name`, `link_type`, `provider`,
   `placement`, `link_label`, `event count`, `active users`.
 
