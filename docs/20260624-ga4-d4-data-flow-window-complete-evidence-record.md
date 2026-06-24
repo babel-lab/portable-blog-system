@@ -190,7 +190,10 @@ preflight that preceded it) found these may still be sent as **raw GA4 event par
 - `src/views/pages/post-detail.ejs` emits `data-ga4-param-link_url` / `data-ga4-param-outbound`.
 - `src/views/layout/article-bottom-nav.ejs` emits `data-ga4-param-target_url`.
 - `src/js/modules/link-tracker.js` forwards **every** `data-ga4-param-*` attribute verbatim
-  to `gtag`; there is **no allowlist / filter**.
+  to `gtag`; there is **no allowlist / filter**. *(2026-06-24 follow-up: this is no longer
+  true in source — the Route B central allowlist filter landed/frozen at `bb56ea6`; see §M.
+  The transmission caveat below still holds for the **live** site until a separately approved
+  build/deploy, because templates were not changed and no deploy was done.)*
 
 So the evidence here supports only: **these fields are not registered as custom
 dimensions.** It does **not** establish that they are absent from the event payload. As of
@@ -228,9 +231,14 @@ this docs-only phase.
   registered as a custom dimension.
 - 🟡 **GitHub stream current-48h status = WATCH.** The GitHub stream (`…HLELH`) showed no
   past-48h data on the stream screen; current GitHub stream live traffic is not claimed.
-- 🟡 **Raw-params allowlist = WATCH / future phase.** `link_url` / `target_url` / `outbound`
-  may still be transmitted as raw event params; stopping that needs a separate approved
-  source phase.
+- 🟡 **Raw-params allowlist = source landed/frozen at `bb56ea6`; live verification still
+  WATCH.** The Route B central forwarding filter is now in source (see §M, 2026-06-24
+  follow-up), so `link-tracker.js` no longer forwards non-allowlisted `data-ga4-param-*`
+  values. But **live production verification remains WATCH**: no build/deploy was done, the
+  static HTML still carries the `data-ga4-param-link_url` / `target_url` attrs (templates
+  unchanged), the live GitHub Pages bundle is **not** proven to contain the new JS, and the
+  GA4 backend has **not** been re-observed. `link_url` / `target_url` / `outbound` therefore
+  stay WATCH until a separately approved build/deploy + live GA4 observation.
 - 🟡 **Overall D4 data-flow = PASS with WATCH** (not unrestricted PASS), pending a
   stream-filtered confirmation of which stream produced the D4 rows.
 - ✅ **Naming integrity preserved.** All four keys match D1 §5 verbatim.
@@ -331,12 +339,97 @@ permanently forbidden per CLAUDE.md §29 / §3a red lines):
 - ✅ **Deferred-field registration discipline = PASS** (raw-URL / token fields not
   registered as dimensions), with the §E.2 caveat that *not registered* ≠ *not transmitted*.
 - 🟡 **GitHub stream current-48h status = WATCH** (no past-48h data on the stream screen).
-- 🟡 **Raw-params allowlist = WATCH / future phase** (§H.B).
+- 🟡 **Raw-params allowlist = source landed/frozen at `bb56ea6`; live verification WATCH**
+  (Route B central filter in source; build/deploy + live GA4 observation not done — see §M).
 - 🟡 **Overall D4 data-flow = PASS with WATCH** pending stream-filtered confirmation (§H.A).
 - ✅ No build / deploy / Blogger repost / dev server / source change / generated HTML change
   / backend action was done in this phase.
 - ✅ ADMIN stays closed / idle freeze; write path dormant; Reverse UTM dormant; pm-26 gate
   BLOCKED.
+
+---
+
+## M. 2026-06-24 follow-up: Route B source allowlist landed
+
+> **Status delta only.** This subsection records that the GA4 param allowlist source work
+> (previously listed as the §H.B "separate GA4 param allowlist source phase" / WATCH /
+> future phase) has since **landed and frozen in source**. It changes **no** evidence
+> verdict in §G / §L except to refine the raw-params allowlist line from
+> *"WATCH / future phase"* to *"source landed/frozen at `bb56ea6`; live verification still
+> WATCH"*. This follow-up is itself **docs-only**: no source, build, deploy, or backend
+> action was taken to write it.
+
+### M.1 Follow-up edit baseline
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| branch | `main` | `main` ✅ |
+| `HEAD` | `bb56ea6` | `bb56ea6e809f92cb840ce4b2a1e47cfd61072d13` ✅ |
+| `origin/main` | `bb56ea6` | `bb56ea6e809f92cb840ce4b2a1e47cfd61072d13` ✅ |
+| `HEAD == origin/main` | yes | yes ✅ |
+| ahead / behind | `0 / 0` | `0 / 0` ✅ |
+| latest subject | `feat(ga4): allowlist-filter forwarded event params (drop raw url fields)` | match ✅ |
+| working tree (entry) | clean | clean ✅ |
+| `.git/index.lock` | absent | absent ✅ |
+
+(The §A.1 baseline above records the **original** creation entry at `199353a`; this M.1
+table records the **follow-up** edit entry at `bb56ea6`.)
+
+### M.2 What landed (source allowlist — Route B)
+
+- **Commit:** `bb56ea6` — `feat(ga4): allowlist-filter forwarded event params (drop raw url fields)`.
+- **Changed files (source):**
+  - `src/js/modules/link-tracker.js` — central forwarding filter (the only behavioural change).
+  - `src/scripts/check-ga4-param-allowlist.js` — smoke check for the allowlist.
+- **Central filter only.** No EJS template changes; no generated HTML changes.
+- **Allowlisted params (still forwarded by `link-tracker.js`):**
+  `link_type`, `provider`, `placement`, `link_label`, `post_slug`, `surface`,
+  `click_area`, `nav_direction`, `target_slug`.
+- **Dropped by `link-tracker.js` (no longer forwarded):**
+  `link_url`, `target_url`, `outbound`, `link_source_key`, and any other
+  non-allowlisted `data-ga4-param-*`.
+
+### M.3 Precise scope — what this does and does NOT establish
+
+- ✅ The filter **now prevents `link-tracker.js` from forwarding** non-allowlisted
+  `data-ga4-param-*` values to `gtag` (source behaviour).
+- ❌ It does **not** remove the `data-ga4-param-link_url` / `data-ga4-param-target_url`
+  attributes from the **static HTML** — Route B did **not** modify the EJS templates, so the
+  attributes are still emitted in markup (they are simply no longer forwarded by the JS).
+- ❌ It does **not** prove the **current live GitHub Pages** site carries the new JS bundle:
+  **no build/deploy was done** in this source landing, so the deployed bundle is unproven.
+- ❌ It does **not** independently confirm GA4 backend behaviour. Dean would need to
+  **independently verify the GA4 backend** after a future live deployment.
+
+### M.4 Checks run (read-only; this follow-up)
+
+| Check | Result |
+| --- | --- |
+| `node src/scripts/check-ga4-param-allowlist.js` | **13/13 passed** ✅ |
+| `node src/scripts/check-blogger-operator-guidance.js` | **11 / 0** ✅ |
+| `node src/scripts/check-platform-policy-effective.js` | **40 / 0** ✅ |
+
+No build / deploy / dev / preview / backend action was taken to run these — they are
+read-only `node` smoke checks.
+
+### M.5 Future verification (separately approved; not done here)
+
+- Future **build / deploy / live observation** if/when Dean wants the live GitHub Pages site
+  to actually serve the new JS bundle.
+- Future **GA4 DebugView / Realtime** check to verify that `link_url` / `target_url` /
+  `outbound` **no longer appear** in the raw event params after a live deployment.
+- The deferred params stay **dropped in source only**; nothing is re-enabled, and any change
+  to the allowlist (add/remove a param) requires **separate re-approval**.
+
+### M.6 Evidence status after this follow-up (refined)
+
+- ✅ **D4 custom dimensions populated in Explore = PASS** (unchanged).
+- ✅ **Deferred-field registration discipline = PASS** (unchanged; raw-URL / token fields
+  still not registered as custom dimensions).
+- 🟡 **GitHub stream current-48h status = WATCH** (unchanged).
+- 🟢→🟡 **Raw-params allowlist = source landed/frozen at `bb56ea6`; live deployment / GA4
+  backend verification remains WATCH.**
+- 🟡 **Overall D4 data-flow = PASS with WATCH** (unchanged).
 
 ---
 
