@@ -1673,6 +1673,43 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
     });
   }
 
+  // 6b. Slice 1（warning-only；default-case visibility）：
+  //   per docs/20260624-download-listing-special-page-preflight-spec-lock.md §2.D Slice 1
+  //   + docs/20260624-sp-download-include-in-listings-opt-in-preanalysis.md §2 / §6 Slice 1
+  //
+  //   觸發條件（同時成立）：
+  //     a. contentKind === 'download'  OR  pageType ∈ { 'download', 'gated_download' }
+  //     b. includeInListings === undefined（既未顯式 true 也未顯式 false）
+  //
+  //   設計理由：補既有 gap —— rules 6 / 8 只在 includeInListings === true 顯式時觸發，無法覆蓋
+  //   「contentKind=download 之 post 因預設仍納入站內列表」之 default case；本 Slice 1 補上此可見性。
+  //   ⚠️ 本 rule **不**改 build / render / listing / sitemap / robots 行為（純 validation layer）。
+  //   作者修正方式：在 frontmatter 顯式宣告 `includeInListings: true`（留在列表）或 `false`（隱藏）。
+  //
+  //   互斥 cascade（避免噪音）：
+  //     - 若 includeInListings 非 undefined（含合法 boolean / 非法型別），本 rule 不觸發；
+  //       非法型別由 rule 2 (`page-include-flag-invalid-type`) 處理。
+  //     - 若同時命中 contentKind=download 與 pageType ∈ {download, gated_download}，本 rule 仍只觸發一次。
+  //     - 與 rule 6 / 8 完全正交（後者僅在顯式 true 時觸發）。
+  {
+    const triggersByContentKind = post.contentKind === 'download';
+    const triggersByPageType =
+      frontmatterPageType === 'download' || frontmatterPageType === 'gated_download';
+    if ((triggersByContentKind || triggersByPageType) && post.includeInListings === undefined) {
+      const causeParts = [];
+      if (triggersByContentKind) causeParts.push('contentKind="download"');
+      if (triggersByPageType) causeParts.push(`pageType="${frontmatterPageType}"`);
+      issues.push({
+        severity: 'warning',
+        type: 'download-in-listings-default',
+        sourcePath,
+        value:
+          `${causeParts.join(' + ')} with includeInListings absent ` +
+          `(page will appear in site listings by default; declare includeInListings: true to keep, or false to hide)`,
+      });
+    }
+  }
+
   // 7. seo.indexing = noindex-* 且 includeInSitemap = true → warning（正交危險組合）
   if (isNoindex && post.includeInSitemap === true) {
     issues.push({

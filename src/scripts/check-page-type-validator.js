@@ -53,16 +53,23 @@ function makePost(overrides) {
   };
 }
 
-// 回傳該 post 觸發之 SP-2 issue（type 前綴 'page-'）
+// Slice 1（20260624）：rule name 用 'download-' 前綴（per spec lock §2.D Slice 1）；
+//   harness 將其與 'page-' 前綴一同視為 SP-2 系列輸出，以保持單一 issue 池與相同 severity 不變式。
+const SP_EXTRA_RULE_TYPES = new Set(['download-in-listings-default']);
+function isSpRuleType(t) {
+  return typeof t === 'string' && (t.startsWith('page-') || SP_EXTRA_RULE_TYPES.has(t));
+}
+
+// 回傳該 post 觸發之 SP-2 / Slice-1 issue（type 前綴 'page-' 或屬 SP_EXTRA_RULE_TYPES）
 function pageIssues(overrides) {
   const result = validateContent({ posts: [makePost(overrides)], settings: SETTINGS });
-  // 不變式：validateContent 永不為 SP-2 規則回 error
+  // 不變式：validateContent 永不為 SP-2 / Slice-1 規則回 error
   for (const i of result.issues) {
-    if (i.type.startsWith('page-')) {
-      assert.equal(i.severity, 'warning', `SP-2 issue ${i.type} must be severity 'warning', got '${i.severity}'`);
+    if (isSpRuleType(i.type)) {
+      assert.equal(i.severity, 'warning', `SP rule ${i.type} must be severity 'warning', got '${i.severity}'`);
     }
   }
-  return result.issues.filter((i) => i.type.startsWith('page-'));
+  return result.issues.filter((i) => isSpRuleType(i.type));
 }
 
 function types(issues) {
@@ -135,7 +142,11 @@ check('11 gatedDownload string → page-gated-download-invalid-type (no suspicio
 });
 
 check('12 gated_download + index → page-gated-download-indexed', () => {
-  assert.deepEqual(types(pageIssues({ pageType: 'gated_download', seo: { indexing: 'index' } })), ['page-gated-download-indexed']);
+  // includeInListings: false 顯式宣告以隔離 Slice-1 default-case warning（test 38–45 已專責覆蓋）
+  assert.deepEqual(
+    types(pageIssues({ pageType: 'gated_download', includeInListings: false, seo: { indexing: 'index' } })),
+    ['page-gated-download-indexed']
+  );
 });
 
 check('13 gated_download + includeInListings true → page-gated-download-in-listings', () => {
@@ -264,6 +275,62 @@ check('36 platformPolicy non-object (string) → SP-2 rule 3 unchanged, no SP-8 
 check('37 unknown platform key with invalid nested value → both warnings (independent)', () => {
   const out = pageIssues({ platformPolicy: { wordpress: { indexing: 'sometimes' } } });
   assert.deepEqual(types(out), ['page-platform-policy-indexing-invalid', 'page-platform-policy-unknown-platform']);
+});
+
+// ─── Slice 1：download-in-listings-default（default-case visibility；warning-only）─────────
+//   per docs/20260624-download-listing-special-page-preflight-spec-lock.md §2.D Slice 1
+//   - 觸發：(contentKind==='download' OR pageType∈{download,gated_download}) AND includeInListings===undefined
+//   - 互斥：includeInListings 顯式 true / false / 非法型別 → 本 rule 不觸發（後者由 rule 2 處理）
+//   - 與 rule 6 / 8 正交
+
+check('38 contentKind=download + includeInListings absent → download-in-listings-default', () => {
+  assert.deepEqual(
+    types(pageIssues({ contentKind: 'download' })),
+    ['download-in-listings-default']
+  );
+});
+
+check('39 pageType=download + includeInListings absent → download-in-listings-default', () => {
+  assert.deepEqual(
+    types(pageIssues({ contentKind: 'post', pageType: 'download' })),
+    ['download-in-listings-default']
+  );
+});
+
+check('40 pageType=gated_download + includeInListings absent → download-in-listings-default', () => {
+  assert.deepEqual(
+    types(pageIssues({ contentKind: 'post', pageType: 'gated_download' })),
+    ['download-in-listings-default']
+  );
+});
+
+check('41 contentKind=download + includeInListings=false → no Slice-1 warning', () => {
+  const out = pageIssues({ contentKind: 'download', includeInListings: false });
+  assert.ok(!types(out).includes('download-in-listings-default'));
+});
+
+check('42 contentKind=download + includeInListings=true → no Slice-1 warning (rule 8 also silent since no noindex)', () => {
+  const out = pageIssues({ contentKind: 'download', includeInListings: true });
+  assert.ok(!types(out).includes('download-in-listings-default'));
+});
+
+check('43 contentKind=download + pageType=gated_download + absent → exactly 1 Slice-1 warning', () => {
+  const out = pageIssues({ contentKind: 'download', pageType: 'gated_download' });
+  const slice1 = out.filter((i) => i.type === 'download-in-listings-default');
+  assert.equal(slice1.length, 1, 'must fire exactly once even when both triggers match');
+  assert.ok(slice1[0].value.includes('contentKind="download"'));
+  assert.ok(slice1[0].value.includes('pageType="gated_download"'));
+});
+
+check('44 contentKind=post + pageType=article + absent → no Slice-1 warning', () => {
+  assert.ok(!types(pageIssues({ contentKind: 'post', pageType: 'article' })).includes('download-in-listings-default'));
+});
+
+check('45 contentKind=download + includeInListings invalid type → only invalid-type warning (Slice-1 silent)', () => {
+  const out = pageIssues({ contentKind: 'download', includeInListings: 'yes' });
+  const t = types(out);
+  assert.ok(t.includes('page-include-flag-invalid-type'));
+  assert.ok(!t.includes('download-in-listings-default'), 'Slice-1 must not double-fire when type is invalid');
 });
 
 // ─── summary ─────────────────────────────────────────────────────────────
