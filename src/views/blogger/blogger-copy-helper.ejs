@@ -286,3 +286,60 @@ SEO indexing: <%= indexingValue %>
 - 若上述為 noindex 類值，請於 Blogger 後台對應設定（避免該頁被搜尋引擎直接收錄）
 - precedence 規則詳見 docs/seo-indexing-rules.md §3
 - 本批未處理 Blogger sitemap / robots.txt（屬 SEO-4 範圍）
+<%# Phase 20260624-sp9d：Blogger pageType / platformPolicy operator guidance（display-only；audit metadata） -%>
+<%# - 僅當 bloggerOperatorGuidance.present（有 pageType 或 platformPolicy.blogger.*）時渲染；否則 byte-identical -%>
+<%# - audit / future-merge metadata only：不改 Blogger live output / 不改 generated post HTML / 不自動 noindex -%>
+<%# - platformPolicy.blogger.* 值由 build-blogger.js 經 SP-9a resolvePlatformPolicyValue 預計算（secret-safe / inherit-aware）；EJS 不重寫 secret filtering，不直接讀 raw platformPolicy -%>
+<%# - 沿用 [14] SEO guidance 之 trim-newline pattern：無 pageType & 無 platformPolicy.blogger 之 post → 本區塊前後 byte-identical -%>
+<% if (typeof bloggerOperatorGuidance !== 'undefined' && bloggerOperatorGuidance && bloggerOperatorGuidance.present) {
+  const g = bloggerOperatorGuidance;
+  // pageType → Blogger 後台期望（per docs/20260624-sp9c §3 矩陣；display-only，非系統自動行為）
+  const PAGE_TYPE_GUIDANCE = {
+    gated_download: 'Blogger 後台建議 noindex, nofollow（內嵌 Google Form 漏斗閘門；不傳遞權重）。須依 docs/20260624-sp9c §2 SOP 在 Blogger 後台手動設定並 view-source 驗證。',
+    download: 'Blogger 後台建議 noindex, follow（下載 landing；保留 PageRank flow）。建議避免放入常用導覽 label。',
+    utility_hidden: 'Blogger 後台建議 noindex, nofollow（preview / test / 內部工具頁）。建議避開所有公開 label，或 unpublish / 限作者可見。',
+    redirect_canonical: 'Blogger 後台建議 noindex, follow（純跳轉 / canonical 載體）。canonical 必須 explicit。',
+    static_page: 'Blogger Page（非 Post）；通常 index, follow。Page 不進一般 post feed，但仍可能被 Google 索引。',
+    landing: '推廣 / 導流前導頁；通常 index, follow（除非有特殊理由）。',
+    article: '一般文章；通常 index, follow（無特殊 robots 設定）。',
+    platform_special: '平台特殊頁；目前無一致語義，依作者刻意定義。',
+  };
+  const lines = [];
+  if (g.pageType !== null) {
+    lines.push('pageType：' + g.pageType);
+    const pg = PAGE_TYPE_GUIDANCE[g.pageType];
+    lines.push('  → ' + (pg || '（未知 pageType 值；無對應 backend guidance，請對照 docs/20260624-sp9c §3）'));
+  }
+  if (g.hasBloggerPolicy && g.blogger) {
+    const idx = g.blogger.indexing;
+    if (idx.source === 'override') lines.push('platformPolicy.blogger.indexing：' + idx.value + '（audit record；非自動套用，Blogger 後台仍須手動設定）');
+    else if (idx.source === 'inherit') lines.push('platformPolicy.blogger.indexing：inherit（沿用 top-level / default；無 override）');
+    else if (idx.source === 'invalid') lines.push('platformPolicy.blogger.indexing：（非法值，已由 SP-8 validator warn；請修正 frontmatter）');
+    else if (idx.source === 'secret') lines.push('platformPolicy.blogger.indexing：（偵測到 secret-like key，已隱藏，不顯示值）');
+
+    const lst = g.blogger.includeInListings;
+    if (lst.source === 'override') lines.push('platformPolicy.blogger.includeInListings：' + lst.value + '（audit 意圖記錄；repo 無法壓制 Blogger label / 首頁 / archive 自動列表）');
+    else if (lst.source === 'inherit') lines.push('platformPolicy.blogger.includeInListings：inherit（無 override）');
+    else if (lst.source === 'invalid') lines.push('platformPolicy.blogger.includeInListings：（非法值，已由 SP-8 validator warn）');
+    else if (lst.source === 'secret') lines.push('platformPolicy.blogger.includeInListings：（偵測到 secret-like key，已隱藏，不顯示值）');
+
+    const sm = g.blogger.includeInSitemap;
+    if (sm.source === 'override') lines.push('platformPolicy.blogger.includeInSitemap：' + sm.value + '（audit 意圖記錄；repo 無法控制 Blogger 自動 sitemap / feed）');
+    else if (sm.source === 'inherit') lines.push('platformPolicy.blogger.includeInSitemap：inherit（無 override）');
+    else if (sm.source === 'invalid') lines.push('platformPolicy.blogger.includeInSitemap：（非法值，已由 SP-8 validator warn）');
+    else if (sm.source === 'secret') lines.push('platformPolicy.blogger.includeInSitemap：（偵測到 secret-like key，已隱藏，不顯示值）');
+  }
+-%>
+
+----------------------------------------
+[15] Blogger pageType / platformPolicy 操作指引（display-only；audit metadata）
+----------------------------------------
+<%= lines.join('\n') %>
+
+提示：
+- 本區塊為 audit / future-merge metadata only，**不會改變 Blogger live 線上輸出**（generated post HTML 不受影響）
+- Blogger 後台仍是 source of truth；noindex / robots 仍須在 Blogger 後台手動設定，並 view-source 人工驗證
+- platformPolicy.blogger.* 僅記錄意圖；repo **無法**控制 Blogger 自動 sitemap / feed / label 列表
+- 本系統**不會**自動 noindex 任何頁，亦**不**改 robots / sitemap / listing
+- 完整 operator SOP 與 pageType 矩陣詳見 docs/20260624-sp9c-blogger-platform-policy-operator-guidance.md
+<% } -%>

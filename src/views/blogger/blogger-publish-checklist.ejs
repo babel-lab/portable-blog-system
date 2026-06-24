@@ -148,3 +148,49 @@ SEO 檢查（5-f）
 ----------------------------------------
 [ ] 發布後 URL 已回填到 <%= post.sourcePath %> 的 blogger.publishedUrl
 [ ] FB 推廣文案已複製（屬 Phase 4 promotion，目前未實作）
+<%# Phase 20260624-sp9d：特殊 pageType / platformPolicy.blogger.* operator manual-check rows（display-only） -%>
+<%# - 僅當 bloggerOperatorGuidance.present（有 pageType 或 platformPolicy.blogger.*）時渲染；否則 byte-identical -%>
+<%# - audit / future-merge metadata only：不改 Blogger live output / generated post HTML / 不自動 noindex / sitemap / listing -%>
+<%# - platformPolicy.blogger.* 值由 build-blogger.js 經 SP-9a 預計算（secret-safe）；checklist 不直接讀 raw platformPolicy，不 echo secret value -%>
+<%# - 沿用既有 conditional checklist 之 trim-newline pattern：無 special pageType & 無 platformPolicy.blogger 之 post → byte-identical -%>
+<% if (typeof bloggerOperatorGuidance !== 'undefined' && bloggerOperatorGuidance && bloggerOperatorGuidance.present) {
+  const g = bloggerOperatorGuidance;
+  const rows = [];
+  // pageType-specific Blogger 後台操作檢查（per docs/20260624-sp9c §2 SOP + §3 矩陣）
+  if (g.pageType === 'gated_download') {
+    rows.push('[ ] gated_download：已於 Blogger 後台設 noindex, nofollow，並依 docs/20260624-sp9c §2 Google Form SOP 完成 view-source 驗證');
+    rows.push('[ ] gated_download：已避免使用公開導覽 label（建議用 _internal-* / _hidden-* 等內部前綴）');
+  } else if (g.pageType === 'download') {
+    rows.push('[ ] download：已於 Blogger 後台設 noindex, follow（下載 landing；保留 PageRank flow）');
+    rows.push('[ ] download：已避免放入常用導覽 label');
+  } else if (g.pageType === 'utility_hidden') {
+    rows.push('[ ] utility_hidden：已於 Blogger 後台設 noindex, nofollow，並避開所有公開 label（或 unpublish / 限作者可見）');
+  } else if (g.pageType === 'redirect_canonical') {
+    rows.push('[ ] redirect_canonical：已於 Blogger 後台設 noindex, follow，且 canonical 為 explicit');
+  } else if (g.pageType !== null) {
+    rows.push('[ ] pageType=' + g.pageType + '：已對照 copy-helper [15] / docs/20260624-sp9c §3，確認 Blogger 後台設定符合預期');
+  }
+  // platformPolicy.blogger.* audit reconcile（含 secret 偵測；不 echo value）
+  if (g.hasBloggerPolicy && g.blogger) {
+    const anySecret = ['indexing', 'includeInListings', 'includeInSitemap'].some(function (f) {
+      return g.blogger[f] && g.blogger[f].source === 'secret';
+    });
+    if (anySecret) {
+      rows.push('[ ] ⚠️ platformPolicy.blogger 偵測到 secret-like key：請從 frontmatter 移除（不得放 token / secret / credential）');
+    }
+    rows.push('[ ] 已對照 copy-helper [15]，確認 platformPolicy.blogger.* 與 Blogger 後台實際設定一致（metadata ≠ live output）');
+  }
+-%>
+
+----------------------------------------
+特殊 pageType / platformPolicy 操作檢查（display-only audit guidance）
+----------------------------------------
+[ ] 已理解：本區塊為 audit / future-merge metadata only；**不**改 Blogger live output / generated post HTML
+[ ] 已理解：Blogger 後台為 source of truth；noindex / robots 仍須手動於 Blogger 後台設定並 view-source 驗證
+<% rows.forEach(function (r) { -%>
+<%= r %>
+<% }); -%>
+[ ] 已知 repo **無法**控制 Blogger 自動 sitemap / feed（單篇排除唯一可靠手段為 Blogger 後台 per-post noindex）
+[ ] 已知 includeInListings / platformPolicy.blogger.includeInListings **無法**壓制 Blogger label / 首頁 / archive 自動列表
+[ ] 詳細 operator SOP 與 pageType 矩陣對照 docs/20260624-sp9c-blogger-platform-policy-operator-guidance.md
+<% } -%>

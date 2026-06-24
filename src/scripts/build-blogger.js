@@ -29,6 +29,11 @@ import { deriveRenderedAffiliateLinks, deriveRenderedAffiliateBlocks } from './r
 //   - articleAd1..5 為 pages-only → blogger surface 回空；ads.enabled=false 時全 {}。
 //   - 本批僅本機 build dry-run wiring，不 deploy / 不重貼 Blogger。
 import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
+// Phase 20260624-sp9d：platformPolicy secret-safe / inherit-aware projection helper（SP-9a 落地）。
+//   - 僅用於 copy-helper / publish-checklist 之 display-only operator guidance 區塊預計算。
+//   - **不**接入 post.html / robots / sitemap / listing / metadata selector；不改 post object。
+//   - suspicious nested key 之 value 永不被讀取（resolvePlatformPolicyValue 回 source='secret'）。
+import { resolvePlatformPolicyValue } from './platform-policy-effective.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -377,8 +382,50 @@ async function renderCategoryIndex(data) {
   );
 }
 
+// Phase 20260624-sp9d：Blogger operator guidance 投影（display-only；audit metadata only）。
+//   - 讀 post.pageType（SP-2 封閉列舉）+ platformPolicy.blogger.{indexing,includeInListings,includeInSitemap}。
+//   - platformPolicy 值一律經 resolvePlatformPolicyValue（SP-9a）→ secret-safe + inherit-aware；
+//     **不**在 EJS 重寫 secret filtering；suspicious nested key 之 value 永不進投影（source='secret'）。
+//   - 純函式；不消費於任何 build 輸出（post.html / robots / sitemap / listing 皆不受影響）。
+//   - present=false（無 pageType 且無 platformPolicy.blogger）→ EJS 不渲染 [15] / checklist 區塊
+//     → 既有 posts 之 copy-helper.txt / publish-checklist.txt byte-identical。
+function deriveBloggerOperatorGuidance(post) {
+  const pageType =
+    post && typeof post.pageType === 'string' && post.pageType.trim() !== ''
+      ? post.pageType.trim()
+      : null;
+
+  const policy = post && typeof post === 'object' ? post.platformPolicy : undefined;
+  const hasBloggerPolicy = !!(
+    policy &&
+    typeof policy === 'object' &&
+    !Array.isArray(policy) &&
+    policy.blogger &&
+    typeof policy.blogger === 'object' &&
+    !Array.isArray(policy.blogger)
+  );
+
+  let blogger = null;
+  if (hasBloggerPolicy) {
+    blogger = {};
+    for (const field of ['indexing', 'includeInListings', 'includeInSitemap']) {
+      const r = resolvePlatformPolicyValue(post, 'blogger', field);
+      // 僅保留 value + source；suspicious nested key → value=null / source='secret'（不 echo）。
+      blogger[field] = { value: r.value, source: r.source };
+    }
+  }
+
+  return {
+    present: pageType !== null || hasBloggerPolicy,
+    pageType,
+    hasBloggerPolicy,
+    blogger,
+  };
+}
+
 // Phase 3-e-5：copy-helper.txt（純文字、可逐區複製到 Blogger 後台）
 // Phase 5-f-3：擴充傳入 ogFields / jsonLd 給 SEO 區段 [7]-[10]
+// Phase 20260624-sp9d：additive prop bloggerOperatorGuidance（display-only [15] 區塊）
 async function renderCopyHelper(
   post,
   canonical,
@@ -387,6 +434,7 @@ async function renderCopyHelper(
   jsonLd,
   copyHelperSeriesTitle,
   copyHelperSeriesTitleUnresolvedPlaceholders,
+  bloggerOperatorGuidance,
 ) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-copy-helper.ejs'),
@@ -404,17 +452,19 @@ async function renderCopyHelper(
       jsonLd,
       copyHelperSeriesTitle,
       copyHelperSeriesTitleUnresolvedPlaceholders,
+      bloggerOperatorGuidance,
     },
     { async: true },
   );
 }
 
 // Phase 3-e-5：publish-checklist.txt（mode-aware checkbox 清單）
-async function renderPublishChecklist(post, canonical, meta) {
+// Phase 20260624-sp9d：additive prop bloggerOperatorGuidance（display-only manual-check rows）
+async function renderPublishChecklist(post, canonical, meta, bloggerOperatorGuidance) {
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-publish-checklist.ejs'),
     // Phase 8-d-3b：additive alias `normalized`（見 renderFullPost 之說明）
-    { post, normalized: post.normalized, canonical, meta },
+    { post, normalized: post.normalized, canonical, meta, bloggerOperatorGuidance },
     { async: true },
   );
 }
@@ -585,6 +635,12 @@ async function main() {
       }
     }
 
+    // Phase 20260624-sp9d：預計算 Blogger operator guidance（display-only；audit metadata only）
+    //   - secret-safe / inherit-aware projection（委派 SP-9a resolvePlatformPolicyValue）
+    //   - 不改 post object / post.html / robots / sitemap / listing；無 pageType & 無 platformPolicy.blogger
+    //     → present=false → EJS 不渲染 → copy-helper.txt / publish-checklist.txt byte-identical
+    const bloggerOperatorGuidance = deriveBloggerOperatorGuidance(post);
+
     const copyHelperText = await renderCopyHelper(
       post,
       canonical,
@@ -593,8 +649,14 @@ async function main() {
       jsonLd,
       copyHelperSeriesTitle,
       copyHelperSeriesTitleUnresolvedPlaceholders,
+      bloggerOperatorGuidance,
     );
-    const publishChecklistText = await renderPublishChecklist(post, canonical, meta);
+    const publishChecklistText = await renderPublishChecklist(
+      post,
+      canonical,
+      meta,
+      bloggerOperatorGuidance,
+    );
     await writeText(copyHelperFile, copyHelperText);
     await writeText(publishChecklistFile, publishChecklistText);
     console.log(`[build-blogger] wrote ${rel(copyHelperFile)}`);
