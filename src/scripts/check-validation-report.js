@@ -335,6 +335,21 @@ if (existsSync(REPORT_PATH)) {
       );
     }
   });
+
+  // B6（F-fixture group 2 / slice 12）：deferred-case `.md` fixtures（dangling / absolute-URL ref）
+  //   端對端產生 0 issue → 鎖住「dangling / absolute URL deferred → silent」；0-warning → 不 bump baseline。
+  check('B6 deferred-case downloadFunnel .md fixtures produce 0 issues (absent from report)', () => {
+    for (const p of [
+      'content/validation-fixtures/github/posts/_test-download-funnel-dangling-target.md',
+      'content/validation-fixtures/github/posts/_test-download-funnel-absolute-url-target.md',
+    ]) {
+      assert.equal(
+        report.bySourcePath.find((e) => e.sourcePath === p),
+        undefined,
+        `${p} should produce 0 issues (deferred-case fixture)`,
+      );
+    }
+  });
 }
 
 // ─── C. corpus cross-post: downloadFunnel bidirectional (F8 / slice 10) ────
