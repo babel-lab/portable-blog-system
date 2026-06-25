@@ -393,19 +393,20 @@ check('53 role case variant ("Entry") → downloadFunnel-role-invalid-enum', () 
 });
 
 check('54 unknown / secret-like key (driveFolderId) → downloadFunnel-suspicious-field, value not echoed', () => {
-  const out = pageIssues({ downloadFunnel: { role: 'gated_page', driveFolderId: 'SECRET-ID-VALUE' } });
+  // entryPages 提供以隔離 slice-2 gated-page-missing-entry-pages（test 58 已專責覆蓋）
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'], driveFolderId: 'SECRET-ID-VALUE' } });
   assert.deepEqual(types(out), ['downloadFunnel-suspicious-field']);
   assert.ok(!out[0].value.includes('SECRET-ID-VALUE'), 'must not echo the disallowed value');
   assert.ok(out[0].value.includes('driveFolderId'), 'should name the field');
 });
 
-check('55 all four allowed keys only → 0 funnel warning', () => {
+check('55 all allowed keys for role=entry (role+targetGatedPage+ctaEventName) → 0 funnel warning', () => {
+  // role=entry 之合法欄位組合不含 entryPages（entryPages 屬 gated_page；slice-2 §3.3）
   assert.deepEqual(
     types(pageIssues({
       downloadFunnel: {
         role: 'entry',
         targetGatedPage: 'gated-zhuyin-download',
-        entryPages: ['a'],
         ctaEventName: 'click_all_download',
       },
     })),
@@ -417,6 +418,106 @@ check('56 invalid role + unknown key → both warnings (independent)', () => {
   assert.deepEqual(
     types(pageIssues({ downloadFunnel: { role: 'bogus', token: 'X' } })),
     ['downloadFunnel-role-invalid-enum', 'downloadFunnel-suspicious-field']
+  );
+});
+
+// ─── F1 §5.2 Slice 2：downloadFunnel required-combo / field-combination（warning-only；不 echo value）─────
+//   per docs/20260625-funnel-metadata-schema-preflight-a.md §3.2.2 / §3.2.3 / §3.3 / §5.2
+//   - role-combo（missing / wrong-role）只在 role 為合法 enum 時評估；field-shape 獨立評估
+//   - 所有 sample 一律 placeholder / fake（無真實 Drive ID / Form URL / response URL / token）
+//   - 凡 value 可能像 URL / token / respondent data，warning message 不得 echo（test 67/68 鎖定）
+
+check('57 role=entry without targetGatedPage → entry-missing-target-gated-page', () => {
+  assert.deepEqual(types(pageIssues({ downloadFunnel: { role: 'entry' } })), ['downloadFunnel-entry-missing-target-gated-page']);
+});
+
+check('58 role=gated_page without entryPages → gated-page-missing-entry-pages', () => {
+  assert.deepEqual(types(pageIssues({ downloadFunnel: { role: 'gated_page' } })), ['downloadFunnel-gated-page-missing-entry-pages']);
+});
+
+check('59 role=gated_page with empty entryPages [] → gated-page-missing-entry-pages', () => {
+  assert.deepEqual(types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: [] } })), ['downloadFunnel-gated-page-missing-entry-pages']);
+});
+
+check('60 role=gated_page with targetGatedPage → target-gated-page-wrong-role', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'], targetGatedPage: 'gated-zhuyin-download' } })),
+    ['downloadFunnel-target-gated-page-wrong-role']
+  );
+});
+
+check('61 role=entry with entryPages → entry-pages-wrong-role', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'gated-zhuyin-download', entryPages: ['zhuyin-intro'] } })),
+    ['downloadFunnel-entry-pages-wrong-role']
+  );
+});
+
+check('62 targetGatedPage non-string (number) → target-gated-page-invalid-type (no missing)', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 123 } })),
+    ['downloadFunnel-target-gated-page-invalid-type']
+  );
+});
+
+check('63 entryPages non-array (string) → entry-pages-invalid-type (no missing)', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: 'zhuyin-intro' } })),
+    ['downloadFunnel-entry-pages-invalid-type']
+  );
+});
+
+check('64 entryPages array with non-string element → entry-pages-invalid-type', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro', 5] } })),
+    ['downloadFunnel-entry-pages-invalid-type']
+  );
+});
+
+check('65 entryPages > 10 unique → entry-pages-too-many', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: Array.from({ length: 11 }, (_, i) => `entry-${i}`) } })),
+    ['downloadFunnel-entry-pages-too-many']
+  );
+});
+
+check('66 entryPages duplicate → entry-pages-duplicate', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro', 'zhuyin-intro'] } })),
+    ['downloadFunnel-entry-pages-duplicate']
+  );
+});
+
+check('67 entry-pages-duplicate message must NOT echo value (URL-like placeholder)', () => {
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/p', 'https://example.com/p'] } });
+  assert.deepEqual(types(out), ['downloadFunnel-entry-pages-duplicate']);
+  assert.ok(!out[0].value.includes('example.com'), 'must not echo the (possibly URL/secret) entry value');
+});
+
+check('68 target-gated-page-invalid-type message must NOT echo value (array placeholder)', () => {
+  const out = pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: ['https://example.com/x'] } });
+  assert.deepEqual(types(out), ['downloadFunnel-target-gated-page-invalid-type']);
+  assert.ok(!out[0].value.includes('example.com'), 'must not echo the (possibly URL/secret) value');
+});
+
+check('69 invalid role + field-shape error → both warnings (combo role-rules gated off)', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'bogus', targetGatedPage: 123 } })),
+    ['downloadFunnel-role-invalid-enum', 'downloadFunnel-target-gated-page-invalid-type']
+  );
+});
+
+check('70 role=gated_page with exactly 10 unique entryPages → 0 funnel warning (boundary)', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: Array.from({ length: 10 }, (_, i) => `entry-${i}`) } })),
+    []
+  );
+});
+
+check('71 entryPages too-many AND duplicate → both warnings (independent)', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: [...Array.from({ length: 11 }, (_, i) => `entry-${i}`), 'entry-0'] } })),
+    ['downloadFunnel-entry-pages-duplicate', 'downloadFunnel-entry-pages-too-many']
   );
 });
 

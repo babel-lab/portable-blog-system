@@ -130,6 +130,8 @@ const DOWNLOAD_FUNNEL_ALLOWED_KEYS = new Set([
   'entryPages',
   'ctaEventName',
 ]);
+// entryPages 建議上限（per §3.2.3；超過 → downloadFunnel-entry-pages-too-many，warning-only，非 hard cap）
+const DOWNLOAD_FUNNEL_MAX_ENTRY_PAGES = 10;
 
 // Phase 20260623-pm-sp8：platformPolicy 巢狀 shallow shape 列舉（warning-only；additive；只在 SP-2 之
 //   page-platform-policy-invalid-type 不觸發時，即 platformPolicy 為 plain object 時，才評估這些子規則）。
@@ -1670,8 +1672,9 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
   // 11. downloadFunnel metadata 結構 / enum 驗證（warning-only；additive；F1 schema preflight Slice 1）
   //   per docs/20260625-funnel-metadata-schema-preflight-a.md §3 / §5.1
   //   - 純 metadata 層：完全不影響 robots / sitemap / listings 之 effective 行為（§4.7 最低層）。
-  //   - 本 slice 只做 (a) 結構 (b) role 缺省 (c) role enum (d) 未知 / secret-like key 四檢查；
-  //     required-combo（§5.2）/ value-based secret heuristic（§5.3）/ cross-field（§5.4）一律 deferred。
+  //   - slice 1 做 (a) 結構 (b) role 缺省 (c) role enum (d) 未知 / secret-like key；
+  //     required-combo（§5.2）見下方 block 12（slice 2）；value-based secret heuristic（§5.3）/
+  //     cross-field（§5.4）一律 deferred。
   //   - suspicious-field 只報欄位名、不 echo value（mirror gatedDownload / platformPolicy 慣例）；
   //     secret-like key（token / driveFolderId / formResponse 等）因不在 allowed 4 key 內，自動由 (d) 攔下。
   const funnel = post.downloadFunnel;
@@ -1714,6 +1717,111 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
             sourcePath,
             value: `downloadFunnel.${k} is not an allowed funnel field (role / targetGatedPage / entryPages / ctaEventName); do not store secrets / tokens / Drive IDs / form response URLs in repo frontmatter`,
           });
+        }
+      }
+
+      // 12. downloadFunnel required-combo / field-combination 驗證（warning-only；additive；F1 §5.2；slice 2）
+      //   per docs/20260625-funnel-metadata-schema-preflight-a.md §3.2.2 / §3.2.3 / §3.3 / §5.2
+      //   🔴 紅線：targetGatedPage / entryPages 之 value 可能為 slug / public URL / 誤填 secret；本 block 之
+      //     warning message **一律只報「欄位名 / typeof / index / count」，絕不 echo value**（避免洩漏可能
+      //     像 URL / token / respondent data 的字串；value-based secret heuristic 屬 §5.3，deferred）。
+      //   - role-combo 規則（missing / wrong-role）只在 role 為合法 enum 時評估（role 非法 / 缺省時已由
+      //     (b)/(c) 報，避免重複噪音）；field-shape 規則（invalid-type / too-many / duplicate）依欄位是否
+      //     present 獨立評估，與 role 是否合法無關（mirror F2 之獨立 warning 慣例）。
+      const funnelRole = funnel.role;
+      const hasTargetGatedPage = funnel.targetGatedPage !== undefined;
+      const hasEntryPages = funnel.entryPages !== undefined;
+
+      // (e) role=entry 但 targetGatedPage 缺省 → warning
+      if (funnelRole === 'entry' && !hasTargetGatedPage) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-entry-missing-target-gated-page',
+          sourcePath,
+          value: 'downloadFunnel.role="entry" but targetGatedPage is missing (an entry page should declare its target gated page)',
+        });
+      }
+      // (f) role=gated_page 但 entryPages 缺省或空陣列 → warning
+      if (
+        funnelRole === 'gated_page' &&
+        (funnel.entryPages === undefined ||
+          (Array.isArray(funnel.entryPages) && funnel.entryPages.length === 0))
+      ) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-gated-page-missing-entry-pages',
+          sourcePath,
+          value: 'downloadFunnel.role="gated_page" but entryPages is missing or empty (a gated page should list at least one entry page)',
+        });
+      }
+      // (g) role=gated_page 但 targetGatedPage 出現（屬 role=entry 之欄位）→ warning（不 echo value）
+      if (funnelRole === 'gated_page' && hasTargetGatedPage) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-target-gated-page-wrong-role',
+          sourcePath,
+          value: 'downloadFunnel.targetGatedPage is set but role="gated_page" (targetGatedPage belongs to role="entry")',
+        });
+      }
+      // (h) role=entry 但 entryPages 出現（屬 role=gated_page 之欄位）→ warning（不 echo value）
+      if (funnelRole === 'entry' && hasEntryPages) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-entry-pages-wrong-role',
+          sourcePath,
+          value: 'downloadFunnel.entryPages is set but role="entry" (entryPages belongs to role="gated_page")',
+        });
+      }
+      // (i) targetGatedPage present 但非 string → warning（只報 typeof，不 echo value）
+      if (hasTargetGatedPage && typeof funnel.targetGatedPage !== 'string') {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-target-gated-page-invalid-type',
+          sourcePath,
+          value: `downloadFunnel.targetGatedPage typeof=${describeTypeof(funnel.targetGatedPage)} (must be a single string: slug or public URL)`,
+        });
+      }
+      // (j) entryPages present → array-of-string shape / too-many / duplicate（一律只報 typeof / index / count）
+      if (hasEntryPages) {
+        const ep = funnel.entryPages;
+        if (!Array.isArray(ep)) {
+          issues.push({
+            severity: 'warning',
+            type: 'downloadFunnel-entry-pages-invalid-type',
+            sourcePath,
+            value: `downloadFunnel.entryPages typeof=${describeTypeof(ep)} (must be an array of string)`,
+          });
+        } else {
+          // 非 string 元素 → invalid-type（只報第一個 index + typeof，不 echo value）
+          const badIndex = ep.findIndex((e) => typeof e !== 'string');
+          if (badIndex !== -1) {
+            issues.push({
+              severity: 'warning',
+              type: 'downloadFunnel-entry-pages-invalid-type',
+              sourcePath,
+              value: `downloadFunnel.entryPages[${badIndex}] typeof=${describeTypeof(ep[badIndex])} (every entry must be a string: slug or public URL)`,
+            });
+          }
+          // too-many（只報 length，不 echo value）
+          if (ep.length > DOWNLOAD_FUNNEL_MAX_ENTRY_PAGES) {
+            issues.push({
+              severity: 'warning',
+              type: 'downloadFunnel-entry-pages-too-many',
+              sourcePath,
+              value: `downloadFunnel.entryPages has ${ep.length} entries (recommended <= ${DOWNLOAD_FUNNEL_MAX_ENTRY_PAGES})`,
+            });
+          }
+          // duplicate（只看 string 元素；只報重複數量，不 echo value）
+          const stringEntries = ep.filter((e) => typeof e === 'string');
+          const duplicateCount = stringEntries.length - new Set(stringEntries).size;
+          if (duplicateCount > 0) {
+            issues.push({
+              severity: 'warning',
+              type: 'downloadFunnel-entry-pages-duplicate',
+              sourcePath,
+              value: `downloadFunnel.entryPages contains ${duplicateCount} duplicate entry value(s) (each entry page should be listed once)`,
+            });
+          }
         }
       }
     }
