@@ -137,6 +137,38 @@ const DOWNLOAD_FUNNEL_ALLOWED_KEYS = new Set([
 // entryPages 建議上限（per §3.2.3；超過 → downloadFunnel-entry-pages-too-many，warning-only，非 hard cap）
 const DOWNLOAD_FUNNEL_MAX_ENTRY_PAGES = 10;
 
+// Phase 20260625-funnel-secret-heuristic（slice 8 / F7；§5.3）：downloadFunnel allowed value field
+//   （targetGatedPage / entryPages[]）之 value-based private-link heuristic。
+//   per docs/20260625-funnel-metadata-schema-validator-slice7-secret-heuristic-preflight.md §5
+//   - **只**對明確 Google Drive / Google Form host·path，或 secret-意味 query key（token/key/auth/
+//     email/respondent）命中；**不**對「含數字 / 很長 / 一般 querystring（如 utm_*）」命中（避免 false
+//     positive）。bare opaque ID / host-mismatch / ctaEventName / 全 frontmatter 掃描 = deferred，不在此。
+//   - 回傳 boolean；呼叫端據此 push warning，**絕不 echo value**（value 可能為真實 Drive ID / Form URL /
+//     token / respondent data）。
+const FUNNEL_SECRET_QUERY_KEY_RE = /[?&](token|key|auth|email|respondent)=/i;
+function looksLikePrivateFunnelLink(value) {
+  if (typeof value !== 'string') return false;
+  const lower = value.trim().toLowerCase();
+  if (lower === '') return false;
+  // Google Drive-like：host label 以 drive. 開頭，或 path 含 /drive/folders/ 或 /file/d/
+  if (/(^|\/\/)drive\./.test(lower)) return true;
+  if (lower.includes('/drive/folders/') || lower.includes('/file/d/')) return true;
+  // Google Form-like：host label 以 forms. 開頭，或 path 含 /forms/ 且帶 edit / formResponse / prefill / viewform
+  if (/(^|\/\/)forms\./.test(lower)) return true;
+  if (
+    lower.includes('/forms/') &&
+    (lower.includes('edit') ||
+      lower.includes('formresponse') ||
+      lower.includes('prefill') ||
+      lower.includes('viewform'))
+  ) {
+    return true;
+  }
+  // token-like secret query key（精確比對 key 名，避免 utm_* 等一般 querystring 誤判）
+  if (FUNNEL_SECRET_QUERY_KEY_RE.test(value)) return true;
+  return false;
+}
+
 // Phase 20260623-pm-sp8：platformPolicy 巢狀 shallow shape 列舉（warning-only；additive；只在 SP-2 之
 //   page-platform-policy-invalid-type 不觸發時，即 platformPolicy 為 plain object 時，才評估這些子規則）。
 //   - per docs/20260623-pm-sp8-platform-policy-shape-validator.md + SP-8 spec
@@ -1892,6 +1924,33 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
             value: 'downloadFunnel.role="gated_page" but effective GitHub robots is indexable ("index, follow"); set seo.indexing: noindex-follow or use pageType gated_download/download to keep the gated page out of the index',
           });
         }
+      }
+
+      // 14. downloadFunnel value-based private-link heuristic（warning-only；additive；F7 §5.3；slice 8）
+      //   per docs/20260625-funnel-metadata-schema-validator-slice7-secret-heuristic-preflight.md §5
+      //   - 只掃 allowed value field：targetGatedPage（string）/ entryPages[]（string 元素）；與 role 無關
+      //     （欄位 present 即掃）。非 string → 既有 invalid-type 處理，本 block 不重複。
+      //   - **不**掃 ctaEventName、**不**掃全 frontmatter、**不**處理 bare opaque ID、**不**做 host-mismatch。
+      //   - message **只含 field name + reason，絕不 echo value**（value 可能為真實 Drive ID / Form URL /
+      //     token / respondent）。warning-only；不改 indexing / sitemap / listings safety。
+      if (typeof funnel.targetGatedPage === 'string' && looksLikePrivateFunnelLink(funnel.targetGatedPage)) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-target-gated-page-private-value',
+          sourcePath,
+          value: 'downloadFunnel.targetGatedPage looks like a private / sensitive link (Drive / Form / token / respondent query); use a public slug or page URL — value not shown',
+        });
+      }
+      if (
+        Array.isArray(funnel.entryPages) &&
+        funnel.entryPages.some((e) => typeof e === 'string' && looksLikePrivateFunnelLink(e))
+      ) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-entry-pages-private-value',
+          sourcePath,
+          value: 'downloadFunnel.entryPages contains an entry that looks like a private / sensitive link (Drive / Form / token / respondent query); use public slugs or page URLs — value not shown',
+        });
       }
     }
   }

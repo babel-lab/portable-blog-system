@@ -670,6 +670,104 @@ check('89 gated_page + pageType=gated_download + seo.indexing=index → robots-s
   );
 });
 
+// ─── F1 §5.3 Slice 8：downloadFunnel value-based private-link heuristic（warning-only；不 echo value）─────
+//   per docs/20260625-funnel-metadata-schema-validator-slice7-secret-heuristic-preflight.md §5
+//   - 只掃 targetGatedPage / entryPages[]；只對 Drive/Form host·path 或 secret query key 告警
+//   - SAFE：simple slug / relative path / 一般 public absolute URL；DEFERRED：bare opaque ID / 一般 querystring / ctaEventName
+//   - sample 全 fake / placeholder（drive.example.com / forms.example.com / FAKE-*）；message 不 echo value
+
+check('90 targetGatedPage simple slug → safe (no private-value)', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'gated-zhuyin-download' } }));
+  assert.ok(!out.includes('downloadFunnel-target-gated-page-private-value'));
+  assert.deepEqual(out, []);
+});
+
+check('91 targetGatedPage relative path → safe', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: '/posts/gated-zhuyin-download/' } }));
+  assert.ok(!out.includes('downloadFunnel-target-gated-page-private-value'));
+  assert.deepEqual(out, []);
+});
+
+check('92 targetGatedPage general public absolute URL → safe', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'https://example.github.io/posts/gated-zhuyin-download/' } }));
+  assert.ok(!out.includes('downloadFunnel-target-gated-page-private-value'));
+  assert.deepEqual(out, []);
+});
+
+check('93 targetGatedPage Drive-like value → target-gated-page-private-value', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'https://drive.example.com/drive/folders/FAKE' } })),
+    ['downloadFunnel-target-gated-page-private-value']
+  );
+});
+
+check('94 targetGatedPage Form-like value → target-gated-page-private-value', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'https://forms.example.com/forms/d/FAKE/edit' } })),
+    ['downloadFunnel-target-gated-page-private-value']
+  );
+});
+
+check('95 targetGatedPage token-like query key → target-gated-page-private-value', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'https://example.com/x?token=FAKE' } })),
+    ['downloadFunnel-target-gated-page-private-value']
+  );
+});
+
+check('96 entryPages simple slug → safe (no private-value)', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, seo: { indexing: 'noindex-follow' } }));
+  assert.ok(!out.includes('downloadFunnel-entry-pages-private-value'));
+  assert.deepEqual(out, []);
+});
+
+check('97 entryPages Drive-like value → entry-pages-private-value', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://drive.example.com/drive/folders/FAKE'] }, seo: { indexing: 'noindex-follow' } })),
+    ['downloadFunnel-entry-pages-private-value']
+  );
+});
+
+check('98 entryPages Form-like value → entry-pages-private-value', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://forms.example.com/forms/d/FAKE/edit'] }, seo: { indexing: 'noindex-follow' } })),
+    ['downloadFunnel-entry-pages-private-value']
+  );
+});
+
+check('99 entryPages token-like query key → entry-pages-private-value', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/x?respondent=FAKE'] }, seo: { indexing: 'noindex-follow' } })),
+    ['downloadFunnel-entry-pages-private-value']
+  );
+});
+
+check('100 private-value message must NOT echo sample value', () => {
+  const out = pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'https://drive.example.com/drive/folders/SECRET-FAKE-ID' } });
+  assert.deepEqual(types(out), ['downloadFunnel-target-gated-page-private-value']);
+  assert.ok(!out[0].value.includes('SECRET-FAKE-ID'), 'must not echo the sample value');
+  assert.ok(!out[0].value.includes('drive.example.com'), 'must not echo the host');
+});
+
+check('101 ctaEventName not scanned by F7 (even if URL-like) → no private-value', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'gated-zhuyin-download', ctaEventName: 'https://drive.example.com/drive/folders/FAKE' } }));
+  assert.ok(!out.includes('downloadFunnel-target-gated-page-private-value'));
+  assert.ok(!out.includes('downloadFunnel-entry-pages-private-value'));
+  assert.deepEqual(out, []);
+});
+
+check('102 bare long opaque ID-like value → deferred / no warning', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789' } }));
+  assert.ok(!out.includes('downloadFunnel-target-gated-page-private-value'));
+  assert.deepEqual(out, []);
+});
+
+check('103 general querystring (utm_*) → no warning (false-positive guard)', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'https://example.com/x?utm_source=fb&utm_medium=social' } }));
+  assert.ok(!out.includes('downloadFunnel-target-gated-page-private-value'));
+  assert.deepEqual(out, []);
+});
+
 // ─── summary ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
