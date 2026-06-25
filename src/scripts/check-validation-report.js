@@ -319,6 +319,22 @@ if (existsSync(REPORT_PATH)) {
       assert.equal(typeof c.sourcePath, 'string', 'crossPost sourcePath string');
     }
   });
+
+  // B5（F-fixture / slice 11）：valid downloadFunnel `.md` fixtures 端對端產生 0 issue
+  //   → 不出現在 bySourcePath；證明 valid entry + valid gated_page reciprocating pair 不誤報，
+  //   且 production / fixture baseline 維持 0/133/105（valid fixture 貢獻 0 warning）。
+  check('B5 valid downloadFunnel .md fixtures produce 0 issues (absent from report)', () => {
+    for (const p of [
+      'content/validation-fixtures/github/posts/_test-download-funnel-valid-entry.md',
+      'content/validation-fixtures/github/posts/_test-download-funnel-valid-gated-page.md',
+    ]) {
+      assert.equal(
+        report.bySourcePath.find((e) => e.sourcePath === p),
+        undefined,
+        `${p} should produce 0 issues (valid fixture)`,
+      );
+    }
+  });
 }
 
 // ─── C. corpus cross-post: downloadFunnel bidirectional (F8 / slice 10) ────
@@ -425,6 +441,39 @@ check('C7 private-looking ref (F7) → skipped by cross-file, no duplicate bidir
     ]),
     [],
   );
+});
+
+// ─── D. isolated invalid private-value + no-value-echo (F-fixture / slice 11) ──
+//   在「獨立 baseline + 明確隔離」之 in-memory harness 驗 invalid private-value，**不**經 global
+//   validate:content 掃描（故 production validate:content 維持 0/133/105；scanned invalid .md 會 +1，
+//   與本 phase 硬約束衝突，故 invalid case 改以隔離 harness 驗）。sample 全 fake / placeholder。
+function funnelTypes(downloadFunnel) {
+  const r = validateContent({
+    posts: [corpusPost('isolated-funnel-case', downloadFunnel)],
+    settings: { categories: [], tags: [] },
+  });
+  return r.issues.filter((i) => i.type.startsWith('downloadFunnel-'));
+}
+
+check('D1 invalid private-value (isolated) → only private-value warning, value not echoed', () => {
+  const out = funnelTypes({ role: 'entry', targetGatedPage: 'https://drive.example.com/drive/folders/FAKE' });
+  assert.deepEqual(out.map((i) => i.type).sort(), ['downloadFunnel-target-gated-page-private-value']);
+  for (const i of out) {
+    assert.equal(i.severity, 'warning', 'private-value must be warning');
+    assert.ok(!String(i.value).includes('drive.example.com'), 'must not echo the fake host');
+    assert.ok(!String(i.value).includes('FAKE'), 'must not echo the fake id');
+  }
+});
+
+check('D2 valid reciprocating pair (isolated, mirrors .md fixtures) → 0 funnel warning', () => {
+  const r = validateContent({
+    posts: [
+      corpusPost('test-download-funnel-valid-entry', { role: 'entry', targetGatedPage: 'test-download-funnel-valid-gated-page' }),
+      { ...corpusPost('test-download-funnel-valid-gated-page', { role: 'gated_page', entryPages: ['test-download-funnel-valid-entry'] }), pageType: 'gated_download', includeInListings: false, includeInSitemap: false, seo: { indexing: 'noindex-follow' } },
+    ],
+    settings: { categories: [], tags: [] },
+  });
+  assert.deepEqual(r.issues.filter((i) => i.type.startsWith('downloadFunnel-')).map((i) => i.type), []);
 });
 
 // ─── Summary ────────────────────────────────────────────────────────────
