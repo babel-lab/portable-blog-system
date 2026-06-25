@@ -114,6 +114,23 @@ const GATED_DOWNLOAD_DISALLOWED_KEYS = new Set([
   'respondents',
 ]);
 
+// Phase 20260625-funnel-metadata-schema-validator-slice1：downloadFunnel 結構 / enum 列舉
+//   （warning-only；additive；純 metadata 層）。
+//   - per docs/20260625-funnel-metadata-schema-preflight-a.md §3 / §5.1（F1 schema preflight Slice 1）
+//   - 本 slice 只做「結構 / role enum / 未知 key」三類；required-combo（§5.2）/ value-based secret
+//     heuristic（§5.3）/ cross-field 一致性（§5.4）一律 deferred 至後續 slice。
+//   - downloadFunnel 屬純 metadata：**完全不影響** robots / sitemap / listings 之 effective 行為
+//     （§4.7 安全優先順序最低層；indexing decision 永遠由 seo.indexing / pageType / contentKind /
+//     platformPolicy / top-level includeIn* safety 決定）。
+//   - role 'post_submit' 不列入合法值（per §3.2.1；layer C 不獨立為 .md，故不可作 role 落地）。
+const VALID_DOWNLOAD_FUNNEL_ROLE = new Set(['entry', 'gated_page']);
+const DOWNLOAD_FUNNEL_ALLOWED_KEYS = new Set([
+  'role',
+  'targetGatedPage',
+  'entryPages',
+  'ctaEventName',
+]);
+
 // Phase 20260623-pm-sp8：platformPolicy 巢狀 shallow shape 列舉（warning-only；additive；只在 SP-2 之
 //   page-platform-policy-invalid-type 不觸發時，即 platformPolicy 為 plain object 時，才評估這些子規則）。
 //   - per docs/20260623-pm-sp8-platform-policy-shape-validator.md + SP-8 spec
@@ -1646,6 +1663,58 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
           sourcePath,
           value: `gatedDownload.${k} looks like a secret / token / response / private-permission field; do not store it in repo frontmatter`,
         });
+      }
+    }
+  }
+
+  // 11. downloadFunnel metadata 結構 / enum 驗證（warning-only；additive；F1 schema preflight Slice 1）
+  //   per docs/20260625-funnel-metadata-schema-preflight-a.md §3 / §5.1
+  //   - 純 metadata 層：完全不影響 robots / sitemap / listings 之 effective 行為（§4.7 最低層）。
+  //   - 本 slice 只做 (a) 結構 (b) role 缺省 (c) role enum (d) 未知 / secret-like key 四檢查；
+  //     required-combo（§5.2）/ value-based secret heuristic（§5.3）/ cross-field（§5.4）一律 deferred。
+  //   - suspicious-field 只報欄位名、不 echo value（mirror gatedDownload / platformPolicy 慣例）；
+  //     secret-like key（token / driveFolderId / formResponse 等）因不在 allowed 4 key 內，自動由 (d) 攔下。
+  const funnel = post.downloadFunnel;
+  if (funnel !== undefined) {
+    if (!isPlainObject(funnel)) {
+      // (a) downloadFunnel present 但非 plain object → warning
+      issues.push({
+        severity: 'warning',
+        type: 'downloadFunnel-invalid-type',
+        sourcePath,
+        value: `downloadFunnel typeof=${describeTypeof(funnel)} (must be object)`,
+      });
+    } else {
+      // (b) role 缺省 → warning
+      if (funnel.role === undefined) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-role-missing',
+          sourcePath,
+          value: 'downloadFunnel present but role is missing (must be "entry" or "gated_page")',
+        });
+      } else if (!(typeof funnel.role === 'string' && VALID_DOWNLOAD_FUNNEL_ROLE.has(funnel.role))) {
+        // (c) role present 但非合法列舉值（含非 string / 大小寫變體 / post_submit）→ warning
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-role-invalid-enum',
+          sourcePath,
+          value:
+            typeof funnel.role === 'string'
+              ? `downloadFunnel.role="${funnel.role}" (must be "entry" or "gated_page")`
+              : `downloadFunnel.role typeof=${describeTypeof(funnel.role)} (must be a string enum: "entry" or "gated_page")`,
+        });
+      }
+      // (d) 未知 / secret-like key（不在 allowed 4 key 內）→ warning（只報欄位名，不 echo value）
+      for (const k of Object.keys(funnel)) {
+        if (!DOWNLOAD_FUNNEL_ALLOWED_KEYS.has(k)) {
+          issues.push({
+            severity: 'warning',
+            type: 'downloadFunnel-suspicious-field',
+            sourcePath,
+            value: `downloadFunnel.${k} is not an allowed funnel field (role / targetGatedPage / entryPages / ctaEventName); do not store secrets / tokens / Drive IDs / form response URLs in repo frontmatter`,
+          });
+        }
       }
     }
   }

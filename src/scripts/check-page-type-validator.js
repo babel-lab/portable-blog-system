@@ -57,7 +57,10 @@ function makePost(overrides) {
 //   harness 將其與 'page-' 前綴一同視為 SP-2 系列輸出，以保持單一 issue 池與相同 severity 不變式。
 const SP_EXTRA_RULE_TYPES = new Set(['download-in-listings-default']);
 function isSpRuleType(t) {
-  return typeof t === 'string' && (t.startsWith('page-') || SP_EXTRA_RULE_TYPES.has(t));
+  return (
+    typeof t === 'string' &&
+    (t.startsWith('page-') || t.startsWith('downloadFunnel-') || SP_EXTRA_RULE_TYPES.has(t))
+  );
 }
 
 // 回傳該 post 觸發之 SP-2 / Slice-1 issue（type 前綴 'page-' 或屬 SP_EXTRA_RULE_TYPES）
@@ -331,6 +334,90 @@ check('45 contentKind=download + includeInListings invalid type → only invalid
   const t = types(out);
   assert.ok(t.includes('page-include-flag-invalid-type'));
   assert.ok(!t.includes('download-in-listings-default'), 'Slice-1 must not double-fire when type is invalid');
+});
+
+// ─── F1 Slice 1：downloadFunnel 結構 / enum / 未知 key（warning-only；additive；純 metadata）─────────
+//   per docs/20260625-funnel-metadata-schema-preflight-a.md §3 / §5.1
+//   - 缺省 downloadFunnel → 0 warning（既有 post 行為不變）
+//   - downloadFunnel 屬純 metadata：不參與 robots / sitemap / listings decision（本 harness 不碰 build）
+//   - required-combo（§5.2）/ value-based secret heuristic（§5.3）/ cross-field（§5.4）本 slice 不實作
+
+check('46 downloadFunnel absent → 0 funnel warning', () => {
+  assert.ok(!types(pageIssues({})).some((t) => t.startsWith('downloadFunnel-')));
+});
+
+check('47 valid entry role (+ targetGatedPage) → 0 funnel warning', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'gated-zhuyin-download' } })),
+    []
+  );
+});
+
+check('48 valid gated_page role (+ entryPages) → 0 funnel warning', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] } })),
+    []
+  );
+});
+
+check('49 downloadFunnel non-object (string) → downloadFunnel-invalid-type', () => {
+  assert.deepEqual(types(pageIssues({ downloadFunnel: 'entry' })), ['downloadFunnel-invalid-type']);
+});
+
+check('50 downloadFunnel object but role missing → downloadFunnel-role-missing', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { targetGatedPage: 'x' } })),
+    ['downloadFunnel-role-missing']
+  );
+});
+
+check('51 role = post_submit (not allowed) → downloadFunnel-role-invalid-enum', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'post_submit' } })),
+    ['downloadFunnel-role-invalid-enum']
+  );
+});
+
+check('52 role non-string (number) → downloadFunnel-role-invalid-enum', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 1 } })),
+    ['downloadFunnel-role-invalid-enum']
+  );
+});
+
+check('53 role case variant ("Entry") → downloadFunnel-role-invalid-enum', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'Entry' } })),
+    ['downloadFunnel-role-invalid-enum']
+  );
+});
+
+check('54 unknown / secret-like key (driveFolderId) → downloadFunnel-suspicious-field, value not echoed', () => {
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', driveFolderId: 'SECRET-ID-VALUE' } });
+  assert.deepEqual(types(out), ['downloadFunnel-suspicious-field']);
+  assert.ok(!out[0].value.includes('SECRET-ID-VALUE'), 'must not echo the disallowed value');
+  assert.ok(out[0].value.includes('driveFolderId'), 'should name the field');
+});
+
+check('55 all four allowed keys only → 0 funnel warning', () => {
+  assert.deepEqual(
+    types(pageIssues({
+      downloadFunnel: {
+        role: 'entry',
+        targetGatedPage: 'gated-zhuyin-download',
+        entryPages: ['a'],
+        ctaEventName: 'click_all_download',
+      },
+    })),
+    []
+  );
+});
+
+check('56 invalid role + unknown key → both warnings (independent)', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'bogus', token: 'X' } })),
+    ['downloadFunnel-role-invalid-enum', 'downloadFunnel-suspicious-field']
+  );
 });
 
 // ─── summary ─────────────────────────────────────────────────────────────
