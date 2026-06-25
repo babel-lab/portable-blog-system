@@ -39,7 +39,7 @@ const REPORT_PATH = path.join(PROJECT_ROOT, '.cache', 'data', 'validation-report
 // 20260624 Slice 1 (download-in-listings-default)：rule landing 顯式 +21 warning / +3 issue-post
 //   per docs/20260624-download-listing-special-page-preflight-spec-lock.md §2.D Slice 1
 //   pre-Slice-1: { errorCount: 0, warningCount: 112, issuePostCount: 102 }
-const BASELINE = { errorCount: 0, warningCount: 133, issuePostCount: 105 };
+const BASELINE = { errorCount: 0, warningCount: 134, issuePostCount: 106 };
 
 const ASOF = '2026-01-01T00:00:00.000Z';
 
@@ -260,7 +260,7 @@ if (existsSync(REPORT_PATH)) {
     assert.ok(report.buckets && Array.isArray(report.buckets.settings) && Array.isArray(report.buckets.fixtures) && Array.isArray(report.buckets.crossPost));
   });
 
-  check('B2 totals match validate:content baseline (0/133/105)', () => {
+  check('B2 totals match validate:content baseline (0/134/106)', () => {
     assert.equal(report.totals.errorCount, BASELINE.errorCount, 'errorCount');
     assert.equal(report.totals.warningCount, BASELINE.warningCount, 'warningCount');
     assert.equal(report.totals.issuePostCount, BASELINE.issuePostCount, 'issuePostCount');
@@ -349,6 +349,23 @@ if (existsSync(REPORT_PATH)) {
         `${p} should produce 0 issues (deferred-case fixture)`,
       );
     }
+  });
+
+  // B7（F-fixture group 3 / scanned invalid bump）：scanned invalid `.md` fixture（role=entry 缺 targetGatedPage）
+  //   端對端產生 exactly 1 warning（required-combo），證明 scanned invalid baseline bump 鎖定；
+  //   此 fixture 即 0/133/105 → 0/134/106 bump 之唯一來源。
+  check('B7 scanned invalid downloadFunnel .md fixture produces exactly 1 required-combo warning', () => {
+    const p = 'content/validation-fixtures/github/posts/_test-download-funnel-invalid-entry.md';
+    const entry = report.bySourcePath.find((e) => e.sourcePath === p);
+    assert.ok(entry, `${p} should appear in report (scanned invalid fixture)`);
+    assert.equal(entry.kind, 'fixture', 'kind=fixture');
+    assert.equal(entry.errorCount, 0, 'errorCount 0 (warning-only)');
+    assert.equal(entry.warningCount, 1, 'exactly 1 warning');
+    assert.deepEqual(
+      entry.issues.map((i) => i.type),
+      ['downloadFunnel-entry-missing-target-gated-page'],
+      'exactly the required-combo missing-target code',
+    );
   });
 }
 
