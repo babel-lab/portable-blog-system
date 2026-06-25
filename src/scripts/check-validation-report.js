@@ -27,6 +27,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildReport, classifyRuleClass, classifyKind, BY_CLASS_KEYS } from './report-validation.js';
+// F8 / slice 10：corpus cross-post bidirectional locks 需直接餵 validateContent（全 posts）。
+import { validateContent } from './validate-content.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), '..', '..');
@@ -204,6 +206,23 @@ check('A8 buckets + cross-post split', () => {
   assert.equal(r.buckets.crossPost.find((c) => c.type === 'unknown-tag'), undefined);
 });
 
+// A8b. F8 downloadFunnel bidirectional cross-post codes → frontmatter class + crossPost bucket
+check('A8b downloadFunnel bidirectional codes classify + bucket', () => {
+  assert.equal(classifyRuleClass('downloadFunnel-entry-page-not-listed-by-gated-page'), 'frontmatter');
+  assert.equal(classifyRuleClass('downloadFunnel-gated-page-not-targeted-by-entry'), 'frontmatter');
+  const r = buildReport(
+    result([
+      issue({ type: 'downloadFunnel-entry-page-not-listed-by-gated-page', sourcePath: 'content/github/posts/e.md' }),
+      issue({ type: 'downloadFunnel-gated-page-not-targeted-by-entry', sourcePath: 'content/github/posts/g.md' }),
+    ]),
+    { asOf: ASOF },
+  );
+  assert.deepEqual(r.buckets.crossPost.map((c) => c.type).sort(), [
+    'downloadFunnel-entry-page-not-listed-by-gated-page',
+    'downloadFunnel-gated-page-not-targeted-by-entry',
+  ]);
+});
+
 // A9. determinism + no input mutation
 check('A9 deterministic + does not mutate input', () => {
   const issues = [issue({ type: 'unknown-tag', value: 'x' }), issue({ type: 'missing-title', sourcePath: 'content/github/posts/b.md' })];
@@ -288,11 +307,125 @@ if (existsSync(REPORT_PATH)) {
     assert.equal(report.buckets.settings.length, report.bySourcePath.filter((e) => e.kind === 'settings').length);
     assert.equal(report.buckets.fixtures.length, report.bySourcePath.filter((e) => e.kind === 'fixture').length);
     for (const c of report.buckets.crossPost) {
-      assert.ok(['duplicate-slug', 'series-number-duplicate'].includes(c.type), `crossPost type (${c.type})`);
+      assert.ok(
+        [
+          'duplicate-slug',
+          'series-number-duplicate',
+          'downloadFunnel-entry-page-not-listed-by-gated-page',
+          'downloadFunnel-gated-page-not-targeted-by-entry',
+        ].includes(c.type),
+        `crossPost type (${c.type})`,
+      );
       assert.equal(typeof c.sourcePath, 'string', 'crossPost sourcePath string');
     }
   });
 }
+
+// ─── C. corpus cross-post: downloadFunnel bidirectional (F8 / slice 10) ────
+//   直接餵 validateContent（全 posts）；只斷言 BIDIR 兩 type；sample 全 placeholder slug。
+//   per docs/20260625-funnel-metadata-schema-validator-slice9-bidirectional-preflight.md §3
+const BIDIR_TYPES = new Set([
+  'downloadFunnel-entry-page-not-listed-by-gated-page',
+  'downloadFunnel-gated-page-not-targeted-by-entry',
+]);
+function corpusPost(slug, downloadFunnel) {
+  return {
+    sourcePath: `content/github/posts/${slug}.md`,
+    status: 'ready',
+    title: slug,
+    slug,
+    date: '2026-06-25',
+    contentKind: 'post',
+    description: 'fixture',
+    cover: '/images/placeholders/cover.png',
+    tags: [],
+    downloadFunnel,
+  };
+}
+function bidir(posts) {
+  const r = validateContent({ posts, settings: { categories: [], tags: [] } });
+  for (const i of r.issues) {
+    if (BIDIR_TYPES.has(i.type)) {
+      assert.equal(i.severity, 'warning', `${i.type} must be warning`);
+      assert.ok(
+        typeof i.value !== 'string' || !i.value.includes('://'),
+        `${i.type} must not echo URL-like value`,
+      );
+    }
+  }
+  return r.issues
+    .filter((i) => BIDIR_TYPES.has(i.type))
+    .map((i) => `${i.type}@${i.sourcePath}`)
+    .sort();
+}
+
+check('C1 entry→gated, gated does not list entry → entry-page-not-listed', () => {
+  assert.deepEqual(
+    bidir([
+      corpusPost('entry-e', { role: 'entry', targetGatedPage: 'gated-x' }),
+      corpusPost('gated-x', { role: 'gated_page', entryPages: ['other'] }),
+    ]),
+    ['downloadFunnel-entry-page-not-listed-by-gated-page@content/github/posts/entry-e.md'],
+  );
+});
+
+check('C2 gated lists entry, entry does not point back → gated-page-not-targeted', () => {
+  assert.deepEqual(
+    bidir([
+      corpusPost('gated-x', { role: 'gated_page', entryPages: ['entry-e'] }),
+      corpusPost('entry-e', { role: 'entry', targetGatedPage: 'other-gated' }),
+    ]),
+    ['downloadFunnel-gated-page-not-targeted-by-entry@content/github/posts/gated-x.md'],
+  );
+});
+
+check('C3 bidirectional consistent → no bidir warning', () => {
+  assert.deepEqual(
+    bidir([
+      corpusPost('entry-e', { role: 'entry', targetGatedPage: 'gated-x' }),
+      corpusPost('gated-x', { role: 'gated_page', entryPages: ['entry-e'] }),
+    ]),
+    [],
+  );
+});
+
+check('C4 multiple entries → same gated, all listed back → no bidir warning', () => {
+  assert.deepEqual(
+    bidir([
+      corpusPost('entry-1', { role: 'entry', targetGatedPage: 'gated-x' }),
+      corpusPost('entry-2', { role: 'entry', targetGatedPage: 'gated-x' }),
+      corpusPost('gated-x', { role: 'gated_page', entryPages: ['entry-1', 'entry-2'] }),
+    ]),
+    [],
+  );
+});
+
+check('C5 dangling reference (target post missing) → deferred, no bidir warning', () => {
+  assert.deepEqual(
+    bidir([corpusPost('entry-e', { role: 'entry', targetGatedPage: 'nonexistent-gated' })]),
+    [],
+  );
+});
+
+check('C6 absolute URL ref → deferred, no bidir warning', () => {
+  assert.deepEqual(
+    bidir([
+      corpusPost('entry-e', { role: 'entry', targetGatedPage: 'https://example.com/gated-x' }),
+      corpusPost('gated-x', { role: 'gated_page', entryPages: ['entry-e'] }),
+    ]),
+    [],
+  );
+});
+
+check('C7 private-looking ref (F7) → skipped by cross-file, no duplicate bidir warning', () => {
+  assert.deepEqual(
+    bidir([
+      corpusPost('entry-e', { role: 'entry', targetGatedPage: 'https://drive.example.com/drive/folders/FAKE' }),
+      corpusPost('gated-x', { role: 'gated_page', entryPages: ['entry-e'] }),
+    ]),
+    [],
+  );
+});
 
 // ─── Summary ────────────────────────────────────────────────────────────
 

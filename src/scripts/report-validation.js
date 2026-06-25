@@ -40,7 +40,13 @@ const GENERATOR = 'report-validation';
 
 // §D.2 cross-post rule types — these remain in their per-sourcePath entry AND get an
 // aggregated view in buckets.crossPost.
-const CROSS_POST_TYPES = new Set(['duplicate-slug', 'series-number-duplicate']);
+const CROSS_POST_TYPES = new Set([
+  'duplicate-slug',
+  'series-number-duplicate',
+  // F8 / slice 10：downloadFunnel entry ↔ gated_page 跨檔案一致性（corpus cross-post warnings）
+  'downloadFunnel-entry-page-not-listed-by-gated-page',
+  'downloadFunnel-gated-page-not-targeted-by-entry',
+]);
 
 // §C.2 byClass canonical key set (stable shape; download/book/series fold into frontmatter
 // for v1 per §C.4, so their keys stay 0 — kept for forward-compat / schema stability).
@@ -77,7 +83,7 @@ export function classifyRuleClass(type) {
     return 'blogger';
   }
   if (
-    /^(missing-|invalid-|long-|empty-tags|body-leading-h1|contentkind-and-type-conflict|related-links-|book-|series-|download-|page-|duplicate-slug)/.test(
+    /^(missing-|invalid-|long-|empty-tags|body-leading-h1|contentkind-and-type-conflict|related-links-|book-|series-|download-|downloadFunnel-|page-|duplicate-slug)/.test(
       t,
     )
   ) {

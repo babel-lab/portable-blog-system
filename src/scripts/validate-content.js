@@ -169,6 +169,20 @@ function looksLikePrivateFunnelLink(value) {
   return false;
 }
 
+// Phase 20260625-funnel-bidirectional（slice 10 / F8）：downloadFunnel cross-file ref → 可比對 slug。
+//   per docs/20260625-funnel-metadata-schema-validator-slice9-bidirectional-preflight.md §6
+//   - 只處理 simple slug / 單段 relative path：strip querystring/hash → strip 前後斜線；
+//     absolute URL（含 '://'）/ 空字串 → null（deferred，不 cross-file resolve）。
+//   - case-sensitive；**不**做 .html strip、**不**取 last-segment（保守，避免誤判；多段 path 不匹配＝deferred）。
+function normalizeFunnelRef(value) {
+  if (typeof value !== 'string') return null;
+  let v = value.trim();
+  if (v === '' || v.includes('://')) return null;
+  v = v.split('?')[0].split('#')[0];
+  v = v.replace(/^\/+/, '').replace(/\/+$/, '');
+  return v === '' ? null : v;
+}
+
 // Phase 20260623-pm-sp8：platformPolicy 巢狀 shallow shape 列舉（warning-only；additive；只在 SP-2 之
 //   page-platform-policy-invalid-type 不觸發時，即 platformPolicy 為 plain object 時，才評估這些子規則）。
 //   - per docs/20260623-pm-sp8-platform-policy-shape-validator.md + SP-8 spec
@@ -3074,6 +3088,79 @@ export function validateContent({ posts, settings }) {
           sourcePath: entry.sourcePath,
           value: `series.id="${entry.id}", series.number=${entry.number}`,
         });
+      }
+    }
+  }
+
+  // Phase 20260625-funnel-bidirectional（slice 10 / F8）：downloadFunnel entry ↔ gated_page 跨檔案
+  //   一致性（warning-only；corpus cross-post pass；mirror duplicate-slug / series-number-duplicate）。
+  //   per docs/20260625-funnel-metadata-schema-validator-slice9-bidirectional-preflight.md §3–§7
+  //   - corpus 層（全 posts）；**不**放單篇 validatePageTypeMetadata（後者無 corpus context）。
+  //   - 只比對可解析 simple slug / 單段 relative path；absolute URL（'://'）/ private value（F7）/
+  //     非 string（F3）/ dangling（解析不到 post）→ skip（deferred，不告警）。
+  //   - role missing/invalid（F2）→ skip。與 robots/sitemap/listings（F5/F6）正交，不重複告警。
+  //   - message **只用 safe own-slug + sourcePath，絕不 echo raw ref value**。
+  const funnelPostBySlug = new Map();
+  for (const post of posts) {
+    if (typeof post.slug === 'string' && post.slug.trim() !== '') {
+      const key = post.slug.trim();
+      if (!funnelPostBySlug.has(key)) funnelPostBySlug.set(key, post);
+    }
+  }
+  const validFunnelOf = (post) => {
+    const f = post && post.downloadFunnel;
+    if (!isPlainObject(f)) return null;
+    if (f.role !== 'entry' && f.role !== 'gated_page') return null; // F2 covers missing/invalid
+    return f;
+  };
+  // ref → 可比對 slug；private（F7）/ 非 string（F3）/ absolute / 空 → null（skip）
+  const refSlug = (raw) =>
+    typeof raw === 'string' && !looksLikePrivateFunnelLink(raw) ? normalizeFunnelRef(raw) : null;
+  for (const post of posts) {
+    const f = validFunnelOf(post);
+    if (!f) continue;
+    const ownSlug = typeof post.slug === 'string' ? post.slug.trim() : '';
+    if (ownSlug === '') continue;
+    if (f.role === 'entry') {
+      // 方向 1：entry E → targetGatedPage G；G 為 gated_page 但 entryPages 未列 E → warn（掛 E）
+      const targetSlug = refSlug(f.targetGatedPage);
+      if (targetSlug === null) continue; // 非 string / private / absolute / 空 → deferred
+      const gated = funnelPostBySlug.get(targetSlug);
+      if (!gated) continue; // dangling → deferred
+      const gf = validFunnelOf(gated);
+      if (!gf || gf.role !== 'gated_page') continue; // 目標非 gated_page → 不在本 slice 範圍
+      const listedBack =
+        Array.isArray(gf.entryPages) && gf.entryPages.some((ep) => refSlug(ep) === ownSlug);
+      if (!listedBack) {
+        issues.push({
+          severity: 'warning',
+          type: 'downloadFunnel-entry-page-not-listed-by-gated-page',
+          sourcePath: post.sourcePath,
+          value: `entry slug "${ownSlug}" targets a gated page that does not list it back in entryPages`,
+        });
+      }
+    } else {
+      // 方向 2：gated_page G 之 entryPages 列 E；E 為 entry 但 targetGatedPage 未指回 G → warn（掛 G）
+      if (!Array.isArray(f.entryPages)) continue; // F3 covers
+      const seenEntrySlug = new Set();
+      for (const ep of f.entryPages) {
+        const entrySlug = refSlug(ep);
+        if (entrySlug === null || seenEntrySlug.has(entrySlug)) continue;
+        seenEntrySlug.add(entrySlug);
+        const entryPost = funnelPostBySlug.get(entrySlug);
+        if (!entryPost) continue; // dangling → deferred
+        const ef = validFunnelOf(entryPost);
+        if (!ef || ef.role !== 'entry') continue; // 列入者非 entry → 不在本 slice 範圍
+        const backSlug = refSlug(ef.targetGatedPage);
+        if (backSlug === null) continue; // E 之 target 不可解析（absent/private/absolute）→ indeterminate → skip
+        if (backSlug !== ownSlug) {
+          issues.push({
+            severity: 'warning',
+            type: 'downloadFunnel-gated-page-not-targeted-by-entry',
+            sourcePath: post.sourcePath,
+            value: `gated page slug "${ownSlug}" lists an entry whose targetGatedPage does not point back to it`,
+          });
+        }
       }
     }
   }
