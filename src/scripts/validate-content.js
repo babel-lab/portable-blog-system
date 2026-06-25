@@ -20,6 +20,10 @@ import { resolvePlaceholders } from './resolve-placeholders.js';
 //   - 用於 series-title-unresolved warning 規則之 placeholder 偵測
 //   - 與 normalize-post-output / build-promotion 共用同一 helper（資料一致性）
 import { resolveTitleTemplate } from './resolve-series-title.js';
+// Phase 20260625-funnel-robots-safety（slice 6 / F6）：effective GitHub robots 之權威推導（純函式、
+//   零 side-effect、無 circular import）。downloadFunnel role↔robots safety 重用此函式，確保「可索引」
+//   判定與 build 輸出對齊，避免 false-positive。**只讀不改**：不影響任何 indexing decision。
+import { resolvePostDetailRobots } from './page-type-robots.js';
 
 // Phase 5-g-3：ERROR 規則常數
 const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
@@ -1870,6 +1874,22 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
             type: 'downloadFunnel-gated-page-pageType-mismatch',
             sourcePath,
             value: 'downloadFunnel.role="gated_page" but pageType is not "gated_download" or "download" (declare a gated/download pageType)',
+          });
+        }
+        // (n) gated_page 但 effective GitHub robots 可索引 → warning（F6；§5.4 robots-safety；slice 6）
+        //   per docs/20260625-funnel-metadata-schema-validator-slice5-robots-safety-preflight.md §3 / §4
+        //   - 重用純函式 resolvePostDetailRobots(post)（page-type-robots.js）取得與 build 對齊之 effective
+        //     GitHub robots；只在確定為 'index, follow'（可索引）時告警，避免 false-positive：任何 noindex
+        //     路徑（seo.indexing noindex / contentKind:download / pageType download·gated_download·
+        //     utility_hidden·redirect_canonical / platformPolicy.github.indexing tighten）→ 自動 safe。
+        //   - **只讀不改** indexing decision；message 不含任何 value（只有固定字串 + robots enum）。
+        //   - Blogger robots 屬作者後台手動（SP-9c），不在此推導範圍（deferred）。
+        if (resolvePostDetailRobots(post) === 'index, follow') {
+          issues.push({
+            severity: 'warning',
+            type: 'downloadFunnel-role-conflicts-robots-safety',
+            sourcePath,
+            value: 'downloadFunnel.role="gated_page" but effective GitHub robots is indexable ("index, follow"); set seo.indexing: noindex-follow or use pageType gated_download/download to keep the gated page out of the index',
           });
         }
       }

@@ -353,9 +353,10 @@ check('47 valid entry role (+ targetGatedPage) → 0 funnel warning', () => {
   );
 });
 
-check('48 valid gated_page role (+ entryPages) → 0 funnel warning', () => {
+check('48 valid gated_page role (+ entryPages, noindex) → 0 funnel warning', () => {
+  // seo.indexing noindex-follow → robots-safe，隔離 slice-6 robots-safety（test 83/84 專責覆蓋）
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, seo: { indexing: 'noindex-follow' } })),
     []
   );
 });
@@ -394,7 +395,7 @@ check('53 role case variant ("Entry") → downloadFunnel-role-invalid-enum', () 
 
 check('54 unknown / secret-like key (driveFolderId) → downloadFunnel-suspicious-field, value not echoed', () => {
   // entryPages 提供以隔離 slice-2 gated-page-missing-entry-pages（test 58 已專責覆蓋）
-  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'], driveFolderId: 'SECRET-ID-VALUE' } });
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'], driveFolderId: 'SECRET-ID-VALUE' }, seo: { indexing: 'noindex-follow' } });
   assert.deepEqual(types(out), ['downloadFunnel-suspicious-field']);
   assert.ok(!out[0].value.includes('SECRET-ID-VALUE'), 'must not echo the disallowed value');
   assert.ok(out[0].value.includes('driveFolderId'), 'should name the field');
@@ -432,16 +433,16 @@ check('57 role=entry without targetGatedPage → entry-missing-target-gated-page
 });
 
 check('58 role=gated_page without entryPages → gated-page-missing-entry-pages', () => {
-  assert.deepEqual(types(pageIssues({ downloadFunnel: { role: 'gated_page' } })), ['downloadFunnel-gated-page-missing-entry-pages']);
+  assert.deepEqual(types(pageIssues({ downloadFunnel: { role: 'gated_page' }, seo: { indexing: 'noindex-follow' } })), ['downloadFunnel-gated-page-missing-entry-pages']);
 });
 
 check('59 role=gated_page with empty entryPages [] → gated-page-missing-entry-pages', () => {
-  assert.deepEqual(types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: [] } })), ['downloadFunnel-gated-page-missing-entry-pages']);
+  assert.deepEqual(types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: [] }, seo: { indexing: 'noindex-follow' } })), ['downloadFunnel-gated-page-missing-entry-pages']);
 });
 
 check('60 role=gated_page with targetGatedPage → target-gated-page-wrong-role', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'], targetGatedPage: 'gated-zhuyin-download' } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'], targetGatedPage: 'gated-zhuyin-download' }, seo: { indexing: 'noindex-follow' } })),
     ['downloadFunnel-target-gated-page-wrong-role']
   );
 });
@@ -462,34 +463,34 @@ check('62 targetGatedPage non-string (number) → target-gated-page-invalid-type
 
 check('63 entryPages non-array (string) → entry-pages-invalid-type (no missing)', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: 'zhuyin-intro' } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: 'zhuyin-intro' }, seo: { indexing: 'noindex-follow' } })),
     ['downloadFunnel-entry-pages-invalid-type']
   );
 });
 
 check('64 entryPages array with non-string element → entry-pages-invalid-type', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro', 5] } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro', 5] }, seo: { indexing: 'noindex-follow' } })),
     ['downloadFunnel-entry-pages-invalid-type']
   );
 });
 
 check('65 entryPages > 10 unique → entry-pages-too-many', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: Array.from({ length: 11 }, (_, i) => `entry-${i}`) } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: Array.from({ length: 11 }, (_, i) => `entry-${i}`) }, seo: { indexing: 'noindex-follow' } })),
     ['downloadFunnel-entry-pages-too-many']
   );
 });
 
 check('66 entryPages duplicate → entry-pages-duplicate', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro', 'zhuyin-intro'] } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro', 'zhuyin-intro'] }, seo: { indexing: 'noindex-follow' } })),
     ['downloadFunnel-entry-pages-duplicate']
   );
 });
 
 check('67 entry-pages-duplicate message must NOT echo value (URL-like placeholder)', () => {
-  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/p', 'https://example.com/p'] } });
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/p', 'https://example.com/p'] }, seo: { indexing: 'noindex-follow' } });
   assert.deepEqual(types(out), ['downloadFunnel-entry-pages-duplicate']);
   assert.ok(!out[0].value.includes('example.com'), 'must not echo the (possibly URL/secret) entry value');
 });
@@ -509,14 +510,14 @@ check('69 invalid role + field-shape error → both warnings (combo role-rules g
 
 check('70 role=gated_page with exactly 10 unique entryPages → 0 funnel warning (boundary)', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: Array.from({ length: 10 }, (_, i) => `entry-${i}`) } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: Array.from({ length: 10 }, (_, i) => `entry-${i}`) }, seo: { indexing: 'noindex-follow' } })),
     []
   );
 });
 
 check('71 entryPages too-many AND duplicate → both warnings (independent)', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: [...Array.from({ length: 11 }, (_, i) => `entry-${i}`), 'entry-0'] } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: [...Array.from({ length: 11 }, (_, i) => `entry-${i}`), 'entry-0'] }, seo: { indexing: 'noindex-follow' } })),
     ['downloadFunnel-entry-pages-duplicate', 'downloadFunnel-entry-pages-too-many']
   );
 });
@@ -528,29 +529,32 @@ check('71 entryPages too-many AND duplicate → both warnings (independent)', ()
 //   - gated_page 樣本一律帶 entryPages（隔離 slice-2 gated-page-missing-entry-pages）；sample 全 placeholder
 
 check('72 gated_page + includeInSitemap=true → role-conflicts-sitemap-safety', () => {
+  // pageType gated_download → robots-safe（隔離 slice-6 robots-safety），includeInListings:false 抑制 Slice-1
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, includeInSitemap: true })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, includeInSitemap: true, pageType: 'gated_download', includeInListings: false })),
     ['downloadFunnel-role-conflicts-sitemap-safety']
   );
 });
 
 check('73 gated_page + platformPolicy.github.includeInSitemap=true → role-conflicts-sitemap-safety', () => {
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, platformPolicy: { github: { includeInSitemap: true } } })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, platformPolicy: { github: { includeInSitemap: true } }, pageType: 'gated_download', includeInListings: false })),
     ['downloadFunnel-role-conflicts-sitemap-safety']
   );
 });
 
 check('74 gated_page + includeInListings=true → role-conflicts-listings-default', () => {
+  // contentKind download → robots-safe（隔離 slice-6）；includeInListings:true 已抑制 Slice-1，且非 noindex seo 故不觸發 rule 8
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, includeInListings: true })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, includeInListings: true, contentKind: 'download' })),
     ['downloadFunnel-role-conflicts-listings-default']
   );
 });
 
-check('75 gated_page + pageType=article → gated-page-pageType-mismatch', () => {
+check('75 gated_page + pageType=article (noindex) → gated-page-pageType-mismatch', () => {
+  // seo noindex-follow → robots-safe（隔離 slice-6）；pageType article 仍觸發 mismatch
   assert.deepEqual(
-    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, pageType: 'article' })),
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, pageType: 'article', seo: { indexing: 'noindex-follow' } })),
     ['downloadFunnel-gated-page-pageType-mismatch']
   );
 });
@@ -569,8 +573,8 @@ check('77 gated_page + pageType=gated_download (policy flags false) → no funne
   );
 });
 
-check('78 gated_page + pageType absent → no pageType-mismatch', () => {
-  const out = types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] } }));
+check('78 gated_page + pageType absent (noindex) → no pageType-mismatch', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, seo: { indexing: 'noindex-follow' } }));
   assert.ok(!out.includes('downloadFunnel-gated-page-pageType-mismatch'));
   assert.deepEqual(out, []);
 });
@@ -588,12 +592,13 @@ check('80 role=entry + includeInListings=true → no listings-conflict', () => {
 });
 
 check('81 sitemap-conflict message must NOT echo entry value (URL-like placeholder)', () => {
-  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/p'] }, includeInSitemap: true });
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/p'] }, includeInSitemap: true, pageType: 'gated_download', includeInListings: false });
   assert.deepEqual(types(out), ['downloadFunnel-role-conflicts-sitemap-safety']);
   assert.ok(!out[0].value.includes('example.com'), 'must not echo any entry value');
 });
 
-check('82 gated_page + sitemap+listings+pageType conflicts → three warnings (independent)', () => {
+check('82 gated_page + sitemap+listings+pageType(article, indexable) → four warnings (independent)', () => {
+  // 此頁 indexable（pageType article，無 noindex）→ slice-6 robots-safety 亦合理並存（展示四 funnel 規則獨立）
   assert.deepEqual(
     types(pageIssues({
       downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] },
@@ -604,8 +609,64 @@ check('82 gated_page + sitemap+listings+pageType conflicts → three warnings (i
     [
       'downloadFunnel-gated-page-pageType-mismatch',
       'downloadFunnel-role-conflicts-listings-default',
+      'downloadFunnel-role-conflicts-robots-safety',
       'downloadFunnel-role-conflicts-sitemap-safety',
     ]
+  );
+});
+
+// ─── F1 §5.4 Slice 6：downloadFunnel role↔robots safety（warning-only；不 echo value）─────────
+//   per docs/20260625-funnel-metadata-schema-validator-slice5-robots-safety-preflight.md §3 / §4
+//   - 只在 role='gated_page' 評估；重用 resolvePostDetailRobots → 只在 effective robots 'index, follow' 告警
+//   - safe path：seo.indexing noindex / contentKind:download / pageType download·gated_download → 不告警
+//   - sample 全 placeholder；message 不 echo value
+
+check('83 gated_page + seo.indexing=index (explicit) → role-conflicts-robots-safety', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, seo: { indexing: 'index' } })),
+    ['downloadFunnel-role-conflicts-robots-safety']
+  );
+});
+
+check('84 gated_page + default indexable (no seo/pageType, contentKind post) → role-conflicts-robots-safety', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] } })),
+    ['downloadFunnel-role-conflicts-robots-safety']
+  );
+});
+
+check('85 gated_page + seo.indexing=noindex-follow → no robots-safety (safe)', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, seo: { indexing: 'noindex-follow' } })),
+    []
+  );
+});
+
+check('86 gated_page + contentKind=download → no robots-safety (false-positive defense)', () => {
+  // effective robots = noindex,follow via legacy contentKind:download → resolvePostDetailRobots safe
+  const out = types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, contentKind: 'download', includeInListings: false }));
+  assert.ok(!out.includes('downloadFunnel-role-conflicts-robots-safety'));
+  assert.deepEqual(out, []);
+});
+
+check('87 role=entry + seo.indexing=index → no robots-safety (rule only applies to gated_page)', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'gated-zhuyin-download' }, seo: { indexing: 'index' } }));
+  assert.ok(!out.includes('downloadFunnel-role-conflicts-robots-safety'));
+  assert.deepEqual(out, []);
+});
+
+check('88 robots-safety message must NOT echo entry value (URL-like placeholder)', () => {
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/p'] }, seo: { indexing: 'index' } });
+  assert.deepEqual(types(out), ['downloadFunnel-role-conflicts-robots-safety']);
+  assert.ok(!out[0].value.includes('example.com'), 'must not echo any entry value');
+});
+
+check('89 gated_page + pageType=gated_download + seo.indexing=index → robots-safety + SP-2 indexed (overlap)', () => {
+  // explicit seo.indexing=index 勝過 pageType 推導 → effective robots index,follow → robots-safety；
+  // 同時既有 SP-2 rule 5 page-gated-download-indexed 亦觸發（獨立維度；overlap 記錄）
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, pageType: 'gated_download', seo: { indexing: 'index' }, includeInListings: false })),
+    ['downloadFunnel-role-conflicts-robots-safety', 'page-gated-download-indexed']
   );
 });
 
