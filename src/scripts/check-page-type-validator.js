@@ -521,6 +521,94 @@ check('71 entryPages too-many AND duplicate → both warnings (independent)', ()
   );
 });
 
+// ─── F1 §5.4 Slice 4：downloadFunnel 單篇 role↔policy 一致性（warning-only；不 echo value）─────────
+//   per docs/20260625-funnel-metadata-schema-validator-slice3-preflight.md §3.1
+//   - 三規則只在 role='gated_page' 時評估；純 role × includeInSitemap / includeInListings / pageType 比較
+//   - 不跨檔案、不推導 effective robots、不改 indexing decision；message 不含任何 value
+//   - gated_page 樣本一律帶 entryPages（隔離 slice-2 gated-page-missing-entry-pages）；sample 全 placeholder
+
+check('72 gated_page + includeInSitemap=true → role-conflicts-sitemap-safety', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, includeInSitemap: true })),
+    ['downloadFunnel-role-conflicts-sitemap-safety']
+  );
+});
+
+check('73 gated_page + platformPolicy.github.includeInSitemap=true → role-conflicts-sitemap-safety', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, platformPolicy: { github: { includeInSitemap: true } } })),
+    ['downloadFunnel-role-conflicts-sitemap-safety']
+  );
+});
+
+check('74 gated_page + includeInListings=true → role-conflicts-listings-default', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, includeInListings: true })),
+    ['downloadFunnel-role-conflicts-listings-default']
+  );
+});
+
+check('75 gated_page + pageType=article → gated-page-pageType-mismatch', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, pageType: 'article' })),
+    ['downloadFunnel-gated-page-pageType-mismatch']
+  );
+});
+
+check('76 gated_page + pageType=download (+ includeInListings:false) → no mismatch', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, pageType: 'download', includeInListings: false })),
+    []
+  );
+});
+
+check('77 gated_page + pageType=gated_download (policy flags false) → no funnel policy warning', () => {
+  assert.deepEqual(
+    types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] }, pageType: 'gated_download', includeInListings: false, includeInSitemap: false })),
+    []
+  );
+});
+
+check('78 gated_page + pageType absent → no pageType-mismatch', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] } }));
+  assert.ok(!out.includes('downloadFunnel-gated-page-pageType-mismatch'));
+  assert.deepEqual(out, []);
+});
+
+check('79 role=entry + includeInSitemap=true → no sitemap-conflict (rules only apply to gated_page)', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'gated-zhuyin-download' }, includeInSitemap: true }));
+  assert.ok(!out.includes('downloadFunnel-role-conflicts-sitemap-safety'));
+  assert.deepEqual(out, []);
+});
+
+check('80 role=entry + includeInListings=true → no listings-conflict', () => {
+  const out = types(pageIssues({ downloadFunnel: { role: 'entry', targetGatedPage: 'gated-zhuyin-download' }, includeInListings: true }));
+  assert.ok(!out.includes('downloadFunnel-role-conflicts-listings-default'));
+  assert.deepEqual(out, []);
+});
+
+check('81 sitemap-conflict message must NOT echo entry value (URL-like placeholder)', () => {
+  const out = pageIssues({ downloadFunnel: { role: 'gated_page', entryPages: ['https://example.com/p'] }, includeInSitemap: true });
+  assert.deepEqual(types(out), ['downloadFunnel-role-conflicts-sitemap-safety']);
+  assert.ok(!out[0].value.includes('example.com'), 'must not echo any entry value');
+});
+
+check('82 gated_page + sitemap+listings+pageType conflicts → three warnings (independent)', () => {
+  assert.deepEqual(
+    types(pageIssues({
+      downloadFunnel: { role: 'gated_page', entryPages: ['zhuyin-intro'] },
+      includeInSitemap: true,
+      includeInListings: true,
+      pageType: 'article',
+    })),
+    [
+      'downloadFunnel-gated-page-pageType-mismatch',
+      'downloadFunnel-role-conflicts-listings-default',
+      'downloadFunnel-role-conflicts-sitemap-safety',
+    ]
+  );
+});
+
 // ─── summary ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

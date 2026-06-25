@@ -1824,6 +1824,55 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
           }
         }
       }
+
+      // 13. downloadFunnel 單篇 role↔policy 一致性（warning-only；additive；F1 §5.4 子集；slice 4）
+      //   per docs/20260625-funnel-metadata-schema-validator-slice3-preflight.md §3.1 + F1 §5.4 / §4.4 / §4.5 / §4.1
+      //   - 只比較 role 與**單篇** metadata policy 欄位（includeInSitemap / includeInListings / pageType）；
+      //     **不**跨檔案查找、**不**推導 effective robots、**不**改 indexing decision。
+      //   - 純 enum / boolean 比較，message **不含任何 value**（不 echo URL / slug / token / Drive ID / Form URL）。
+      //   - 方向為**強化** safety：當作者試圖以 includeIn*:true 把 gated_page 拉進 sitemap/listings 時告警；
+      //     既有 noindex / download / special pageType safety 與 §4.7 安全優先順序完全不變（只告警，不放寬）。
+      if (funnelRole === 'gated_page') {
+        // (k) gated_page 但被宣告納入 sitemap：top-level includeInSitemap:true 或 platformPolicy.github.includeInSitemap:true
+        const githubPolicy =
+          isPlainObject(post.platformPolicy) && isPlainObject(post.platformPolicy.github)
+            ? post.platformPolicy.github
+            : null;
+        const sitemapOptIn =
+          post.includeInSitemap === true ||
+          (githubPolicy !== null && githubPolicy.includeInSitemap === true);
+        if (sitemapOptIn) {
+          issues.push({
+            severity: 'warning',
+            type: 'downloadFunnel-role-conflicts-sitemap-safety',
+            sourcePath,
+            value: 'downloadFunnel.role="gated_page" but includeInSitemap / platformPolicy.github.includeInSitemap=true (a gated page should not be listed in the sitemap)',
+          });
+        }
+        // (l) gated_page 但被宣告納入 listings：top-level includeInListings:true
+        if (post.includeInListings === true) {
+          issues.push({
+            severity: 'warning',
+            type: 'downloadFunnel-role-conflicts-listings-default',
+            sourcePath,
+            value: 'downloadFunnel.role="gated_page" but includeInListings=true (a gated page should not appear in site listings)',
+          });
+        }
+        // (m) gated_page 但 pageType 與 gated 體裁不一致（pageType present 且非 gated_download / download；缺省不觸發）
+        const funnelPageType = post.pageType;
+        if (
+          funnelPageType !== undefined &&
+          funnelPageType !== 'gated_download' &&
+          funnelPageType !== 'download'
+        ) {
+          issues.push({
+            severity: 'warning',
+            type: 'downloadFunnel-gated-page-pageType-mismatch',
+            sourcePath,
+            value: 'downloadFunnel.role="gated_page" but pageType is not "gated_download" or "download" (declare a gated/download pageType)',
+          });
+        }
+      }
     }
   }
 
