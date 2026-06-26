@@ -10,5 +10,9 @@
   {
     "label": "分類",
     "href": "/categories/"
+  },
+  {
+    "label": "標籤",
+    "href": "/tags/"
   }
 ]
