@@ -102,6 +102,9 @@ function makeBaseData(settings, mode) {
     navigation: settings.navigation,
     ga4: settings.ga4,
     ads: settings.ads,
+    // Phase 20260626 footer-disclosure-source-landing：footer.config.json 注入 base.ejs locals，
+    //   再由 layout/footer.ejs 經 EJS include 繼承取用（渲染揭露連結；缺失時不輸出空殼）。
+    footer: settings.footer,
     basePath,
     isProdBuild,
     ...extra,
@@ -550,6 +553,17 @@ function buildSeoNoindex({ pageType, settings }) {
   };
 }
 
+// Phase 20260626 footer-disclosure-source-landing：靜態揭露頁（privacy / affiliate-disclosure）SEO。
+//   - robots: index, follow（commonSeo 預設；揭露頁應可被索引，與 gated/noindex 相反）
+//   - canonical: `${base}/${slug}/`（站內絕對 URL；缺 base 時 null，與其他頁一致）
+//   - jsonLd / ogImage 維持 null（與 home / post-list / category 同層級；SEO partials 皆有 guard）
+//   - 不進 listings（非 post，天然不入 listingPosts）；sitemap include 由 build-sitemap.js 顯式加入
+function buildSeoForStaticPage({ pageType, slug, settings }) {
+  const base = siteBaseUrl(settings);
+  const canonicalUrl = base ? `${base}/${slug}/` : null;
+  return commonSeo({ pageType, settings, canonicalUrl });
+}
+
 async function main() {
   const mode = parseMode(process.argv.slice(2));
   const startedAt = new Date();
@@ -788,6 +802,36 @@ async function main() {
     }),
   });
   await writeText(path.join(PAGES_DIR, '404.html'), notFoundHtml, outputs);
+
+  // Phase 20260626 footer-disclosure-source-landing：靜態揭露頁（避免 footer links 成 dead link）。
+  //   - /privacy/ 與 /affiliate-disclosure/，slug 對齊 footer.config.json。
+  //   - robots index, follow（buildSeoForStaticPage → commonSeo 預設）；sitemap include 見 build-sitemap.js；
+  //     listings exclude（非 post，不入 listingPosts）。
+  const staticPages = [
+    {
+      slug: 'privacy',
+      template: 'pages/privacy.ejs',
+      title: '隱私權政策',
+      description: `${settings.site.siteName} 隱私權政策：本站如何處理瀏覽資料與第三方服務的一般性說明。`,
+    },
+    {
+      slug: 'affiliate-disclosure',
+      template: 'pages/affiliate-disclosure.ejs',
+      title: '聯盟揭露',
+      description: `${settings.site.siteName} 聯盟揭露：本站聯盟／導購連結運作方式與編輯立場的一般性說明。`,
+    },
+  ];
+  for (const sp of staticPages) {
+    const html = await renderPage({
+      template: sp.template,
+      data: baseData({
+        title: `${sp.title} | ${settings.site.siteName}`,
+        description: sp.description,
+        seo: buildSeoForStaticPage({ pageType: 'static-page', slug: sp.slug, settings }),
+      }),
+    });
+    await writeText(path.join(PAGES_DIR, sp.slug, 'index.html'), html, outputs);
+  }
 
   const designSubpages = [
     { slug: 'colors', name: 'Colors', code: 'G-02' },

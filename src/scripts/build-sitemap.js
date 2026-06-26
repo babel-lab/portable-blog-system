@@ -152,6 +152,12 @@ function buildEntries({ base, posts, categoryMap, tagMap, buildIso }) {
     entries.push({ loc: `${base}/tags/${slug}/`, lastmod: buildIso });
   }
 
+  // 6. 靜態揭露頁（Phase 20260626 footer-disclosure-source-landing）
+  //    - /privacy/ 與 /affiliate-disclosure/：index, follow → sitemap include。
+  //    - 與 listings 正交（揭露頁不入文章列表，但希望被搜尋引擎找到）。
+  entries.push({ loc: `${base}/privacy/`, lastmod: buildIso });
+  entries.push({ loc: `${base}/affiliate-disclosure/`, lastmod: buildIso });
+
   return entries;
 }
 

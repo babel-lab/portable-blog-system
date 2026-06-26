@@ -1,5 +1,22 @@
 <footer class="lab-footer">
   <div class="lab-container">
     © <%= new Date().getFullYear() %> <%= site.siteName %>. Built for GitHub Pages + Blogger export.
+    <%
+      // Phase 20260626 footer-disclosure-source-landing：渲染 footer.config.json 的 links。
+      //   - 站內揭露連結（隱私權政策 / 聯盟揭露），依 §16.3 不加 nofollow / 不加 UTM / 同分頁。
+      //   - footer 物件由 build-github.js baseData 注入，經 EJS include 繼承（與 header 取得 basePath 同機制）。
+      //   - 防禦式 guard：footer / links 缺失時不輸出空殼、不 crash（沿用 Optional block 不輸出空白區塊原則）。
+      var footerLinks = (typeof footer !== 'undefined' && footer && Array.isArray(footer.links)) ? footer.links : [];
+      var footerLinksValid = footerLinks.filter(function (link) {
+        return link && typeof link.href === 'string' && link.href !== '' && typeof link.label === 'string' && link.label !== '';
+      });
+    -%>
+    <% if (footerLinksValid.length > 0) { -%>
+    <nav class="lab-footer__links" aria-label="揭露與政策">
+      <% footerLinksValid.forEach(function (link) { -%>
+      <a class="lab-footer__link" href="<%= basePath %><%= link.href %>"><%= link.label %></a>
+      <% }); -%>
+    </nav>
+    <% } -%>
   </div>
 </footer>
