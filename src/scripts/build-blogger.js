@@ -122,6 +122,58 @@ function deriveRenderedCrossLinks(rawLinks, settings, slot) {
   });
 }
 
+// Phase 20260626-blogger-gated-download-safe-placeholder-renderer-source-a：
+//   Blogger-only gated download **safe placeholder** render object（Option A / Option C，per
+//   docs/20260626-blogger-gated-form-renderer-implementation-scan-record-docs-only-a.md §10–§11）。
+//   - 安全過渡版本：只供 EJS render placeholder，**永不** render iframe、**永不**直出 Form / Drive / download 連結。
+//   - gated page 判定（三條件 AND）：
+//       post.pageType === 'gated_download'
+//       post.downloadFunnel.role === 'gated_page'
+//       post.gatedDownload.enabled === true
+//     現有 access.md 草稿無 gatedDownload.enabled（gatedDownload only-allowed keys =
+//     mechanism / formEmbedUrl / postSubmitResource，per decision packet §3）→ enabled 缺 →
+//     回 { enabled:false } → EJS 不渲染 → 既有 ready post post.html byte-identical。
+//     未來由 Dean 於 content 加 enabled:true 啟用，本 session 不改 content。
+//   - 紅線：回傳 object **不得**含 raw formEmbedUrl；是否有 URL 只以 boolean hasFormEmbedUrl 表示。
+//     Google Form URL / Drive URL / response URL / respondent data **一律不**進 template context。
+//   - title / message 為 build 端 safe 常數文案（**不**讀 gatedDownload.*，避免 suspicious-field）。
+//   - 不消費於 robots / sitemap / listing / metadata selector；純 render-time placeholder。
+function deriveRenderedGatedDownload(post) {
+  const isGatedPageType = !!post && post.pageType === 'gated_download';
+
+  const funnel =
+    post && typeof post.downloadFunnel === 'object' && post.downloadFunnel && !Array.isArray(post.downloadFunnel)
+      ? post.downloadFunnel
+      : null;
+  const isGatedRole = !!funnel && funnel.role === 'gated_page';
+
+  const gated =
+    post && typeof post.gatedDownload === 'object' && post.gatedDownload && !Array.isArray(post.gatedDownload)
+      ? post.gatedDownload
+      : null;
+  const isEnabled = !!gated && gated.enabled === true;
+
+  if (!(isGatedPageType && isGatedRole && isEnabled)) {
+    return { enabled: false };
+  }
+
+  // mechanism：safe enum string only（非 URL）；缺 / 非字串 → null。
+  const mechanism =
+    typeof gated.mechanism === 'string' && gated.mechanism.trim() !== '' ? gated.mechanism.trim() : null;
+
+  // hasFormEmbedUrl：boolean ONLY。**永不**回傳 formEmbedUrl 本身；即使非空，本 session 亦不 render iframe。
+  const hasFormEmbedUrl = typeof gated.formEmbedUrl === 'string' && gated.formEmbedUrl.trim() !== '';
+
+  return {
+    enabled: true,
+    mechanism,
+    renderMode: 'placeholder',
+    hasFormEmbedUrl,
+    title: '表單閘門下載',
+    message: '此頁為表單閘門下載頁；正式 Google Form 嵌入尚未啟用，等待設定中。',
+  };
+}
+
 async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
   const bodyHtml = renderBody(post.body || '');
   // Phase 8-d-3b：additive alias for EJS ergonomics；指向 8-d-2 掛載之 post.normalized。
@@ -146,6 +198,10 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
   //   - pm-8 policy：blogger surface 僅 articleAd6/beforeRelatedLinks resolve；其餘 anchor 回空。
   //   - pure resolver；不洩 internal 欄位；template 端僅在 beforeRelatedLinks anchor 插入。
   const adsenseBlocksRendered = deriveRenderedAdsenseBlocks(post, settings.ads, 'blogger');
+  // Phase 20260626-blogger-gated-download-safe-placeholder-renderer-source-a：
+  //   gated download safe placeholder render object（無 raw formEmbedUrl / Form / Drive URL）。
+  //   非 gated page → { enabled:false } → EJS 不渲染 → 既有 post.html byte-identical。
+  const gatedDownloadRendered = deriveRenderedGatedDownload(post);
   return await ejs.renderFile(
     path.join(VIEWS_DIR, 'blogger', 'blogger-post-full.ejs'),
     {
@@ -158,6 +214,7 @@ async function renderFullPost(post, canonicalUrl, jsonLd, settings) {
       affiliateLinksRendered,
       affiliateBlocksRendered,
       adsenseBlocksRendered,
+      gatedDownloadRendered,
       ads: settings.ads,
     },
     { async: true },

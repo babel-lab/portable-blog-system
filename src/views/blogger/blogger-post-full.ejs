@@ -23,6 +23,12 @@ const affiliateBottomBlocks = affiliateBlocks.filter(function (b) { return b && 
 //   - adsenseBlocksRendered 由 build 端以 surface='blogger' 解析；無 / 非 object → {}。
 //   - default-safe：對應 anchor 無 resolved block 時，adsense-anchor partial 整段 zero-byte。
 const _adsAnchors = (typeof adsenseBlocksRendered !== 'undefined' && adsenseBlocksRendered) ? adsenseBlocksRendered : {};
+// Phase 20260626-blogger-gated-download-safe-placeholder-renderer-source-a：
+//   Blogger-only gated download safe placeholder（Option A）。build 端 deriveRenderedGatedDownload 已清洗
+//   → render object 無 raw formEmbedUrl / Form / Drive URL。非 gated page → { enabled:false } → 不渲染。
+//   isGatedPage 同時用於 guard legacy download box：gated page 不得走 download.fileUrl direct download 分支。
+const gatedDownload = (typeof gatedDownloadRendered !== 'undefined' && gatedDownloadRendered && typeof gatedDownloadRendered === 'object') ? gatedDownloadRendered : {};
+const isGatedPage = gatedDownload.enabled === true;
 %>
 <div class="lab-blogger-article">
 
@@ -104,8 +110,23 @@ const _adsAnchors = (typeof adsenseBlocksRendered !== 'undefined' && adsenseBloc
     <%- post.bodyHtml %>
   </div>
 
+  <%# === Gated Download placeholder（Phase 20260626-...-safe-placeholder-renderer-source-a；Blogger-only） === %>
+  <%# - safe 過渡版本：只輸出 placeholder block；**不** render iframe、**不**直出 Form / Drive / download 連結、**不** echo raw URL %>
+  <%# - 觸發條件 = gatedDownloadRendered.enabled === true（build 端 deriveRenderedGatedDownload 三條件 AND 後產出） %>
+  <% if (isGatedPage) { %>
+  <aside class="lab-download-box lab-download-box--gated">
+    <% if (gatedDownload.title) { %>
+    <h3 class="lab-download-box__title"><%= gatedDownload.title %></h3>
+    <% } %>
+    <% if (gatedDownload.message) { %>
+    <p class="lab-download-box__note"><%= gatedDownload.message %></p>
+    <% } %>
+  </aside>
+  <% } %>
+
   <%# === Download Box（enabled + fileUrl） === %>
-  <% if (post.download && post.download.enabled && post.download.fileUrl) { %>
+  <%# Phase 20260626-...-safe-placeholder-renderer-source-a：加 !isGatedPage guard —— gated page 不得走 direct-file download 分支（不得 render <a download href=...>） %>
+  <% if (!isGatedPage && post.download && post.download.enabled && post.download.fileUrl) { %>
   <aside class="lab-download-box">
     <% if (post.download.title) { %>
     <h3 class="lab-download-box__title"><%= post.download.title %></h3>
