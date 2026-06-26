@@ -110,9 +110,10 @@ const isGatedPage = gatedDownload.enabled === true;
     <%- post.bodyHtml %>
   </div>
 
-  <%# === Gated Download placeholder（Phase 20260626-...-safe-placeholder-renderer-source-a；Blogger-only） === %>
-  <%# - safe 過渡版本：只輸出 placeholder block；**不** render iframe、**不**直出 Form / Drive / download 連結、**不** echo raw URL %>
-  <%# - 觸發條件 = gatedDownloadRendered.enabled === true（build 端 deriveRenderedGatedDownload 三條件 AND 後產出） %>
+  <%# === Gated Download（Phase 20260626-...-iframe-renderer-source-a；Blogger-only） === %>
+  <%# - 觸發條件 = gatedDownloadRendered.enabled === true（build 端 deriveRenderedGatedDownload 之 gated detection） %>
+  <%# - renderMode==='iframe'（build 端 strict allowlist 驗證通過）→ 嵌入 sanitized Google Form iframe %>
+  <%# - 否則維持 safe placeholder（title / message）；**不** render iframe、**不**直出 Form / Drive / download 連結、**不** echo raw URL %>
   <% if (isGatedPage) { %>
   <aside class="lab-download-box lab-download-box--gated">
     <% if (gatedDownload.title) { %>
@@ -120,6 +121,18 @@ const isGatedPage = gatedDownload.enabled === true;
     <% } %>
     <% if (gatedDownload.message) { %>
     <p class="lab-download-box__note"><%= gatedDownload.message %></p>
+    <% } %>
+    <%# 僅當 build 端 allowlist 驗證通過（renderMode==='iframe' + sanitized iframe.src）才嵌入 Google Form。 %>
+    <%# - iframe.src / title 皆經 <%= %> escape；含 loading="lazy"；inline Blogger-safe 樣式；無 direct file link / Drive URL / raw rejected URL。 %>
+    <% if (gatedDownload.renderMode === 'iframe' && gatedDownload.iframe && gatedDownload.iframe.src) { %>
+    <div class="gated-download-form-frame">
+      <iframe
+        src="<%= gatedDownload.iframe.src %>"
+        title="<%= gatedDownload.iframe.title %>"
+        loading="lazy"
+        style="width:100%;border:0;min-height:<%= gatedDownload.iframe.height || 720 %>px;"
+      ></iframe>
+    </div>
     <% } %>
   </aside>
   <% } %>

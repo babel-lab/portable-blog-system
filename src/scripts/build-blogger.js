@@ -139,6 +139,46 @@ function deriveRenderedCrossLinks(rawLinks, settings, slot) {
 //     Google Form URL / Drive URL / response URL / respondent data **一律不**進 template context。
 //   - title / message 為 build 端 safe 常數文案（**不**讀 gatedDownload.*，避免 suspicious-field）。
 //   - 不消費於 robots / sitemap / listing / metadata selector；純 render-time placeholder。
+//
+// Phase 20260626-blogger-gated-form-iframe-renderer-source-a：
+//   strict allowlist validator —— 判斷一個字串是否為「可安全嵌入 iframe 的 Google Forms public embed URL」。
+//   - 純函式；回 **boolean only**。**永不** echo / log / return 被拒絕的 URL 字串（no-echo policy）。
+//   - 僅在以下全部成立時回 true：
+//       1. non-empty string
+//       2. parseable by new URL(...)
+//       3. protocol === 'https:'（拒 http: / javascript: / data: / blob:）
+//       4. host === 'docs.google.com'（拒非 Google host / forms.gle 短連結）
+//       5. pathname 含 '/forms/' 且以 '/viewform' 結尾（public viewform 形態）
+//       6. query 含 embedded=true
+//       7. 非 edit / response / formResponse path；無 token-like / respondent-like / prefilled-private query key
+//   - comment 僅提欄位名；不含任何實際 URL / Drive ID / token / respondent data。
+function isAllowedGoogleFormEmbedUrl(raw) {
+  if (typeof raw !== 'string' || raw.trim() === '') return false;
+  let url;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:') return false;
+  if (url.host !== 'docs.google.com') return false;
+  const pathname = url.pathname;
+  if (!pathname.includes('/forms/')) return false;
+  if (!pathname.endsWith('/viewform')) return false;
+  // 雙重保險：即使結尾為 /viewform，亦明確拒絕 edit / response 形態 path segment。
+  if (/\/(edit|formResponse)(\/|$)/.test(pathname)) return false;
+  // query 必含 embedded=true。
+  if (url.searchParams.get('embedded') !== 'true') return false;
+  // 拒絕 token-like / respondent-like / prefilled-private query key（prefilled entry.* 帶值亦拒）。
+  for (const key of url.searchParams.keys()) {
+    const k = key.toLowerCase();
+    if (k === 'embedded') continue;
+    if (k.startsWith('entry.')) return false;
+    if (/(token|response|respondent|edit|prefill|email)/.test(k)) return false;
+  }
+  return true;
+}
+
 function deriveRenderedGatedDownload(post) {
   const isGatedPageType = !!post && post.pageType === 'gated_download';
 
@@ -173,9 +213,33 @@ function deriveRenderedGatedDownload(post) {
       ? gated.mechanism.trim()
       : null;
 
-  // hasFormEmbedUrl：boolean ONLY。**永不**回傳 formEmbedUrl 本身；即使非空，本 session 亦不 render iframe。
-  const hasFormEmbedUrl =
-    !!gated && typeof gated.formEmbedUrl === 'string' && gated.formEmbedUrl.trim() !== '';
+  // rawFormEmbedUrl：僅供本地 allowlist 驗證；**不**進 return object（no-echo）。
+  const rawFormEmbedUrl =
+    !!gated && typeof gated.formEmbedUrl === 'string' ? gated.formEmbedUrl.trim() : '';
+  // hasFormEmbedUrl：boolean ONLY。**永不**回傳 formEmbedUrl 本身。
+  const hasFormEmbedUrl = rawFormEmbedUrl !== '';
+
+  // iframe gating：只有通過 strict allowlist 的 public Google Form embed URL 才升級為 iframe。
+  //   - 空字串 / 不合法 / 非 docs.google.com / edit / response / token-like → renderMode='placeholder'。
+  //   - iframeSrc 為「已驗證合法」之 sanitized 值；被拒絕的 raw URL 不會出現在此（為 null）。
+  const iframeSrc = isAllowedGoogleFormEmbedUrl(rawFormEmbedUrl) ? rawFormEmbedUrl : null;
+
+  if (iframeSrc) {
+    // sanitized iframe object：只含 src / title / height；不含 rejected URL / Drive URL / token / response data。
+    return {
+      enabled: true,
+      mechanism,
+      renderMode: 'iframe',
+      hasFormEmbedUrl: true,
+      iframe: {
+        src: iframeSrc,
+        title: '下載申請表單',
+        height: 720,
+      },
+      title: '表單閘門下載',
+      message: '請於下方表單填寫並送出，依表單指示取得下載資源。',
+    };
+  }
 
   return {
     enabled: true,
