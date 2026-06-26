@@ -10,6 +10,13 @@ const detailCoverAlt = display.coverAlt || post.coverAlt || detailTitle;
 // Phase 20260611-night-2（N8 anchor wiring）：六區塊 AdSense per-anchor resolved blocks（build 端 deriveRenderedAdsenseBlocks 注入）。
 //   - 缺漏時退回空物件；ads.enabled=false（current production）→ 永遠 {} → 全 anchor zero-byte。
 const _adsAnchors = (typeof adsenseBlocksRendered !== 'undefined' && adsenseBlocksRendered) ? adsenseBlocksRendered : {};
+// Phase 20260626-github-gated-download-direct-file-guard-source-a：
+//   防誤直出 guard（per docs/20260626-funnel-renderer-bridge-source-preflight-record-docs-only-a.md §8 P1 / §9 Optional guard）。
+//   gated download 頁（pageType: gated_download）即使資料誤填 download.fileUrl，
+//   也不得進入 legacy direct download box（line 115）而直出 <a download href> 繞過 gate。
+//   - 純判斷，不新增 gated UI / placeholder UI；不消費 gatedDownload / downloadFunnel body。
+//   - 非 gated 頁（pageType 缺省 / 其他值）行為 byte-identical：guard 為 false，既有 download box 不變。
+const isGatedDownloadPage = !!(post && post.pageType === 'gated_download');
 %>
 <article class="lab-article">
   <header class="lab-article__header lab-container">
@@ -112,7 +119,8 @@ const _adsAnchors = (typeof adsenseBlocksRendered !== 'undefined' && adsenseBloc
   <%# 本批不加 per-item filter / URL 驗證 / validate rule / GA4 event；mirror Blogger 既有 pattern -%>
   <%# trim-newline pattern：對無 download 之 ready post，index.html 結構性 byte-identical-modulo-builtAt -%>
   <%# 本批 EJS comment 嚴格無 EJS delimiter 字符（mirror 9-g-d-c-fix / 9-g-f-b / 9-h-b-b 既有預防經驗） -%>
-  <% if (post.download && post.download.enabled && post.download.fileUrl) { %>
+  <%# Phase 20260626-github-gated-download-direct-file-guard-source-a：guard 前置 isGatedDownloadPage，gated 頁不直出 fileUrl direct download link -%>
+  <% if (!isGatedDownloadPage && post.download && post.download.enabled && post.download.fileUrl) { %>
   <div class="lab-container">
     <aside class="lab-download-box">
       <% if (post.download.title) { %>
