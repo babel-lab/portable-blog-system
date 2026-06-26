@@ -1992,6 +1992,37 @@ function validatePageTypeMetadata(post, sourcePath, issues) {
     });
   }
 
+  // 6a-fileurl. Phase 20260626-gated-download-fileurl-validator-hardening（warning-only；presence-based；no-echo）：
+  //   per docs/20260626-gated-download-fileurl-validator-hardening-preflight-record-docs-only-a.md §6 / §7
+  //   pageType = gated_download 且仍帶 legacy direct download.fileUrl → warning（gated page 不應與 legacy
+  //   direct download 欄位共存；renderer 已 guard，但 validator 層原本無對應提示）。
+  //   - 第一刀只鎖 frontmatterPageType === 'gated_download'；downloadFunnel.role === 'gated_page' /
+  //     gatedDownload metadata 之 broader signal 留待 future phase（per preanalysis §6）。
+  //   - 觸發條件：download 為 plain object 且 download.fileUrl 為 non-empty string；**不**要求
+  //     download.enabled === true（gated page 帶任何 legacy fileUrl 皆反模式，與 enabled 旗標無關；
+  //     若加 enabled gate 會漏掉 enabled:false 但誤留 fileUrl 的情形）。
+  //   - ⚠️ 絕不 echo download.fileUrl 值（可能為真實 Drive / Form / private 下載連結）；只描述欄位共存
+  //     問題（不沿用 D3 download-fileurl-invalid-format 之 echo pattern）。
+  if (frontmatterPageType === 'gated_download') {
+    const gatedDirectDownload = post.download;
+    const downloadIsPlainObject =
+      gatedDirectDownload !== null &&
+      typeof gatedDirectDownload === 'object' &&
+      !Array.isArray(gatedDirectDownload);
+    if (
+      downloadIsPlainObject &&
+      typeof gatedDirectDownload.fileUrl === 'string' &&
+      gatedDirectDownload.fileUrl.trim() !== ''
+    ) {
+      issues.push({
+        severity: 'warning',
+        type: 'page-gated-download-has-direct-file-url',
+        sourcePath,
+        value: 'download.fileUrl present; gated pages must not carry direct download links',
+      });
+    }
+  }
+
   // 6b. Slice 1（warning-only；default-case visibility）：
   //   per docs/20260624-download-listing-special-page-preflight-spec-lock.md §2.D Slice 1
   //   + docs/20260624-sp-download-include-in-listings-opt-in-preanalysis.md §2 / §6 Slice 1

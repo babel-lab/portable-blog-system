@@ -768,6 +768,82 @@ check('103 general querystring (utm_*) → no warning (false-positive guard)', (
   assert.deepEqual(out, []);
 });
 
+// ─── 20260626 gated-download fileUrl hardening：pageType=gated_download 不得帶 legacy direct download.fileUrl ─────
+//   per docs/20260626-gated-download-fileurl-validator-hardening-preflight-record-docs-only-a.md §6 / §7
+//   - warning-only / presence-based / no-echo；第一刀只鎖 pageType === 'gated_download'
+//   - 正交隔離：gated_download + includeInListings absent 會觸發 Slice-1 download-in-listings-default，
+//     故 positive case 一律帶 includeInListings:false（mirror test 12 之隔離手法）
+//   - rule type 'page-' 前綴 → 自動納入 SP issue 池 + warning 不變式（pageIssues helper 已斷言 severity）
+
+check('104 gated_download + download.fileUrl present → exactly page-gated-download-has-direct-file-url', () => {
+  assert.deepEqual(
+    types(pageIssues({
+      pageType: 'gated_download',
+      includeInListings: false,
+      download: { fileUrl: 'https://example.com/private.pdf' },
+    })),
+    ['page-gated-download-has-direct-file-url']
+  );
+});
+
+check('105 gated_download without download block → no fileUrl warning', () => {
+  const out = types(pageIssues({ pageType: 'gated_download', includeInListings: false }));
+  assert.ok(!out.includes('page-gated-download-has-direct-file-url'));
+  assert.deepEqual(out, []);
+});
+
+check('106 legacy download page (pageType=download) + fileUrl → no gated fileUrl warning', () => {
+  const out = types(pageIssues({
+    pageType: 'download',
+    includeInListings: false,
+    download: { fileUrl: 'https://example.com/file.pdf' },
+  }));
+  assert.ok(!out.includes('page-gated-download-has-direct-file-url'), 'non-gated download page must not trigger the gated rule');
+  assert.deepEqual(out, []);
+});
+
+check('107 non-page download page (contentKind=download, no pageType) + fileUrl → no gated fileUrl warning', () => {
+  const out = types(pageIssues({
+    contentKind: 'download',
+    includeInListings: false,
+    download: { fileUrl: 'https://example.com/file.pdf' },
+  }));
+  assert.ok(!out.includes('page-gated-download-has-direct-file-url'));
+  assert.deepEqual(out, []);
+});
+
+check('108 gated_download + enabled:false but fileUrl present → still warns (presence-based, no enabled gate)', () => {
+  assert.deepEqual(
+    types(pageIssues({
+      pageType: 'gated_download',
+      includeInListings: false,
+      download: { enabled: false, fileUrl: 'https://example.com/private.pdf' },
+    })),
+    ['page-gated-download-has-direct-file-url']
+  );
+});
+
+check('109 gated_download + empty/whitespace fileUrl → no warning (presence-based)', () => {
+  const out = types(pageIssues({
+    pageType: 'gated_download',
+    includeInListings: false,
+    download: { fileUrl: '   ' },
+  }));
+  assert.ok(!out.includes('page-gated-download-has-direct-file-url'));
+  assert.deepEqual(out, []);
+});
+
+check('110 no-echo：fileUrl value (Drive-like secret placeholder) must NOT appear in warning message', () => {
+  const out = pageIssues({
+    pageType: 'gated_download',
+    includeInListings: false,
+    download: { fileUrl: 'https://drive.example.com/file/d/SECRET-FAKE-FILE-ID/view' },
+  });
+  assert.deepEqual(types(out), ['page-gated-download-has-direct-file-url']);
+  assert.ok(!out[0].value.includes('SECRET-FAKE-FILE-ID'), 'must not echo the fileUrl value');
+  assert.ok(!out[0].value.includes('drive.example.com'), 'must not echo the fileUrl host');
+});
+
 // ─── summary ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
