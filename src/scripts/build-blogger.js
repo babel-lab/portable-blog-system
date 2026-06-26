@@ -122,18 +122,19 @@ function deriveRenderedCrossLinks(rawLinks, settings, slot) {
   });
 }
 
-// Phase 20260626-blogger-gated-download-safe-placeholder-renderer-source-a：
+// Phase 20260626-blogger-gated-download-safe-placeholder-renderer-source-a
+//   + detection-fix（20260626-blogger-gated-placeholder-detection-fix-source-a）：
 //   Blogger-only gated download **safe placeholder** render object（Option A / Option C，per
 //   docs/20260626-blogger-gated-form-renderer-implementation-scan-record-docs-only-a.md §10–§11）。
 //   - 安全過渡版本：只供 EJS render placeholder，**永不** render iframe、**永不**直出 Form / Drive / download 連結。
-//   - gated page 判定（三條件 AND）：
-//       post.pageType === 'gated_download'
-//       post.downloadFunnel.role === 'gated_page'
-//       post.gatedDownload.enabled === true
-//     現有 access.md 草稿無 gatedDownload.enabled（gatedDownload only-allowed keys =
-//     mechanism / formEmbedUrl / postSubmitResource，per decision packet §3）→ enabled 缺 →
-//     回 { enabled:false } → EJS 不渲染 → 既有 ready post post.html byte-identical。
-//     未來由 Dean 於 content 加 enabled:true 啟用，本 session 不改 content。
+//   - gated page 判定（**OR / 任一成立**即啟用，非三條件 AND）：
+//       (a) post.pageType === 'gated_download'                         ← 單獨即可啟用
+//       (b) post.downloadFunnel.role === 'gated_page'
+//       (c) post.gatedDownload 存在且帶任一 gated metadata signal：
+//           mechanism / formEmbedUrl / postSubmitResource（key 存在即算）/ 或 future enabled === true
+//     不再依賴 gatedDownload.enabled（validator / content 目前未正式要求該欄位）。
+//     → 現有 access.md（pageType:gated_download + role:gated_page + mechanism/postSubmitResource）
+//       即會被判定為 gated → placeholder render + legacy download guard 生效。
 //   - 紅線：回傳 object **不得**含 raw formEmbedUrl；是否有 URL 只以 boolean hasFormEmbedUrl 表示。
 //     Google Form URL / Drive URL / response URL / respondent data **一律不**進 template context。
 //   - title / message 為 build 端 safe 常數文案（**不**讀 gatedDownload.*，避免 suspicious-field）。
@@ -151,18 +152,30 @@ function deriveRenderedGatedDownload(post) {
     post && typeof post.gatedDownload === 'object' && post.gatedDownload && !Array.isArray(post.gatedDownload)
       ? post.gatedDownload
       : null;
-  const isEnabled = !!gated && gated.enabled === true;
+  // gated metadata signal：gatedDownload 存在且帶任一 allowed gated key（key 存在即算）或 future enabled===true。
+  const hasGatedSignal =
+    !!gated &&
+    (typeof gated.mechanism !== 'undefined' ||
+      typeof gated.formEmbedUrl !== 'undefined' ||
+      typeof gated.postSubmitResource !== 'undefined' ||
+      gated.enabled === true);
 
-  if (!(isGatedPageType && isGatedRole && isEnabled)) {
+  // OR 判定：pageType / role / metadata-signal 任一成立即視為 gated download page。
+  const isGatedDownloadPage = isGatedPageType || isGatedRole || hasGatedSignal;
+
+  if (!isGatedDownloadPage) {
     return { enabled: false };
   }
 
-  // mechanism：safe enum string only（非 URL）；缺 / 非字串 → null。
+  // mechanism：safe enum string only（非 URL）；缺 / 非字串 / gated 為 null → null。
   const mechanism =
-    typeof gated.mechanism === 'string' && gated.mechanism.trim() !== '' ? gated.mechanism.trim() : null;
+    !!gated && typeof gated.mechanism === 'string' && gated.mechanism.trim() !== ''
+      ? gated.mechanism.trim()
+      : null;
 
   // hasFormEmbedUrl：boolean ONLY。**永不**回傳 formEmbedUrl 本身；即使非空，本 session 亦不 render iframe。
-  const hasFormEmbedUrl = typeof gated.formEmbedUrl === 'string' && gated.formEmbedUrl.trim() !== '';
+  const hasFormEmbedUrl =
+    !!gated && typeof gated.formEmbedUrl === 'string' && gated.formEmbedUrl.trim() !== '';
 
   return {
     enabled: true,
