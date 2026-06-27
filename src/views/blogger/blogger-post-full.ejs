@@ -123,7 +123,8 @@ const isGatedPage = gatedDownload.enabled === true;
     <p class="lab-download-box__note"><%= gatedDownload.message %></p>
     <% } %>
     <%# 僅當 build 端 allowlist 驗證通過（renderMode==='iframe' + sanitized iframe.src）才嵌入 Google Form。 %>
-    <%# - iframe.src / title 皆經 <%= %> escape；含 loading="lazy"；inline Blogger-safe 樣式；無 direct file link / Drive URL / raw rejected URL。 %>
+    <%# - iframe.src / title 皆在下方 interpolation 處 EJS-escape；含 loading="lazy"；inline Blogger-safe 樣式；無 direct file link / Drive URL / raw rejected URL。 -%>
+    <%# - 本 EJS comment 嚴格不含 EJS delimiter 字符（mirror article-bottom-nav / affiliate / related-links / hashtag 預防經驗）。 -%>
     <% if (gatedDownload.renderMode === 'iframe' && gatedDownload.iframe && gatedDownload.iframe.src) { %>
     <div class="gated-download-form-frame">
       <iframe
