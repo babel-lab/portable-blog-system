@@ -1010,5 +1010,41 @@ check('91 defense-in-depth: input pretending to be ready cannot flip export stat
   assert.equal(d.draft, true, 'frontmatter draft MUST stay true');
 });
 
+// Phase 20260627-admin-markdown-export-ui-preflight-hardening-a:
+//   Defense-in-depth lock on the raw markdown TEXT (not just gray-matter parsed
+//   data). Case 91 already locks parsed `d.status === 'draft'` via gray-matter,
+//   but the Admin "Draft-only contract" callout claims literally
+//   `status: "draft"` and `draft: true` appear in the file. Lock those literal
+//   substrings so any future helper refactor that switches YAML quoting style
+//   without updating UI copy will surface here.
+check('92 raw markdown text contains literal `status: "draft"` and `draft: true` lines', () => {
+  const inputs = [
+    happy,
+    {},
+    null,
+    undefined,
+    { ...readyHappy, status: 'ready', draft: false },  // pretend-ready must NOT flip serialized text
+    { ...happy, site: 'blogger' },
+    { ...happy, title: 'edge "quoted" title', slug: 'edge-case' },
+  ];
+  for (const inp of inputs) {
+    const md = buildPostMarkdown(inp);
+    assert.ok(
+      /^status: "draft"$/m.test(md),
+      'raw markdown MUST contain literal `status: "draft"` line (input: ' + JSON.stringify(inp) + ')'
+    );
+    assert.ok(
+      /^draft: true$/m.test(md),
+      'raw markdown MUST contain literal `draft: true` line (input: ' + JSON.stringify(inp) + ')'
+    );
+    // Cross-lock: must NOT contain ready / published / draft:false text anywhere in frontmatter.
+    const fmEnd = md.indexOf('\n---', 4);
+    const frontmatter = fmEnd > 0 ? md.slice(0, fmEnd) : md;
+    assert.ok(!/^status: "ready"$/m.test(frontmatter), 'frontmatter MUST NOT contain `status: "ready"`');
+    assert.ok(!/^status: "published"$/m.test(frontmatter), 'frontmatter MUST NOT contain `status: "published"`');
+    assert.ok(!/^draft: false$/m.test(frontmatter), 'frontmatter MUST NOT contain `draft: false`');
+  }
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

@@ -1794,11 +1794,32 @@
   <p class="section-lede" style="color: #555; font-size: 0.88em; margin: 0 0 0.5rem;">
     Authoring helper：填欄位 → 自動產生符合 <code>content/{site}/posts/*.md</code> schema 的 markdown 文字，可
     <strong>Copy</strong> 或 <strong>Download .md</strong>。產出永遠是 <code>status:"draft"</code>（最安全；validator 不會多 warning）。
-    取得 .md 後請手動存到 <code>content/{site}/posts/</code>，再以 VS Code 編修為 ready/published。
+    Admin <strong>不會</strong>自動寫入 repo、<strong>不會</strong>自動發布；取得 <code>.md</code> 後請由 Dean 人工存到 <code>content/{site}/posts/</code>，再以 VS Code 編修為 ready/published。
   </p>
   <p style="background: #fff8e1; border: 1px solid #f0d264; padding: 0.5rem 0.75rem; border-radius: 3px; margin: 0 0 0.75rem; font-size: 0.85em; color: #856404;">
     🔒 Authoring helper — no fs write · no fetch · no Apply · copy / download only. Repo 寫入仍只由 VS Code / terminal-only CLI 進行。
   </p>
+
+  <%# Phase 20260627-admin-markdown-export-ui-preflight-hardening-a:
+      Draft-only contract callout — non-interactive, scannable summary of what
+      `New post draft` export does and does NOT do. Wording mirrors the
+      constants + invariants locked by check:admin-markdown-export
+      (TARGET_FOLDERS / VALIDATION_COMMAND / status:"draft" + draft:true).
+      - Pure display; no JS bind; no fetch / no Apply.
+      - Invariants listed here map to smoke cases 32 / 33 / 91 / 92.
+  -%>
+  <div class="npd-draft-contract"
+       style="background: #eef4fb; border: 1px solid #b3c8e0; padding: 0.6rem 0.75rem; border-radius: 4px; margin: 0 0 0.75rem; font-size: 0.85em; color: #1f4e79;">
+    <div style="font-weight: 600; margin-bottom: 0.3rem;">📋 Draft-only contract <span class="section-tag tag-readonly" style="font-size: 0.72em; font-weight: 500;">read-only invariants</span></div>
+    <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.65;">
+      <li><strong>產出永遠是 draft</strong>：frontmatter 固定 <code>status: "draft"</code> + <code>draft: true</code>；表單沒有 ready / published 切換。</li>
+      <li><strong>產出 ≠ 發布</strong>：Copy / Download 不會送上 Blogger、GitHub Pages、Google Drive 或任何後台；不會觸發 build / deploy。</li>
+      <li><strong>不會自動寫入 repo</strong>：Admin 不寫 <code>content/</code>、不發 fetch、不跑 Apply / safeWrite / middleware；要存檔請由 Dean 人工貼入。</li>
+      <li><strong>目標位置</strong>：依 <code>site</code> 切換 <code>content/github/posts/</code> 或 <code>content/blogger/posts/</code>，檔名 <code>{date}-{slug}.md</code>。</li>
+      <li><strong>匯入後請執行 validation</strong>：<code>npm run validate:content</code>（VS Code terminal）；通過後再決定是否在 VS Code 把 <code>status</code> 改成 ready / published。</li>
+      <li><strong>狀態切換在 repo 端</strong>：Admin 永遠不切 ready / published；要升 ready 請先檢視下方 <strong>Ready preflight</strong> 列出的 blocking 欄位。</li>
+    </ul>
+  </div>
 
   <div class="new-post-draft-block" style="background: #f4f7fb; border: 1px solid #c5d6e8; padding: 0.75rem; border-radius: 4px;">
     <%# Phase 20260627-admin-draft-markdown-output-usability-slice-a:
@@ -2005,7 +2026,9 @@
       </div>
       <p class="text-muted" style="font-size: 0.8em; line-height: 1.55; margin: 0 0 0.5rem;">
         本區塊<strong>只顯示路徑與指令</strong>給 Dean 手動操作；Admin <strong>不寫入</strong>
-        <code>content/</code>、<strong>不</strong>觸發 build、<strong>不</strong> deploy。
+        <code>content/</code>、<strong>不</strong>觸發 build、<strong>不</strong> deploy、<strong>不</strong>送任何後台。
+        即使按下 Copy / Download，<code>.md</code> 也不會在 repo 中產生；必須由 Dean 用 VS Code / Explorer 手動存到下方
+        <strong>target folder</strong>，才算進入 repo。
         Copy markdown / Download / Copy target path 共用同一驗證（title + slug + date 必須合法）；不合法時三顆都會被 disable。
       </p>
       <table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
@@ -2039,10 +2062,11 @@
         <span id="npd-flow-status" style="font-size: 0.8em;" aria-live="polite"></span>
       </div>
       <ol style="margin: 0.6rem 0 0; padding-left: 1.4rem; font-size: 0.82em; color: #1f2d3d; line-height: 1.7;">
-        <li><strong>Download .md</strong>（或 Copy markdown），取得 <code>{date}-{slug}.md</code> 檔案</li>
-        <li>把 <code>.md</code> 手動存到 <strong>target folder</strong>（例：<code>content/github/posts/</code>）</li>
-        <li>在 terminal 跑 <code>npm run validate:content</code> 檢查 frontmatter 與 schema</li>
-        <li>需要時用 <strong>VS Code</strong> 編修 body / category / tags / cover；維持 <code>status:"draft"</code> 直到內容完成</li>
+        <li><strong>Download .md</strong>（或 Copy markdown），取得 <code>{date}-{slug}.md</code> 檔案 — 此時檔案<strong>還在瀏覽器 / 剪貼簿</strong>，<strong>尚未進入 repo</strong></li>
+        <li>用 <strong>VS Code</strong> 或 Explorer 把 <code>.md</code> 手動存到 <strong>target folder</strong>（例：<code>content/github/posts/</code>）— 這一步完成後檔案才正式在 repo 內</li>
+        <li>在 terminal 跑 <code>npm run validate:content</code> 檢查 frontmatter 與 schema（PASS 才算 import 完成）</li>
+        <li>需要時用 <strong>VS Code</strong> 編修 body / category / tags / cover；本階段請維持 <code>status:"draft"</code> + <code>draft:true</code></li>
+        <li>若日後要升 ready / published，請在 <strong>VS Code</strong> 手動改 frontmatter（Admin 永遠不切 status），改完再跑 <code>npm run validate:content</code> 確認 0 errors</li>
       </ol>
     </div>
 
