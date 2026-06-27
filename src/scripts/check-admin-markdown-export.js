@@ -886,5 +886,129 @@ check('86 buildExportSummary tag counter dedupes / trims (matches normalizeTags 
   assert.equal(s.counts.tags, 3);
 });
 
+// Phase 20260627-admin-markdown-export-cross-helper-smoke-evidence:
+//   Cross-helper invariant cases. The individual helpers already have
+//   per-helper non-mutation cases (24 / 51 / 75 / 85) and per-rule edge cases
+//   (35–39 / 41–50 / 63–74). These 5 cases lock the *combined* behaviour
+//   the Admin UI relies on every keystroke — all 4 read-only helpers run on
+//   the same input, then buildPostMarkdown runs, and the export must still
+//   emit status:"draft" + draft:true. Pure smoke; no new exports.
+check('87 analyzeRegistryHints accumulates category + tag hints in input order', () => {
+  // category-site-mismatch comes first (max 1, scanned before tags), then tag
+  // hints follow input order. 'github' is known + allowed for github → no hint.
+  const r = analyzeRegistryHints(
+    { site: 'github', category: 'book-review', tags: 'made-up, book, github' },
+    REGS
+  );
+  assert.equal(r.hasHints, true);
+  assert.equal(r.hints.length, 3, 'expected 1 category + 2 tag hints');
+  assert.equal(r.hints[0].kind, 'category-site-mismatch');
+  assert.equal(r.hints[0].value, 'book-review');
+  assert.equal(r.hints[1].kind, 'unknown-tag');
+  assert.equal(r.hints[1].value, 'made-up');
+  assert.equal(r.hints[2].kind, 'tag-site-mismatch');
+  assert.equal(r.hints[2].value, 'book');
+});
+
+check('88 cross-helper sequence does not throw and does not flip export to ready', () => {
+  // Mirrors the Admin UI recompute() ordering: isExportReady → analyzeReadyGap →
+  // analyzeRegistryHints → buildExportSummary → buildPostMarkdown. Locks that
+  // any combination of input states keeps the export draft-only.
+  const inputs = [
+    happy,                                                  // valid draft baseline
+    {},                                                      // all missing
+    { ...readyHappy, status: 'ready', draft: false },        // pretends to be ready
+    { ...readyHappy, category: 'unknown-cat', tags: 'a,b' }, // registry mismatches
+    null,                                                    // null safety
+  ];
+  for (const inp of inputs) {
+    assert.doesNotThrow(() => {
+      isExportReady(inp);
+      analyzeReadyGap(inp);
+      analyzeRegistryHints(inp, REGS);
+      buildExportSummary(inp);
+    });
+    const d = matter(buildPostMarkdown(inp)).data;
+    assert.equal(d.status, 'draft', 'status must stay draft after full helper sequence');
+    assert.equal(d.draft, true, 'draft must stay true after full helper sequence');
+  }
+});
+
+check('89 many tags input handled without throw; counts + hints match expected', () => {
+  // Stress case — 20 tags total: 2 known (github, vite) + 18 unknown.
+  // analyzeRegistryHints must report 18 unknown-tag hints; buildExportSummary
+  // counts.tags must reflect the deduped (=20) array; buildPostMarkdown emits
+  // all 20 in tags[] without breaking gray-matter parsing.
+  const known = ['github', 'vite'];
+  const unknown = Array.from({ length: 18 }, (_, i) => 'unknown-' + i);
+  const tagsList = known.concat(unknown);
+  const input = { site: 'github', category: 'tech-note', tags: tagsList };
+  const hints = analyzeRegistryHints(input, REGS);
+  const unknownCount = hints.hints.filter((h) => h.kind === 'unknown-tag').length;
+  assert.equal(unknownCount, 18);
+  const summary = buildExportSummary({ ...happy, tags: tagsList });
+  assert.equal(summary.counts.tags, 20);
+  const parsed = matter(buildPostMarkdown({ ...happy, tags: tagsList }));
+  assert.equal(parsed.data.tags.length, 20);
+  assert.equal(parsed.data.status, 'draft');
+});
+
+check('90 cross-consistency: isExportReady.ok=true ⇒ filename and targetPath non-empty', () => {
+  // When isExportReady reports OK, buildExportSummary MUST be able to produce
+  // both filename and targetPath — these power the Download / Copy target path
+  // buttons that gate on isExportReady. Locks the contract so the UI cannot
+  // expose an enabled Download button with an empty filename.
+  for (const inp of [happy, readyHappy, { ...happy, site: 'blogger' }]) {
+    const ready = isExportReady(inp);
+    const summary = buildExportSummary(inp);
+    if (ready.ok) {
+      assert.notEqual(summary.filename, '', 'filename must be present when ready.ok');
+      assert.notEqual(summary.targetPath, '', 'targetPath must be present when ready.ok');
+      assert.equal(summary.targetPath, summary.targetFolder + summary.filename);
+    }
+  }
+  // Conversely: any single missing/invalid required field → targetPath empty.
+  const failures = [
+    { ...happy, title: '' },           // title missing — filename still works but ready=false
+    { ...happy, slug: '' },            // slug invalid → filename empty
+    { ...happy, date: '2026/06/27' },  // date format bad → filename empty
+  ];
+  for (const inp of failures) {
+    const ready = isExportReady(inp);
+    const summary = buildExportSummary(inp);
+    assert.equal(ready.ok, false);
+    // title-only failure still yields a filename (title is not part of filename);
+    // slug / date failures must zero filename + targetPath.
+    if (ready.missing.includes('slug') || ready.missing.includes('date')) {
+      assert.equal(summary.filename, '');
+      assert.equal(summary.targetPath, '');
+    }
+  }
+});
+
+check('91 defense-in-depth: input pretending to be ready cannot flip export status', () => {
+  // Even when every analyzer reports "this looks ready", buildPostMarkdown
+  // STILL emits status:"draft" + draft:true. The export is the single source
+  // of truth for what lands in content/{site}/posts/*.md; analysis is hint-only.
+  const pretend = {
+    ...readyHappy,
+    status: 'ready',
+    draft: false,
+    publishedAt: '2026-06-27T12:00:00Z',  // ignored — no such field on input contract
+  };
+  const ready = isExportReady(pretend);
+  const gap = analyzeReadyGap(pretend);
+  const summary = buildExportSummary(pretend);
+  assert.equal(ready.ok, true);
+  assert.equal(gap.ok, true);
+  assert.equal(gap.summary, 'ready-candidate');
+  assert.equal(summary.status, 'draft', 'summary.status must be literal "draft"');
+  assert.equal(summary.draft, true, 'summary.draft must be literal true');
+  assert.equal(summary.ready.ok, true);
+  const d = matter(buildPostMarkdown(pretend)).data;
+  assert.equal(d.status, 'draft', 'frontmatter status MUST stay draft');
+  assert.equal(d.draft, true, 'frontmatter draft MUST stay true');
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
