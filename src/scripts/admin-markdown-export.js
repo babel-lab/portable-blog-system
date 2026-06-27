@@ -308,6 +308,75 @@ function findRegistryEntry(arr, key) {
   return null;
 }
 
+// Phase 20260627-admin-draft-markdown-output-usability-slice-a:
+//   buildExportSummary — read-only at-a-glance digest of the current Admin
+//   draft form state. Mirrors what Dean already needs to track manually
+//   (slug / suggested filename / draft status / character counts vs limits)
+//   and consolidates it into one shape the inline UI can render top-of-panel.
+//
+//   IMPORTANT — safety invariants:
+//   - Pure: no fs / fetch / IO; never throws on null / undefined input.
+//   - Read-only: never mutates buildPostMarkdown output (status:"draft" stays).
+//   - No new "ready" option introduced; status / draft remain literal 'draft' / true.
+//   - Field limits mirror analyzeReadyGap (READY_MAX_TITLE_LEN /
+//     READY_MAX_DESCRIPTION_LEN) so the panel + preflight stay aligned.
+//
+//   Output shape:
+//     {
+//       site, contentKind, primaryPlatform,
+//       slug,         // sanitized or '' when invalid (matches sanitizeSlug)
+//       filename,     // '' when invalid (matches buildPostFilename)
+//       targetFolder, // always present (falls back to github folder)
+//       targetPath,   // '' when filename invalid
+//       status: 'draft', draft: true,
+//       ready: { ok, missing },
+//       counts: {
+//         title, description, searchDescription, coverAlt, tags
+//       },
+//       limits: { titleMax, descriptionMax }
+//     }
+export function buildExportSummary(input) {
+  const safeInput = input && typeof input === 'object' ? input : {};
+  const site = pickEnum(safeInput.site, VALID_SITES, 'github');
+  const contentKind = pickEnum(safeInput.contentKind, VALID_CONTENT_KINDS, 'tech-note');
+  const primaryPlatform = pickEnum(safeInput.primaryPlatform, VALID_PRIMARY_PLATFORMS, site);
+  const slug = sanitizeSlug(safeInput.slug);
+  const filename = buildPostFilename(safeInput);
+  const targetFolder = buildTargetFolder(safeInput);
+  const targetPath = buildTargetPath(safeInput);
+  const ready = isExportReady(safeInput);
+  const titleRaw = String(safeInput.title == null ? '' : safeInput.title).trim();
+  const description = String(safeInput.description == null ? '' : safeInput.description).trim();
+  const searchDescription = String(
+    safeInput.searchDescription == null ? '' : safeInput.searchDescription
+  ).trim();
+  const coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).trim();
+  const tags = normalizeTagsInput(safeInput.tags);
+  return {
+    site,
+    contentKind,
+    primaryPlatform,
+    slug,
+    filename,
+    targetFolder,
+    targetPath,
+    status: 'draft',
+    draft: true,
+    ready,
+    counts: {
+      title: titleRaw.length,
+      description: description.length,
+      searchDescription: searchDescription.length,
+      coverAlt: coverAlt.length,
+      tags: tags.length,
+    },
+    limits: {
+      titleMax: READY_MAX_TITLE_LEN,
+      descriptionMax: READY_MAX_DESCRIPTION_LEN,
+    },
+  };
+}
+
 export function analyzeReadyGap(input) {
   const safeInput = input && typeof input === 'object' ? input : {};
   const titleRaw = String(safeInput.title == null ? '' : safeInput.title).trim();

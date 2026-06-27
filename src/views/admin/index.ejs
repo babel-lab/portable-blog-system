@@ -1801,6 +1801,32 @@
   </p>
 
   <div class="new-post-draft-block" style="background: #f4f7fb; border: 1px solid #c5d6e8; padding: 0.75rem; border-radius: 4px;">
+    <%# Phase 20260627-admin-draft-markdown-output-usability-slice-a:
+        Draft summary strip — at-a-glance read-only digest of the current form
+        state. Mirrors admin-markdown-export.js buildExportSummary (smoke 76-86).
+        - Pure render: no fetch / no write / no Apply / no fs.
+        - Status badge is hard-wired to "draft" + draft:true (never flips).
+        - Char counters use READY_MAX_TITLE_LEN / READY_MAX_DESCRIPTION_LEN
+          (smoke 78); over-limit shows as warning color (not blocking). -%>
+    <div class="npd-summary-strip" style="margin: 0 0 0.6rem; padding: 0.5rem 0.65rem; background: #fff; border: 1px solid #c5d6e8; border-radius: 3px; font-size: 0.82em;">
+      <div style="display: flex; flex-wrap: wrap; gap: 0.4rem 0.85rem; align-items: center;">
+        <span><strong>site:</strong> <code class="mono" id="npd-summary-site">github</code></span>
+        <span><strong>contentKind:</strong> <code class="mono" id="npd-summary-kind">tech-note</code></span>
+        <span><strong>slug:</strong> <code class="mono" id="npd-summary-slug">（未填）</code></span>
+        <span><strong>filename:</strong> <code class="mono" id="npd-summary-filename">（待 date + slug）</code></span>
+        <span><strong>status:</strong> <span class="badge b-draft" style="font-size: 0.78em;">draft</span></span>
+        <span><strong>ready:</strong> <span id="npd-summary-ready" class="badge b-draft" style="font-size: 0.78em;" aria-live="polite">missing</span></span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.4rem 0.85rem; align-items: center; margin-top: 0.3rem; color: #555;">
+        <span><strong>target:</strong> <code class="mono" id="npd-summary-target">content/github/posts/</code></span>
+        <span><strong>tags:</strong> <span id="npd-summary-tagcount">0</span></span>
+      </div>
+      <p class="text-muted" style="font-size: 0.76em; margin: 0.35rem 0 0; line-height: 1.5;">
+        本 strip 為 read-only 快照：site / contentKind / slug / filename / target / draft 狀態皆同步上方表單；
+        匯出 frontmatter 永遠是 <code>status:"draft"</code> + <code>draft:true</code>，不會因任何欄位變動而切 ready。
+      </p>
+    </div>
+
     <table style="width: 100%; border-collapse: collapse; font-size: 0.88em;">
       <tbody>
         <tr>
@@ -1840,6 +1866,7 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-title">title</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <input type="text" id="npd-title" maxlength="120" placeholder="文章標題（將寫入 frontmatter 的 title；不要在 body 寫第二個 H1）" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
+            <span class="text-muted" style="font-size: 0.78em;">→ <span id="npd-count-title">0</span>/60（超過為 long-title soft warning，不擋 export）</span>
           </td>
         </tr>
         <tr>
@@ -1903,6 +1930,7 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-description">description</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <textarea id="npd-description" rows="2" maxlength="160" placeholder="60–160 字內的文章摘要（將進入 og:description / meta description / JSON-LD）" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
+            <span class="text-muted" style="font-size: 0.78em;">→ <span id="npd-count-description">0</span>/160（超過為 long-description soft warning，不擋 export）</span>
           </td>
         </tr>
         <%# Phase 20260627-admin-richer-fields-slice-a:
@@ -1922,7 +1950,7 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-search-description">searchDescription</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <textarea id="npd-search-description" rows="2" maxlength="160" placeholder="（optional）給搜尋引擎 / Blogger 搜尋說明用的摘要；空白時不會擋 export，但 ready preflight 會 warning" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
-            <span class="text-muted" style="font-size: 0.82em;">→ 通常與 <code>description</code> 不同；空白時 Blogger 後台可手動補</span>
+            <span class="text-muted" style="font-size: 0.82em;">→ 通常與 <code>description</code> 不同；空白時 Blogger 後台可手動補（目前 <span id="npd-count-search-description">0</span> 字）</span>
           </td>
         </tr>
         <tr>
@@ -1936,7 +1964,7 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-cover-alt">coverAlt</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <input type="text" id="npd-cover-alt" maxlength="200" placeholder="（optional）封面圖替代文字；幫螢幕閱讀器描述圖片內容" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
-            <span class="text-muted" style="font-size: 0.82em;">→ 空白時 ready preflight 會 warning（不擋 ready）</span>
+            <span class="text-muted" style="font-size: 0.82em;">→ 空白時 ready preflight 會 warning（不擋 ready）（目前 <span id="npd-count-cover-alt">0</span> 字）</span>
           </td>
         </tr>
         <tr>
@@ -3435,6 +3463,20 @@
       var REGISTRY_SNAPSHOT = (window.NPD_REGISTRY && typeof window.NPD_REGISTRY === 'object')
         ? window.NPD_REGISTRY
         : { categories: [], tags: [] };
+      // Phase 20260627-admin-draft-markdown-output-usability-slice-a:
+      //   Draft summary strip + per-field char counter elements. Mirror of
+      //   admin-markdown-export.js buildExportSummary (smoke 76-86).
+      var SUM_SITE_EL = document.getElementById('npd-summary-site');
+      var SUM_KIND_EL = document.getElementById('npd-summary-kind');
+      var SUM_SLUG_EL = document.getElementById('npd-summary-slug');
+      var SUM_FILENAME_EL = document.getElementById('npd-summary-filename');
+      var SUM_TARGET_EL = document.getElementById('npd-summary-target');
+      var SUM_READY_EL = document.getElementById('npd-summary-ready');
+      var SUM_TAGCOUNT_EL = document.getElementById('npd-summary-tagcount');
+      var CNT_TITLE_EL = document.getElementById('npd-count-title');
+      var CNT_DESC_EL = document.getElementById('npd-count-description');
+      var CNT_SEARCH_DESC_EL = document.getElementById('npd-count-search-description');
+      var CNT_COVER_ALT_EL = document.getElementById('npd-count-cover-alt');
       if (!SITE_EL || !OUT_EL || !COPY_BTN || !DL_BTN) return;
 
       var VALID_SITES = ['github', 'blogger'];
@@ -3708,6 +3750,94 @@
           }
         }
       }
+      // Phase 20260627-admin-draft-markdown-output-usability-slice-a:
+      //   Client mirror of admin-markdown-export.js buildExportSummary.
+      //   Smoke 76-86 covers the server-side version; keep the two in sync.
+      //   Read-only digest — never mutates markdown export (status stays draft).
+      function buildExportSummary(input) {
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var site = pickEnum(safeInput.site, VALID_SITES, 'github');
+        var contentKind = pickEnum(safeInput.contentKind, VALID_KINDS, 'tech-note');
+        var primaryPlatform = pickEnum(safeInput.primaryPlatform, VALID_PRIMARY, site);
+        var slug = sanitizeSlug(safeInput.slug);
+        var filename = buildFilename(safeInput.date, safeInput.slug);
+        var targetFolder = buildTargetFolder(safeInput.site);
+        var targetPath = buildTargetPath(safeInput.site, safeInput.date, safeInput.slug);
+        var ready = isExportReady(safeInput.title, safeInput.slug, safeInput.date);
+        var titleRaw = String(safeInput.title == null ? '' : safeInput.title).replace(/^\s+|\s+$/g, '');
+        var description = String(safeInput.description == null ? '' : safeInput.description).replace(/^\s+|\s+$/g, '');
+        var searchDescription = String(safeInput.searchDescription == null ? '' : safeInput.searchDescription).replace(/^\s+|\s+$/g, '');
+        var coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).replace(/^\s+|\s+$/g, '');
+        var tags = normalizeTags(safeInput.tags);
+        return {
+          site: site,
+          contentKind: contentKind,
+          primaryPlatform: primaryPlatform,
+          slug: slug,
+          filename: filename,
+          targetFolder: targetFolder,
+          targetPath: targetPath,
+          status: 'draft',
+          draft: true,
+          ready: ready,
+          counts: {
+            title: titleRaw.length,
+            description: description.length,
+            searchDescription: searchDescription.length,
+            coverAlt: coverAlt.length,
+            tags: tags.length
+          },
+          limits: {
+            titleMax: READY_MAX_TITLE_LEN,
+            descriptionMax: READY_MAX_DESCRIPTION_LEN
+          }
+        };
+      }
+      function renderExportSummary(sum) {
+        if (SUM_SITE_EL) SUM_SITE_EL.textContent = sum.site;
+        if (SUM_KIND_EL) SUM_KIND_EL.textContent = sum.contentKind;
+        if (SUM_SLUG_EL) {
+          if (sum.slug === '') {
+            SUM_SLUG_EL.textContent = '（未填 / 不合法）';
+            SUM_SLUG_EL.style.color = '#a00';
+          } else {
+            SUM_SLUG_EL.textContent = sum.slug;
+            SUM_SLUG_EL.style.color = '#2c5282';
+          }
+        }
+        if (SUM_FILENAME_EL) {
+          if (sum.filename === '') {
+            SUM_FILENAME_EL.textContent = '（待 date + slug）';
+            SUM_FILENAME_EL.style.color = '#a00';
+          } else {
+            SUM_FILENAME_EL.textContent = sum.filename;
+            SUM_FILENAME_EL.style.color = '#2c5282';
+          }
+        }
+        if (SUM_TARGET_EL) {
+          SUM_TARGET_EL.textContent = sum.targetPath !== '' ? sum.targetPath : sum.targetFolder;
+        }
+        if (SUM_READY_EL) {
+          if (sum.ready.ok) {
+            SUM_READY_EL.textContent = 'export ok';
+            SUM_READY_EL.className = 'badge b-ready';
+          } else {
+            SUM_READY_EL.textContent = 'missing ' + sum.ready.missing.join(' / ');
+            SUM_READY_EL.className = 'badge b-draft';
+          }
+        }
+        if (SUM_TAGCOUNT_EL) SUM_TAGCOUNT_EL.textContent = String(sum.counts.tags);
+        // Per-field counters — over-limit shows warning color but never blocks.
+        function paintCounter(el, value, limit) {
+          if (!el) return;
+          el.textContent = String(value);
+          el.style.color = (typeof limit === 'number' && value > limit) ? '#856404' : '#555';
+        }
+        paintCounter(CNT_TITLE_EL, sum.counts.title, sum.limits.titleMax);
+        paintCounter(CNT_DESC_EL, sum.counts.description, sum.limits.descriptionMax);
+        paintCounter(CNT_SEARCH_DESC_EL, sum.counts.searchDescription, null);
+        paintCounter(CNT_COVER_ALT_EL, sum.counts.coverAlt, null);
+      }
       function missingReason(missing) {
         if (!missing || missing.length === 0) return '';
         var labels = { title: 'title', slug: 'slug (僅 a-z 0-9 -)', date: 'date (YYYY-MM-DD)' };
@@ -3869,6 +3999,10 @@
         // Phase 20260627-admin-category-tag-registry-hints-implementation-a:
         //   Registry alignment hints (read-only; never gates export).
         renderRegistryHints(analyzeRegistryHints(input, REGISTRY_SNAPSHOT));
+        // Phase 20260627-admin-draft-markdown-output-usability-slice-a:
+        //   At-a-glance summary strip + per-field char counters. Mirrors
+        //   admin-markdown-export.js buildExportSummary (smoke 76-86).
+        renderExportSummary(buildExportSummary(input));
       }
 
       function fallbackCopy() {

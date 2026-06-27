@@ -20,6 +20,7 @@ import {
   isExportReady,
   analyzeReadyGap,
   analyzeRegistryHints,
+  buildExportSummary,
   READY_UNSUPPORTED_CONTENT_KINDS,
   READY_MAX_TITLE_LEN,
   READY_MAX_DESCRIPTION_LEN,
@@ -746,6 +747,143 @@ check('75 analyzeRegistryHints does not alter buildPostMarkdown output', () => {
     assert.equal(d.status, 'draft');
     assert.equal(d.draft, true);
   }
+});
+
+// Phase 20260627-admin-draft-markdown-output-usability-slice-a:
+//   buildExportSummary smoke cases — at-a-glance digest helper for the Admin
+//   draft summary strip. Locks shape + status invariant + counts + limits so
+//   the inline UI mirror stays aligned with the server helper.
+check('76 buildExportSummary happy → shape + values', () => {
+  const s = buildExportSummary(happy);
+  assert.equal(s.site, 'github');
+  assert.equal(s.contentKind, 'tech-note');
+  assert.equal(s.primaryPlatform, 'github');
+  assert.equal(s.slug, 'test-post');
+  assert.equal(s.filename, '2026-06-27-test-post.md');
+  assert.equal(s.targetFolder, 'content/github/posts/');
+  assert.equal(s.targetPath, 'content/github/posts/2026-06-27-test-post.md');
+  assert.equal(s.status, 'draft');
+  assert.equal(s.draft, true);
+  assert.equal(s.ready.ok, true);
+  assert.deepEqual(s.ready.missing, []);
+});
+
+check('77 buildExportSummary counts match trimmed input lengths', () => {
+  const s = buildExportSummary({
+    ...happy,
+    title: '  abcd  ',
+    description: '一二三四五',
+    searchDescription: '搜尋摘要',
+    coverAlt: '封面替代',
+    tags: 'a, b, c',
+  });
+  assert.equal(s.counts.title, 4);
+  assert.equal(s.counts.description, 5);
+  assert.equal(s.counts.searchDescription, 4);
+  assert.equal(s.counts.coverAlt, 4);
+  assert.equal(s.counts.tags, 3);
+});
+
+check('78 buildExportSummary limits mirror READY_MAX_* constants', () => {
+  const s = buildExportSummary(happy);
+  assert.equal(s.limits.titleMax, READY_MAX_TITLE_LEN);
+  assert.equal(s.limits.descriptionMax, READY_MAX_DESCRIPTION_LEN);
+});
+
+check('79 buildExportSummary invalid slug → slug empty, filename empty, targetPath empty', () => {
+  const s = buildExportSummary({ ...happy, slug: 'BAD SLUG' });
+  assert.equal(s.slug, '');
+  assert.equal(s.filename, '');
+  assert.equal(s.targetPath, '');
+  assert.equal(s.targetFolder, 'content/github/posts/');
+  assert.equal(s.ready.ok, false);
+  assert.ok(s.ready.missing.includes('slug'));
+});
+
+check('80 buildExportSummary invalid date → filename empty, targetPath empty, status still draft', () => {
+  const s = buildExportSummary({ ...happy, date: '06/27/2026' });
+  assert.equal(s.filename, '');
+  assert.equal(s.targetPath, '');
+  assert.equal(s.status, 'draft');
+  assert.equal(s.draft, true);
+  assert.ok(s.ready.missing.includes('date'));
+});
+
+check('81 buildExportSummary site=blogger → blogger folder + path', () => {
+  const s = buildExportSummary({ ...happy, site: 'blogger' });
+  assert.equal(s.targetFolder, 'content/blogger/posts/');
+  assert.equal(s.targetPath, 'content/blogger/posts/2026-06-27-test-post.md');
+  assert.equal(s.primaryPlatform, 'github', 'primaryPlatform unchanged unless caller overrides');
+});
+
+check('82 buildExportSummary invalid site / contentKind fall back', () => {
+  const s = buildExportSummary({ ...happy, site: 'twitter', contentKind: 'rants' });
+  assert.equal(s.site, 'github');
+  assert.equal(s.contentKind, 'tech-note');
+  assert.equal(s.targetFolder, 'content/github/posts/');
+});
+
+check('83 buildExportSummary status / draft always literal regardless of input', () => {
+  // Mirrors smoke 24 / 51 — at-a-glance digest must never advertise ready.
+  const inputs = [
+    { ...happy, status: 'ready', draft: false },
+    { ...happy, contentKind: 'book-review' },
+    { ...happy, title: '', slug: '', date: '' },
+  ];
+  for (const inp of inputs) {
+    const s = buildExportSummary(inp);
+    assert.equal(s.status, 'draft');
+    assert.equal(s.draft, true);
+  }
+});
+
+check('84 buildExportSummary null / undefined input does not throw + defaults stable', () => {
+  for (const v of [null, undefined]) {
+    const s = buildExportSummary(v);
+    assert.equal(s.site, 'github');
+    assert.equal(s.contentKind, 'tech-note');
+    assert.equal(s.primaryPlatform, 'github');
+    assert.equal(s.slug, '');
+    assert.equal(s.filename, '');
+    assert.equal(s.targetFolder, 'content/github/posts/');
+    assert.equal(s.targetPath, '');
+    assert.equal(s.status, 'draft');
+    assert.equal(s.draft, true);
+    assert.equal(s.ready.ok, false);
+    assert.equal(s.counts.title, 0);
+    assert.equal(s.counts.description, 0);
+    assert.equal(s.counts.searchDescription, 0);
+    assert.equal(s.counts.coverAlt, 0);
+    assert.equal(s.counts.tags, 0);
+    assert.equal(s.limits.titleMax, READY_MAX_TITLE_LEN);
+    assert.equal(s.limits.descriptionMax, READY_MAX_DESCRIPTION_LEN);
+  }
+});
+
+check('85 buildExportSummary does not alter buildPostMarkdown output', () => {
+  // Read-only invariant: calling buildExportSummary first must not mutate
+  // anything downstream — buildPostMarkdown still emits status:"draft" + draft:true.
+  const inputs = [
+    happy,
+    { ...happy, slug: '', date: '' },
+    { ...happy, contentKind: 'download' },
+  ];
+  for (const inp of inputs) {
+    buildExportSummary(inp);
+    const md = buildPostMarkdown(inp);
+    const d = matter(md).data;
+    assert.equal(d.status, 'draft');
+    assert.equal(d.draft, true);
+  }
+});
+
+check('86 buildExportSummary tag counter dedupes / trims (matches normalizeTags rule)', () => {
+  const s = buildExportSummary({
+    ...happy,
+    tags: ' github , vite, github , , react ',
+  });
+  // Mirrors smoke 10 normalization rule — first-seen unique non-empty.
+  assert.equal(s.counts.tags, 3);
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
