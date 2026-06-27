@@ -2016,10 +2016,13 @@
 
     <%# Phase 20260627-admin-markdown-import-checklist-slice2-a:
         Manual import flow block — 純 display helper：顯示「應該存到哪裡」「之後該跑什麼」+
-        4 步 checklist；按鈕只 copy 字串到 clipboard，永不寫 fs / fetch / repo。
+        5 步 checklist（download → save → validate → edit → 升 ready 前再 validate）；
+        按鈕只 copy 字串到 clipboard，永不寫 fs / fetch / repo。
         target folder / target path / Copy markdown / Download / Copy target path
         共用同一套 date + slug + title 驗證來源（isExportReady → npd state），
-        避免使用者誤把半成品 copy 出去並存進 content/posts/。 -%>
+        避免使用者誤把半成品 copy 出去並存進 content/posts/。
+        Lock：實際 <ol> 必須維持 5 個 <li>，且 source 不再宣稱「4 步」/「4-step」；
+        smoke 鎖在 check-admin-markdown-export.js。 -%>
     <div class="npd-import-flow" style="margin-top: 0.85rem; padding: 0.6rem 0.75rem; background: #fff; border: 1px dashed #c5d6e8; border-radius: 4px;">
       <div style="font-weight: 600; font-size: 0.88em; color: #1f2d3d; margin-bottom: 0.35rem;">
         📥 Manual import flow <span class="section-tag tag-readonly" style="font-size: 0.72em; font-weight: 500;">no repo write</span>

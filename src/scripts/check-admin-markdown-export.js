@@ -11,6 +11,9 @@
 //   npm run check:admin-markdown-export
 
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import matter from 'gray-matter';
 import {
   buildPostMarkdown,
@@ -1044,6 +1047,49 @@ check('92 raw markdown text contains literal `status: "draft"` and `draft: true`
     assert.ok(!/^status: "published"$/m.test(frontmatter), 'frontmatter MUST NOT contain `status: "published"`');
     assert.ok(!/^draft: false$/m.test(frontmatter), 'frontmatter MUST NOT contain `draft: false`');
   }
+});
+
+// Phase 20260627-admin-markdown-export-import-flow-hygiene-a:
+//   Lock Admin UI manual import flow to 5 steps (matches actual DOM since
+//   slice2-a). Browser smoke 2026-06-27 confirmed 5 <li>; source comment near
+//   line 2019 used to claim "4 步" which drifted out of sync. This smoke
+//   pins both the source comment hygiene and the DOM li count so any future
+//   silent regression (e.g. dropping a step or reintroducing the stale "4 步"
+//   wording) surfaces here instead of waiting for the next browser smoke.
+//
+//   No DOM / no headless browser; pure string scan of the EJS source. The
+//   <ol> in question is the only `class="..."` ol inside `.npd-import-flow`
+//   (a literal source string), making the slice deterministic.
+check('93 admin index.ejs manual import flow is 5-step (no stale "4 步" / "4-step")', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  assert.ok(
+    !/4\s*步\s*checklist/.test(src),
+    'index.ejs MUST NOT still claim "4 步 checklist" (actual import flow is 5-step)'
+  );
+  assert.ok(
+    !/4-step\s+(checklist|import|flow)/i.test(src),
+    'index.ejs MUST NOT mention "4-step checklist/import/flow" (actual import flow is 5-step)'
+  );
+  assert.ok(
+    !/four[-\s]step\s+(checklist|import|flow)/i.test(src),
+    'index.ejs MUST NOT mention "four-step checklist/import/flow" (actual import flow is 5-step)'
+  );
+
+  const flowAnchor = src.indexOf('class="npd-import-flow"');
+  assert.ok(flowAnchor > 0, 'index.ejs MUST contain `class="npd-import-flow"` block');
+  const olOpen = src.indexOf('<ol', flowAnchor);
+  const olClose = src.indexOf('</ol>', olOpen);
+  assert.ok(olOpen > flowAnchor && olClose > olOpen, 'npd-import-flow MUST contain an <ol>…</ol> checklist after the anchor');
+  const olBlock = src.slice(olOpen, olClose);
+  const liMatches = olBlock.match(/<li(\s|>)/g) || [];
+  assert.equal(
+    liMatches.length,
+    5,
+    `manual import flow <ol> MUST have exactly 5 <li> (found ${liMatches.length})`
+  );
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
