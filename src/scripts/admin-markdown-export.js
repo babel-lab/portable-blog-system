@@ -38,6 +38,17 @@ export const VALID_MODES = ['full', 'summary', 'redirect-card'];
 export const VALID_SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 export const VALID_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Phase 20260627-admin-markdown-import-checklist-slice2-a:
+//   - Manual import flow constants used by both the Admin UI inline client
+//     script and the smoke. Kept as constants (not derived) so the smoke
+//     can lock the exact string the UI offers as "Copy validation command".
+//   - Folder strings are intentionally written as POSIX-style (CLAUDE.md §8).
+export const VALIDATION_COMMAND = 'npm run validate:content';
+export const TARGET_FOLDERS = {
+  github: 'content/github/posts/',
+  blogger: 'content/blogger/posts/',
+};
+
 function yamlEscapeScalar(raw) {
   const collapsed = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
   const escaped = collapsed.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -106,6 +117,35 @@ export function buildPostFilename(input) {
   const slug = sanitizeSlug(input && input.slug);
   if (date === '' || slug === '') return '';
   return date + '-' + slug + '.md';
+}
+
+// Phase 20260627-admin-markdown-import-checklist-slice2-a:
+//   buildTargetFolder / buildTargetPath / isExportReady are additive pure
+//   helpers for the manual-import flow block. They never touch fs / fetch
+//   and never throw on null / undefined. UI gating (Copy markdown / Download
+//   / Copy target path) reads isExportReady(input).ok so the three buttons
+//   share a single source of truth for date+slug+title validity.
+export function buildTargetFolder(input) {
+  const site = pickEnum(input && input.site, VALID_SITES, 'github');
+  return TARGET_FOLDERS[site];
+}
+
+export function buildTargetPath(input) {
+  const filename = buildPostFilename(input);
+  if (filename === '') return '';
+  return buildTargetFolder(input) + filename;
+}
+
+export function isExportReady(input) {
+  const safeInput = input && typeof input === 'object' ? input : {};
+  const titleRaw = String(safeInput.title == null ? '' : safeInput.title).trim();
+  const slugClean = sanitizeSlug(safeInput.slug);
+  const dateClean = sanitizeDate(safeInput.date);
+  const missing = [];
+  if (titleRaw === '') missing.push('title');
+  if (slugClean === '') missing.push('slug');
+  if (dateClean === '') missing.push('date');
+  return { ok: missing.length === 0, missing };
 }
 
 export function buildPostMarkdown(input) {

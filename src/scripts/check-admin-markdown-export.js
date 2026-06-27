@@ -15,6 +15,11 @@ import matter from 'gray-matter';
 import {
   buildPostMarkdown,
   buildPostFilename,
+  buildTargetFolder,
+  buildTargetPath,
+  isExportReady,
+  VALIDATION_COMMAND,
+  TARGET_FOLDERS,
   VALID_SITES,
   VALID_CONTENT_KINDS,
   VALID_PRIMARY_PLATFORMS,
@@ -221,6 +226,94 @@ check('25 null / undefined input does not throw', () => {
   assert.equal(p2.data.status, 'draft');
   assert.equal(buildPostFilename(null), '');
   assert.equal(buildPostFilename(undefined), '');
+});
+
+// Phase 20260627-admin-markdown-import-checklist-slice2-a:
+//   Slice-2 cases — additive only; mirror the 4 new helper exports plus the
+//   constants the inline client script reads. Cover happy path + invalid
+//   input + null/undefined-safety, since the Admin UI relies on these for
+//   Copy markdown / Download / Copy target path / Copy validation command
+//   gating (per CLAUDE.md §27).
+check('26 buildTargetFolder site=github → content/github/posts/', () => {
+  assert.equal(buildTargetFolder({ site: 'github' }), 'content/github/posts/');
+});
+
+check('27 buildTargetFolder site=blogger → content/blogger/posts/', () => {
+  assert.equal(buildTargetFolder({ site: 'blogger' }), 'content/blogger/posts/');
+});
+
+check('28 buildTargetFolder invalid site → fallback to github folder', () => {
+  assert.equal(buildTargetFolder({ site: 'twitter' }), 'content/github/posts/');
+  assert.equal(buildTargetFolder({ site: '' }), 'content/github/posts/');
+  assert.equal(buildTargetFolder({}), 'content/github/posts/');
+  assert.equal(buildTargetFolder(null), 'content/github/posts/');
+  assert.equal(buildTargetFolder(undefined), 'content/github/posts/');
+});
+
+check('29 buildTargetPath happy = folder + filename', () => {
+  assert.equal(buildTargetPath(happy), 'content/github/posts/2026-06-27-test-post.md');
+  assert.equal(
+    buildTargetPath({ ...happy, site: 'blogger' }),
+    'content/blogger/posts/2026-06-27-test-post.md'
+  );
+});
+
+check('30 buildTargetPath empty when date invalid', () => {
+  assert.equal(buildTargetPath({ ...happy, date: '' }), '');
+  assert.equal(buildTargetPath({ ...happy, date: '2026/06/27' }), '');
+});
+
+check('31 buildTargetPath empty when slug invalid', () => {
+  assert.equal(buildTargetPath({ ...happy, slug: '' }), '');
+  assert.equal(buildTargetPath({ ...happy, slug: 'TEST-POST' }), '');
+  assert.equal(buildTargetPath({ ...happy, slug: '../etc/passwd' }), '');
+});
+
+check('32 VALIDATION_COMMAND is the literal "npm run validate:content"', () => {
+  assert.equal(VALIDATION_COMMAND, 'npm run validate:content');
+});
+
+check('33 TARGET_FOLDERS shape matches sites', () => {
+  assert.deepEqual(Object.keys(TARGET_FOLDERS).sort(), ['blogger', 'github']);
+  assert.equal(TARGET_FOLDERS.github, 'content/github/posts/');
+  assert.equal(TARGET_FOLDERS.blogger, 'content/blogger/posts/');
+});
+
+check('34 isExportReady happy → ok=true, missing=[]', () => {
+  assert.deepEqual(isExportReady(happy), { ok: true, missing: [] });
+});
+
+check('35 isExportReady missing title → ok=false, missing=[title]', () => {
+  assert.deepEqual(isExportReady({ ...happy, title: '' }), { ok: false, missing: ['title'] });
+  assert.deepEqual(isExportReady({ ...happy, title: '   ' }), { ok: false, missing: ['title'] });
+});
+
+check('36 isExportReady invalid slug → ok=false, missing=[slug]', () => {
+  assert.deepEqual(isExportReady({ ...happy, slug: '' }), { ok: false, missing: ['slug'] });
+  assert.deepEqual(isExportReady({ ...happy, slug: 'TEST POST' }), { ok: false, missing: ['slug'] });
+  assert.deepEqual(isExportReady({ ...happy, slug: '-bad' }), { ok: false, missing: ['slug'] });
+});
+
+check('37 isExportReady invalid date → ok=false, missing=[date]', () => {
+  assert.deepEqual(isExportReady({ ...happy, date: '' }), { ok: false, missing: ['date'] });
+  assert.deepEqual(isExportReady({ ...happy, date: '2026/06/27' }), { ok: false, missing: ['date'] });
+});
+
+check('38 isExportReady multi-missing preserves title/slug/date order', () => {
+  assert.deepEqual(isExportReady({}), { ok: false, missing: ['title', 'slug', 'date'] });
+  assert.deepEqual(
+    isExportReady({ ...happy, title: '', slug: '' }),
+    { ok: false, missing: ['title', 'slug'] }
+  );
+  assert.deepEqual(
+    isExportReady({ ...happy, slug: '', date: '' }),
+    { ok: false, missing: ['slug', 'date'] }
+  );
+});
+
+check('39 isExportReady null / undefined input does not throw', () => {
+  assert.deepEqual(isExportReady(null), { ok: false, missing: ['title', 'slug', 'date'] });
+  assert.deepEqual(isExportReady(undefined), { ok: false, missing: ['title', 'slug', 'date'] });
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);

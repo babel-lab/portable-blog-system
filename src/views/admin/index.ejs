@@ -1907,12 +1907,64 @@
                 spellcheck="false"></textarea>
     </div>
     <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-      <button type="button" id="npd-copy"
+      <button type="button" id="npd-copy" disabled aria-disabled="true"
               style="padding: 0.35rem 0.75rem; border: 1px solid #2c5282; background: #cfe2ff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #2c5282;">Copy markdown</button>
       <button type="button" id="npd-download" disabled aria-disabled="true"
               style="padding: 0.35rem 0.75rem; border: 1px solid #2c5282; background: #cfe2ff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #2c5282;">Download .md</button>
       <span id="npd-status" style="font-size: 0.82em;" aria-live="polite"></span>
-      <span class="text-muted" style="font-size: 0.78em; margin-left: auto;">產出 .md 後請手動存到 <code>content/{site}/posts/</code>，再跑 <code>npm run validate:content</code></span>
+    </div>
+
+    <%# Phase 20260627-admin-markdown-import-checklist-slice2-a:
+        Manual import flow block — 純 display helper：顯示「應該存到哪裡」「之後該跑什麼」+
+        4 步 checklist；按鈕只 copy 字串到 clipboard，永不寫 fs / fetch / repo。
+        target folder / target path / Copy markdown / Download / Copy target path
+        共用同一套 date + slug + title 驗證來源（isExportReady → npd state），
+        避免使用者誤把半成品 copy 出去並存進 content/posts/。 -%>
+    <div class="npd-import-flow" style="margin-top: 0.85rem; padding: 0.6rem 0.75rem; background: #fff; border: 1px dashed #c5d6e8; border-radius: 4px;">
+      <div style="font-weight: 600; font-size: 0.88em; color: #1f2d3d; margin-bottom: 0.35rem;">
+        📥 Manual import flow <span class="section-tag tag-readonly" style="font-size: 0.72em; font-weight: 500;">no repo write</span>
+      </div>
+      <p class="text-muted" style="font-size: 0.8em; line-height: 1.55; margin: 0 0 0.5rem;">
+        本區塊<strong>只顯示路徑與指令</strong>給 Dean 手動操作；Admin <strong>不寫入</strong>
+        <code>content/</code>、<strong>不</strong>觸發 build、<strong>不</strong> deploy。
+        Copy markdown / Download / Copy target path 共用同一驗證（title + slug + date 必須合法）；不合法時三顆都會被 disable。
+      </p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
+        <tbody>
+          <tr>
+            <td style="padding: 0.2rem 0.5rem; width: 9rem; vertical-align: top; color: #555;">target folder</td>
+            <td style="padding: 0.2rem 0.5rem;">
+              <code class="mono" id="npd-target-folder">content/github/posts/</code>
+              <span class="text-muted" style="font-size: 0.78em; margin-left: 0.4rem;">（依 <code>site</code> 切換）</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0.2rem 0.5rem; vertical-align: top; color: #555;">target path</td>
+            <td style="padding: 0.2rem 0.5rem;">
+              <code class="mono" id="npd-target-path">（請補上合法 title / slug / date）</code>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0.2rem 0.5rem; vertical-align: top; color: #555;">validation</td>
+            <td style="padding: 0.2rem 0.5rem;">
+              <code class="mono" id="npd-validation-command">npm run validate:content</code>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        <button type="button" id="npd-copy-path" disabled aria-disabled="true"
+                style="padding: 0.3rem 0.65rem; border: 1px solid #2c5282; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.82em; font-weight: 600; color: #2c5282;">Copy target path</button>
+        <button type="button" id="npd-copy-cmd"
+                style="padding: 0.3rem 0.65rem; border: 1px solid #2c5282; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.82em; font-weight: 600; color: #2c5282;">Copy validation command</button>
+        <span id="npd-flow-status" style="font-size: 0.8em;" aria-live="polite"></span>
+      </div>
+      <ol style="margin: 0.6rem 0 0; padding-left: 1.4rem; font-size: 0.82em; color: #1f2d3d; line-height: 1.7;">
+        <li><strong>Download .md</strong>（或 Copy markdown），取得 <code>{date}-{slug}.md</code> 檔案</li>
+        <li>把 <code>.md</code> 手動存到 <strong>target folder</strong>（例：<code>content/github/posts/</code>）</li>
+        <li>在 terminal 跑 <code>npm run validate:content</code> 檢查 frontmatter 與 schema</li>
+        <li>需要時用 <strong>VS Code</strong> 編修 body / category / tags / cover；維持 <code>status:"draft"</code> 直到內容完成</li>
+      </ol>
     </div>
   </div>
 
@@ -3245,6 +3297,15 @@
       var COPY_BTN = document.getElementById('npd-copy');
       var DL_BTN = document.getElementById('npd-download');
       var STATUS_EL = document.getElementById('npd-status');
+      // Phase 20260627-admin-markdown-import-checklist-slice2-a:
+      //   Manual import flow elements (target folder / path / validation command
+      //   readout + Copy target path / Copy validation command buttons). Mirror
+      //   strings come from admin-markdown-export.js TARGET_FOLDERS / VALIDATION_COMMAND.
+      var TARGET_FOLDER_EL = document.getElementById('npd-target-folder');
+      var TARGET_PATH_EL = document.getElementById('npd-target-path');
+      var COPY_PATH_BTN = document.getElementById('npd-copy-path');
+      var COPY_CMD_BTN = document.getElementById('npd-copy-cmd');
+      var FLOW_STATUS_EL = document.getElementById('npd-flow-status');
       if (!SITE_EL || !OUT_EL || !COPY_BTN || !DL_BTN) return;
 
       var VALID_SITES = ['github', 'blogger'];
@@ -3252,6 +3313,13 @@
       var VALID_PRIMARY = ['github', 'blogger'];
       var SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
       var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+      // Mirror of admin-markdown-export.js TARGET_FOLDERS / VALIDATION_COMMAND.
+      // Smoke 32 / 33 lock the server-side strings; keep this block in sync.
+      var TARGET_FOLDERS = {
+        github: 'content/github/posts/',
+        blogger: 'content/blogger/posts/'
+      };
+      var VALIDATION_COMMAND = 'npm run validate:content';
 
       function todayIso() {
         var d = new Date();
@@ -3314,6 +3382,33 @@
         var s = sanitizeSlug(slug);
         if (d === '' || s === '') return '';
         return d + '-' + s + '.md';
+      }
+      // Phase 20260627-admin-markdown-import-checklist-slice2-a:
+      //   mirror of admin-markdown-export.js helpers (smoke 26–31 / 34–39).
+      function buildTargetFolder(siteRaw) {
+        var site = pickEnum(siteRaw, VALID_SITES, 'github');
+        return TARGET_FOLDERS[site];
+      }
+      function buildTargetPath(siteRaw, dateRaw, slugRaw) {
+        var fn = buildFilename(dateRaw, slugRaw);
+        if (fn === '') return '';
+        return buildTargetFolder(siteRaw) + fn;
+      }
+      function isExportReady(titleRaw, slugRaw, dateRaw) {
+        var title = String(titleRaw == null ? '' : titleRaw).replace(/^\s+|\s+$/g, '');
+        var slugClean = sanitizeSlug(slugRaw);
+        var dateClean = sanitizeDate(dateRaw);
+        var missing = [];
+        if (title === '') missing.push('title');
+        if (slugClean === '') missing.push('slug');
+        if (dateClean === '') missing.push('date');
+        return { ok: missing.length === 0, missing: missing };
+      }
+      function missingReason(missing) {
+        if (!missing || missing.length === 0) return '';
+        var labels = { title: 'title', slug: 'slug (僅 a-z 0-9 -)', date: 'date (YYYY-MM-DD)' };
+        var parts = missing.map(function (k) { return labels[k] || k; });
+        return '請補上：' + parts.join('、');
       }
       function buildMarkdown(input) {
         var site = pickEnum(input.site, VALID_SITES, 'github');
@@ -3409,16 +3504,47 @@
         };
         OUT_EL.value = buildMarkdown(input);
         var fn = buildFilename(input.date, input.slug);
+        var ready = isExportReady(input.title, input.slug, input.date);
+        // Phase 20260627-admin-markdown-import-checklist-slice2-a:
+        //   filename / target-path preview gated by date+slug (Q3 — same source of truth).
+        //   Copy markdown / Download / Copy target path gated by title+slug+date (Q2).
         if (fn === '') {
           FN_EL.textContent = '（filename 待輸入合法 date + slug）';
           FN_EL.style.color = '#a00';
-          DL_BTN.disabled = true;
-          DL_BTN.setAttribute('aria-disabled', 'true');
         } else {
           FN_EL.textContent = fn;
           FN_EL.style.color = '#2c5282';
-          DL_BTN.disabled = false;
-          DL_BTN.setAttribute('aria-disabled', 'false');
+        }
+        if (TARGET_FOLDER_EL) {
+          TARGET_FOLDER_EL.textContent = buildTargetFolder(input.site);
+        }
+        if (TARGET_PATH_EL) {
+          var tp = buildTargetPath(input.site, input.date, input.slug);
+          if (tp === '') {
+            TARGET_PATH_EL.textContent = '（請補上合法 title / slug / date）';
+            TARGET_PATH_EL.style.color = '#a00';
+          } else {
+            TARGET_PATH_EL.textContent = tp;
+            TARGET_PATH_EL.style.color = '#2c5282';
+          }
+        }
+        var disable = !ready.ok;
+        COPY_BTN.disabled = disable;
+        COPY_BTN.setAttribute('aria-disabled', disable ? 'true' : 'false');
+        DL_BTN.disabled = disable;
+        DL_BTN.setAttribute('aria-disabled', disable ? 'true' : 'false');
+        if (COPY_PATH_BTN) {
+          COPY_PATH_BTN.disabled = disable;
+          COPY_PATH_BTN.setAttribute('aria-disabled', disable ? 'true' : 'false');
+        }
+        if (STATUS_EL) {
+          if (disable) {
+            STATUS_EL.textContent = missingReason(ready.missing);
+            STATUS_EL.style.color = '#a00';
+          } else if (STATUS_EL.textContent && STATUS_EL.style.color === 'rgb(170, 0, 0)') {
+            // clear stale validation-missing hint once user satisfied all three
+            STATUS_EL.textContent = '';
+          }
         }
       }
 
@@ -3437,6 +3563,7 @@
         }
       }
       COPY_BTN.addEventListener('click', function () {
+        if (COPY_BTN.disabled) return;
         var text = OUT_EL.value || '';
         if (!text) { showStatus('尚無內容', true); return; }
         if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -3445,6 +3572,58 @@
           }).catch(function () { fallbackCopy(); });
         } else { fallbackCopy(); }
       });
+
+      // Phase 20260627-admin-markdown-import-checklist-slice2-a:
+      //   Manual import flow button handlers — copy strings to clipboard only.
+      //   No fs / fetch / write path; status surfaced in #npd-flow-status (2s clear).
+      function showFlowStatus(msg, isErr) {
+        if (!FLOW_STATUS_EL) return;
+        FLOW_STATUS_EL.textContent = msg;
+        FLOW_STATUS_EL.style.color = isErr ? '#a00' : '#080';
+        setTimeout(function () {
+          if (FLOW_STATUS_EL.textContent === msg) FLOW_STATUS_EL.textContent = '';
+        }, 2000);
+      }
+      function copyTextToClipboard(text, okMsg) {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(text).then(function () {
+            showFlowStatus(okMsg, false);
+          }).catch(function () {
+            showFlowStatus('複製失敗，請手動選取', true);
+          });
+        } else {
+          // execCommand fallback via temporary textarea (no fs / fetch).
+          try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', 'readonly');
+            ta.style.position = 'absolute';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            var ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            document.body.removeChild(ta);
+            if (ok) showFlowStatus(okMsg, false);
+            else showFlowStatus('複製失敗，請手動選取', true);
+          } catch (e) {
+            showFlowStatus('複製失敗，請手動選取', true);
+          }
+        }
+      }
+      if (COPY_PATH_BTN) {
+        COPY_PATH_BTN.addEventListener('click', function () {
+          if (COPY_PATH_BTN.disabled) return;
+          var tp = buildTargetPath(SITE_EL.value, DATE_EL.value, SLUG_EL.value);
+          if (tp === '') { showFlowStatus('target path 尚未合法', true); return; }
+          copyTextToClipboard(tp, '已複製 path');
+        });
+      }
+      if (COPY_CMD_BTN) {
+        COPY_CMD_BTN.addEventListener('click', function () {
+          copyTextToClipboard(VALIDATION_COMMAND, '已複製指令');
+        });
+      }
 
       DL_BTN.addEventListener('click', function () {
         if (DL_BTN.disabled) return;
