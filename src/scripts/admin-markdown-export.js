@@ -261,6 +261,16 @@ export function buildPostMarkdown(input) {
   const description = String(safeInput.description == null ? '' : safeInput.description);
   const category = String(safeInput.category == null ? '' : safeInput.category).trim();
   const tags = normalizeTagsInput(safeInput.tags);
+  // Phase 20260627-admin-richer-fields-slice-a:
+  //   Optional SEO / cover scalars — accepted, trimmed, emitted as YAML strings.
+  //   Empty values still emit the key with "" (keeps preview shape stable so the
+  //   Ready preflight panel mirrors what would land in content/{site}/posts/*.md).
+  //   No upload / no file picker — plain text only (see Admin UI note).
+  const searchDescription = String(
+    safeInput.searchDescription == null ? '' : safeInput.searchDescription
+  ).trim();
+  const cover = String(safeInput.cover == null ? '' : safeInput.cover).trim();
+  const coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).trim();
   const bodyRaw =
     typeof safeInput.body === 'string' && safeInput.body.trim() !== ''
       ? safeInput.body
@@ -300,10 +310,10 @@ export function buildPostMarkdown(input) {
   lines.push(tagsBlock);
   lines.push('');
   lines.push('description: ' + yamlEscapeScalar(description));
-  lines.push('searchDescription: ""');
+  lines.push('searchDescription: ' + yamlEscapeScalar(searchDescription));
   lines.push('');
-  lines.push('cover: ""');
-  lines.push('coverAlt: ""');
+  lines.push('cover: ' + yamlEscapeScalar(cover));
+  lines.push('coverAlt: ' + yamlEscapeScalar(coverAlt));
   lines.push('');
   lines.push('status: "draft"');
   lines.push('draft: true');

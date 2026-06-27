@@ -461,5 +461,106 @@ check('52 READY_UNSUPPORTED_CONTENT_KINDS enum exposed; tech-note + post not uns
   assert.deepEqual(r.unsupported, []);
 });
 
+// Phase 20260627-admin-richer-fields-slice-a:
+//   Smoke cases for optional SEO / Cover scalars now collected by the Admin form.
+//   - buildPostMarkdown must emit them into frontmatter (smoke 53–55)
+//   - empty defaults stay "" (smoke 56)
+//   - YAML escaping mirrors title escaping (smoke 57)
+//   - analyzeReadyGap blocker / warning resolution lines up with form fills (smoke 58–60)
+//   - status / draft invariant preserved across all combinations (smoke 61)
+//   - null / undefined safety preserved across new fields (smoke 62)
+check('53 frontmatter emits searchDescription when provided', () => {
+  const md = buildPostMarkdown({ ...happy, searchDescription: '搜尋說明文字' });
+  assert.equal(matter(md).data.searchDescription, '搜尋說明文字');
+});
+
+check('54 frontmatter emits cover when provided', () => {
+  const md = buildPostMarkdown({
+    ...happy,
+    cover: '/images/placeholders/cover-placeholder.svg',
+  });
+  assert.equal(matter(md).data.cover, '/images/placeholders/cover-placeholder.svg');
+});
+
+check('55 frontmatter emits coverAlt when provided', () => {
+  const md = buildPostMarkdown({ ...happy, coverAlt: '封面圖示意：書桌與筆電' });
+  assert.equal(matter(md).data.coverAlt, '封面圖示意：書桌與筆電');
+});
+
+check('56 frontmatter default for SEO / cover fields is "" when not provided', () => {
+  const d = matter(buildPostMarkdown(happy)).data;
+  assert.equal(d.searchDescription, '');
+  assert.equal(d.cover, '');
+  assert.equal(d.coverAlt, '');
+});
+
+check('57 YAML escape handles quote / newline / backslash in SEO / cover fields', () => {
+  const md = buildPostMarkdown({
+    ...happy,
+    searchDescription: 'has "quote"\nand newline',
+    cover: 'path\\to\\image.jpg',
+    coverAlt: 'alt: with "quote"',
+  });
+  const d = matter(md).data;
+  assert.equal(d.searchDescription, 'has "quote" and newline');
+  assert.equal(d.cover, 'path\\to\\image.jpg');
+  assert.equal(d.coverAlt, 'alt: with "quote"');
+});
+
+check('58 analyzeReadyGap cover blocker clears once cover provided', () => {
+  const before = analyzeReadyGap({ ...readyHappy, cover: '' });
+  assert.ok(fieldNames(before.blocking).includes('cover'));
+  const after = analyzeReadyGap({
+    ...readyHappy,
+    cover: '/images/placeholders/cover-placeholder.svg',
+  });
+  assert.equal(fieldNames(after.blocking).includes('cover'), false);
+});
+
+check('59 analyzeReadyGap searchDescription warning clears once filled', () => {
+  const before = analyzeReadyGap({ ...readyHappy, searchDescription: '' });
+  assert.ok(fieldNames(before.warnings).includes('searchDescription'));
+  const after = analyzeReadyGap({ ...readyHappy, searchDescription: '搜尋摘要' });
+  assert.equal(fieldNames(after.warnings).includes('searchDescription'), false);
+});
+
+check('60 analyzeReadyGap coverAlt warning clears once filled', () => {
+  const before = analyzeReadyGap({ ...readyHappy, coverAlt: '' });
+  assert.ok(fieldNames(before.warnings).includes('coverAlt'));
+  const after = analyzeReadyGap({ ...readyHappy, coverAlt: '封面圖替代文字' });
+  assert.equal(fieldNames(after.warnings).includes('coverAlt'), false);
+});
+
+check('61 status:"draft" + draft:true preserved when richer fields filled', () => {
+  // Even if user fills every optional field, export must stay draft (no ready
+  // option in this slice). Mirrors smoke 24 / 51 but covers the new fields.
+  const md = buildPostMarkdown({
+    ...readyHappy,
+    searchDescription: '搜尋摘要',
+    cover: '/images/cover.jpg',
+    coverAlt: 'alt text',
+  });
+  const d = matter(md).data;
+  assert.equal(d.status, 'draft');
+  assert.equal(d.draft, true);
+});
+
+check('62 null / undefined SEO / cover fields stay safe + emit ""', () => {
+  for (const v of [null, undefined]) {
+    const md = buildPostMarkdown({
+      ...happy,
+      searchDescription: v,
+      cover: v,
+      coverAlt: v,
+    });
+    const d = matter(md).data;
+    assert.equal(d.searchDescription, '');
+    assert.equal(d.cover, '');
+    assert.equal(d.coverAlt, '');
+    assert.equal(d.status, 'draft');
+    assert.equal(d.draft, true);
+  }
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

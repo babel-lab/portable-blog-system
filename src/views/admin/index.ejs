@@ -1888,6 +1888,40 @@
             <textarea id="npd-description" rows="2" maxlength="160" placeholder="60–160 字內的文章摘要（將進入 og:description / meta description / JSON-LD）" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
           </td>
         </tr>
+        <%# Phase 20260627-admin-richer-fields-slice-a:
+            SEO / Cover fields — optional text inputs。輸出仍是 status:"draft" + draft:true（不變）。
+            目的：讓 Ready preflight panel 能即時反映 cover blocker / coverAlt warning / searchDescription warning 是否仍 outstanding。
+            ❌ 不做 upload、❌ 不做 file picker、❌ 不寫 repo — 純 text input。 -%>
+        <tr>
+          <td colspan="2" style="padding: 0.5rem 0.5rem 0.1rem; border-top: 1px dashed #c5d6e8; color: #1f2d3d; font-weight: 600; font-size: 0.85em;">
+            SEO / Cover fields <span class="section-tag tag-readonly" style="font-size: 0.72em; font-weight: 500; margin-left: 0.3rem;">optional</span>
+            <div class="text-muted" style="font-weight: 400; font-size: 0.78em; margin-top: 0.15rem;">
+              這些欄位是 optional，沒填不會擋 export；填了能讓上方 <strong>Ready preflight</strong> 即時消掉對應的 blocker / warning。
+              匯出 frontmatter 仍會是 <code>status:"draft"</code> + <code>draft:true</code>；圖片仍需手動上傳至 Blogger / Drive / 圖床，這裡只輸入 URL 字串。
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-search-description">searchDescription</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <textarea id="npd-search-description" rows="2" maxlength="160" placeholder="（optional）給搜尋引擎 / Blogger 搜尋說明用的摘要；空白時不會擋 export，但 ready preflight 會 warning" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
+            <span class="text-muted" style="font-size: 0.82em;">→ 通常與 <code>description</code> 不同；空白時 Blogger 後台可手動補</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-cover">cover</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <input type="text" id="npd-cover" maxlength="500" placeholder="（optional）封面圖 URL，例：/images/placeholders/cover-placeholder.svg" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
+            <span class="text-muted" style="font-size: 0.82em;">→ 純 text input；不做 upload。空白時 ready preflight 會列為 <strong>blocking</strong></span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-cover-alt">coverAlt</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <input type="text" id="npd-cover-alt" maxlength="200" placeholder="（optional）封面圖替代文字；幫螢幕閱讀器描述圖片內容" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
+            <span class="text-muted" style="font-size: 0.82em;">→ 空白時 ready preflight 會 warning（不擋 ready）</span>
+          </td>
+        </tr>
         <tr>
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-body">body (markdown)</label></td>
           <td style="padding: 0.25rem 0.5rem;">
@@ -1999,8 +2033,8 @@
         </div>
       </div>
       <p class="text-muted" style="font-size: 0.78em; line-height: 1.5; margin: 0.5rem 0 0;">
-        注意：表單目前沒有 <code>cover</code> / <code>coverAlt</code> / <code>searchDescription</code> 欄位，
-        這些欄位需要在存到 <code>content/{site}/posts/</code> 後用 VS Code 編 frontmatter 補上，才能消掉對應的 blocking / warning。
+        提示：上方表單已支援 <code>searchDescription</code> / <code>cover</code> / <code>coverAlt</code>（optional），填寫後即時消掉對應 blocking / warning。
+        其它欄位（如 <code>book.*</code> / <code>download.*</code> / <code>affiliate.*</code>）仍需存到 <code>content/{site}/posts/</code> 後用 VS Code 編 frontmatter 補上。
       </p>
     </div>
   </div>
@@ -3328,6 +3362,12 @@
       var CAT_EL = document.getElementById('npd-category');
       var TAGS_EL = document.getElementById('npd-tags');
       var DESC_EL = document.getElementById('npd-description');
+      // Phase 20260627-admin-richer-fields-slice-a:
+      //   Optional SEO / Cover field refs. Mirror admin-markdown-export.js
+      //   (smoke locks the server-side helper; keep both in sync).
+      var SEARCH_DESC_EL = document.getElementById('npd-search-description');
+      var COVER_EL = document.getElementById('npd-cover');
+      var COVER_ALT_EL = document.getElementById('npd-cover-alt');
       var BODY_EL = document.getElementById('npd-body');
       var OUT_EL = document.getElementById('npd-output');
       var FN_EL = document.getElementById('npd-filename');
@@ -3561,6 +3601,11 @@
         var description = String(input.description == null ? '' : input.description);
         var category = String(input.category == null ? '' : input.category).replace(/^\s+|\s+$/g, '');
         var tags = normalizeTags(input.tags);
+        // Phase 20260627-admin-richer-fields-slice-a:
+        //   Optional SEO / Cover scalars (mirror admin-markdown-export.js).
+        var searchDescription = String(input.searchDescription == null ? '' : input.searchDescription).replace(/^\s+|\s+$/g, '');
+        var cover = String(input.cover == null ? '' : input.cover).replace(/^\s+|\s+$/g, '');
+        var coverAlt = String(input.coverAlt == null ? '' : input.coverAlt).replace(/^\s+|\s+$/g, '');
         var bodyRaw = (typeof input.body === 'string' && input.body.replace(/^\s+|\s+$/g, '') !== '')
           ? input.body : defaultBody();
         var idStr = (date !== '' && slugClean !== '') ? (date.replace(/-/g, '') + '-' + slugClean) : 'TODO-fill-id';
@@ -3589,10 +3634,10 @@
         lines.push(tagsBlock);
         lines.push('');
         lines.push('description: ' + yamlEscapeScalar(description));
-        lines.push('searchDescription: ""');
+        lines.push('searchDescription: ' + yamlEscapeScalar(searchDescription));
         lines.push('');
-        lines.push('cover: ""');
-        lines.push('coverAlt: ""');
+        lines.push('cover: ' + yamlEscapeScalar(cover));
+        lines.push('coverAlt: ' + yamlEscapeScalar(coverAlt));
         lines.push('');
         lines.push('status: "draft"');
         lines.push('draft: true');
@@ -3641,6 +3686,12 @@
           category: CAT_EL.value,
           tags: TAGS_EL.value,
           description: DESC_EL.value,
+          // Phase 20260627-admin-richer-fields-slice-a:
+          //   Optional SEO / Cover fields — feeds both buildMarkdown (frontmatter
+          //   emission) and analyzeReadyGap (blocker / warning resolution).
+          searchDescription: SEARCH_DESC_EL ? SEARCH_DESC_EL.value : '',
+          cover: COVER_EL ? COVER_EL.value : '',
+          coverAlt: COVER_ALT_EL ? COVER_ALT_EL.value : '',
           body: BODY_EL.value
         };
         OUT_EL.value = buildMarkdown(input);
@@ -3799,7 +3850,12 @@
         debounceTimer = setTimeout(recompute, 50);
       }
       [SITE_EL, KIND_EL, PRIM_EL, CAT_EL].forEach(function (el) { el.addEventListener('change', recompute); });
-      [TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, BODY_EL].forEach(function (el) { el.addEventListener('input', debounceRecompute); });
+      // Phase 20260627-admin-richer-fields-slice-a:
+      //   Wire input events for the optional SEO / Cover fields so the Ready
+      //   preflight panel + markdown preview recompute as Dean fills them.
+      [TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]
+        .filter(function (el) { return el; })
+        .forEach(function (el) { el.addEventListener('input', debounceRecompute); });
 
       recompute();
     })();
