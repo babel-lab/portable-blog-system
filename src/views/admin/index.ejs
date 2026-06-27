@@ -1966,6 +1966,43 @@
         <li>需要時用 <strong>VS Code</strong> 編修 body / category / tags / cover；維持 <code>status:"draft"</code> 直到內容完成</li>
       </ol>
     </div>
+
+    <%# Phase 20260627-admin-ready-preflight-panel-implementation-a:
+        Ready preflight panel — read-only hint about what's still missing /
+        risky if Dean ever manually flips this draft to status: ready.
+        - Export still emits status:"draft" + draft:true (smoke 24 / 51).
+        - 不新增 ready option；不切 status；不寫入 repo / Blogger / Drive。
+        - Mirror of admin-markdown-export.js analyzeReadyGap() (smoke 40-52).
+    -%>
+    <div class="npd-ready-preflight" style="margin-top: 0.85rem; padding: 0.6rem 0.75rem; background: #fff; border: 1px dashed #c5d6e8; border-radius: 4px;">
+      <div style="font-weight: 600; font-size: 0.88em; color: #1f2d3d; margin-bottom: 0.35rem;">
+        🩺 Ready preflight <span class="section-tag tag-readonly" style="font-size: 0.72em; font-weight: 500;">read-only hint</span>
+        <span id="npd-ready-summary" class="badge b-draft" style="margin-left: 0.4rem; font-size: 0.78em;" aria-live="polite">keep-draft</span>
+      </div>
+      <p class="text-muted" style="font-size: 0.8em; line-height: 1.55; margin: 0 0 0.5rem;">
+        本區為 read-only 提示 — 目前匯出仍只會是 <code>status:"draft"</code> + <code>draft:true</code>（最安全；validator 不會多 warning）。
+        若未來想把這份 draft 手動改成 <code>status:"ready"</code>，需要先補下方 <strong>Blocking</strong> 欄位、檢視 <strong>Soft warnings</strong>，並注意 <strong>contentKind 提示</strong>。
+        Admin <strong>不</strong>新增 ready option、<strong>不</strong>切 export 的 <code>status</code>、<strong>不</strong>寫入 <code>content/</code>。實際切 ready 仍由 VS Code 編 frontmatter + <code>npm run validate:content</code> 把關。
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85em;">
+        <div>
+          <strong style="color: #721c24;">Blocking（ready 前必補）：</strong>
+          <span id="npd-ready-blocking" style="color: #721c24;">—</span>
+        </div>
+        <div>
+          <strong style="color: #856404;">Soft warnings（建議補；不擋 ready）：</strong>
+          <span id="npd-ready-warnings" style="color: #856404;">—</span>
+        </div>
+        <div>
+          <strong style="color: #383d41;">contentKind 提示：</strong>
+          <span id="npd-ready-unsupported" style="color: #383d41;">—</span>
+        </div>
+      </div>
+      <p class="text-muted" style="font-size: 0.78em; line-height: 1.5; margin: 0.5rem 0 0;">
+        注意：表單目前沒有 <code>cover</code> / <code>coverAlt</code> / <code>searchDescription</code> 欄位，
+        這些欄位需要在存到 <code>content/{site}/posts/</code> 後用 VS Code 編 frontmatter 補上，才能消掉對應的 blocking / warning。
+      </p>
+    </div>
   </div>
 
   <%# Phase 20260615-night-1-admin-ia-shell-implementation-a：以下為 IA shell 新增之 read-only 區塊
@@ -3306,6 +3343,13 @@
       var COPY_PATH_BTN = document.getElementById('npd-copy-path');
       var COPY_CMD_BTN = document.getElementById('npd-copy-cmd');
       var FLOW_STATUS_EL = document.getElementById('npd-flow-status');
+      // Phase 20260627-admin-ready-preflight-panel-implementation-a:
+      //   Ready preflight panel elements (read-only hint surface).
+      //   Mirror of admin-markdown-export.js analyzeReadyGap (smoke 40-52).
+      var READY_BLOCKING_EL = document.getElementById('npd-ready-blocking');
+      var READY_WARNINGS_EL = document.getElementById('npd-ready-warnings');
+      var READY_UNSUPPORTED_EL = document.getElementById('npd-ready-unsupported');
+      var READY_SUMMARY_EL = document.getElementById('npd-ready-summary');
       if (!SITE_EL || !OUT_EL || !COPY_BTN || !DL_BTN) return;
 
       var VALID_SITES = ['github', 'blogger'];
@@ -3403,6 +3447,103 @@
         if (slugClean === '') missing.push('slug');
         if (dateClean === '') missing.push('date');
         return { ok: missing.length === 0, missing: missing };
+      }
+
+      // Phase 20260627-admin-ready-preflight-panel-implementation-a:
+      //   Client mirror of admin-markdown-export.js analyzeReadyGap helper.
+      //   Smoke 40-52 covers the server-side version; keep the two in sync.
+      //   This block is hint-only — it does NOT change buildMarkdown output
+      //   (which always emits status:"draft" + draft:true; see smoke 24 / 51).
+      var READY_UNSUPPORTED_KINDS = ['book-review', 'download'];
+      var READY_MAX_TITLE_LEN = 60;
+      var READY_MAX_DESCRIPTION_LEN = 160;
+      var READY_FIELD_LABELS = {
+        title: 'title（必填；validator missing-title）',
+        slug: 'slug（kebab-case；validator missing-slug）',
+        date: 'date（YYYY-MM-DD；validator missing-date / invalid-date-format）',
+        description: 'description（SEO 摘要；validator missing-description）',
+        category: 'category（須對齊 categories.json；validator missing-category / unknown-category）',
+        tags: 'tags（至少 1 個；validator empty-tags）',
+        cover: 'cover（封面圖；validator missing-cover）'
+      };
+      var READY_WARNING_LABELS = {
+        searchDescription: 'searchDescription 空（建議補；不影響 baseline）',
+        coverAlt: 'coverAlt 空（建議補；不影響 baseline）',
+        titleLength: 'title 長度 > 60（validator long-title soft warning）',
+        descriptionLength: 'description 長度 > 160（validator long-description soft warning）'
+      };
+      var READY_UNSUPPORTED_REASONS = {
+        'book-review': 'book-review 需 book.title / book.authors / book.publisher / affiliate.* 等欄位；Admin 表單未收集，第一版不建議直接切 ready。',
+        'download': 'download contentKind 需 download.fileUrl + listing 策略；Admin 表單未收集，第一版不建議直接切 ready。'
+      };
+      function analyzeReadyGap(input) {
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var titleRaw = String(safeInput.title == null ? '' : safeInput.title).replace(/^\s+|\s+$/g, '');
+        var slugClean = sanitizeSlug(safeInput.slug);
+        var dateClean = sanitizeDate(safeInput.date);
+        var description = String(safeInput.description == null ? '' : safeInput.description).replace(/^\s+|\s+$/g, '');
+        var category = String(safeInput.category == null ? '' : safeInput.category).replace(/^\s+|\s+$/g, '');
+        var tags = normalizeTags(safeInput.tags);
+        var cover = String(safeInput.cover == null ? '' : safeInput.cover).replace(/^\s+|\s+$/g, '');
+        var searchDescription = String(safeInput.searchDescription == null ? '' : safeInput.searchDescription).replace(/^\s+|\s+$/g, '');
+        var coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).replace(/^\s+|\s+$/g, '');
+        var contentKind = typeof safeInput.contentKind === 'string' ? safeInput.contentKind : '';
+        var blocking = [];
+        if (titleRaw === '') blocking.push({ field: 'title', label: READY_FIELD_LABELS.title });
+        if (slugClean === '') blocking.push({ field: 'slug', label: READY_FIELD_LABELS.slug });
+        if (dateClean === '') blocking.push({ field: 'date', label: READY_FIELD_LABELS.date });
+        if (description === '') blocking.push({ field: 'description', label: READY_FIELD_LABELS.description });
+        if (category === '') blocking.push({ field: 'category', label: READY_FIELD_LABELS.category });
+        if (tags.length === 0) blocking.push({ field: 'tags', label: READY_FIELD_LABELS.tags });
+        if (cover === '') blocking.push({ field: 'cover', label: READY_FIELD_LABELS.cover });
+        var warnings = [];
+        if (searchDescription === '') warnings.push({ field: 'searchDescription', label: READY_WARNING_LABELS.searchDescription });
+        if (coverAlt === '') warnings.push({ field: 'coverAlt', label: READY_WARNING_LABELS.coverAlt });
+        if (titleRaw.length > READY_MAX_TITLE_LEN) warnings.push({ field: 'titleLength', label: READY_WARNING_LABELS.titleLength });
+        if (description.length > READY_MAX_DESCRIPTION_LEN) warnings.push({ field: 'descriptionLength', label: READY_WARNING_LABELS.descriptionLength });
+        var unsupported = [];
+        if (READY_UNSUPPORTED_KINDS.indexOf(contentKind) >= 0) {
+          unsupported.push({ contentKind: contentKind, reason: READY_UNSUPPORTED_REASONS[contentKind] });
+        }
+        var ok = blocking.length === 0 && unsupported.length === 0;
+        return {
+          ok: ok,
+          blocking: blocking,
+          warnings: warnings,
+          unsupported: unsupported,
+          summary: ok ? 'ready-candidate' : 'keep-draft'
+        };
+      }
+      function renderReadyPreflight(a) {
+        if (READY_SUMMARY_EL) {
+          READY_SUMMARY_EL.textContent = a.summary;
+          READY_SUMMARY_EL.className = 'badge ' + (a.ok ? 'b-ready' : 'b-draft');
+        }
+        if (READY_BLOCKING_EL) {
+          if (a.blocking.length === 0) {
+            READY_BLOCKING_EL.textContent = '無';
+            READY_BLOCKING_EL.style.color = '#155724';
+          } else {
+            READY_BLOCKING_EL.textContent = a.blocking.map(function (b) { return b.label; }).join('；');
+            READY_BLOCKING_EL.style.color = '#721c24';
+          }
+        }
+        if (READY_WARNINGS_EL) {
+          if (a.warnings.length === 0) {
+            READY_WARNINGS_EL.textContent = '無';
+            READY_WARNINGS_EL.style.color = '#155724';
+          } else {
+            READY_WARNINGS_EL.textContent = a.warnings.map(function (w) { return w.label; }).join('；');
+            READY_WARNINGS_EL.style.color = '#856404';
+          }
+        }
+        if (READY_UNSUPPORTED_EL) {
+          if (a.unsupported.length === 0) {
+            READY_UNSUPPORTED_EL.textContent = '（目前 contentKind 適用）';
+          } else {
+            READY_UNSUPPORTED_EL.textContent = a.unsupported.map(function (u) { return u.reason; }).join('；');
+          }
+        }
       }
       function missingReason(missing) {
         if (!missing || missing.length === 0) return '';
@@ -3546,6 +3687,11 @@
             STATUS_EL.textContent = '';
           }
         }
+        // Phase 20260627-admin-ready-preflight-panel-implementation-a:
+        //   Recompute the read-only Ready preflight hint on every recompute.
+        //   Even when disable=true (export not gated), this still updates so
+        //   the user can see the consolidated blocking / warning list.
+        renderReadyPreflight(analyzeReadyGap(input));
       }
 
       function fallbackCopy() {

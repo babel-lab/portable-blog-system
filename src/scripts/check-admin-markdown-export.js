@@ -18,6 +18,10 @@ import {
   buildTargetFolder,
   buildTargetPath,
   isExportReady,
+  analyzeReadyGap,
+  READY_UNSUPPORTED_CONTENT_KINDS,
+  READY_MAX_TITLE_LEN,
+  READY_MAX_DESCRIPTION_LEN,
   VALIDATION_COMMAND,
   TARGET_FOLDERS,
   VALID_SITES,
@@ -314,6 +318,147 @@ check('38 isExportReady multi-missing preserves title/slug/date order', () => {
 check('39 isExportReady null / undefined input does not throw', () => {
   assert.deepEqual(isExportReady(null), { ok: false, missing: ['title', 'slug', 'date'] });
   assert.deepEqual(isExportReady(undefined), { ok: false, missing: ['title', 'slug', 'date'] });
+});
+
+// Phase 20260627-admin-ready-preflight-panel-implementation-a:
+//   analyzeReadyGap smoke cases — read-only hint helper. These tests lock the
+//   shape returned to the Admin UI panel + the rules listed in the preanalysis
+//   (docs/20260627-admin-ready-mode-validator-impact-preanalysis.md §10).
+//   The helper MUST NOT mutate buildPostMarkdown output (case 51 locks this).
+const readyHappy = {
+  ...happy,
+  cover: 'https://example.com/cover.jpg',
+  coverAlt: 'cover alt',
+  searchDescription: 'search description',
+};
+
+function fieldNames(arr) {
+  return arr.map((x) => x.field);
+}
+
+check('40 analyzeReadyGap happy → ok=true, summary=ready-candidate', () => {
+  const r = analyzeReadyGap(readyHappy);
+  assert.equal(r.ok, true, 'ok must be true when nothing blocking / unsupported');
+  assert.deepEqual(r.blocking, []);
+  assert.deepEqual(r.warnings, []);
+  assert.deepEqual(r.unsupported, []);
+  assert.equal(r.summary, 'ready-candidate');
+});
+
+check('41 analyzeReadyGap missing description → blocking includes description', () => {
+  const r = analyzeReadyGap({ ...readyHappy, description: '' });
+  assert.equal(r.ok, false);
+  assert.ok(fieldNames(r.blocking).includes('description'));
+  assert.equal(r.summary, 'keep-draft');
+});
+
+check('42 analyzeReadyGap missing category → blocking includes category', () => {
+  const r = analyzeReadyGap({ ...readyHappy, category: '' });
+  assert.equal(r.ok, false);
+  assert.ok(fieldNames(r.blocking).includes('category'));
+});
+
+check('43 analyzeReadyGap empty tags → blocking includes tags', () => {
+  const r1 = analyzeReadyGap({ ...readyHappy, tags: '' });
+  const r2 = analyzeReadyGap({ ...readyHappy, tags: [] });
+  const r3 = analyzeReadyGap({ ...readyHappy, tags: '   ,  , ' });
+  assert.ok(fieldNames(r1.blocking).includes('tags'));
+  assert.ok(fieldNames(r2.blocking).includes('tags'));
+  assert.ok(fieldNames(r3.blocking).includes('tags'));
+});
+
+check('44 analyzeReadyGap missing cover → blocking includes cover', () => {
+  const r = analyzeReadyGap({ ...readyHappy, cover: '' });
+  assert.equal(r.ok, false);
+  assert.ok(fieldNames(r.blocking).includes('cover'));
+});
+
+check('45 analyzeReadyGap empty searchDescription → soft warnings (not blocking)', () => {
+  const r = analyzeReadyGap({ ...readyHappy, searchDescription: '' });
+  assert.ok(fieldNames(r.warnings).includes('searchDescription'));
+  assert.equal(fieldNames(r.blocking).includes('searchDescription'), false);
+  // searchDescription empty alone is warning-only → ok must still be true
+  assert.equal(r.ok, true);
+  assert.equal(r.summary, 'ready-candidate');
+});
+
+check('46 analyzeReadyGap unsupported contentKind download', () => {
+  const r = analyzeReadyGap({ ...readyHappy, contentKind: 'download' });
+  assert.equal(r.ok, false, 'unsupported contentKind must flip ok=false');
+  assert.equal(r.unsupported.length, 1);
+  assert.equal(r.unsupported[0].contentKind, 'download');
+  assert.equal(typeof r.unsupported[0].reason, 'string');
+  assert.ok(r.unsupported[0].reason.length > 0);
+  assert.equal(r.summary, 'keep-draft');
+});
+
+check('47 analyzeReadyGap unsupported contentKind book-review', () => {
+  const r = analyzeReadyGap({ ...readyHappy, contentKind: 'book-review' });
+  assert.equal(r.ok, false);
+  assert.equal(r.unsupported.length, 1);
+  assert.equal(r.unsupported[0].contentKind, 'book-review');
+});
+
+check('48 analyzeReadyGap null / undefined → no throw; all required fields blocking', () => {
+  const r1 = analyzeReadyGap(null);
+  const r2 = analyzeReadyGap(undefined);
+  for (const r of [r1, r2]) {
+    assert.equal(r.ok, false);
+    assert.equal(r.summary, 'keep-draft');
+    const fields = fieldNames(r.blocking);
+    assert.ok(fields.includes('title'));
+    assert.ok(fields.includes('slug'));
+    assert.ok(fields.includes('date'));
+    assert.ok(fields.includes('description'));
+    assert.ok(fields.includes('category'));
+    assert.ok(fields.includes('tags'));
+    assert.ok(fields.includes('cover'));
+    assert.deepEqual(r.unsupported, []);
+  }
+});
+
+check('49 analyzeReadyGap long title → soft warning titleLength', () => {
+  const longTitle = 'x'.repeat(READY_MAX_TITLE_LEN + 1);
+  const r = analyzeReadyGap({ ...readyHappy, title: longTitle });
+  assert.ok(fieldNames(r.warnings).includes('titleLength'));
+  // long title alone is warning-only; blocking should not include title (it's non-empty)
+  assert.equal(fieldNames(r.blocking).includes('title'), false);
+});
+
+check('50 analyzeReadyGap long description → soft warning descriptionLength', () => {
+  const longDesc = 'x'.repeat(READY_MAX_DESCRIPTION_LEN + 1);
+  const r = analyzeReadyGap({ ...readyHappy, description: longDesc });
+  assert.ok(fieldNames(r.warnings).includes('descriptionLength'));
+  assert.equal(fieldNames(r.blocking).includes('description'), false);
+});
+
+check('51 analyzeReadyGap does not alter buildPostMarkdown output (status stays draft)', () => {
+  // Whatever analyzeReadyGap reports, the export markdown MUST still be
+  // status:"draft" + draft:true (zero-warning safe path).
+  const inputs = [
+    readyHappy,
+    { ...readyHappy, contentKind: 'download' },
+    { ...readyHappy, contentKind: 'book-review' },
+    { ...readyHappy, description: '', category: '', tags: '', cover: '' },
+  ];
+  for (const inp of inputs) {
+    analyzeReadyGap(inp);
+    const md = buildPostMarkdown(inp);
+    const d = matter(md).data;
+    assert.equal(d.status, 'draft', 'status must remain draft regardless of preflight');
+    assert.equal(d.draft, true, 'draft must remain true regardless of preflight');
+  }
+});
+
+check('52 READY_UNSUPPORTED_CONTENT_KINDS enum exposed; tech-note + post not unsupported', () => {
+  assert.ok(Array.isArray(READY_UNSUPPORTED_CONTENT_KINDS));
+  assert.ok(READY_UNSUPPORTED_CONTENT_KINDS.includes('download'));
+  assert.ok(READY_UNSUPPORTED_CONTENT_KINDS.includes('book-review'));
+  assert.equal(READY_UNSUPPORTED_CONTENT_KINDS.includes('tech-note'), false);
+  assert.equal(READY_UNSUPPORTED_CONTENT_KINDS.includes('post'), false);
+  // tech-note happy path should have empty unsupported
+  const r = analyzeReadyGap({ ...readyHappy, contentKind: 'tech-note' });
+  assert.deepEqual(r.unsupported, []);
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);

@@ -148,6 +148,108 @@ export function isExportReady(input) {
   return { ok: missing.length === 0, missing };
 }
 
+// Phase 20260627-admin-ready-preflight-panel-implementation-a:
+//   analyzeReadyGap is a read-only hint for the Admin UI Ready preflight panel.
+//   It reports what would still be missing / risky if this draft were later
+//   manually flipped to status: ready, but does NOT change export output.
+//
+//   IMPORTANT — safety invariants:
+//   - Pure: no fs / fetch / IO; never throws on null / undefined input.
+//   - Read-only: caller must not feed result back into buildPostMarkdown()
+//     (which always emits status:"draft" + draft:true, per smoke 24).
+//   - No ready option introduced; this helper does not influence buildPostMarkdown.
+//
+//   READY required fields mirror validate-content.js READY_STATUS gate rules
+//   most likely to bump baseline if user flipped status:
+//     missing-description / missing-category / missing-cover / empty-tags.
+//   (title / slug / date are already gated by isExportReady; they are repeated
+//   here so the panel can show one consolidated blocking list.)
+//
+//   Soft warnings mirror non-blocking SEO heuristics (long-* + empty
+//   searchDescription / coverAlt).
+//
+//   Unsupported contentKinds = book-review / download — these require entire
+//   sub-schemas (book.*, download.*, affiliate.*) that the Admin form does not
+//   collect; the preanalysis (§8) notes flipping them to ready would trigger
+//   5–15 extra warnings.
+export const READY_UNSUPPORTED_CONTENT_KINDS = ['book-review', 'download'];
+export const READY_MAX_TITLE_LEN = 60;
+export const READY_MAX_DESCRIPTION_LEN = 160;
+
+const READY_FIELD_LABELS = {
+  title: 'title（必填；validator missing-title）',
+  slug: 'slug（kebab-case；validator missing-slug）',
+  date: 'date（YYYY-MM-DD；validator missing-date / invalid-date-format）',
+  description: 'description（SEO 摘要；validator missing-description）',
+  category: 'category（須對齊 categories.json；validator missing-category / unknown-category）',
+  tags: 'tags（至少 1 個；validator empty-tags）',
+  cover: 'cover（封面圖；validator missing-cover）',
+};
+
+const READY_WARNING_LABELS = {
+  searchDescription: 'searchDescription 空（建議補；不影響 baseline）',
+  coverAlt: 'coverAlt 空（建議補；不影響 baseline）',
+  titleLength: 'title 長度 > 60（validator long-title soft warning）',
+  descriptionLength: 'description 長度 > 160（validator long-description soft warning）',
+};
+
+const READY_UNSUPPORTED_REASONS = {
+  'book-review':
+    'book-review 需 book.title / book.authors / book.publisher / affiliate.* 等欄位；Admin 表單未收集，第一版不建議直接切 ready。',
+  download:
+    'download contentKind 需 download.fileUrl + listing 策略；Admin 表單未收集，第一版不建議直接切 ready。',
+};
+
+export function analyzeReadyGap(input) {
+  const safeInput = input && typeof input === 'object' ? input : {};
+  const titleRaw = String(safeInput.title == null ? '' : safeInput.title).trim();
+  const slugClean = sanitizeSlug(safeInput.slug);
+  const dateClean = sanitizeDate(safeInput.date);
+  const description = String(safeInput.description == null ? '' : safeInput.description).trim();
+  const category = String(safeInput.category == null ? '' : safeInput.category).trim();
+  const tags = normalizeTagsInput(safeInput.tags);
+  const cover = String(safeInput.cover == null ? '' : safeInput.cover).trim();
+  const searchDescription = String(
+    safeInput.searchDescription == null ? '' : safeInput.searchDescription
+  ).trim();
+  const coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).trim();
+  const contentKind = typeof safeInput.contentKind === 'string' ? safeInput.contentKind : '';
+
+  const blocking = [];
+  if (titleRaw === '') blocking.push({ field: 'title', label: READY_FIELD_LABELS.title });
+  if (slugClean === '') blocking.push({ field: 'slug', label: READY_FIELD_LABELS.slug });
+  if (dateClean === '') blocking.push({ field: 'date', label: READY_FIELD_LABELS.date });
+  if (description === '') {
+    blocking.push({ field: 'description', label: READY_FIELD_LABELS.description });
+  }
+  if (category === '') blocking.push({ field: 'category', label: READY_FIELD_LABELS.category });
+  if (tags.length === 0) blocking.push({ field: 'tags', label: READY_FIELD_LABELS.tags });
+  if (cover === '') blocking.push({ field: 'cover', label: READY_FIELD_LABELS.cover });
+
+  const warnings = [];
+  if (searchDescription === '') {
+    warnings.push({ field: 'searchDescription', label: READY_WARNING_LABELS.searchDescription });
+  }
+  if (coverAlt === '') {
+    warnings.push({ field: 'coverAlt', label: READY_WARNING_LABELS.coverAlt });
+  }
+  if (titleRaw.length > READY_MAX_TITLE_LEN) {
+    warnings.push({ field: 'titleLength', label: READY_WARNING_LABELS.titleLength });
+  }
+  if (description.length > READY_MAX_DESCRIPTION_LEN) {
+    warnings.push({ field: 'descriptionLength', label: READY_WARNING_LABELS.descriptionLength });
+  }
+
+  const unsupported = [];
+  if (READY_UNSUPPORTED_CONTENT_KINDS.includes(contentKind)) {
+    unsupported.push({ contentKind, reason: READY_UNSUPPORTED_REASONS[contentKind] });
+  }
+
+  const ok = blocking.length === 0 && unsupported.length === 0;
+  const summary = ok ? 'ready-candidate' : 'keep-draft';
+  return { ok, blocking, warnings, unsupported, summary };
+}
+
 export function buildPostMarkdown(input) {
   const safeInput = input && typeof input === 'object' ? input : {};
   const site = pickEnum(safeInput.site, VALID_SITES, 'github');
