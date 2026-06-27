@@ -19,6 +19,7 @@ import {
   buildTargetPath,
   isExportReady,
   analyzeReadyGap,
+  analyzeRegistryHints,
   READY_UNSUPPORTED_CONTENT_KINDS,
   READY_MAX_TITLE_LEN,
   READY_MAX_DESCRIPTION_LEN,
@@ -557,6 +558,191 @@ check('62 null / undefined SEO / cover fields stay safe + emit ""', () => {
     assert.equal(d.searchDescription, '');
     assert.equal(d.cover, '');
     assert.equal(d.coverAlt, '');
+    assert.equal(d.status, 'draft');
+    assert.equal(d.draft, true);
+  }
+});
+
+// Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+//   analyzeRegistryHints smoke cases — registry alignment hint helper.
+//   Lock shape consumed by Admin UI Ready preflight panel + mirror rules from
+//   validate-content.js (unknown-category / category-site-mismatch /
+//   unknown-tag / tag-site-mismatch). Must NOT mutate buildPostMarkdown output
+//   (case 75 locks this), MUST NOT throw on missing / empty registries, and
+//   MUST treat entry.site=[] as "no site constraint" (case 73).
+const REGS = {
+  categories: [
+    { id: 'tech-note', slug: 'tech-note', site: ['github', 'blogger'] },
+    { id: 'book-review', slug: 'book-review', site: ['blogger'] },
+  ],
+  tags: [
+    { id: 'github', slug: 'github', site: ['github'] },
+    { id: 'vite', slug: 'vite', site: ['github'] },
+    { id: 'book', slug: 'book', site: ['blogger'] },
+  ],
+};
+
+check('63 analyzeRegistryHints known category + known tags → no hints', () => {
+  const r = analyzeRegistryHints(
+    { site: 'github', category: 'tech-note', tags: 'github, vite' },
+    REGS
+  );
+  assert.equal(r.hasHints, false);
+  assert.deepEqual(r.hints, []);
+});
+
+check('64 analyzeRegistryHints unknown category → unknown-category hint', () => {
+  const r = analyzeRegistryHints(
+    { site: 'github', category: 'made-up-cat', tags: '' },
+    REGS
+  );
+  assert.equal(r.hasHints, true);
+  assert.equal(r.hints.length, 1);
+  assert.equal(r.hints[0].kind, 'unknown-category');
+  assert.equal(r.hints[0].field, 'category');
+  assert.equal(r.hints[0].value, 'made-up-cat');
+  assert.equal(typeof r.hints[0].label, 'string');
+});
+
+check('65 analyzeRegistryHints category-site-mismatch hint', () => {
+  // book-review allowed sites=[blogger]; site=github → mismatch
+  const r = analyzeRegistryHints(
+    { site: 'github', category: 'book-review', tags: '' },
+    REGS
+  );
+  assert.equal(r.hasHints, true);
+  const kinds = r.hints.map((h) => h.kind);
+  assert.ok(kinds.includes('category-site-mismatch'));
+  const hint = r.hints.find((h) => h.kind === 'category-site-mismatch');
+  assert.deepEqual(hint.siteAllowed, ['blogger']);
+  assert.equal(hint.siteCurrent, 'github');
+});
+
+check('66 analyzeRegistryHints unknown tag → unknown-tag hint', () => {
+  const r = analyzeRegistryHints(
+    { site: 'github', category: '', tags: 'made-up-tag' },
+    REGS
+  );
+  assert.equal(r.hasHints, true);
+  assert.equal(r.hints[0].kind, 'unknown-tag');
+  assert.equal(r.hints[0].field, 'tags');
+  assert.equal(r.hints[0].value, 'made-up-tag');
+});
+
+check('67 analyzeRegistryHints tag-site-mismatch hint', () => {
+  // book allowed sites=[blogger]; site=github → mismatch
+  const r = analyzeRegistryHints(
+    { site: 'github', category: '', tags: 'book' },
+    REGS
+  );
+  const kinds = r.hints.map((h) => h.kind);
+  assert.ok(kinds.includes('tag-site-mismatch'));
+});
+
+check('68 analyzeRegistryHints empty registries → no hints, no throw', () => {
+  const r1 = analyzeRegistryHints(
+    { site: 'github', category: 'whatever', tags: 'whatever' },
+    {}
+  );
+  const r2 = analyzeRegistryHints(
+    { site: 'github', category: 'whatever', tags: 'whatever' }
+  );
+  const r3 = analyzeRegistryHints(
+    { site: 'github', category: 'whatever', tags: 'whatever' },
+    null
+  );
+  const r4 = analyzeRegistryHints(
+    { site: 'github', category: 'whatever', tags: 'whatever' },
+    { categories: [], tags: [] }
+  );
+  for (const r of [r1, r2, r3, r4]) {
+    assert.deepEqual(r.hints, []);
+    assert.equal(r.hasHints, false);
+  }
+});
+
+check('69 analyzeRegistryHints null / undefined input safe', () => {
+  assert.doesNotThrow(() => analyzeRegistryHints(null, REGS));
+  assert.doesNotThrow(() => analyzeRegistryHints(undefined, REGS));
+  assert.doesNotThrow(() => analyzeRegistryHints(null, null));
+  const r1 = analyzeRegistryHints(null, REGS);
+  assert.deepEqual(r1.hints, []);
+  assert.equal(r1.hasHints, false);
+});
+
+check('70 analyzeRegistryHints matches by id OR slug', () => {
+  const localRegs = {
+    tags: [
+      { id: 'tag-id-only', slug: '', site: [] },
+      { id: '', slug: 'slug-only', site: [] },
+    ],
+  };
+  const r1 = analyzeRegistryHints(
+    { site: 'github', category: '', tags: 'tag-id-only' },
+    localRegs
+  );
+  const r2 = analyzeRegistryHints(
+    { site: 'github', category: '', tags: 'slug-only' },
+    localRegs
+  );
+  assert.equal(r1.hasHints, false);
+  assert.equal(r2.hasHints, false);
+});
+
+check('71 analyzeRegistryHints site-mismatch only when entry.site non-empty', () => {
+  const localRegs = {
+    tags: [{ id: 'wildcard', slug: 'wildcard', site: [] }],
+  };
+  const r = analyzeRegistryHints(
+    { site: 'github', category: '', tags: 'wildcard' },
+    localRegs
+  );
+  // entry.site=[] interpreted as "no constraint" → no mismatch hint
+  assert.equal(r.hasHints, false);
+});
+
+check('72 analyzeRegistryHints multiple unknown tags accumulate', () => {
+  const r = analyzeRegistryHints(
+    { site: 'github', category: '', tags: 'a, b, c' },
+    REGS
+  );
+  assert.equal(r.hints.length, 3);
+  for (const h of r.hints) {
+    assert.equal(h.kind, 'unknown-tag');
+    assert.equal(h.field, 'tags');
+  }
+});
+
+check('73 analyzeRegistryHints empty category + empty tags → no hints', () => {
+  const r = analyzeRegistryHints(
+    { site: 'github', category: '', tags: '' },
+    REGS
+  );
+  assert.equal(r.hasHints, false);
+});
+
+check('74 analyzeRegistryHints invalid site falls back to github for mismatch check', () => {
+  // pickEnum fallback: site='twitter' → 'github'
+  // book (allowed=[blogger]) → mismatch against github
+  const r = analyzeRegistryHints(
+    { site: 'twitter', category: '', tags: 'book' },
+    REGS
+  );
+  const hint = r.hints.find((h) => h.kind === 'tag-site-mismatch');
+  assert.ok(hint);
+  assert.equal(hint.siteCurrent, 'github');
+});
+
+check('75 analyzeRegistryHints does not alter buildPostMarkdown output', () => {
+  const inputs = [
+    { ...happy, category: 'unknown-cat', tags: 'unknown-tag1, unknown-tag2' },
+    { ...happy, site: 'blogger', category: 'tech-note', tags: 'github' },
+    { ...happy, category: 'book-review' },
+  ];
+  for (const inp of inputs) {
+    analyzeRegistryHints(inp, REGS);
+    const md = buildPostMarkdown(inp);
+    const d = matter(md).data;
     assert.equal(d.status, 'draft');
     assert.equal(d.draft, true);
   }

@@ -1878,8 +1878,25 @@
         <tr>
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-tags">tags</label></td>
           <td style="padding: 0.25rem 0.5rem;">
-            <input type="text" id="npd-tags" placeholder="comma-separated；空白會 trim、重複會去除" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
-            <span class="text-muted" style="font-size: 0.82em;">→ 例：<code>github, vite, static-site</code>；建議使用 <code>tags.json</code> 既有 id</span>
+            <%# Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+                datalist hint —— 從 tagUsage.perTag 取得 registry-defined tag ids（含 unused），
+                以瀏覽器原生 datalist 提供 autocomplete 提示。新增 tag 仍允許 free text；
+                不在 registry 的 tag 會在 Ready preflight 顯示 unknown-tag warning。
+                不使用 picker component / 不引入新 dependency。 -%>
+            <input type="text" id="npd-tags" list="npd-tags-options" placeholder="comma-separated；空白會 trim、重複會去除" style="width: 100%; padding: 0.25rem; box-sizing: border-box;" autocomplete="off">
+            <datalist id="npd-tags-options">
+              <%
+                var npdRegTags = (typeof tagUsage === 'object' && tagUsage && Array.isArray(tagUsage.perTag)) ? tagUsage.perTag : [];
+                npdRegTags.forEach(function(t) {
+                  var tid = typeof t.id === 'string' && t.id ? t.id : (typeof t.slug === 'string' ? t.slug : '');
+                  if (tid === '') return;
+                  var tsites = Array.isArray(t.site) ? t.site.join('/') : '';
+                  var tlabel = tsites ? (tid + ' [' + tsites + ']') : tid;
+              %>
+                <option value="<%= tid %>" label="<%= tlabel %>"></option>
+              <% }); %>
+            </datalist>
+            <span class="text-muted" style="font-size: 0.82em;">→ 例：<code>github, vite, static-site</code>；datalist 自動列出 <code>tags.json</code> 既有 id，不在清單內仍可輸入（Ready preflight 會顯示 unknown-tag warning）</span>
           </td>
         </tr>
         <tr>
@@ -2031,10 +2048,19 @@
           <strong style="color: #383d41;">contentKind 提示：</strong>
           <span id="npd-ready-unsupported" style="color: #383d41;">—</span>
         </div>
+        <%# Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+            registry hint row — mirror of analyzeRegistryHints(input, registries).
+            read-only：列出 category / tag 是否對齊 categories.json / tags.json + site scope；
+            不擋 export；不自動修改文章 / registry；validator 仍為 ground truth。 -%>
+        <div>
+          <strong style="color: #1f4e79;">registry 對齊提示：</strong>
+          <span id="npd-ready-registry-hints" style="color: #1f4e79;">—</span>
+        </div>
       </div>
       <p class="text-muted" style="font-size: 0.78em; line-height: 1.5; margin: 0.5rem 0 0;">
         提示：上方表單已支援 <code>searchDescription</code> / <code>cover</code> / <code>coverAlt</code>（optional），填寫後即時消掉對應 blocking / warning。
         其它欄位（如 <code>book.*</code> / <code>download.*</code> / <code>affiliate.*</code>）仍需存到 <code>content/{site}/posts/</code> 後用 VS Code 編 frontmatter 補上。
+        registry 對齊提示僅做 read-only 對照：unknown category / unknown tag / site-mismatch 皆 <strong>不擋 draft export</strong>，仍由 <code>npm run validate:content</code> 為 ground truth。
       </p>
     </div>
   </div>
@@ -3351,6 +3377,18 @@
       - Download uses Blob + URL.createObjectURL + a.click (no fetch, no fs).
       - Copy uses navigator.clipboard.writeText with execCommand('copy') fallback (mirror commerce snippet).
       - 不啟動 admin-write CLI / Apply path；產出 .md 文字由 Dean 手動存到 content/{site}/posts/。 -%>
+  <%# Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+      Inject registry snapshot for the inline client mirror of analyzeRegistryHints.
+      DATA SOURCE = sys.categories.list (server-derived) + tagUsage.perTag (registry-defined tags).
+      Read-only / serialized once on render; no fetch / no refresh / no write path.
+      JSON-encoded via JSON.stringify so no inline JS escaping concerns. -%>
+  <script>
+    window.NPD_REGISTRY = (function () {
+      var cats = <%- JSON.stringify(((sys && sys.categories && Array.isArray(sys.categories.list)) ? sys.categories.list : []).map(function(c) { return { id: c.id || '', slug: c.slug || '', site: Array.isArray(c.site) ? c.site : [] }; })) %>;
+      var tags = <%- JSON.stringify(((typeof tagUsage === 'object' && tagUsage && Array.isArray(tagUsage.perTag)) ? tagUsage.perTag : []).map(function(t) { return { id: t.id || '', slug: t.slug || '', site: Array.isArray(t.site) ? t.site : [] }; })) %>;
+      return { categories: cats, tags: tags };
+    })();
+  </script>
   <script>
     (function () {
       var SITE_EL = document.getElementById('npd-site');
@@ -3390,6 +3428,13 @@
       var READY_WARNINGS_EL = document.getElementById('npd-ready-warnings');
       var READY_UNSUPPORTED_EL = document.getElementById('npd-ready-unsupported');
       var READY_SUMMARY_EL = document.getElementById('npd-ready-summary');
+      // Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+      //   Registry hints row + injected registry snapshot. Mirror of
+      //   admin-markdown-export.js analyzeRegistryHints (smoke 63-75).
+      var READY_REGISTRY_EL = document.getElementById('npd-ready-registry-hints');
+      var REGISTRY_SNAPSHOT = (window.NPD_REGISTRY && typeof window.NPD_REGISTRY === 'object')
+        ? window.NPD_REGISTRY
+        : { categories: [], tags: [] };
       if (!SITE_EL || !OUT_EL || !COPY_BTN || !DL_BTN) return;
 
       var VALID_SITES = ['github', 'blogger'];
@@ -3553,6 +3598,84 @@
           unsupported: unsupported,
           summary: ok ? 'ready-candidate' : 'keep-draft'
         };
+      }
+      // Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+      //   Client mirror of admin-markdown-export.js analyzeRegistryHints.
+      //   Smoke 63–75 covers the server-side version; keep the two in sync.
+      //   Hint-only — does NOT change buildMarkdown output (status stays draft).
+      function findRegistryEntry(arr, key) {
+        if (!Array.isArray(arr) || typeof key !== 'string' || key === '') return null;
+        for (var i = 0; i < arr.length; i++) {
+          var e = arr[i];
+          if (!e || typeof e !== 'object') continue;
+          if (typeof e.id === 'string' && e.id === key) return e;
+          if (typeof e.slug === 'string' && e.slug === key) return e;
+        }
+        return null;
+      }
+      function analyzeRegistryHints(input, registries) {
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var safeReg = registries && typeof registries === 'object' ? registries : {};
+        var cats = Array.isArray(safeReg.categories) ? safeReg.categories : [];
+        var tagsReg = Array.isArray(safeReg.tags) ? safeReg.tags : [];
+        var site = pickEnum(safeInput.site, VALID_SITES, 'github');
+        var category = String(safeInput.category == null ? '' : safeInput.category).replace(/^\s+|\s+$/g, '');
+        var tagsList = normalizeTags(safeInput.tags);
+        var hints = [];
+        if (cats.length > 0 && category !== '') {
+          var cEntry = findRegistryEntry(cats, category);
+          if (!cEntry) {
+            hints.push({
+              kind: 'unknown-category',
+              field: 'category',
+              value: category,
+              label: 'category "' + category + '" 不在 categories.json — validator unknown-category warning'
+            });
+          } else if (Array.isArray(cEntry.site) && cEntry.site.length > 0 && cEntry.site.indexOf(site) < 0) {
+            hints.push({
+              kind: 'category-site-mismatch',
+              field: 'category',
+              value: category,
+              siteAllowed: cEntry.site.slice(0),
+              siteCurrent: site,
+              label: 'category "' + category + '" allowed sites=[' + cEntry.site.join(',') + ']，但目前 site=' + site
+            });
+          }
+        }
+        if (tagsReg.length > 0 && tagsList.length > 0) {
+          for (var i = 0; i < tagsList.length; i++) {
+            var t = tagsList[i];
+            var tEntry = findRegistryEntry(tagsReg, t);
+            if (!tEntry) {
+              hints.push({
+                kind: 'unknown-tag',
+                field: 'tags',
+                value: t,
+                label: 'tag "' + t + '" 不在 tags.json — validator unknown-tag warning'
+              });
+            } else if (Array.isArray(tEntry.site) && tEntry.site.length > 0 && tEntry.site.indexOf(site) < 0) {
+              hints.push({
+                kind: 'tag-site-mismatch',
+                field: 'tags',
+                value: t,
+                siteAllowed: tEntry.site.slice(0),
+                siteCurrent: site,
+                label: 'tag "' + t + '" allowed sites=[' + tEntry.site.join(',') + ']，但目前 site=' + site
+              });
+            }
+          }
+        }
+        return { hints: hints, hasHints: hints.length > 0 };
+      }
+      function renderRegistryHints(rh) {
+        if (!READY_REGISTRY_EL) return;
+        if (!rh || !Array.isArray(rh.hints) || rh.hints.length === 0) {
+          READY_REGISTRY_EL.textContent = '無（category / tags 皆對齊 registry，或 registry 空）';
+          READY_REGISTRY_EL.style.color = '#155724';
+          return;
+        }
+        READY_REGISTRY_EL.textContent = rh.hints.map(function (h) { return h.label; }).join('；');
+        READY_REGISTRY_EL.style.color = '#1f4e79';
       }
       function renderReadyPreflight(a) {
         if (READY_SUMMARY_EL) {
@@ -3743,6 +3866,9 @@
         //   Even when disable=true (export not gated), this still updates so
         //   the user can see the consolidated blocking / warning list.
         renderReadyPreflight(analyzeReadyGap(input));
+        // Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+        //   Registry alignment hints (read-only; never gates export).
+        renderRegistryHints(analyzeRegistryHints(input, REGISTRY_SNAPSHOT));
       }
 
       function fallbackCopy() {

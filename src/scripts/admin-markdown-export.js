@@ -200,6 +200,114 @@ const READY_UNSUPPORTED_REASONS = {
     'download contentKind 需 download.fileUrl + listing 策略；Admin 表單未收集，第一版不建議直接切 ready。',
 };
 
+// Phase 20260627-admin-category-tag-registry-hints-implementation-a:
+//   analyzeRegistryHints — read-only registry alignment hint for the Admin UI
+//   Ready preflight panel. Mirrors validate-content.js unknown-category /
+//   category-site-mismatch / unknown-tag / tag-site-mismatch rules but does
+//   NOT block export (Admin export always emits status:"draft" + draft:true).
+//
+//   IMPORTANT — safety invariants:
+//   - Pure: no fs / fetch / IO; never throws on null / undefined input.
+//   - registries arg is optional; missing / empty registries → empty hints
+//     (caller may pass `undefined` / `null` / `{}` without crashing).
+//   - Read-only: never mutates buildPostMarkdown output (status stays draft).
+//   - No auto-fix; never suggests adding tags to tags.json (CLAUDE.md §3 red lines).
+//
+//   Output shape: { hints: [...], hasHints: boolean }
+//     where each hint = { kind, field, value, label[, siteAllowed, siteCurrent] }
+//
+//   kind values:
+//     'unknown-category'        — category not found by id-or-slug in categories.json
+//     'category-site-mismatch'  — category exists but entry.site[] excludes current site
+//     'unknown-tag'             — tag not found by id-or-slug in tags.json
+//     'tag-site-mismatch'       — tag exists but entry.site[] excludes current site
+//
+//   Site comparison rules:
+//     - entry.site must be a non-empty array to trigger mismatch check
+//       (entry.site = [] is interpreted as "no constraint" → no mismatch)
+//     - input.site is normalized via pickEnum so unsupported values fall back to 'github'
+export function analyzeRegistryHints(input, registries) {
+  const safeInput = input && typeof input === 'object' ? input : {};
+  const safeReg = registries && typeof registries === 'object' ? registries : {};
+  const cats = Array.isArray(safeReg.categories) ? safeReg.categories : [];
+  const tagsReg = Array.isArray(safeReg.tags) ? safeReg.tags : [];
+
+  const site = pickEnum(safeInput.site, VALID_SITES, 'github');
+  const category = String(safeInput.category == null ? '' : safeInput.category).trim();
+  const tagsList = normalizeTagsInput(safeInput.tags);
+
+  const hints = [];
+
+  if (cats.length > 0 && category !== '') {
+    const entry = findRegistryEntry(cats, category);
+    if (!entry) {
+      hints.push({
+        kind: 'unknown-category',
+        field: 'category',
+        value: category,
+        label:
+          'category "' + category + '" 不在 categories.json — validator unknown-category warning',
+      });
+    } else if (
+      Array.isArray(entry.site) &&
+      entry.site.length > 0 &&
+      !entry.site.includes(site)
+    ) {
+      hints.push({
+        kind: 'category-site-mismatch',
+        field: 'category',
+        value: category,
+        siteAllowed: entry.site.slice(0),
+        siteCurrent: site,
+        label:
+          'category "' + category + '" allowed sites=[' +
+          entry.site.join(',') + ']，但目前 site=' + site,
+      });
+    }
+  }
+
+  if (tagsReg.length > 0 && tagsList.length > 0) {
+    for (const t of tagsList) {
+      const entry = findRegistryEntry(tagsReg, t);
+      if (!entry) {
+        hints.push({
+          kind: 'unknown-tag',
+          field: 'tags',
+          value: t,
+          label: 'tag "' + t + '" 不在 tags.json — validator unknown-tag warning',
+        });
+      } else if (
+        Array.isArray(entry.site) &&
+        entry.site.length > 0 &&
+        !entry.site.includes(site)
+      ) {
+        hints.push({
+          kind: 'tag-site-mismatch',
+          field: 'tags',
+          value: t,
+          siteAllowed: entry.site.slice(0),
+          siteCurrent: site,
+          label:
+            'tag "' + t + '" allowed sites=[' +
+            entry.site.join(',') + ']，但目前 site=' + site,
+        });
+      }
+    }
+  }
+
+  return { hints, hasHints: hints.length > 0 };
+}
+
+function findRegistryEntry(arr, key) {
+  if (!Array.isArray(arr) || typeof key !== 'string' || key === '') return null;
+  for (const e of arr) {
+    if (!e || typeof e !== 'object') continue;
+    if (typeof e.id === 'string' && e.id === key) return e;
+    if (typeof e.slug === 'string' && e.slug === key) return e;
+  }
+  return null;
+}
+
 export function analyzeReadyGap(input) {
   const safeInput = input && typeof input === 'object' ? input : {};
   const titleRaw = String(safeInput.title == null ? '' : safeInput.title).trim();
