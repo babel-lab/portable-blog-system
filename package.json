@@ -37,6 +37,7 @@
     "check:admin-governance-aggregation": "node src/scripts/check-admin-governance-aggregation.js",
     "check:validation-report": "node src/scripts/check-validation-report.js",
     "check:admin-validation-consume": "node src/scripts/check-admin-validation-consume.js",
+    "check:admin-markdown-export": "node src/scripts/check-admin-markdown-export.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },

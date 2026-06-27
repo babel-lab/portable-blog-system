@@ -195,6 +195,7 @@
     <ul>
       <li><a href="#dashboard">Dashboard</a></li>
       <li><a href="#posts">Posts</a></li>
+      <li><a href="#new-post-draft">New post draft</a></li>
       <li><a href="#categories">Categories</a></li>
       <li><a href="#tags">Tags</a></li>
       <li><a href="#blogger-export">Blogger Export</a></li>
@@ -1779,6 +1780,142 @@
     <strong>規格：</strong>詳見 <code>docs/admin-1-readonly-preflight.md</code> / <code>docs/admin-mvp-pre-analysis.md</code>。
   </div>
 
+  <%# Phase 20260627-admin-markdown-draft-export-implementation-a:
+      New post draft (Markdown export, authoring helper)
+      - 純 client-side：無 fetch / XHR / fs write / form submit / Apply / safeWrite caller / middleware ping
+      - server-side helper: src/scripts/admin-markdown-export.js（純函式；被 check:admin-markdown-export smoke 鎖）
+      - client JS 為 helper 邏輯之鏡像；若改 helper 請同步本 inline script（smoke 覆蓋 server 端）
+      - 永遠輸出 status:"draft" + draft:true（最安全 zero-warning 路徑；對應 validate-content.js READY_STATUS rules 不觸發必填）
+      - 不寫 repo / 不導入 DB / 不導入 login；產出 .md 文字由 Dean 手動存到 content/{site}/posts/
+  -%>
+  <h2 id="new-post-draft" style="margin: 1.5rem 0 0.5rem; font-size: 1.1rem; color: #1f2d3d; border-bottom: 1px solid #ddd; padding-bottom: 0.35rem;">
+    New post draft <span class="section-tag tag-readonly">export-only</span>
+  </h2>
+  <p class="section-lede" style="color: #555; font-size: 0.88em; margin: 0 0 0.5rem;">
+    Authoring helper：填欄位 → 自動產生符合 <code>content/{site}/posts/*.md</code> schema 的 markdown 文字，可
+    <strong>Copy</strong> 或 <strong>Download .md</strong>。產出永遠是 <code>status:"draft"</code>（最安全；validator 不會多 warning）。
+    取得 .md 後請手動存到 <code>content/{site}/posts/</code>，再以 VS Code 編修為 ready/published。
+  </p>
+  <p style="background: #fff8e1; border: 1px solid #f0d264; padding: 0.5rem 0.75rem; border-radius: 3px; margin: 0 0 0.75rem; font-size: 0.85em; color: #856404;">
+    🔒 Authoring helper — no fs write · no fetch · no Apply · copy / download only. Repo 寫入仍只由 VS Code / terminal-only CLI 進行。
+  </p>
+
+  <div class="new-post-draft-block" style="background: #f4f7fb; border: 1px solid #c5d6e8; padding: 0.75rem; border-radius: 4px;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.88em;">
+      <tbody>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; width: 11rem; vertical-align: top;"><label for="npd-site">site</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <select id="npd-site" style="padding: 0.25rem; font-family: inherit;">
+              <option value="github" selected>github</option>
+              <option value="blogger">blogger</option>
+            </select>
+            <span class="text-muted" style="font-size: 0.82em; margin-left: 0.5rem;">→ 決定產出 .md 應放到 <code>content/{site}/posts/</code></span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-contentkind">contentKind</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <select id="npd-contentkind" style="padding: 0.25rem; font-family: inherit;">
+              <option value="post">post</option>
+              <option value="tech-note" selected>tech-note</option>
+              <option value="book-review">book-review</option>
+              <option value="download">download</option>
+              <option value="comic">comic</option>
+              <option value="life-note">life-note</option>
+              <option value="page">page</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-primary">primaryPlatform</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <select id="npd-primary" style="padding: 0.25rem; font-family: inherit;">
+              <option value="github" selected>github</option>
+              <option value="blogger">blogger</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-title">title</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <input type="text" id="npd-title" maxlength="120" placeholder="文章標題（將寫入 frontmatter 的 title；不要在 body 寫第二個 H1）" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-slug">slug</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <input type="text" id="npd-slug" maxlength="80" placeholder="kebab-case，僅 a-z 0-9 -" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
+            <span class="text-muted" style="font-size: 0.82em;">→ 檔名 <code>{date}-{slug}.md</code>；不合法時 Download 按鈕會 disable</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-date">date</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <input type="date" id="npd-date" style="padding: 0.2rem; font-family: inherit;">
+            <span class="text-muted" style="font-size: 0.82em;">→ YYYY-MM-DD；預設今天</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-category">category</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <select id="npd-category" style="padding: 0.25rem; font-family: inherit;">
+              <option value="">— 空（先不填） —</option>
+              <%
+                var sysCats = (sys && sys.categories && Array.isArray(sys.categories.list)) ? sys.categories.list : [];
+                sysCats.forEach(function(c) {
+                  var cid = typeof c.id === 'string' ? c.id : '';
+                  if (cid === '') return;
+                  var cname = typeof c.name === 'string' ? c.name : cid;
+                  var csites = Array.isArray(c.site) ? c.site.join(',') : '';
+              %>
+                <option value="<%= cid %>" data-site="<%= csites %>"><%= cid %> — <%= cname %><% if (csites) { %> [<%= csites %>]<% } %></option>
+              <% }); %>
+            </select>
+            <span class="text-muted" style="font-size: 0.82em;">→ 來源 <code>categories.json</code>；draft 不檢查 site mismatch</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-tags">tags</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <input type="text" id="npd-tags" placeholder="comma-separated；空白會 trim、重複會去除" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
+            <span class="text-muted" style="font-size: 0.82em;">→ 例：<code>github, vite, static-site</code>；建議使用 <code>tags.json</code> 既有 id</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-description">description</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <textarea id="npd-description" rows="2" maxlength="160" placeholder="60–160 字內的文章摘要（將進入 og:description / meta description / JSON-LD）" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-body">body (markdown)</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <textarea id="npd-body" rows="6" placeholder="（空白 → 帶入 ## 簡介 / ## 段落 / ## 結尾 預設模板）" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em;"></textarea>
+            <span class="text-muted" style="font-size: 0.82em;">→ 請以 <code>##</code> 開頭撰寫，避免在 body 第一行寫 <code># 標題</code>（會與 article header 之 <code>&lt;h1&gt;</code> 重複）</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top: 0.75rem;">
+      <label for="npd-output" style="font-weight: 600; font-size: 0.88em;">Markdown preview</label>
+      <span id="npd-filename" class="mono" style="margin-left: 0.5rem; font-size: 0.82em; color: #2c5282;">（filename 待輸入合法 date + slug）</span>
+      <textarea id="npd-output" readonly rows="14"
+                style="width: 100%; box-sizing: border-box; margin-top: 0.25rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82em; padding: 0.4rem; border: 1px solid #c5d6e8; background: #fff; resize: vertical;"
+                aria-label="generated markdown preview"
+                spellcheck="false"></textarea>
+    </div>
+    <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+      <button type="button" id="npd-copy"
+              style="padding: 0.35rem 0.75rem; border: 1px solid #2c5282; background: #cfe2ff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #2c5282;">Copy markdown</button>
+      <button type="button" id="npd-download" disabled aria-disabled="true"
+              style="padding: 0.35rem 0.75rem; border: 1px solid #2c5282; background: #cfe2ff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #2c5282;">Download .md</button>
+      <span id="npd-status" style="font-size: 0.82em;" aria-live="polite"></span>
+      <span class="text-muted" style="font-size: 0.78em; margin-left: auto;">產出 .md 後請手動存到 <code>content/{site}/posts/</code>，再跑 <code>npm run validate:content</code></span>
+    </div>
+  </div>
+
   <%# Phase 20260615-night-1-admin-ia-shell-implementation-a：以下為 IA shell 新增之 read-only 區塊
       - 全部 read-only；沒有任何 Apply / Save / Submit / Edit / Delete / Publish 互動
       - 未實作項目以 "planned" 文字 + 灰色清單呈現；不放假按鈕引導誤點 -%>
@@ -3081,6 +3218,267 @@
     })();
   </script>
   <% } %>
+
+  <%# Phase 20260627-admin-markdown-draft-export-implementation-a:
+      Client script for #new-post-draft section.
+      - Pure client-side: no fetch / XHR / fs write / form submit / Apply / safeWrite caller / middleware ping.
+      - Mirrors src/scripts/admin-markdown-export.js (server-side helper locked by check:admin-markdown-export smoke).
+        Keep BOTH in sync if you change the schema; the smoke covers the server-side helper only.
+      - Always emits status:"draft" + draft:true (zero-warning per validate-content.js READY_STATUS rules).
+      - Download uses Blob + URL.createObjectURL + a.click (no fetch, no fs).
+      - Copy uses navigator.clipboard.writeText with execCommand('copy') fallback (mirror commerce snippet).
+      - 不啟動 admin-write CLI / Apply path；產出 .md 文字由 Dean 手動存到 content/{site}/posts/。 -%>
+  <script>
+    (function () {
+      var SITE_EL = document.getElementById('npd-site');
+      var KIND_EL = document.getElementById('npd-contentkind');
+      var PRIM_EL = document.getElementById('npd-primary');
+      var TITLE_EL = document.getElementById('npd-title');
+      var SLUG_EL = document.getElementById('npd-slug');
+      var DATE_EL = document.getElementById('npd-date');
+      var CAT_EL = document.getElementById('npd-category');
+      var TAGS_EL = document.getElementById('npd-tags');
+      var DESC_EL = document.getElementById('npd-description');
+      var BODY_EL = document.getElementById('npd-body');
+      var OUT_EL = document.getElementById('npd-output');
+      var FN_EL = document.getElementById('npd-filename');
+      var COPY_BTN = document.getElementById('npd-copy');
+      var DL_BTN = document.getElementById('npd-download');
+      var STATUS_EL = document.getElementById('npd-status');
+      if (!SITE_EL || !OUT_EL || !COPY_BTN || !DL_BTN) return;
+
+      var VALID_SITES = ['github', 'blogger'];
+      var VALID_KINDS = ['post', 'tech-note', 'book-review', 'download', 'comic', 'life-note', 'page'];
+      var VALID_PRIMARY = ['github', 'blogger'];
+      var SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+      var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+      function todayIso() {
+        var d = new Date();
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+      }
+      if (DATE_EL && !DATE_EL.value) DATE_EL.value = todayIso();
+
+      function yamlEscapeScalar(raw) {
+        var collapsed = String(raw == null ? '' : raw).replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+        var escaped = collapsed.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        return '"' + escaped + '"';
+      }
+      function normalizeTags(raw) {
+        var arr = String(raw == null ? '' : raw).split(',');
+        var out = [];
+        var seen = {};
+        for (var i = 0; i < arr.length; i++) {
+          var s = String(arr[i] == null ? '' : arr[i]).replace(/^\s+|\s+$/g, '');
+          if (s === '' || Object.prototype.hasOwnProperty.call(seen, s)) continue;
+          seen[s] = true;
+          out.push(s);
+        }
+        return out;
+      }
+      function sanitizeSlug(raw) {
+        var s = String(raw == null ? '' : raw).replace(/^\s+|\s+$/g, '');
+        if (s === '' || !SLUG_RE.test(s)) return '';
+        return s;
+      }
+      function sanitizeDate(raw) {
+        var s = String(raw == null ? '' : raw).replace(/^\s+|\s+$/g, '');
+        if (s === '' || !DATE_RE.test(s)) return '';
+        return s;
+      }
+      function pickEnum(raw, allowed, fallback) {
+        if (typeof raw !== 'string') return fallback;
+        return allowed.indexOf(raw) >= 0 ? raw : fallback;
+      }
+      function defaultBody() {
+        return [
+          '## 簡介',
+          '',
+          '請從 `##` 開始撰文；frontmatter 的 title 已是文章主 H1。',
+          '',
+          '## 段落標題範例',
+          '',
+          '主要內容請放這裡。',
+          '',
+          '## 結尾段落',
+          '',
+          '文章結尾...',
+          ''
+        ].join('\n');
+      }
+      function buildFilename(date, slug) {
+        var d = sanitizeDate(date);
+        var s = sanitizeSlug(slug);
+        if (d === '' || s === '') return '';
+        return d + '-' + s + '.md';
+      }
+      function buildMarkdown(input) {
+        var site = pickEnum(input.site, VALID_SITES, 'github');
+        var kind = pickEnum(input.contentKind, VALID_KINDS, 'tech-note');
+        var prim = pickEnum(input.primaryPlatform, VALID_PRIMARY, site);
+        var date = sanitizeDate(input.date);
+        var slugClean = sanitizeSlug(input.slug);
+        var titleRaw = String(input.title == null ? '' : input.title).replace(/^\s+|\s+$/g, '');
+        var description = String(input.description == null ? '' : input.description);
+        var category = String(input.category == null ? '' : input.category).replace(/^\s+|\s+$/g, '');
+        var tags = normalizeTags(input.tags);
+        var bodyRaw = (typeof input.body === 'string' && input.body.replace(/^\s+|\s+$/g, '') !== '')
+          ? input.body : defaultBody();
+        var idStr = (date !== '' && slugClean !== '') ? (date.replace(/-/g, '') + '-' + slugClean) : 'TODO-fill-id';
+        var slugForFm = slugClean !== '' ? slugClean : 'TODO-fill-slug';
+        var dateForFm = date !== '' ? date : 'TODO-fill-date';
+        var titleForFm = titleRaw !== '' ? titleRaw : 'TODO-fill-title';
+        var tagsBlock = tags.length === 0
+          ? 'tags: []'
+          : 'tags:\n' + tags.map(function (t) { return '  - ' + yamlEscapeScalar(t); }).join('\n');
+        var lines = [];
+        lines.push('---');
+        lines.push('id: ' + yamlEscapeScalar(idStr));
+        lines.push('site: ' + yamlEscapeScalar(site));
+        lines.push('contentKind: ' + yamlEscapeScalar(kind));
+        lines.push('primaryPlatform: ' + yamlEscapeScalar(prim));
+        lines.push('');
+        lines.push('title: ' + yamlEscapeScalar(titleForFm));
+        lines.push('titleEn: ""');
+        lines.push('slug: ' + yamlEscapeScalar(slugForFm));
+        lines.push('');
+        lines.push('date: ' + yamlEscapeScalar(dateForFm));
+        lines.push('updated: ' + yamlEscapeScalar(dateForFm));
+        lines.push('author: "Dean"');
+        lines.push('');
+        lines.push(category !== '' ? 'category: ' + yamlEscapeScalar(category) : 'category: ""');
+        lines.push(tagsBlock);
+        lines.push('');
+        lines.push('description: ' + yamlEscapeScalar(description));
+        lines.push('searchDescription: ""');
+        lines.push('');
+        lines.push('cover: ""');
+        lines.push('coverAlt: ""');
+        lines.push('');
+        lines.push('status: "draft"');
+        lines.push('draft: true');
+        lines.push('');
+        lines.push('canonical: "auto"');
+        lines.push('');
+        lines.push('publishTargets:');
+        lines.push('  github:');
+        lines.push('    enabled: ' + (site === 'github' ? 'true' : 'false'));
+        lines.push('    mode: "full"');
+        lines.push('  blogger:');
+        lines.push('    enabled: ' + (site === 'blogger' ? 'true' : 'false'));
+        lines.push('    mode: ' + (site === 'blogger' ? '"full"' : '"summary"'));
+        lines.push('');
+        lines.push('blocks:');
+        lines.push('  toc: false');
+        lines.push('  adsenseTop: true');
+        lines.push('  adsenseMiddle: false');
+        lines.push('  adsenseBottom: true');
+        lines.push('  hashtags: true');
+        lines.push('  socialFollow: true');
+        lines.push('  relatedPosts: true');
+        lines.push('  sidebar: true');
+        lines.push('---');
+        lines.push('');
+        lines.push(bodyRaw);
+        if (bodyRaw.charAt(bodyRaw.length - 1) !== '\n') lines.push('');
+        return lines.join('\n');
+      }
+
+      function showStatus(msg, isErr) {
+        if (!STATUS_EL) return;
+        STATUS_EL.textContent = msg;
+        STATUS_EL.style.color = isErr ? '#a00' : '#080';
+        setTimeout(function () { if (STATUS_EL.textContent === msg) STATUS_EL.textContent = ''; }, 2000);
+      }
+
+      function recompute() {
+        var input = {
+          site: SITE_EL.value,
+          contentKind: KIND_EL.value,
+          primaryPlatform: PRIM_EL.value,
+          title: TITLE_EL.value,
+          slug: SLUG_EL.value,
+          date: DATE_EL.value,
+          category: CAT_EL.value,
+          tags: TAGS_EL.value,
+          description: DESC_EL.value,
+          body: BODY_EL.value
+        };
+        OUT_EL.value = buildMarkdown(input);
+        var fn = buildFilename(input.date, input.slug);
+        if (fn === '') {
+          FN_EL.textContent = '（filename 待輸入合法 date + slug）';
+          FN_EL.style.color = '#a00';
+          DL_BTN.disabled = true;
+          DL_BTN.setAttribute('aria-disabled', 'true');
+        } else {
+          FN_EL.textContent = fn;
+          FN_EL.style.color = '#2c5282';
+          DL_BTN.disabled = false;
+          DL_BTN.setAttribute('aria-disabled', 'false');
+        }
+      }
+
+      function fallbackCopy() {
+        try {
+          OUT_EL.removeAttribute('readonly');
+          OUT_EL.focus();
+          OUT_EL.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          OUT_EL.setAttribute('readonly', 'readonly');
+          if (ok) { showStatus('已複製 (Copied)', false); }
+          else { showStatus('複製失敗，請手動選取後 Ctrl+C', true); }
+        } catch (e) {
+          showStatus('複製失敗，請手動選取後 Ctrl+C', true);
+        }
+      }
+      COPY_BTN.addEventListener('click', function () {
+        var text = OUT_EL.value || '';
+        if (!text) { showStatus('尚無內容', true); return; }
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(text).then(function () {
+            showStatus('已複製 (Copied)', false);
+          }).catch(function () { fallbackCopy(); });
+        } else { fallbackCopy(); }
+      });
+
+      DL_BTN.addEventListener('click', function () {
+        if (DL_BTN.disabled) return;
+        var fn = buildFilename(DATE_EL.value, SLUG_EL.value);
+        if (fn === '') { showStatus('filename 不合法', true); return; }
+        var text = OUT_EL.value || '';
+        if (!text) { showStatus('尚無內容', true); return; }
+        try {
+          var blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = fn;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+          showStatus('已下載 ' + fn, false);
+        } catch (e) {
+          showStatus('下載失敗：' + (e && e.message ? e.message : 'unknown'), true);
+        }
+      });
+
+      var debounceTimer = null;
+      function debounceRecompute() {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(recompute, 50);
+      }
+      [SITE_EL, KIND_EL, PRIM_EL, CAT_EL].forEach(function (el) { el.addEventListener('change', recompute); });
+      [TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, BODY_EL].forEach(function (el) { el.addEventListener('input', debounceRecompute); });
+
+      recompute();
+    })();
+  </script>
 
   <%# Phase 20260617-night-admin-categories-tags-collapsible-split-implementation-a:
       最小、隔離之 client script —— 當 location.hash 指向某 <details> 內部元素（如 nav #tags 在使用者手動收合 Tags 群後），
