@@ -1211,5 +1211,82 @@ check('95 admin index.ejs manual import flow button gating preserved', () => {
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-runtime-button-gating-hygiene-a:
+//   Lock the recompute() runtime re-gating that mirrors the initial HTML
+//   attribute pattern locked by smoke #95. After each input event the inline
+//   <script>'s recompute() reapplies the gate; if a future refactor drops a
+//   reassignment, swaps button refs, or accidentally gates COPY_CMD_BTN, the
+//   initial attrs would stay correct but runtime behavior would silently
+//   break. Smoke #95 locks initial HTML; smoke #96 locks runtime re-gating.
+//
+//   Contract:
+//     - recompute() MUST contain `COPY_BTN.disabled = disable`,
+//       `DL_BTN.disabled = disable`, and `COPY_PATH_BTN.disabled = disable`
+//       (the 3 gated buttons per slice2-a / smoke #95).
+//     - Each MUST be paired (within proximity) with the corresponding
+//       `XXX.setAttribute('aria-disabled', disable ? 'true' : 'false')`.
+//     - recompute() MUST NOT contain `COPY_CMD_BTN.disabled` (always-enabled
+//       exception per smoke #95).
+//
+//   Block extraction: linear brace-count from `function recompute() {`. The
+//   current block has no `{`/`}` inside string literals or comments, so this
+//   is robust. A future change that introduces such literals would surface
+//   here as a loud failure (not a silent regression) — at which point the
+//   extractor should be tightened.
+//
+//   Pure EJS source string scan; no DOM, no headless browser.
+check('96 admin index.ejs recompute() runtime re-gating preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function extractRecomputeBlock() {
+    const sig = 'function recompute() {';
+    const sigPos = src.indexOf(sig);
+    assert.ok(sigPos > 0, 'index.ejs MUST contain `function recompute() {`');
+    let depth = 0;
+    // Start at the opening `{` of the function body.
+    let i = sigPos + sig.length - 1;
+    for (; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return src.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('index.ejs `recompute()` opening brace MUST have a matching close');
+  }
+
+  const block = extractRecomputeBlock();
+
+  const gated = ['COPY_BTN', 'DL_BTN', 'COPY_PATH_BTN'];
+  for (const name of gated) {
+    const assignLit = name + '.disabled = disable';
+    const setAttrLit = name + ".setAttribute('aria-disabled', disable ? 'true' : 'false')";
+    const assignPos = block.indexOf(assignLit);
+    assert.ok(
+      assignPos >= 0,
+      `recompute() MUST contain runtime re-gate \`${assignLit}\` (mirror of smoke #95 initial attr)`
+    );
+    const setAttrPos = block.indexOf(setAttrLit, assignPos);
+    assert.ok(
+      setAttrPos >= 0,
+      `recompute() MUST pair \`${assignLit}\` with \`${setAttrLit}\``
+    );
+    // Proximity guard: the pair lives within ~200 chars in current source
+    // (next non-blank line). A larger gap would suggest a refactor split.
+    assert.ok(
+      setAttrPos - assignPos < 200,
+      `recompute() pair for ${name} MUST stay co-located (assign @${assignPos}, setAttr @${setAttrPos}; gap ${setAttrPos - assignPos})`
+    );
+  }
+
+  assert.ok(
+    !block.includes('COPY_CMD_BTN.disabled'),
+    'recompute() MUST NOT touch `COPY_CMD_BTN.disabled` (always-enabled static VALIDATION_COMMAND copy; per smoke #95)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
