@@ -1691,5 +1691,168 @@ check('100 admin index.ejs showFlowStatus() display contract preserved', () => {
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-copy-text-to-clipboard-contract-hygiene-a:
+//   Lock the inline copyTextToClipboard(text, okMsg) helper that backs the two
+//   manual-import-flow Copy buttons (#npd-copy-path / #npd-copy-cmd). This is
+//   the runtime path Dean exercises every time he runs the import drill — and
+//   it is the only remaining unlocked piece of the markdown-export IIFE
+//   chain after smokes #93–#100.
+//
+//   Lock layering (regression net):
+//     - #93  markup hygiene  (5-step <ol>)
+//     - #94  client-mirror   (TARGET_FOLDERS / VALIDATION_COMMAND)
+//     - #95  initial gating  (initial HTML disabled / aria-disabled)
+//     - #96  runtime gating  (recompute() runtime re-gate)
+//     - #97  event wiring    (change / input listeners + initial paint)
+//     - #98  missing reason  (validation hint output strings)
+//     - #99  showStatus      (markdown-preview status display)
+//     - #100 showFlowStatus  (manual-import-flow status display)
+//     - #101 copyTextToClipboard (clipboard-side contract)
+//
+//   Contract:
+//     - Both paths' SUCCESS handler MUST delegate to `showFlowStatus(okMsg, false)`
+//       — caller-controlled message (#npd-copy-path: '已複製 path';
+//       #npd-copy-cmd: '已複製指令'). Locking the param-passthrough prevents a
+//       silent refactor that hardcodes a generic '已複製' which would drop the
+//       per-button context Dean uses to tell the two buttons apart.
+//     - Both paths' FAILURE handler MUST surface `showFlowStatus('複製失敗，請手動選取', true)`
+//       — exact literal (no `…後 Ctrl+C` suffix; that suffix belongs to the
+//       other IIFE clipboard helpers at L3091 / L3392 / L3394 / L4045 / L4047
+//       which use showStatus). The literal MUST occur exactly 3 times inside
+//       the helper: (1) modern `.catch()`, (2) fallback `else`, (3) outer
+//       `try/catch` envelope.
+//     - Modern path MUST call `navigator.clipboard.writeText(text)` — the
+//       Promise-based API. Without this, Chrome / Firefox modern path
+//       silently drops to fallback every keystroke.
+//     - Fallback path MUST use `document.createElement('textarea')` +
+//       `document.execCommand('copy')` — the legacy reliable path for
+//       browsers without clipboard API (or for non-secure contexts).
+//     - Outer try/catch envelope MUST exist so a thrown DOM exception
+//       (e.g. createElement under a hostile CSP) still surfaces a visible
+//       failure to Dean instead of going silent.
+//
+//   Anchor: `function copyTextToClipboard(` is a UNIQUE substring in the
+//   file (verified at smoke-authoring time — single occurrence at L4072).
+//   Mirrors smoke #100's uniqueness pattern; duplicate-check assertion
+//   below would surface any future refactor that spawns a sibling helper.
+//
+//   Scoping: brace-count from the unique signature to the matching `}`.
+//   The body contains string literals with `(` and `)` but no `{` / `}`
+//   (verified at smoke-authoring time); a future literal containing
+//   `{` / `}` would surface as a loud extractor failure, not a silent
+//   regression.
+//
+//   Pure EJS source string scan; no DOM, no headless browser, no
+//   navigator.clipboard simulation. Out of scope: button wiring (handled
+//   by smoke #95 / #96), Copy buttons' caller-side okMsg strings
+//   (caller-controlled; could be locked separately if drift surfaces),
+//   showStatus IIFE helpers (handled by smoke #99 / #98), fallback
+//   textarea styling (cosmetic offscreen positioning, not user-visible).
+check('101 admin index.ejs copyTextToClipboard() clipboard contract preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function extractCopyTextToClipboardBlock() {
+    const sig = 'function copyTextToClipboard(';
+    const sigPos = src.indexOf(sig);
+    assert.ok(sigPos > 0, 'index.ejs MUST contain `function copyTextToClipboard(`');
+    // Anchor uniqueness — same paired-message-safe pattern as smoke #100.
+    // If a future refactor splits the helper across multiple IIFEs, this
+    // assertion surfaces immediately rather than letting indexOf grab the
+    // first one and silently miss the second copy's contract drift.
+    const dupPos = src.indexOf(sig, sigPos + sig.length);
+    assert.ok(
+      dupPos < 0,
+      'index.ejs MUST contain exactly one `function copyTextToClipboard(` (no IIFE duplicates expected; if intentional, add a disambiguation strategy like smoke #99)'
+    );
+    const openBrace = src.indexOf('{', sigPos);
+    assert.ok(openBrace > sigPos, '`function copyTextToClipboard(...)` MUST have an opening `{`');
+    let depth = 0;
+    for (let i = openBrace; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return src.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('index.ejs `copyTextToClipboard()` opening brace MUST have a matching close');
+  }
+
+  const block = extractCopyTextToClipboardBlock();
+
+  // 1. Modern path: navigator.clipboard.writeText(text). The Promise-based
+  // API is the primary path on any secure context Chrome / Firefox; silent
+  // removal (or swap to a stub) would force every Dean session into the
+  // fallback path. Locking the literal substring (with `text` arg, not
+  // a different param name) keeps the contract obvious.
+  assert.ok(
+    block.includes('navigator.clipboard.writeText(text)'),
+    '`copyTextToClipboard()` MUST invoke `navigator.clipboard.writeText(text)` on the modern path'
+  );
+
+  // 2. Fallback path: document.createElement('textarea') +
+  // document.execCommand('copy'). These two together prove the legacy
+  // reliable path is wired; either one alone would be ambiguous (e.g.
+  // execCommand could be invoked on the document selection without a
+  // hidden textarea, which is unreliable on Safari mobile).
+  assert.ok(
+    block.includes("document.createElement('textarea')"),
+    '`copyTextToClipboard()` fallback path MUST create a hidden `<textarea>` via `document.createElement(\'textarea\')`'
+  );
+  assert.ok(
+    block.includes("document.execCommand('copy')"),
+    '`copyTextToClipboard()` fallback path MUST invoke `document.execCommand(\'copy\')`'
+  );
+
+  // 3. Success delegation: showFlowStatus(okMsg, false). The caller-passed
+  // okMsg MUST flow through unmodified — locks param-passthrough so a
+  // future refactor that hardcodes '已複製' or '已複製 (Copied)' would
+  // surface here. Appears in BOTH modern (.then) and fallback (if ok)
+  // branches; locking exactly 2 occurrences ensures both paths intact.
+  const successLit = 'showFlowStatus(okMsg, false)';
+  const successCount = (block.match(new RegExp(successLit.replace(/[(){}.]/g, '\\$&'), 'g')) || []).length;
+  assert.equal(
+    successCount,
+    2,
+    `\`copyTextToClipboard()\` MUST call \`${successLit}\` exactly 2 times (modern .then + fallback if-ok); found ${successCount}`
+  );
+
+  // 4. Failure literal: showFlowStatus('複製失敗，請手動選取', true).
+  // Exact string (no `…後 Ctrl+C` suffix — that suffix belongs to the
+  // showStatus-based clipboard helpers elsewhere in the file). MUST occur
+  // exactly 3 times inside this helper:
+  //   (1) modern `.catch()` rejection,
+  //   (2) fallback `else` branch when execCommand returns false,
+  //   (3) outer `try/catch` envelope on createElement / DOM exception.
+  // Counting drift surfaces any path that silently goes to no-op or to
+  // a different message.
+  const failureLit = "showFlowStatus('複製失敗，請手動選取', true)";
+  const failureCount = (block.match(new RegExp(failureLit.replace(/[(){}.，]/g, '\\$&'), 'g')) || []).length;
+  assert.equal(
+    failureCount,
+    3,
+    `\`copyTextToClipboard()\` MUST call \`${failureLit}\` exactly 3 times (modern .catch + fallback else + outer catch); found ${failureCount}`
+  );
+
+  // 5. Outer try/catch envelope: the fallback path MUST be wrapped so a
+  // DOM exception (e.g. CSP-blocked createElement, hostile environment)
+  // still surfaces a visible failure rather than a silent crash. We lock
+  // the inner `try { ok = document.execCommand('copy'); }` AND a separate
+  // outer `try {` that wraps createElement / appendChild / removeChild.
+  // Two `try {` and at least two `catch (` MUST appear.
+  const tryCount = (block.match(/\btry\s*\{/g) || []).length;
+  const catchCount = (block.match(/\bcatch\s*\(/g) || []).length;
+  assert.ok(
+    tryCount >= 2,
+    `\`copyTextToClipboard()\` fallback path MUST have BOTH an outer try (DOM exception envelope) AND an inner try (execCommand guard); found ${tryCount} \`try {\` occurrences`
+  );
+  assert.ok(
+    catchCount >= 2,
+    `\`copyTextToClipboard()\` MUST have matching catch blocks for each try; found ${catchCount} \`catch (\` occurrences`
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
