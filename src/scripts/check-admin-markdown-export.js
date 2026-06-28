@@ -1150,5 +1150,66 @@ check('94 admin index.ejs client mirrors TARGET_FOLDERS / VALIDATION_COMMAND fro
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-button-gating-hygiene-a:
+//   Lock the initial disabled / aria-disabled attribute pattern on the 4
+//   buttons that make up the manual import flow group (slice2-a contract):
+//     - #npd-copy            Copy markdown            MUST start disabled
+//     - #npd-download        Download .md             MUST start disabled
+//     - #npd-copy-path       Copy target path         MUST start disabled
+//     - #npd-copy-cmd        Copy validation command  MUST NOT carry disabled
+//
+//   The first three share isExportReady gating (title + slug + date) per the
+//   panel text around L2035 ("三顆都會被 disable") and the inline JS at
+//   recompute() / DL_BTN / COPY_PATH_BTN. The fourth is always-enabled
+//   because the command string is a static literal (no input dependency).
+//
+//   Note on DOM scope: #npd-copy and #npd-download physically live in the
+//   markdown preview block immediately above .npd-import-flow (lines
+//   ~2010–2013), while #npd-copy-path and #npd-copy-cmd sit inside the
+//   .npd-import-flow block. The slice2-a contract groups all four
+//   regardless of parent class; we scan by id so the smoke captures the
+//   logical group, not the DOM parent.
+//
+//   Pure EJS source string scan; no DOM, no headless browser.
+check('95 admin index.ejs manual import flow button gating preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function buttonOpenTag(id) {
+    const idLit = 'id="' + id + '"';
+    const idPos = src.indexOf(idLit);
+    assert.ok(idPos > 0, `index.ejs MUST contain a button with \`${idLit}\``);
+    const tagStart = src.lastIndexOf('<button', idPos);
+    assert.ok(tagStart > 0, `\`${idLit}\` MUST be inside a <button …> opening tag`);
+    const tagEnd = src.indexOf('>', idPos);
+    assert.ok(tagEnd > idPos, `\`${idLit}\` opening tag MUST close with \`>\``);
+    return src.slice(tagStart, tagEnd + 1);
+  }
+
+  const gated = ['npd-copy', 'npd-download', 'npd-copy-path'];
+  for (const id of gated) {
+    const tag = buttonOpenTag(id);
+    assert.ok(
+      /\sdisabled(\s|>)/.test(tag),
+      `#${id} MUST carry initial \`disabled\` attribute (gated by isExportReady)`
+    );
+    assert.ok(
+      /\saria-disabled="true"/.test(tag),
+      `#${id} MUST carry initial \`aria-disabled="true"\` attribute (gated by isExportReady)`
+    );
+  }
+
+  // #npd-copy-cmd is the always-enabled exception; it copies a static string
+  // (VALIDATION_COMMAND) and never depends on isExportReady. Disallow the
+  // literal `disabled` attribute. Leading-whitespace anchor in the regex
+  // ensures we do NOT accidentally match `aria-disabled` (different attr).
+  const alwaysOn = buttonOpenTag('npd-copy-cmd');
+  assert.ok(
+    !/\sdisabled(\s|>|=)/.test(alwaysOn),
+    '#npd-copy-cmd MUST NOT carry `disabled` (always-enabled static string; per panel text around L2035)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
