@@ -2046,7 +2046,7 @@
           <tr>
             <td style="padding: 0.2rem 0.5rem; vertical-align: top; color: #555;">target path</td>
             <td style="padding: 0.2rem 0.5rem;">
-              <code class="mono" id="npd-target-path">（請補上合法 title / slug / date）</code>
+              <code class="mono" id="npd-target-path">（請補上合法 slug / date）</code>
             </td>
           </tr>
           <tr>
@@ -3994,7 +3994,12 @@
         if (TARGET_PATH_EL) {
           var tp = buildTargetPath(input.site, input.date, input.slug);
           if (tp === '') {
-            TARGET_PATH_EL.textContent = '（請補上合法 title / slug / date）';
+            // Phase 20260628-admin-markdown-import-flow-target-path-empty-state-copy-hygiene-a:
+            //   Empty-state copy MUST NOT mention `title`. buildTargetPath only
+            //   depends on site + date + slug; if Dean fills title but blanks
+            //   slug, the readout still fires this branch — saying "fix title"
+            //   was misleading. Smoke #103 locks both surfaces (initial DOM + this).
+            TARGET_PATH_EL.textContent = '（請補上合法 slug / date）';
             TARGET_PATH_EL.style.color = '#a00';
           } else {
             TARGET_PATH_EL.textContent = tp;

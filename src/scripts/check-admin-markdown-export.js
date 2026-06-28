@@ -1954,5 +1954,106 @@ check('102 admin index.ejs manual import flow Copy buttons caller okMsg preserve
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-target-path-empty-state-copy-hygiene-a:
+//   Lock the empty-state copy of the #npd-target-path readout. Previously the
+//   string was '（請補上合法 title / slug / date）' on BOTH surfaces (initial
+//   DOM at L2049 + recompute() runtime fallback at L3997). buildTargetPath
+//   only depends on site + date + slug (it concatenates TARGET_FOLDERS[site]
+//   with buildFilename(date, slug)); title is never read. If Dean filled
+//   `title` but blanked `slug`, the readout still triggered the empty-state
+//   and told Dean to fix `title` — misleading, since the only way out is to
+//   fix slug / date.
+//
+//   The fix dropped `title` from the empty-state copy on both surfaces. This
+//   smoke locks the corrected contract so a future refactor cannot silently
+//   reintroduce the misleading wording or drift the two surfaces apart.
+//
+//   Lock layering (regression net):
+//     - #93  markup hygiene  (5-step <ol>)
+//     - #94  client-mirror   (TARGET_FOLDERS / VALIDATION_COMMAND)
+//     - #95  initial gating  (initial HTML disabled / aria-disabled)
+//     - #96  runtime gating  (recompute() runtime re-gate)
+//     - #97  event wiring    (change / input listeners + initial paint)
+//     - #98  missing reason  (validation hint output strings)
+//     - #99  showStatus      (markdown-preview status display)
+//     - #100 showFlowStatus  (manual-import-flow status display)
+//     - #101 copyTextToClipboard (clipboard-side contract)
+//     - #102 caller-side okMsg literals for the two Copy buttons
+//     - #103 target-path empty-state copy hygiene (this smoke)
+//
+//   Contract:
+//     - Initial DOM at `id="npd-target-path">` MUST start with `（請補上合法 `
+//       (gate-closed empty state) — locked so the readout is recognisably an
+//       empty-state placeholder before recompute() runs.
+//     - The same initial text MUST NOT include the substring `title` — since
+//       buildTargetPath ignores title, surfacing title in the prompt would
+//       point Dean at the wrong field.
+//     - The same initial text MUST include both `slug` and `date` — the
+//       actual required inputs.
+//     - The recompute() runtime fallback `TARGET_PATH_EL.textContent = '…'`
+//       branch MUST contain a literal starting with `（請補上合法 ` that
+//       satisfies the same MUST-NOT-include-title + MUST-include-slug+date
+//       rules. This locks server-side initial DOM and client-side runtime
+//       fallback against drift.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of scope:
+//   the success-branch readout (the path itself) — that text is computed from
+//   site + date + slug and is locked transitively by smokes #29 / #30 / #31.
+check('103 admin index.ejs target-path empty-state copy does not mislead with `title`', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  // 1. Initial DOM at #npd-target-path. The smoke pattern mirrors smoke #94's
+  //    extraction of `id="npd-target-folder">…</code>` and `id="npd-validation-command">…</code>`.
+  const initAnchor = 'id="npd-target-path">';
+  const initOpen = src.indexOf(initAnchor);
+  assert.ok(initOpen > 0, 'index.ejs MUST contain `id="npd-target-path">`');
+  const initClose = src.indexOf('</code>', initOpen);
+  assert.ok(initClose > initOpen, '#npd-target-path MUST be inside a <code>…</code>');
+  const initText = src.slice(initOpen + initAnchor.length, initClose);
+
+  assert.ok(
+    initText.indexOf('（請補上合法 ') === 0,
+    "#npd-target-path initial text MUST start with `（請補上合法 ` (gate-closed empty state; got `" + initText + "`)"
+  );
+  assert.ok(
+    !initText.includes('title'),
+    "#npd-target-path initial text MUST NOT include `title` (buildTargetPath ignores title; mention would mislead Dean to the wrong field; got `" + initText + "`)"
+  );
+  assert.ok(
+    initText.includes('slug') && initText.includes('date'),
+    "#npd-target-path initial text MUST include both `slug` and `date` (the actual required inputs; got `" + initText + "`)"
+  );
+
+  // 2. Runtime fallback inside recompute(). Capture every
+  //    `TARGET_PATH_EL.textContent = '…'` assignment, then locate the empty-state
+  //    branch via the same `（請補上合法 ` prefix. Locking both surfaces ensures
+  //    they cannot drift apart silently.
+  const reAssign = /TARGET_PATH_EL\.textContent\s*=\s*'([^']*)'/g;
+  const seen = [];
+  let m;
+  while ((m = reAssign.exec(src)) !== null) {
+    seen.push(m[1]);
+  }
+  assert.ok(
+    seen.length >= 1,
+    "recompute() MUST contain at least one `TARGET_PATH_EL.textContent = '…'` literal assignment"
+  );
+  const emptyState = seen.find((s) => s.indexOf('（請補上合法 ') === 0);
+  assert.ok(
+    typeof emptyState === 'string',
+    "recompute() MUST contain a `TARGET_PATH_EL.textContent = '（請補上合法 …）'` empty-state branch"
+  );
+  assert.ok(
+    !emptyState.includes('title'),
+    "recompute() empty-state for #npd-target-path MUST NOT include `title` (buildTargetPath ignores title; mention would mislead Dean to the wrong field; got `" + emptyState + "`)"
+  );
+  assert.ok(
+    emptyState.includes('slug') && emptyState.includes('date'),
+    "recompute() empty-state for #npd-target-path MUST include both `slug` and `date` (got `" + emptyState + "`)"
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
