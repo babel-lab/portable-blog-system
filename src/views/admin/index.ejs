@@ -3512,7 +3512,8 @@
       var SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
       var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
       // Mirror of admin-markdown-export.js TARGET_FOLDERS / VALIDATION_COMMAND.
-      // Smoke 32 / 33 lock the server-side strings; keep this block in sync.
+      // Smoke 32 / 33 lock the server-side strings; smoke 94 locks this client
+      // mirror + initial DOM against drift, so keep all three in sync.
       var TARGET_FOLDERS = {
         github: 'content/github/posts/',
         blogger: 'content/blogger/posts/'

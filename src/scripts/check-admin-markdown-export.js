@@ -1092,5 +1092,63 @@ check('93 admin index.ejs manual import flow is 5-step (no stale "4 步" / "4-st
   );
 });
 
+// Phase 20260628-admin-markdown-export-client-mirror-hygiene-a:
+//   Lock the EJS client-side mirror of TARGET_FOLDERS + VALIDATION_COMMAND
+//   against the server-side constants. The Admin UI inline <script>
+//   (slice2-a) hardcodes these for buildTargetPath + Copy validation command;
+//   the initial DOM in #npd-target-folder + #npd-validation-command also
+//   surfaces the same strings before the first recompute(). Either side could
+//   silently drift from admin-markdown-export.js. This smoke surfaces drift
+//   without waiting for a manual browser smoke. Pure string scan; no DOM.
+check('94 admin index.ejs client mirrors TARGET_FOLDERS / VALIDATION_COMMAND from server', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  const jsGh = "github: '" + TARGET_FOLDERS.github + "'";
+  const jsBg = "blogger: '" + TARGET_FOLDERS.blogger + "'";
+  const jsCmd = "var VALIDATION_COMMAND = '" + VALIDATION_COMMAND + "'";
+
+  assert.ok(
+    src.includes(jsGh),
+    `EJS client mirror MUST contain \`${jsGh}\` (drift from server TARGET_FOLDERS.github)`
+  );
+  assert.ok(
+    src.includes(jsBg),
+    `EJS client mirror MUST contain \`${jsBg}\` (drift from server TARGET_FOLDERS.blogger)`
+  );
+  assert.ok(
+    src.includes(jsCmd),
+    `EJS client mirror MUST contain \`${jsCmd}\` (drift from server VALIDATION_COMMAND)`
+  );
+
+  // Initial DOM (before first recompute()): the target-folder readout shows
+  // the default github folder; the validation-command readout shows the
+  // single literal command. Both must match the server-side constants.
+  const folderAnchor = 'id="npd-target-folder">';
+  const folderTagOpen = src.indexOf(folderAnchor);
+  assert.ok(folderTagOpen > 0, 'index.ejs MUST contain `id="npd-target-folder">`');
+  const folderTagClose = src.indexOf('</code>', folderTagOpen);
+  assert.ok(folderTagClose > folderTagOpen, 'npd-target-folder MUST be inside a <code>…</code>');
+  const folderInit = src.slice(folderTagOpen + folderAnchor.length, folderTagClose);
+  assert.equal(
+    folderInit,
+    TARGET_FOLDERS.github,
+    `npd-target-folder initial text MUST equal server TARGET_FOLDERS.github (got \`${folderInit}\`)`
+  );
+
+  const cmdAnchor = 'id="npd-validation-command">';
+  const cmdTagOpen = src.indexOf(cmdAnchor);
+  assert.ok(cmdTagOpen > 0, 'index.ejs MUST contain `id="npd-validation-command">`');
+  const cmdTagClose = src.indexOf('</code>', cmdTagOpen);
+  assert.ok(cmdTagClose > cmdTagOpen, 'npd-validation-command MUST be inside a <code>…</code>');
+  const cmdInit = src.slice(cmdTagOpen + cmdAnchor.length, cmdTagClose);
+  assert.equal(
+    cmdInit,
+    VALIDATION_COMMAND,
+    `npd-validation-command initial text MUST equal server VALIDATION_COMMAND (got \`${cmdInit}\`)`
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
