@@ -3843,7 +3843,20 @@
           }
         }
         if (SUM_TARGET_EL) {
-          SUM_TARGET_EL.textContent = sum.targetPath !== '' ? sum.targetPath : sum.targetFolder;
+          // Phase 20260629-admin-markdown-summary-target-empty-state-color-hygiene-a:
+          //   Mirror sibling SUM_FILENAME_EL / SUM_SLUG_EL red empty-state when
+          //   targetPath is unavailable (date or slug invalid). Previously this
+          //   silently fell back to targetFolder with default color, so the row
+          //   showed slug+filename red but target neutral — looked completed
+          //   even though the filename portion was still pending. Smoke #105
+          //   locks the new contract (folder + explicit pending suffix + red).
+          if (sum.targetPath !== '') {
+            SUM_TARGET_EL.textContent = sum.targetPath;
+            SUM_TARGET_EL.style.color = '#2c5282';
+          } else {
+            SUM_TARGET_EL.textContent = sum.targetFolder + '（待 date + slug）';
+            SUM_TARGET_EL.style.color = '#a00';
+          }
         }
         if (SUM_READY_EL) {
           if (sum.ready.ok) {

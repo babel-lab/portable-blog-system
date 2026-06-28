@@ -2166,5 +2166,134 @@ check('104 admin index.ejs filename empty-state copy does not mislead with `titl
   );
 });
 
+// Phase 20260629-admin-markdown-summary-target-empty-state-color-hygiene-a:
+//   Lock the renderExportSummary() empty-state branch for #npd-summary-target.
+//   Sibling cells SUM_FILENAME_EL and SUM_SLUG_EL already render their empty
+//   states with red `#a00` color + `（…）` placeholder copy when slug / date /
+//   filename are invalid. SUM_TARGET_EL previously fell back silently to just
+//   `sum.targetFolder` with default color, so the strip row showed slug +
+//   filename red but target neutral — visually inconsistent and misleading
+//   ("target looks completed" while filename was still pending). The fix
+//   appends `（待 date + slug）` to the folder and switches to the red color
+//   when targetPath is empty, mirroring the sibling pattern.
+//
+//   Lock layering (regression net):
+//     - #93  markup hygiene  (5-step <ol>)
+//     - #94  client-mirror   (TARGET_FOLDERS / VALIDATION_COMMAND)
+//     - #95  initial gating  (initial HTML disabled / aria-disabled)
+//     - #96  runtime gating  (recompute() runtime re-gate)
+//     - #97  event wiring    (change / input listeners + initial paint)
+//     - #98  missing reason  (validation hint output strings)
+//     - #99  showStatus      (markdown-preview status display)
+//     - #100 showFlowStatus  (manual-import-flow status display)
+//     - #101 copyTextToClipboard (clipboard-side contract)
+//     - #102 caller-side okMsg literals for the two Copy buttons
+//     - #103 #npd-target-path empty-state copy hygiene
+//     - #104 #npd-filename    empty-state copy hygiene
+//     - #105 #npd-summary-target empty-state color + suffix hygiene (this smoke)
+//
+//   Contract:
+//     - renderExportSummary() MUST contain a branch that, when
+//       `sum.targetPath !== ''`, sets `SUM_TARGET_EL.style.color = '#2c5282'`
+//       (success color shared with sibling success branches).
+//     - renderExportSummary() MUST contain a branch that, when targetPath is
+//       empty, sets `SUM_TARGET_EL.style.color = '#a00'` (error color shared
+//       with sibling SUM_SLUG_EL / SUM_FILENAME_EL empty branches).
+//     - The empty-state textContent MUST concatenate `sum.targetFolder` with a
+//       literal containing both `slug` and `date` (the actual required inputs)
+//       but MUST NOT contain `title` (buildTargetPath ignores title; surfacing
+//       title would mislead Dean to the wrong field — same regression class
+//       smoke #103 / #104 catch for #npd-target-path / #npd-filename).
+//
+//   Anchor: `function renderExportSummary(` is a UNIQUE substring in the file
+//   (verified at smoke-authoring time via Grep). The duplicate-check assertion
+//   surfaces any future refactor that spawns a sibling helper across IIFEs.
+//
+//   Scoping: brace-count from the unique signature to the matching `}`. Safe
+//   because the body has no `{`/`}` inside string literals; future refactors
+//   that introduce such literals would surface as a loud extractor failure,
+//   not a silent regression.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of scope:
+//   initial DOM at `id="npd-summary-target"` — that placeholder is overwritten
+//   the moment recompute() fires (locked by smoke #97's trailing initial paint).
+check('105 admin index.ejs renderExportSummary() target empty-state color + suffix preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function extractRenderExportSummaryBlock() {
+    const sig = 'function renderExportSummary(';
+    const sigPos = src.indexOf(sig);
+    assert.ok(sigPos > 0, 'index.ejs MUST contain `function renderExportSummary(`');
+    const dupPos = src.indexOf(sig, sigPos + sig.length);
+    assert.ok(
+      dupPos < 0,
+      'index.ejs MUST contain exactly one `function renderExportSummary(` (no IIFE duplicates expected; if intentional, add a disambiguation strategy like smoke #99)'
+    );
+    const openBrace = src.indexOf('{', sigPos);
+    assert.ok(openBrace > sigPos, '`function renderExportSummary(...)` MUST have an opening `{`');
+    let depth = 0;
+    for (let i = openBrace; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return src.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('index.ejs `renderExportSummary()` opening brace MUST have a matching close');
+  }
+
+  const block = extractRenderExportSummaryBlock();
+
+  // Sanity: helper MUST reference SUM_TARGET_EL (the cell this smoke covers).
+  assert.ok(
+    block.includes('SUM_TARGET_EL'),
+    'extracted renderExportSummary() MUST reference `SUM_TARGET_EL` (export summary target cell)'
+  );
+
+  // 1. Success branch: SUM_TARGET_EL.style.color = '#2c5282'.
+  //    Shared success color with sibling SUM_SLUG_EL / SUM_FILENAME_EL.
+  assert.ok(
+    block.includes("SUM_TARGET_EL.style.color = '#2c5282'"),
+    "renderExportSummary() MUST set `SUM_TARGET_EL.style.color = '#2c5282'` on the success branch (sum.targetPath !== '')"
+  );
+
+  // 2. Empty-state branch: SUM_TARGET_EL.style.color = '#a00'.
+  //    Shared error color with sibling empty-state branches (smoke #103-style
+  //    visual consistency). Without this, the row would show slug + filename
+  //    red but target neutral — visually inconsistent.
+  assert.ok(
+    block.includes("SUM_TARGET_EL.style.color = '#a00'"),
+    "renderExportSummary() MUST set `SUM_TARGET_EL.style.color = '#a00'` on the empty-state branch (sum.targetPath === '')"
+  );
+
+  // 3. Empty-state literal: must concatenate `sum.targetFolder` with a string
+  //    literal mentioning both `slug` and `date`, and MUST NOT mention `title`.
+  //    Mirrors the smoke #103 / #104 regression class for #npd-target-path /
+  //    #npd-filename — buildTargetPath ignores title, so surfacing it would
+  //    point Dean at the wrong field.
+  const reAssign = /SUM_TARGET_EL\.textContent\s*=\s*sum\.targetFolder\s*\+\s*'([^']*)'/g;
+  const seen = [];
+  let m;
+  while ((m = reAssign.exec(block)) !== null) {
+    seen.push(m[1]);
+  }
+  assert.ok(
+    seen.length >= 1,
+    "renderExportSummary() MUST contain at least one `SUM_TARGET_EL.textContent = sum.targetFolder + '…'` empty-state assignment"
+  );
+  const emptySuffix = seen[0];
+  assert.ok(
+    !emptySuffix.includes('title'),
+    "renderExportSummary() empty-state suffix MUST NOT include `title` (buildTargetPath ignores title; mention would mislead Dean to the wrong field; got `" + emptySuffix + "`)"
+  );
+  assert.ok(
+    emptySuffix.includes('slug') && emptySuffix.includes('date'),
+    "renderExportSummary() empty-state suffix MUST include both `slug` and `date` (the actual required inputs; got `" + emptySuffix + "`)"
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
