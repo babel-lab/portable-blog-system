@@ -1854,5 +1854,105 @@ check('101 admin index.ejs copyTextToClipboard() clipboard contract preserved', 
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-copy-buttons-okmsg-contract-hygiene-a:
+//   Lock the caller-side okMsg literals passed into copyTextToClipboard() by
+//   the two manual-import-flow Copy buttons (#npd-copy-path / #npd-copy-cmd),
+//   plus the empty-target-path guard literal surfaced by the same path
+//   button when the form is not yet complete.
+//
+//   This closes the explicit "out of scope" gap noted in smoke #101 around
+//   L1748: "Copy buttons' caller-side okMsg strings (caller-controlled;
+//   could be locked separately if drift surfaces)". Smoke #101 locks the
+//   helper-side contract (param-passthrough of okMsg, navigator + fallback
+//   path, failure literal counts); it cannot catch a caller that swaps
+//   '已複製 path' for a generic '已複製' because the helper would still
+//   passthrough whatever string the caller hands in.
+//
+//   Lock layering:
+//     - #100 showFlowStatus()    display contract (color / timing / guard)
+//     - #101 copyTextToClipboard() helper contract (modern + fallback paths)
+//     - #102 caller-side okMsg literals for the two Copy buttons
+//
+//   Contract:
+//     - #npd-copy-path click handler MUST call
+//       `copyTextToClipboard(tp, '已複製 path')` — locks both the param
+//       name (`tp`, the computed target path) and the caller-controlled
+//       success message Dean uses to confirm THIS button succeeded.
+//     - #npd-copy-path click handler MUST surface
+//       `showFlowStatus('target path 尚未合法', true)` when `tp === ''`.
+//       Locks the only user-visible surface that explains why the click
+//       did nothing when the date / slug fields are not yet complete.
+//     - #npd-copy-cmd click handler MUST call
+//       `copyTextToClipboard(VALIDATION_COMMAND, '已複製指令')` — locks
+//       both that the static VALIDATION_COMMAND constant flows through
+//       (not a recomputed string) AND the distinct success message Dean
+//       uses to confirm THIS button (not the path button) succeeded.
+//
+//   Anchor: `COPY_PATH_BTN.addEventListener('click',` and
+//   `COPY_CMD_BTN.addEventListener('click',` are UNIQUE substrings in the
+//   file (verified at smoke-authoring time via Grep, single occurrence
+//   each). The uniqueness assertions below would catch any future refactor
+//   that splits the handlers or duplicates them across IIFEs.
+//
+//   Scoping: rather than brace-count (the surrounding `if (COPY_PATH_BTN)
+//   { ... }` adds an extra nesting layer that complicates extraction), we
+//   slice a fixed-size proximity window after each anchor. The window
+//   matches the current handler size with comfortable headroom; a future
+//   refactor that grows the handler past the window would surface as a
+//   loud failure (not a silent regression) — at which point the window
+//   should be widened in step.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of
+//   scope: button wiring presence (handled by #95 / #96), guard short-
+//   circuit on `.disabled` (handled by #95 / #96), helper-side okMsg
+//   passthrough behavior (handled by #101).
+check('102 admin index.ejs manual import flow Copy buttons caller okMsg preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function sliceAfterUniqueAnchor(anchor, windowSize, label) {
+    const pos = src.indexOf(anchor);
+    assert.ok(pos > 0, `index.ejs MUST contain \`${anchor}\` (${label})`);
+    const dupPos = src.indexOf(anchor, pos + anchor.length);
+    assert.ok(
+      dupPos < 0,
+      `index.ejs MUST contain exactly one \`${anchor}\` (${label}); if intentional duplicate, add a disambiguation strategy`
+    );
+    return src.slice(pos, pos + windowSize);
+  }
+
+  // 1. #npd-copy-path click handler (~600 char current size; window 800
+  // gives headroom for one more guard line without a smoke maintenance pass).
+  const pathBlock = sliceAfterUniqueAnchor(
+    "COPY_PATH_BTN.addEventListener('click',",
+    800,
+    '#npd-copy-path click handler'
+  );
+
+  assert.ok(
+    pathBlock.includes("copyTextToClipboard(tp, '已複製 path')"),
+    "#npd-copy-path click handler MUST call `copyTextToClipboard(tp, '已複製 path')` — caller-side okMsg locks per-button success context"
+  );
+
+  assert.ok(
+    pathBlock.includes("showFlowStatus('target path 尚未合法', true)"),
+    "#npd-copy-path click handler MUST surface `showFlowStatus('target path 尚未合法', true)` when `tp === ''` — only user-visible surface explaining the empty-path skip"
+  );
+
+  // 2. #npd-copy-cmd click handler (~200 char current size; window 500
+  // gives headroom for the same reason as above).
+  const cmdBlock = sliceAfterUniqueAnchor(
+    "COPY_CMD_BTN.addEventListener('click',",
+    500,
+    '#npd-copy-cmd click handler'
+  );
+
+  assert.ok(
+    cmdBlock.includes("copyTextToClipboard(VALIDATION_COMMAND, '已複製指令')"),
+    "#npd-copy-cmd click handler MUST call `copyTextToClipboard(VALIDATION_COMMAND, '已複製指令')` — caller-side okMsg + static-constant passthrough"
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
