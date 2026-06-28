@@ -1383,5 +1383,102 @@ check('97 admin index.ejs recompute / debounceRecompute event wiring preserved',
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-missing-reason-copy-hygiene-a:
+//   Lock the user-facing literals returned by the inline missingReason()
+//   helper. recompute() writes its output into #npd-status whenever the
+//   export gate is closed (ready.missing populated). Smokes #93–#97 cover
+//   structural / behavioral contracts; #98 closes the remaining gap by
+//   locking the validation-missing hint copy.
+//
+//   Lock layering:
+//     - #95 locks initial HTML button attributes
+//     - #96 locks recompute() runtime re-gating
+//     - #97 locks event wiring that triggers recompute / debounceRecompute
+//     - #98 locks missingReason() validation hint output strings
+//
+//   Contract:
+//     - missingReason(missing) MUST early-return `''` when `missing` is
+//       null / undefined / empty (no false-positive hint when nothing is
+//       wrong).
+//     - The label map MUST contain the 3 literal entries Dean sees in
+//       the gate-closed status line:
+//         title: 'title'
+//         slug:  'slug (僅 a-z 0-9 -)'
+//         date:  'date (YYYY-MM-DD)'
+//     - The composition MUST use the Chinese prefix `'請補上：'` and join
+//       missing labels with the fullwidth comma `'、'`. Locked so a future
+//       "translation" pass can't silently swap the copy without surfacing
+//       here. Multi-field combination output (e.g. "請補上：title、slug")
+//       is composed dynamically — there are no hardcoded N-field literal
+//       strings to lock individually.
+//
+//   Scoping: extract the helper body via brace-counting from the unique
+//   `function missingReason(` anchor (same pattern as smoke #96's
+//   recompute() extractor). Safe because no `{`/`}` appear inside any of
+//   the locked string literals; future refactors that introduce such
+//   literals would surface as a loud extractor failure, not a silent
+//   regression.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of
+//   scope: success path / other UI message hygiene.
+check('98 admin index.ejs missingReason() validation hint output strings preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function extractMissingReasonBlock() {
+    const sig = 'function missingReason(';
+    const sigPos = src.indexOf(sig);
+    assert.ok(sigPos > 0, 'index.ejs MUST contain `function missingReason(`');
+    const openBrace = src.indexOf('{', sigPos);
+    assert.ok(openBrace > sigPos, '`function missingReason(...)` MUST have an opening `{`');
+    let depth = 0;
+    for (let i = openBrace; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return src.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('index.ejs `missingReason()` opening brace MUST have a matching close');
+  }
+
+  const block = extractMissingReasonBlock();
+
+  // 1. Empty / no-missing early-return. Locks both the guard predicate and
+  // the empty-string return so any rewrite that silently drops the early
+  // exit (or returns a non-empty hint when nothing's wrong) surfaces here.
+  assert.ok(
+    /if\s*\(\s*!missing\s*\|\|\s*missing\.length\s*===\s*0\s*\)\s*return\s*''/.test(block),
+    "`missingReason()` MUST early-return `''` for null / empty missing arrays"
+  );
+
+  // 2. Label literals: the user-facing label for each ready.missing field.
+  // These are exactly the strings #npd-status surfaces — silent drift here
+  // would change Dean's UX without breaking any other smoke.
+  const labelLits = [
+    "title: 'title'",
+    "slug: 'slug (僅 a-z 0-9 -)'",
+    "date: 'date (YYYY-MM-DD)'",
+  ];
+  for (const lit of labelLits) {
+    assert.ok(
+      block.includes(lit),
+      '`missingReason()` MUST contain label literal `' + lit + '`'
+    );
+  }
+
+  // 3. Output composition: Chinese prefix + fullwidth comma joiner.
+  assert.ok(
+    block.includes("'請補上：'"),
+    "`missingReason()` MUST use `'請補上：'` prefix for multi-missing output"
+  );
+  assert.ok(
+    block.includes(".join('、')"),
+    "`missingReason()` MUST join missing labels with fullwidth comma `'、'`"
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
