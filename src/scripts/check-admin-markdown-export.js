@@ -1288,5 +1288,100 @@ check('96 admin index.ejs recompute() runtime re-gating preserved', () => {
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-event-wiring-symmetry-hygiene-a:
+//   Lock the inline-script event-wiring tail that triggers recompute() /
+//   debounceRecompute(). Smokes #95 + #96 lock gating state (initial HTML
+//   attrs and runtime re-application inside recompute()) but neither
+//   catches a regression that drops one of the addEventListener rows —
+//   recompute() would stay mechanically correct yet never fire for the
+//   missing field.
+//
+//   Lock layering:
+//     - #95 locks initial HTML button attributes (slice2-a)
+//     - #96 locks recompute() runtime re-gating (assignment + setAttribute pair)
+//     - #97 locks event wiring that triggers recompute / debounceRecompute
+//
+//   Contract:
+//     - change-event wiring MUST contain the exact 4-element array
+//       `[SITE_EL, KIND_EL, PRIM_EL, CAT_EL]` and the literal listener
+//       `addEventListener('change', recompute)` co-located with it.
+//     - input-event wiring MUST contain the exact 9-element array
+//       `[TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL,
+//        COVER_EL, COVER_ALT_EL, BODY_EL]` and the literal listener
+//       `addEventListener('input', debounceRecompute)` co-located with it.
+//     - The wiring tail MUST end with a `recompute();` initial-paint call
+//       (after the input-event listener) so the first render is gated by
+//       the same readiness check the events feed.
+//
+//   Scoping: extract the tail from `function debounceRecompute()` (which
+//   sits immediately above the wiring) to the first `})();` (the
+//   markdown-export IIFE close) so the scan is local — not the whole
+//   inline script and certainly not the whole file. `function
+//   debounceRecompute()` is a unique anchor in this file (verified at
+//   smoke-authoring time); `})();` appears multiple times across the
+//   file but `indexOf` from the wiring start correctly captures the
+//   first one (the markdown-export IIFE close).
+//
+//   Pure EJS source string scan; no DOM, no headless browser.
+check('97 admin index.ejs recompute / debounceRecompute event wiring preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  const wiringStartSig = 'function debounceRecompute()';
+  const wiringStart = src.indexOf(wiringStartSig);
+  assert.ok(wiringStart > 0, 'index.ejs MUST contain `function debounceRecompute()`');
+  const iifeCloseLit = '})();';
+  const wiringEnd = src.indexOf(iifeCloseLit, wiringStart);
+  assert.ok(wiringEnd > wiringStart, 'index.ejs MUST contain `})();` IIFE close after debounceRecompute');
+  const tail = src.slice(wiringStart, wiringEnd + iifeCloseLit.length);
+
+  // 1. change-event wiring: exact 4-element array + co-located listener.
+  const changeArr = '[SITE_EL, KIND_EL, PRIM_EL, CAT_EL]';
+  const changeArrPos = tail.indexOf(changeArr);
+  assert.ok(
+    changeArrPos >= 0,
+    `wiring tail MUST contain change-event array \`${changeArr}\``
+  );
+  const changeListenerLit = "addEventListener('change', recompute)";
+  const changeListenerPos = tail.indexOf(changeListenerLit, changeArrPos);
+  assert.ok(
+    changeListenerPos >= 0,
+    `wiring tail MUST wire change-event array to \`${changeListenerLit}\``
+  );
+  assert.ok(
+    changeListenerPos - changeArrPos < 300,
+    `change-event array and listener MUST stay co-located (gap ${changeListenerPos - changeArrPos})`
+  );
+
+  // 2. input-event wiring: exact 9-element array + co-located listener.
+  const inputArr =
+    '[TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]';
+  const inputArrPos = tail.indexOf(inputArr);
+  assert.ok(
+    inputArrPos >= 0,
+    `wiring tail MUST contain input-event array \`${inputArr}\``
+  );
+  const inputListenerLit = "addEventListener('input', debounceRecompute)";
+  const inputListenerPos = tail.indexOf(inputListenerLit, inputArrPos);
+  assert.ok(
+    inputListenerPos >= 0,
+    `wiring tail MUST wire input-event array to \`${inputListenerLit}\``
+  );
+  assert.ok(
+    inputListenerPos - inputArrPos < 500,
+    `input-event array and listener MUST stay co-located (gap ${inputListenerPos - inputArrPos})`
+  );
+
+  // 3. Trailing initial-paint call AFTER the input wiring — so the first
+  // render runs through the same gating check as later events.
+  const initPaintLit = 'recompute();';
+  const initPaintPos = tail.indexOf(initPaintLit, inputListenerPos);
+  assert.ok(
+    initPaintPos >= 0,
+    'wiring tail MUST contain trailing `recompute();` initial-paint call after the input listener'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
