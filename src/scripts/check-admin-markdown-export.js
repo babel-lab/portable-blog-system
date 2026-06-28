@@ -1592,5 +1592,104 @@ check('99 admin index.ejs showStatus() display contract preserved', () => {
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-show-flow-status-display-contract-hygiene-a:
+//   Lock the inline showFlowStatus(msg, isErr) helper that drives every
+//   #npd-flow-status update. This is the manual-import-flow sibling of
+//   showStatus() — paired by design but a separate helper writing to a
+//   separate DOM target. The Copy target path / Copy validation command
+//   button handlers (and the inline copyTextToClipboard helper) all
+//   route their results through this function.
+//
+//   Lock layering:
+//     - #99  locks showStatus()     / STATUS_EL       (markdown-preview status)
+//     - #100 locks showFlowStatus() / FLOW_STATUS_EL  (manual-import-flow status)
+//
+//   Contract (mirrors #99 but for FLOW_STATUS_EL):
+//     - Error color literal: `'#a00'`
+//     - Success color literal: `'#080'`
+//     - Auto-clear timeout: `setTimeout(..., 2000)` — same 2s timing as
+//       the slice2-a comment at L4063 promises ("#npd-flow-status (2s clear)").
+//     - Clear-only-if-unchanged guard: `FLOW_STATUS_EL.textContent === msg`
+//       — same paired-message-safe pattern as showStatus().
+//
+//   Anchor: `function showFlowStatus(` is a UNIQUE substring in the file
+//   (verified at smoke-authoring time — single occurrence at L4064). No
+//   disambiguation needed unlike smoke #99 (which had 3 candidates). We
+//   still add a duplicate-check assertion so any future refactor that
+//   spawns a sibling helper in another IIFE surfaces here as a loud
+//   failure rather than a silent regression where the smoke could match
+//   the wrong copy.
+//
+//   Scoping: brace-count from the unique signature to the matching `}`.
+//   Safe because the body has no `{`/`}` inside string literals.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of
+//   scope: other status helpers, button wiring, or copy-text behavior.
+check('100 admin index.ejs showFlowStatus() display contract preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function extractShowFlowStatusBlock() {
+    const sig = 'function showFlowStatus(';
+    const sigPos = src.indexOf(sig);
+    assert.ok(sigPos > 0, 'index.ejs MUST contain `function showFlowStatus(`');
+    // Anchor uniqueness re-verified here so a future refactor that
+    // duplicates the helper across IIFEs (the way showStatus is) surfaces
+    // immediately rather than silently letting indexOf grab the first one.
+    const dupPos = src.indexOf(sig, sigPos + sig.length);
+    assert.ok(
+      dupPos < 0,
+      'index.ejs MUST contain exactly one `function showFlowStatus(` (no IIFE duplicates expected; if intentional, add a disambiguation strategy like smoke #99)'
+    );
+    const openBrace = src.indexOf('{', sigPos);
+    assert.ok(openBrace > sigPos, '`function showFlowStatus(...)` MUST have an opening `{`');
+    let depth = 0;
+    for (let i = openBrace; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return src.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('index.ejs `showFlowStatus()` opening brace MUST have a matching close');
+  }
+
+  const block = extractShowFlowStatusBlock();
+
+  // Sanity: helper MUST reference the FLOW_STATUS_EL closure variable
+  // (parallel to STATUS_EL for the markdown-preview helper locked by #99).
+  assert.ok(
+    block.includes('FLOW_STATUS_EL'),
+    'extracted showFlowStatus() MUST reference `FLOW_STATUS_EL` (manual-import-flow status closure)'
+  );
+
+  // 1. Error color literal.
+  assert.ok(
+    block.includes("'#a00'"),
+    "`showFlowStatus()` MUST use `'#a00'` for error color"
+  );
+
+  // 2. Success color literal.
+  assert.ok(
+    block.includes("'#080'"),
+    "`showFlowStatus()` MUST use `'#080'` for success color"
+  );
+
+  // 3. Auto-clear timeout: setTimeout(..., 2000). Regex tolerates whitespace
+  // variations around the delay arg but pins the literal `2000` value.
+  assert.ok(
+    /setTimeout\([\s\S]*?,\s*2000\s*\)/.test(block),
+    '`showFlowStatus()` MUST schedule the auto-clear via `setTimeout(..., 2000)`'
+  );
+
+  // 4. Clear-only-if-unchanged guard inside the setTimeout callback.
+  assert.ok(
+    block.includes('FLOW_STATUS_EL.textContent === msg'),
+    '`showFlowStatus()` MUST guard the auto-clear with `FLOW_STATUS_EL.textContent === msg`'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
