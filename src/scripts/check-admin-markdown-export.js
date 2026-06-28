@@ -1480,5 +1480,117 @@ check('98 admin index.ejs missingReason() validation hint output strings preserv
   );
 });
 
+// Phase 20260628-admin-markdown-import-flow-show-status-display-contract-hygiene-a:
+//   Lock the inline showStatus(msg, isErr) helper that drives every
+//   #npd-status update inside the markdown-export IIFE. recompute()'s
+//   validation-missing branch and the Copy / Download click handlers all
+//   route through this helper; #98 locked the validation-missing copy
+//   itself, but the display contract (colors / timing / unchanged-guard)
+//   was still un-locked until now.
+//
+//   Lock layering:
+//     - #95 locks initial HTML button attributes
+//     - #96 locks recompute() runtime re-gating
+//     - #97 locks event wiring that triggers recompute / debounceRecompute
+//     - #98 locks missingReason() validation hint output strings
+//     - #99 locks showStatus() display contract
+//
+//   Contract:
+//     - Error color literal: `'#a00'` (set when `isErr` truthy)
+//     - Success color literal: `'#080'` (set when `isErr` falsy)
+//     - Auto-clear timeout: `setTimeout(..., 2000)` — silent removal /
+//       change would either leave stale messages forever (delay dropped)
+//       or strobe too fast to read.
+//     - Clear-only-if-unchanged guard: `STATUS_EL.textContent === msg` —
+//       without this guard, a stale "clear" call from an earlier message
+//       could clobber a newer status update (common timing gotcha).
+//
+//   Disambiguation: the file contains THREE `function showStatus(`
+//   declarations (one per IIFE). Anchoring directly on `function
+//   showStatus(` would be ambiguous. We disambiguate by anchoring on the
+//   unique `function missingReason(` (locked by smoke #98) and searching
+//   the `function showStatus(` signature FORWARD from there — this
+//   deterministically lands on the markdown-export IIFE's version, which
+//   is the one paired with recompute() / missingReason() /
+//   debounceRecompute(). A sanity check then confirms the extracted block
+//   references the capitalized `STATUS_EL` closure variable (the other
+//   two IIFEs use lowercased `statusEl`).
+//
+//   Scoping: brace-count from `function showStatus(` (after disambiguation)
+//   to the matching `}`. Safe because the body has no `{`/`}` inside
+//   string literals; future refactors that introduce such literals would
+//   surface as a loud extractor failure, not a silent regression.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of
+//   scope: other status helpers (e.g. showFlowStatus / nested payload
+//   showStatus) or other UI message paths.
+check('99 admin index.ejs showStatus() display contract preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  function extractShowStatusBlock() {
+    const mrAnchor = 'function missingReason(';
+    const mrPos = src.indexOf(mrAnchor);
+    assert.ok(
+      mrPos > 0,
+      'index.ejs MUST contain `function missingReason(` (smoke #98 anchor used for disambiguation)'
+    );
+    const sig = 'function showStatus(';
+    const sigPos = src.indexOf(sig, mrPos);
+    assert.ok(
+      sigPos > mrPos,
+      'index.ejs MUST contain `function showStatus(` AFTER `function missingReason(` (markdown-export IIFE companion)'
+    );
+    const openBrace = src.indexOf('{', sigPos);
+    assert.ok(openBrace > sigPos, '`function showStatus(...)` MUST have an opening `{`');
+    let depth = 0;
+    for (let i = openBrace; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return src.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('index.ejs `showStatus()` opening brace MUST have a matching close');
+  }
+
+  const block = extractShowStatusBlock();
+
+  // Disambiguation sanity: confirm we landed on the markdown-export IIFE's
+  // showStatus (capitalized STATUS_EL), not one of the other two IIFEs'
+  // lowercased-statusEl versions.
+  assert.ok(
+    block.includes('STATUS_EL'),
+    'extracted showStatus() MUST reference `STATUS_EL` (markdown-export IIFE; other IIFEs use lowercased `statusEl`)'
+  );
+
+  // 1. Error color literal.
+  assert.ok(
+    block.includes("'#a00'"),
+    "`showStatus()` MUST use `'#a00'` for error color"
+  );
+
+  // 2. Success color literal.
+  assert.ok(
+    block.includes("'#080'"),
+    "`showStatus()` MUST use `'#080'` for success color"
+  );
+
+  // 3. Auto-clear timeout: setTimeout(..., 2000). Regex tolerates whitespace
+  // variations around the delay arg but pins the literal `2000` value.
+  assert.ok(
+    /setTimeout\([\s\S]*?,\s*2000\s*\)/.test(block),
+    '`showStatus()` MUST schedule the auto-clear via `setTimeout(..., 2000)`'
+  );
+
+  // 4. Clear-only-if-unchanged guard inside the setTimeout callback.
+  assert.ok(
+    block.includes('STATUS_EL.textContent === msg'),
+    '`showStatus()` MUST guard the auto-clear with `STATUS_EL.textContent === msg`'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
