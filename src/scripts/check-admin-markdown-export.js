@@ -2055,5 +2055,116 @@ check('103 admin index.ejs target-path empty-state copy does not mislead with `t
   );
 });
 
+// Phase 20260629-admin-markdown-import-flow-filename-empty-state-copy-hygiene-a:
+//   Lock the empty-state copy of the #npd-filename readout. Parallel to smoke
+//   #103 (which locks #npd-target-path against misleading `title` mentions in
+//   the empty-state copy), this smoke locks the sibling #npd-filename surface
+//   against the same regression class.
+//
+//   #npd-filename and #npd-target-path share the EXACT same trigger condition:
+//   both empty-state branches fire when buildFilename(date, slug) returns ''
+//   — i.e. when date OR slug is invalid. buildFilename ignores title entirely,
+//   so surfacing `title` in the empty-state prompt would point Dean at the
+//   wrong field, the same UX bug smoke #103 fixed for #npd-target-path.
+//
+//   Lock layering (regression net):
+//     - #93  markup hygiene  (5-step <ol>)
+//     - #94  client-mirror   (TARGET_FOLDERS / VALIDATION_COMMAND)
+//     - #95  initial gating  (initial HTML disabled / aria-disabled)
+//     - #96  runtime gating  (recompute() runtime re-gate)
+//     - #97  event wiring    (change / input listeners + initial paint)
+//     - #98  missing reason  (validation hint output strings)
+//     - #99  showStatus      (markdown-preview status display)
+//     - #100 showFlowStatus  (manual-import-flow status display)
+//     - #101 copyTextToClipboard (clipboard-side contract)
+//     - #102 caller-side okMsg literals for the two Copy buttons
+//     - #103 #npd-target-path empty-state copy hygiene
+//     - #104 #npd-filename    empty-state copy hygiene (this smoke)
+//
+//   Contract:
+//     - Initial DOM at `id="npd-filename"` MUST NOT include `title` (since
+//       buildFilename ignores title; mentioning it would mislead Dean).
+//     - Initial DOM MUST include both `slug` and `date` — the actual
+//       required inputs.
+//     - The recompute() runtime fallback `FN_EL.textContent = '…'` empty-state
+//       branch MUST NOT include `title` and MUST include both `slug` and `date`,
+//       mirroring the initial DOM contract. Locking both surfaces ensures
+//       they cannot drift apart silently (the same regression pattern smoke
+//       #103 catches for #npd-target-path).
+//
+//   Anchor uniqueness: there is exactly one `id="npd-filename"` in the file
+//   (verified at smoke-authoring time via Grep). Smoke surfaces any future
+//   refactor that duplicates the element across IIFEs by relying on
+//   indexOf — a second occurrence would shift the slice and almost
+//   certainly fail one of the contract checks.
+//
+//   Out of scope: success-branch readout (the variable assignment
+//   `FN_EL.textContent = fn` becomes the actual filename and is locked
+//   transitively by smokes #13–#17 / #29–#31). Cross-surface wording
+//   consistency between #npd-filename and #npd-target-path is intentionally
+//   NOT locked — the two readouts have different framing (filename label
+//   vs path prompt) and aligning their phrasing is a UX call, not a
+//   correctness contract.
+//
+//   Pure EJS source string scan; no DOM, no headless browser.
+check('104 admin index.ejs filename empty-state copy does not mislead with `title`', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  // 1. Initial DOM at #npd-filename. The element is a <span> (not <code>
+  //    like #npd-target-path), so we close on </span> instead of </code>.
+  const initAnchor = 'id="npd-filename"';
+  const initOpen = src.indexOf(initAnchor);
+  assert.ok(initOpen > 0, 'index.ejs MUST contain `id="npd-filename"`');
+  const tagClose = src.indexOf('>', initOpen);
+  assert.ok(tagClose > initOpen, '#npd-filename opening tag MUST close with `>`');
+  const elClose = src.indexOf('</span>', tagClose);
+  assert.ok(elClose > tagClose, '#npd-filename MUST be inside a <span>…</span>');
+  const initText = src.slice(tagClose + 1, elClose);
+
+  assert.ok(
+    !initText.includes('title'),
+    "#npd-filename initial text MUST NOT include `title` (buildFilename ignores title; mention would mislead Dean to the wrong field; got `" + initText + "`)"
+  );
+  assert.ok(
+    initText.includes('slug') && initText.includes('date'),
+    "#npd-filename initial text MUST include both `slug` and `date` (the actual required inputs; got `" + initText + "`)"
+  );
+
+  // 2. Runtime fallback inside recompute(). The success branch assigns the
+  //    `fn` variable (`FN_EL.textContent = fn;` — no quotes), so the regex
+  //    below naturally only matches the empty-state literal assignment.
+  //    Locking both surfaces ensures they cannot drift apart silently.
+  const reAssign = /FN_EL\.textContent\s*=\s*'([^']*)'/g;
+  const seen = [];
+  let m;
+  while ((m = reAssign.exec(src)) !== null) {
+    seen.push(m[1]);
+  }
+  assert.ok(
+    seen.length >= 1,
+    "recompute() MUST contain at least one `FN_EL.textContent = '…'` literal assignment (empty-state branch)"
+  );
+  // Find the empty-state literal — the one that uses the fullwidth `（`
+  // prompt prefix (current source: `（filename 待輸入合法 date + slug）`).
+  // Anchoring on `（` instead of the exact wording lets Dean later tweak
+  // the phrasing without breaking the smoke, while still pinning the
+  // anti-misleading + must-include-slug+date contract.
+  const emptyState = seen.find((s) => s.indexOf('（') === 0);
+  assert.ok(
+    typeof emptyState === 'string',
+    "recompute() MUST contain a `FN_EL.textContent = '（…）'` empty-state branch"
+  );
+  assert.ok(
+    !emptyState.includes('title'),
+    "recompute() empty-state for #npd-filename MUST NOT include `title` (buildFilename ignores title; mention would mislead Dean to the wrong field; got `" + emptyState + "`)"
+  );
+  assert.ok(
+    emptyState.includes('slug') && emptyState.includes('date'),
+    "recompute() empty-state for #npd-filename MUST include both `slug` and `date` (got `" + emptyState + "`)"
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
