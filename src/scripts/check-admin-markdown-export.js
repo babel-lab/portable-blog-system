@@ -2530,5 +2530,89 @@ check('108 admin index.ejs #npd-summary-filename initial DOM empty-state guard',
   );
 });
 
+// Phase 20260629-admin-markdown-summary-ready-initial-dom-runtime-parity-hygiene-a:
+//   #109 summary-strip ready-badge initial DOM ↔ runtime first-paint parity.
+//   The #npd-summary-target / -slug / -filename cells now have their initial DOM
+//   aligned to their runtime empty-state (smokes #103–#108). The remaining
+//   summary cell with an initial-vs-runtime literal drift was #npd-summary-ready:
+//   its initial DOM showed a bare `missing` badge, while the first recompute()
+//   on the default empty form (title / slug / date all blank) writes
+//   `missing title / slug / date` via `SUM_READY_EL.textContent =
+//   'missing ' + sum.ready.missing.join(' / ')` (renderExportSummary). In the
+//   brief pre-JS render window the badge therefore read `missing` (generic),
+//   then snapped to `missing title / slug / date` once JS ran. The fix aligns
+//   the initial DOM to the runtime first-paint composition exactly.
+//
+//   Lock layering (regression net):
+//     - #105 #npd-summary-target   empty-state color + suffix (runtime only)
+//     - #106 #npd-summary-target   initial DOM empty-state guard
+//     - #107 #npd-summary-slug     initial DOM empty-state guard
+//     - #108 #npd-summary-filename initial DOM empty-state guard
+//     - #109 #npd-summary-ready    initial DOM ↔ runtime first-paint parity (this slice)
+//
+//   Contract:
+//     - Element MUST exist exactly once (anchor uniqueness).
+//     - Opening tag MUST carry the not-ready badge class `b-draft` (the default
+//       empty form is never export-ready; runtime also keeps `b-draft` while
+//       `sum.ready.ok` is false — `SUM_READY_EL.className = 'badge b-draft'`).
+//     - innerText MUST EQUAL the runtime first-paint composition for the default
+//       empty form: `'missing ' + ['title','slug','date'].join(' / ')`. The
+//       expected string is rebuilt from the same join rule the runtime uses
+//       (not a hardcoded magic literal) so a future change to the runtime
+//       separator / prefix surfaces here as a parity failure.
+//
+//   Why title/slug/date specifically: the inputs `#npd-title` / `#npd-slug` /
+//   `#npd-date` ship with no `value=` attribute (placeholder-only), so
+//   isExportReady reports all three missing on first paint — verified at
+//   smoke-authoring time. The ready cell is the only summary cell whose runtime
+//   first-paint text is composed from the missing-field list.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of scope:
+//   the export-ready success branch (`export ok` + `b-ready`; reached only when
+//   isExportReady passes, transitively locked by smokes #34–#39 / #90), and the
+//   aria-live attribute (accessibility wiring, not a copy-parity contract).
+check('109 admin index.ejs #npd-summary-ready initial DOM matches runtime first-paint', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  const idLit = 'id="npd-summary-ready"';
+  const idPos = src.indexOf(idLit);
+  assert.ok(idPos > 0, 'index.ejs MUST contain `' + idLit + '`');
+  const dupPos = src.indexOf(idLit, idPos + idLit.length);
+  assert.ok(
+    dupPos < 0,
+    'index.ejs MUST contain exactly one `' + idLit + '` (no IIFE duplicates expected; if intentional, add a disambiguation strategy)'
+  );
+
+  const tagStart = src.lastIndexOf('<span', idPos);
+  assert.ok(tagStart > 0, '`' + idLit + '` MUST be inside a <span …> opening tag');
+  const tagEnd = src.indexOf('>', idPos);
+  assert.ok(tagEnd > idPos, '`' + idLit + '` opening tag MUST close with `>`');
+  const openTag = src.slice(tagStart, tagEnd + 1);
+  const closePos = src.indexOf('</span>', tagEnd);
+  assert.ok(closePos > tagEnd, '#npd-summary-ready MUST be inside a <span>…</span>');
+  const innerText = src.slice(tagEnd + 1, closePos);
+
+  // 1. Not-ready badge class. The default empty form is never export-ready, so
+  //    the initial badge MUST use `b-draft` (matches the runtime not-ready
+  //    branch `SUM_READY_EL.className = 'badge b-draft'`).
+  assert.ok(
+    /class="[^"]*\bb-draft\b/.test(openTag),
+    '#npd-summary-ready opening tag MUST carry the not-ready class `b-draft` (default form is never ready; mirrors runtime not-ready branch). Got: `' + openTag + '`'
+  );
+
+  // 2. Initial text MUST equal the runtime first-paint composition for the
+  //    default empty form. Rebuild the expected string from the same join rule
+  //    renderExportSummary() uses (`'missing ' + missing.join(' / ')`) with the
+  //    three fields isExportReady reports missing when title/slug/date are blank.
+  const expected = 'missing ' + ['title', 'slug', 'date'].join(' / ');
+  assert.equal(
+    innerText,
+    expected,
+    '#npd-summary-ready initial text MUST equal the runtime first-paint string `' + expected + '` (no initial-vs-runtime drift). Got: `' + innerText + '`'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
