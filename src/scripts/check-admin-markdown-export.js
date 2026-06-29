@@ -3334,5 +3334,49 @@ check('135 admin index.ejs client analyzeReadyGap mirrors bodyDefault warning + 
   );
 });
 
+// Phase 20260629-admin-target-filename-checklist-slice-a:
+//   Dean's real-draft note flagged that a manually-saved file whose name does
+//   not match the UI filename / target path diverges from the frontmatter slug.
+//   The manual-import checklist now (a) tells him the saved filename MUST match
+//   the target path / filename and (b) recommends Download (auto-names). These
+//   cases lock the reminder copy via short stable key-phrase scan of the
+//   import-flow block (NOT full-sentence text) and confirm the existing
+//   Copy / Download / Copy-target-path affordances are not removed.
+//   Pure EJS source string scan; no DOM, no execution.
+function extractImportFlowBlock() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const start = ejsSrc.indexOf('📥 Manual import flow');
+  assert.ok(start > 0, 'index.ejs MUST contain the 📥 Manual import flow block');
+  const end = ejsSrc.indexOf('</ol>', start);
+  assert.ok(end > start, 'import flow block MUST contain the checklist <ol>');
+  return ejsSrc.slice(start, end + '</ol>'.length);
+}
+
+check('136 admin import checklist warns filename must match target path + recommends Download', () => {
+  const block = extractImportFlowBlock();
+  // (a) filename / target-path consistency reminder.
+  assert.ok(block.includes('檔名必須與'), 'checklist MUST warn the saved 檔名 必須與 target path/filename match');
+  assert.ok(block.includes('完全一致'), 'checklist MUST stress 完全一致 (exact match)');
+  assert.ok(block.includes('target path'), 'checklist MUST reference the target path');
+  // (b) Download auto-names → recommended over hand-naming.
+  assert.ok(block.includes('建議優先用 Download'), 'checklist MUST recommend Download');
+  assert.ok(block.includes('自動以正確檔名'), 'checklist MUST state Download auto-names the file');
+});
+
+check('137 admin import checklist keeps Copy / Download / Copy target path affordances', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  // The new reminder copy must NOT have removed the existing buttons.
+  for (const id of ['id="npd-copy"', 'id="npd-download"', 'id="npd-copy-path"']) {
+    assert.ok(src.includes(id), 'index.ejs MUST keep button `' + id + '` (affordance preserved)');
+  }
+  for (const label of ['Copy markdown', 'Download .md', 'Copy target path']) {
+    assert.ok(src.includes(label), 'index.ejs MUST keep `' + label + '` affordance label');
+  }
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

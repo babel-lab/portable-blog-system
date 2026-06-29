@@ -2082,8 +2082,8 @@
         <span id="npd-flow-status" style="font-size: 0.8em;" aria-live="polite"></span>
       </div>
       <ol style="margin: 0.6rem 0 0; padding-left: 1.4rem; font-size: 0.82em; color: #1f2d3d; line-height: 1.7;">
-        <li><strong>Download .md</strong>（或 Copy markdown），取得 <code>{date}-{slug}.md</code> 檔案 — 此時檔案<strong>還在瀏覽器 / 剪貼簿</strong>，<strong>尚未進入 repo</strong></li>
-        <li>用 <strong>VS Code</strong> 或 Explorer 把 <code>.md</code> 手動存到 <strong>target folder</strong>（例：<code>content/github/posts/</code>）— 這一步完成後檔案才正式在 repo 內</li>
+        <li><strong>Download .md</strong>（或 Copy markdown），取得 <code>{date}-{slug}.md</code> 檔案 — <strong>建議優先用 Download</strong>，它會<strong>自動以正確檔名</strong>（<code>{date}-{slug}.md</code>）命名；用 Copy markdown 則需自行命名。此時檔案<strong>還在瀏覽器 / 剪貼簿</strong>，<strong>尚未進入 repo</strong></li>
+        <li>用 <strong>VS Code</strong> 或 Explorer 把 <code>.md</code> 手動存到 <strong>target folder</strong>（例：<code>content/github/posts/</code>）— <strong>存檔檔名必須與</strong>上方 <strong>target path / filename 完全一致</strong>（手動複製時請先按 <strong>Copy target path</strong>，再存成相同路徑 / 檔名），否則檔名會與 frontmatter <code>slug</code> 不一致。這一步完成後檔案才正式在 repo 內</li>
         <li>在 terminal 跑 <code>npm run validate:content</code> 檢查 frontmatter 與 schema（PASS 才算 import 完成）</li>
         <li>需要時用 <strong>VS Code</strong> 編修 body / category / tags / cover；本階段請維持 <code>status:"draft"</code> + <code>draft:true</code></li>
         <li>若日後要升 ready / published，請在 <strong>VS Code</strong> 手動改 frontmatter（Admin 永遠不切 status），改完再跑 <code>npm run validate:content</code> 確認 0 errors</li>
