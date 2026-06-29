@@ -2401,5 +2401,134 @@ check('106 admin index.ejs #npd-summary-target initial DOM empty-state guard', (
   );
 });
 
+// Phase 20260629-admin-markdown-summary-sibling-initial-dom-empty-state-color-hygiene-a:
+//   #107 + #108 sibling summary-strip initial DOM empty-state guards. Smoke #106
+//   locked the #npd-summary-target cell's initial DOM red empty-state and
+//   explicitly listed the sibling cells as the deferred next slice ("other
+//   summary strip cells (sibling SUM_SLUG_EL / SUM_FILENAME_EL initial DOM left
+//   for a separate slice if drift surfaces)"). The drift surfaced: the target
+//   cell rendered red `#a00` at initial paint while #npd-summary-slug and
+//   #npd-summary-filename still rendered default black — visually inconsistent
+//   in the brief pre-JS render window before recompute() flips them red (their
+//   runtime empty-state branches at SUM_SLUG_EL / SUM_FILENAME_EL already set
+//   `#a00`). The fix adds `style="color: #a00;"` to both initial-DOM cells and
+//   aligns the slug copy `（未填）` → `（未填 / 不合法）` to match its runtime
+//   empty-state text exactly.
+//
+//   Lock layering (regression net):
+//     - #103 #npd-target-path      empty-state copy hygiene (initial DOM + runtime)
+//     - #104 #npd-filename         empty-state copy hygiene (initial DOM + runtime)
+//     - #105 #npd-summary-target   empty-state color + suffix (runtime only)
+//     - #106 #npd-summary-target   initial DOM empty-state guard
+//     - #107 #npd-summary-slug     initial DOM empty-state guard (this slice)
+//     - #108 #npd-summary-filename initial DOM empty-state guard (this slice)
+//
+//   Contract (#107 — #npd-summary-slug):
+//     - Element MUST exist exactly once (anchor uniqueness).
+//     - Opening tag MUST carry inline `color: #a00` (matches runtime empty-state
+//       red set by `SUM_SLUG_EL.style.color = '#a00'`).
+//     - textContent MUST equal the runtime empty-state literal `（未填 / 不合法）`
+//       so the initial paint matches the runtime empty-state exactly (no drift).
+//
+//   Contract (#108 — #npd-summary-filename):
+//     - Element MUST exist exactly once (anchor uniqueness).
+//     - Opening tag MUST carry inline `color: #a00` (matches runtime empty-state
+//       red set by `SUM_FILENAME_EL.style.color = '#a00'`).
+//     - textContent MUST mention both `slug` and `date` (the actual
+//       buildFilename dependencies) but MUST NOT mention `title` — same
+//       anti-misleading regression class smokes #103 / #104 / #105 / #106 lock.
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of scope:
+//   runtime empty-state branches (locked transitively by smoke #105's pattern
+//   and buildExportSummary smokes #76-#86), non-empty success paths.
+check('107 admin index.ejs #npd-summary-slug initial DOM empty-state guard', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  const idLit = 'id="npd-summary-slug"';
+  const idPos = src.indexOf(idLit);
+  assert.ok(idPos > 0, 'index.ejs MUST contain `' + idLit + '`');
+  const dupPos = src.indexOf(idLit, idPos + idLit.length);
+  assert.ok(
+    dupPos < 0,
+    'index.ejs MUST contain exactly one `' + idLit + '` (no IIFE duplicates expected; if intentional, add a disambiguation strategy)'
+  );
+
+  const tagStart = src.lastIndexOf('<code', idPos);
+  assert.ok(tagStart > 0, '`' + idLit + '` MUST be inside a <code …> opening tag');
+  const tagEnd = src.indexOf('>', idPos);
+  assert.ok(tagEnd > idPos, '`' + idLit + '` opening tag MUST close with `>`');
+  const openTag = src.slice(tagStart, tagEnd + 1);
+  const closePos = src.indexOf('</code>', tagEnd);
+  assert.ok(closePos > tagEnd, '#npd-summary-slug MUST be inside a <code>…</code>');
+  const innerText = src.slice(tagEnd + 1, closePos);
+
+  // 1. Pending/error color in the opening tag's inline style. Matches the
+  //    runtime empty-state red (`SUM_SLUG_EL.style.color = '#a00'`) and the
+  //    sibling #npd-summary-target initial DOM locked by smoke #106.
+  assert.ok(
+    /style="[^"]*color:\s*#a00/.test(openTag),
+    '#npd-summary-slug opening tag MUST carry inline `color: #a00` (initial DOM empty-state red; mirrors runtime branch + smoke #106). Got: `' + openTag + '`'
+  );
+
+  // 2. textContent MUST equal the runtime empty-state literal so initial paint
+  //    matches runtime exactly (no drift). The runtime branch sets
+  //    `SUM_SLUG_EL.textContent = '（未填 / 不合法）'`.
+  assert.equal(
+    innerText,
+    '（未填 / 不合法）',
+    '#npd-summary-slug initial text MUST equal the runtime empty-state literal `（未填 / 不合法）` (no drift). Got: `' + innerText + '`'
+  );
+});
+
+check('108 admin index.ejs #npd-summary-filename initial DOM empty-state guard', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  const idLit = 'id="npd-summary-filename"';
+  const idPos = src.indexOf(idLit);
+  assert.ok(idPos > 0, 'index.ejs MUST contain `' + idLit + '`');
+  const dupPos = src.indexOf(idLit, idPos + idLit.length);
+  assert.ok(
+    dupPos < 0,
+    'index.ejs MUST contain exactly one `' + idLit + '` (no IIFE duplicates expected; if intentional, add a disambiguation strategy)'
+  );
+
+  const tagStart = src.lastIndexOf('<code', idPos);
+  assert.ok(tagStart > 0, '`' + idLit + '` MUST be inside a <code …> opening tag');
+  const tagEnd = src.indexOf('>', idPos);
+  assert.ok(tagEnd > idPos, '`' + idLit + '` opening tag MUST close with `>`');
+  const openTag = src.slice(tagStart, tagEnd + 1);
+  const closePos = src.indexOf('</code>', tagEnd);
+  assert.ok(closePos > tagEnd, '#npd-summary-filename MUST be inside a <code>…</code>');
+  const innerText = src.slice(tagEnd + 1, closePos);
+
+  // 1. Pending/error color in the opening tag's inline style. Matches the
+  //    runtime empty-state red (`SUM_FILENAME_EL.style.color = '#a00'`) and the
+  //    sibling #npd-summary-target initial DOM locked by smoke #106.
+  assert.ok(
+    /style="[^"]*color:\s*#a00/.test(openTag),
+    '#npd-summary-filename opening tag MUST carry inline `color: #a00` (initial DOM empty-state red; mirrors runtime branch + smoke #106). Got: `' + openTag + '`'
+  );
+
+  // 2. Empty-state copy MUST mention both `slug` and `date` — the actual
+  //    buildFilename dependencies. Same anti-misleading rule smokes #103 /
+  //    #104 / #105 / #106 lock for sibling cells.
+  assert.ok(
+    innerText.includes('slug') && innerText.includes('date'),
+    '#npd-summary-filename initial text MUST mention both `slug` and `date` (actual buildFilename inputs). Got: `' + innerText + '`'
+  );
+
+  // 3. Anti-misleading: MUST NOT mention `title`. buildFilename ignores title;
+  //    surfacing it would point Dean at the wrong field (same regression class
+  //    smokes #103 / #104 / #105 / #106 catch for sibling cells).
+  assert.ok(
+    !innerText.includes('title'),
+    '#npd-summary-filename initial text MUST NOT include `title` (buildFilename ignores title; mention would mislead Dean to the wrong field). Got: `' + innerText + '`'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
