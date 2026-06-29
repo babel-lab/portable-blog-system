@@ -2873,5 +2873,38 @@ check('112 admin index.ejs category helper references Ready preflight site-misma
   );
 });
 
+check('113 analyzeRegistryHints category entry.site=[] → no category-site-mismatch', () => {
+  // Mirror of case 71 (tag side) for the CATEGORY branch: an entry whose
+  // site=[] is interpreted as "no constraint" → no mismatch hint, regardless
+  // of the current input.site. Locks the documented invariant for categories
+  // (REGS only carries non-empty-site categories, so this branch was untested).
+  const localRegs = {
+    categories: [{ id: 'wildcard-cat', slug: 'wildcard-cat', site: [] }],
+  };
+  const r = analyzeRegistryHints(
+    { site: 'blogger', category: 'wildcard-cat', tags: '' },
+    localRegs
+  );
+  assert.equal(r.hasHints, false);
+  assert.deepEqual(r.hints, []);
+});
+
+check('114 analyzeRegistryHints mixed category + tag entry.site=[] → no hints', () => {
+  // Both branches simultaneously carry site=[] ("no constraint"); the combined
+  // registry must produce zero hints — neither the category nor the tag branch
+  // leaks a mismatch when the OTHER branch is also wildcard. Distinct from
+  // case 71 (tag-only) and case 113 (category-only).
+  const localRegs = {
+    categories: [{ id: 'wildcard-cat', slug: 'wildcard-cat', site: [] }],
+    tags: [{ id: 'wildcard-tag', slug: 'wildcard-tag', site: [] }],
+  };
+  const r = analyzeRegistryHints(
+    { site: 'github', category: 'wildcard-cat', tags: 'wildcard-tag' },
+    localRegs
+  );
+  assert.equal(r.hasHints, false);
+  assert.deepEqual(r.hints, []);
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
