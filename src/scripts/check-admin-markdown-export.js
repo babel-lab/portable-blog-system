@@ -2716,5 +2716,119 @@ check('110 admin buildMarkdown() client mirror frontmatter scaffold matches serv
   }
 });
 
+// Phase 20260629-admin-tag-picker-site-aware-options-a:
+//   Lock the tag picker's site-aware datalist behaviour. Dean's manual smoke
+//   surfaced that the #npd-tags autocomplete listed ALL tags.json ids
+//   regardless of the selected site, so on a GitHub draft he was offered
+//   Blogger-only tags (book / reading-notes …) mixed with the 3 GitHub-valid
+//   tags (github / vite / static-site) — and had to ignore the picker and type
+//   `github, vite` by hand. This slice filters the datalist by the selected
+//   site: server renders the default-github set; the inline renderTagOptions()
+//   rebuilds it on #npd-site change. Free text stays allowed (input remains
+//   type=text — NOT converted to a strict <select>).
+//
+//   This smoke locks four invariants so a future refactor cannot silently
+//   regress the UX back to an unfiltered / select-only picker:
+//     1. #npd-tags is a free-text input (type=text + list=npd-tags-options),
+//        never a <select id="npd-tags"> (manual entry MUST stay possible).
+//     2. The server-rendered <datalist id="npd-tags-options"> loop filters to
+//        the default site github (npdDefaultSite guard) so the initial DOM
+//        does not advertise cross-site tags on the default github form.
+//     3. The inline renderTagOptions(site) reads REGISTRY_SNAPSHOT.tags,
+//        filters each entry by `sites.indexOf(picked) < 0`, and rewrites
+//        TAGS_DATALIST_EL.innerHTML (the client mirror of the server filter).
+//     4. renderTagOptions is wired to #npd-site `change` AND called once at
+//        init, so switching site re-scopes the suggestions and the first
+//        paint is already github-scoped.
+//
+//   Pure EJS source string scan; no DOM, no headless browser.
+check('111 admin index.ejs tag picker datalist is site-aware (free-text preserved)', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  // 1. #npd-tags stays a free-text input bound to the datalist — never a select.
+  const tagsIdPos = src.indexOf('id="npd-tags"');
+  assert.ok(tagsIdPos > 0, 'index.ejs MUST contain an element with `id="npd-tags"`');
+  const tagsTagStart = src.lastIndexOf('<', tagsIdPos);
+  const tagsTagEnd = src.indexOf('>', tagsIdPos);
+  const tagsTag = src.slice(tagsTagStart, tagsTagEnd + 1);
+  assert.ok(
+    /^<input\b/.test(tagsTag),
+    '#npd-tags MUST be an <input> (free-text entry preserved), not converted to a control'
+  );
+  assert.ok(
+    /type="text"/.test(tagsTag),
+    '#npd-tags MUST keep `type="text"` (manual tag entry MUST stay possible)'
+  );
+  assert.ok(
+    /list="npd-tags-options"/.test(tagsTag),
+    '#npd-tags MUST stay bound to `list="npd-tags-options"` (datalist hint, not strict select)'
+  );
+  assert.ok(
+    src.indexOf('<select id="npd-tags"') < 0,
+    '#npd-tags MUST NOT become a <select> (strict select would drop free-text entry)'
+  );
+
+  // 2. Server-rendered datalist loop filters to the default site github.
+  const dlAnchor = '<datalist id="npd-tags-options">';
+  const dlOpen = src.indexOf(dlAnchor);
+  assert.ok(dlOpen > 0, 'index.ejs MUST contain `<datalist id="npd-tags-options">`');
+  const dlClose = src.indexOf('</datalist>', dlOpen);
+  assert.ok(dlClose > dlOpen, 'npd-tags-options datalist MUST close with </datalist>');
+  const dlBlock = src.slice(dlOpen, dlClose);
+  assert.ok(
+    dlBlock.includes("var npdDefaultSite = 'github'"),
+    "server datalist loop MUST define `var npdDefaultSite = 'github'` (default-site scope)"
+  );
+  assert.ok(
+    /tsiteArr\.indexOf\(npdDefaultSite\)\s*<\s*0\)\s*return/.test(dlBlock),
+    'server datalist loop MUST skip tags whose site list excludes the default site (initial DOM github-scoped)'
+  );
+
+  // 3. Inline renderTagOptions(site) mirrors the server filter on the client.
+  function extractRenderTagOptionsBlock() {
+    const sig = 'function renderTagOptions(';
+    const sigPos = src.indexOf(sig);
+    assert.ok(sigPos > 0, 'index.ejs MUST contain `function renderTagOptions(`');
+    const dupPos = src.indexOf(sig, sigPos + sig.length);
+    assert.ok(dupPos < 0, 'index.ejs MUST contain exactly one `function renderTagOptions(`');
+    const openBrace = src.indexOf('{', sigPos);
+    let depth = 0;
+    for (let i = openBrace; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return src.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('renderTagOptions() opening brace MUST have a matching close');
+  }
+  const rtoBlock = extractRenderTagOptionsBlock();
+  assert.ok(
+    rtoBlock.includes('REGISTRY_SNAPSHOT.tags'),
+    'renderTagOptions() MUST source options from `REGISTRY_SNAPSHOT.tags` (injected registry mirror)'
+  );
+  assert.ok(
+    /sites\.indexOf\(picked\)\s*<\s*0\)\s*continue/.test(rtoBlock),
+    'renderTagOptions() MUST filter out tags whose site list excludes the selected site'
+  );
+  assert.ok(
+    rtoBlock.includes('TAGS_DATALIST_EL.innerHTML'),
+    'renderTagOptions() MUST rewrite `TAGS_DATALIST_EL.innerHTML` (rebuild the datalist)'
+  );
+
+  // 4. Wired to #npd-site change AND called at init.
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderTagOptions\(SITE_EL\.value\)/.test(src),
+    'renderTagOptions MUST be wired to #npd-site `change` (re-scope suggestions on site switch)'
+  );
+  assert.ok(
+    /\n\s*renderTagOptions\(SITE_EL\.value\);/.test(src),
+    'renderTagOptions(SITE_EL.value) MUST be called once at init (first paint github-scoped)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
