@@ -2830,5 +2830,48 @@ check('111 admin index.ejs tag picker datalist is site-aware (free-text preserve
   );
 });
 
+// Phase 20260629-admin-category-helper-site-mismatch-copy-a:
+//   Lock the category picker's helper text so it stays consistent with the
+//   site-aware tag picker helper. The old copy ("draft 不檢查 site mismatch")
+//   was misleading: although the Admin export never blocks on site mismatch
+//   (it always emits status:"draft"), the Ready preflight panel DOES surface
+//   category-site-mismatch / unknown-category via analyzeRegistryHints
+//   (smoke 63-75 / 87). Telling Dean it is "不檢查" invites him to ignore a
+//   real cross-site category warning the panel already raises — the same class
+//   of manual error the tag picker helper guards against. This smoke pins the
+//   corrected copy so a future edit cannot silently regress to the misleading
+//   "不檢查" wording.
+//
+//   Pure EJS source string scan; no DOM, no headless browser.
+check('112 admin index.ejs category helper references Ready preflight site-mismatch (not "不檢查")', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  // Locate the category select, then the helper <span> that follows its close.
+  const catIdPos = src.indexOf('id="npd-category"');
+  assert.ok(catIdPos > 0, 'index.ejs MUST contain an element with `id="npd-category"`');
+  const selClose = src.indexOf('</select>', catIdPos);
+  assert.ok(selClose > catIdPos, '#npd-category MUST be a <select> that closes with </select>');
+  const helperOpen = src.indexOf('<span class="text-muted"', selClose);
+  assert.ok(helperOpen > selClose, 'category row MUST have a `<span class="text-muted">` helper after the select');
+  const helperClose = src.indexOf('</span>', helperOpen);
+  assert.ok(helperClose > helperOpen, 'category helper <span> MUST close with </span>');
+  const helper = src.slice(helperOpen, helperClose);
+
+  assert.ok(
+    helper.includes('category-site-mismatch'),
+    'category helper MUST reference `category-site-mismatch` (mirror the tag picker helper)'
+  );
+  assert.ok(
+    helper.includes('Ready preflight'),
+    'category helper MUST point Dean at the Ready preflight panel that surfaces the warning'
+  );
+  assert.ok(
+    !helper.includes('不檢查'),
+    'category helper MUST NOT claim site mismatch is "不檢查" — the Ready preflight panel does surface it'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

@@ -1920,7 +1920,7 @@
                 <option value="<%= cid %>" data-site="<%= csites %>"><%= cid %> — <%= cname %><% if (csites) { %> [<%= csites %>]<% } %></option>
               <% }); %>
             </select>
-            <span class="text-muted" style="font-size: 0.82em;">→ 來源 <code>categories.json</code>；draft 不檢查 site mismatch</span>
+            <span class="text-muted" style="font-size: 0.82em;">→ 來源 <code>categories.json</code>；draft export 不擋，但 Ready preflight 會顯示 <code>unknown-category</code> / <code>category-site-mismatch</code> warning（與 tags 一致）</span>
           </td>
         </tr>
         <tr>
