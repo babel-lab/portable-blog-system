@@ -2295,5 +2295,111 @@ check('105 admin index.ejs renderExportSummary() target empty-state color + suff
   );
 });
 
+// Phase 20260629-admin-markdown-summary-target-initial-dom-empty-state-color-hygiene-a:
+//   #106 summary target initial DOM empty-state guard. Closes the gap that smoke
+//   #105 explicitly listed as out-of-scope ("initial DOM at `id=\"npd-summary-target\"`
+//   — that placeholder is overwritten the moment recompute() fires"). Smoke #103
+//   and #104 already lock initial DOM for sibling cells (#npd-target-path /
+//   #npd-filename); the summary strip's target cell was the only one without an
+//   initial-DOM lock, leaving a brief pre-JS render window where the cell looked
+//   "complete" (default black color, bare folder) before recompute() flipped it to
+//   the red empty-state. The fix appends the same `（待 date + slug）` suffix the
+//   runtime branch uses and adds `style="color: #a00;"` so the initial paint
+//   matches the runtime empty-state visually.
+//
+//   Lock layering (regression net):
+//     - #93  markup hygiene  (5-step <ol>)
+//     - #94  client-mirror   (TARGET_FOLDERS / VALIDATION_COMMAND)
+//     - #95  initial gating  (initial HTML disabled / aria-disabled)
+//     - #96  runtime gating  (recompute() runtime re-gate)
+//     - #97  event wiring    (change / input listeners + initial paint)
+//     - #98  missing reason  (validation hint output strings)
+//     - #99  showStatus      (markdown-preview status display)
+//     - #100 showFlowStatus  (manual-import-flow status display)
+//     - #101 copyTextToClipboard (clipboard-side contract)
+//     - #102 caller-side okMsg literals for the two Copy buttons
+//     - #103 #npd-target-path    empty-state copy hygiene (initial DOM + runtime)
+//     - #104 #npd-filename       empty-state copy hygiene (initial DOM + runtime)
+//     - #105 #npd-summary-target empty-state color + suffix (runtime only)
+//     - #106 #npd-summary-target initial DOM empty-state guard (this smoke)
+//
+//   Contract:
+//     - The element with `id="npd-summary-target"` MUST exist exactly once in the
+//       file (anchor uniqueness; mirrors smokes #100 / #101 / #102).
+//     - Its opening tag MUST carry an inline style containing `color: #a00`
+//       (matches sibling SUM_FILENAME_EL / SUM_SLUG_EL empty-state red color
+//       locked by smoke #105's runtime contract).
+//     - Its textContent MUST include the literal `content/github/posts/`
+//       (default `github` site folder; mirrors smoke #94's initial DOM contract
+//       for #npd-target-folder).
+//     - Its textContent MUST mention both `slug` and `date` — the actual
+//       buildTargetPath dependencies (same anti-misleading rule smokes #103 /
+//       #104 / #105 lock for sibling empty-state copy).
+//     - Its textContent MUST NOT mention `title` — buildTargetPath ignores
+//       title; surfacing it would point Dean at the wrong field (same
+//       regression class smokes #103 / #104 / #105 catch).
+//
+//   Pure EJS source string scan; no DOM, no headless browser. Out of scope:
+//   runtime empty-state branch (locked by #105), non-empty success path
+//   (transitively locked by buildExportSummary smokes #76-#86), other summary
+//   strip cells (sibling SUM_SLUG_EL / SUM_FILENAME_EL initial DOM left for a
+//   separate slice if drift surfaces).
+check('106 admin index.ejs #npd-summary-target initial DOM empty-state guard', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+
+  const idLit = 'id="npd-summary-target"';
+  const idPos = src.indexOf(idLit);
+  assert.ok(idPos > 0, 'index.ejs MUST contain `' + idLit + '`');
+  const dupPos = src.indexOf(idLit, idPos + idLit.length);
+  assert.ok(
+    dupPos < 0,
+    'index.ejs MUST contain exactly one `' + idLit + '` (no IIFE duplicates expected; if intentional, add a disambiguation strategy)'
+  );
+
+  const tagStart = src.lastIndexOf('<code', idPos);
+  assert.ok(tagStart > 0, '`' + idLit + '` MUST be inside a <code …> opening tag');
+  const tagEnd = src.indexOf('>', idPos);
+  assert.ok(tagEnd > idPos, '`' + idLit + '` opening tag MUST close with `>`');
+  const openTag = src.slice(tagStart, tagEnd + 1);
+  const closePos = src.indexOf('</code>', tagEnd);
+  assert.ok(closePos > tagEnd, '#npd-summary-target MUST be inside a <code>…</code>');
+  const innerText = src.slice(tagEnd + 1, closePos);
+
+  // 1. Pending/error color in the opening tag's inline style. Matches sibling
+  //    SUM_FILENAME_EL / SUM_SLUG_EL empty-state red color (locked by smoke
+  //    #105's runtime contract). Whitespace-tolerant so a future formatter
+  //    pass cannot silently drop the lock.
+  assert.ok(
+    /style="[^"]*color:\s*#a00/.test(openTag),
+    '#npd-summary-target opening tag MUST carry inline `color: #a00` (initial DOM empty-state red; mirrors runtime branch locked by #105). Got: `' + openTag + '`'
+  );
+
+  // 2. Base path. The default site is github, so the readout MUST start with
+  //    the github posts folder — mirrors smoke #94's initial DOM contract for
+  //    #npd-target-folder (which locks the exact `content/github/posts/` literal).
+  assert.ok(
+    innerText.includes('content/github/posts/'),
+    '#npd-summary-target initial text MUST include `content/github/posts/` (default github folder; mirrors smoke #94). Got: `' + innerText + '`'
+  );
+
+  // 3. Empty-state copy MUST mention both `slug` and `date` — the actual
+  //    buildTargetPath dependencies. Same anti-misleading rule smokes #103 /
+  //    #104 / #105 lock for sibling cells.
+  assert.ok(
+    innerText.includes('slug') && innerText.includes('date'),
+    '#npd-summary-target initial text MUST mention both `slug` and `date` (actual buildTargetPath inputs). Got: `' + innerText + '`'
+  );
+
+  // 4. Anti-misleading: MUST NOT mention `title`. buildTargetPath ignores
+  //    title; surfacing it would point Dean at the wrong field (same
+  //    regression class smokes #103 / #104 / #105 catch for sibling cells).
+  assert.ok(
+    !innerText.includes('title'),
+    '#npd-summary-target initial text MUST NOT include `title` (buildTargetPath ignores title; mention would mislead Dean to the wrong field). Got: `' + innerText + '`'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
