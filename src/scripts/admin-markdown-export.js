@@ -198,6 +198,7 @@ const READY_WARNING_LABELS = {
   titleLength: 'title 長度 > 60（validator long-title soft warning）',
   descriptionLength: 'description 長度 > 160（validator long-description soft warning）',
   titleEnLength: 'titleEn 長度 > 80（建議精簡；不擋 ready）',
+  bodyDefault: 'body 仍是預設範例，建議改成正式正文；不擋 ready',
 };
 
 const READY_UNSUPPORTED_REASONS = {
@@ -405,6 +406,11 @@ export function analyzeReadyGap(input) {
   ).trim();
   const coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).trim();
   const titleEn = String(safeInput.titleEn == null ? '' : safeInput.titleEn).trim();
+  // Phase 20260629-admin-body-default-warning-slice-a:
+  //   Effective body trimmed. Empty body falls back to defaultBody() in
+  //   buildPostMarkdown, so empty and the untouched scaffold both count as "not
+  //   yet written" for the soft warning below.
+  const bodyTrim = String(safeInput.body == null ? '' : safeInput.body).trim();
   const contentKind = typeof safeInput.contentKind === 'string' ? safeInput.contentKind : '';
 
   const blocking = [];
@@ -436,6 +442,13 @@ export function analyzeReadyGap(input) {
   //   over-length value adds a soft warning. Never blocking; never required.
   if (titleEn.length > READY_MAX_TITLE_EN_LEN) {
     warnings.push({ field: 'titleEnLength', label: READY_WARNING_LABELS.titleEnLength });
+  }
+  // Phase 20260629-admin-body-default-warning-slice-a:
+  //   Soft hint when the body is still empty or the untouched defaultBody()
+  //   scaffold (Dean forgot to write the post). warning-only — never blocking,
+  //   never required, never alters buildPostMarkdown output.
+  if (bodyTrim === '' || bodyTrim === defaultBody().trim()) {
+    warnings.push({ field: 'bodyDefault', label: READY_WARNING_LABELS.bodyDefault });
   }
 
   const unsupported = [];

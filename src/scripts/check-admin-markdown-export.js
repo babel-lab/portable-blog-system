@@ -343,7 +343,10 @@ function fieldNames(arr) {
 }
 
 check('40 analyzeReadyGap happy → ok=true, summary=ready-candidate', () => {
-  const r = analyzeReadyGap(readyHappy);
+  // readyHappy carries no body; a true ready candidate has real content, so
+  // pass one here to keep the no-warnings assertion meaningful (an empty /
+  // default body now raises the soft bodyDefault warning — locked by #132–135).
+  const r = analyzeReadyGap({ ...readyHappy, body: '## 正文\n\n實際撰寫的內容。' });
   assert.equal(r.ok, true, 'ok must be true when nothing blocking / unsupported');
   assert.deepEqual(r.blocking, []);
   assert.deepEqual(r.warnings, []);
@@ -3258,6 +3261,77 @@ check('131 admin index.ejs client normalizeTags mirrors server trim/drop/dedupe/
   assert.ok(block.includes('seen[s] = true'), 'client normalizeTags MUST record seen tags');
   // 5. Preserves first-occurrence order by pushing in input order.
   assert.ok(block.includes('out.push(s)'), 'client normalizeTags MUST preserve order via out.push');
+});
+
+// Phase 20260629-admin-body-default-warning-slice-a:
+//   analyzeReadyGap now raises a soft, Admin-only Ready-preflight warning
+//   (field 'bodyDefault') when the body is still empty or the untouched
+//   defaultBody() scaffold — Dean forgot to write the post before exporting.
+//   warning-only: never blocking, never required, never alters
+//   buildPostMarkdown output. The default-body string is obtained via a
+//   round-trip (buildPostMarkdown with empty body emits defaultBody) so the
+//   test needs no extra export of the helper.
+const readyHappyBody = { ...readyHappy, body: '## 正文\n\n實際撰寫的內容，已非預設範例。' };
+
+check('132 analyzeReadyGap default body → soft warning bodyDefault (not blocking, ready not gated)', () => {
+  // The exact defaultBody scaffold, recovered from an empty-body export.
+  const defaultBodyStr = matter(buildPostMarkdown({ ...readyHappy, body: '' })).content;
+  const r = analyzeReadyGap({ ...readyHappy, body: defaultBodyStr });
+  assert.ok(fieldNames(r.warnings).includes('bodyDefault'), 'unchanged scaffold MUST warn');
+  // soft only: never blocking, and the warning does not flip ok=false.
+  assert.ok(!fieldNames(r.blocking).includes('bodyDefault'));
+  assert.equal(r.ok, true);
+  assert.equal(r.summary, 'ready-candidate');
+});
+
+check('133 analyzeReadyGap empty / missing / whitespace body → bodyDefault warning (fallback)', () => {
+  assert.ok(fieldNames(analyzeReadyGap({ ...readyHappy, body: '' }).warnings).includes('bodyDefault'));
+  assert.ok(fieldNames(analyzeReadyGap({ ...readyHappy, body: '   \n  ' }).warnings).includes('bodyDefault'));
+  // key absent → buildPostMarkdown falls back to defaultBody, so it also warns.
+  assert.ok(fieldNames(analyzeReadyGap(readyHappy).warnings).includes('bodyDefault'));
+});
+
+check('134 analyzeReadyGap rewritten body → no bodyDefault warning', () => {
+  const r = analyzeReadyGap(readyHappyBody);
+  assert.ok(!fieldNames(r.warnings).includes('bodyDefault'), 'real content MUST NOT warn');
+  // and the rewritten-body fixture is otherwise a clean ready candidate.
+  assert.deepEqual(r.warnings, []);
+});
+
+check('135 admin index.ejs client analyzeReadyGap mirrors bodyDefault warning + defaultBody compare', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const sig = 'function analyzeReadyGap(input) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain client `function analyzeReadyGap(input) {`');
+  assert.ok(
+    ejsSrc.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one client analyzeReadyGap (no duplicate)'
+  );
+  let depth = 0;
+  let block = '';
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { block = ejsSrc.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(block, 'client analyzeReadyGap block MUST be brace-balanced');
+  // Reads body and compares against defaultBody() (server parity).
+  assert.ok(block.includes('safeInput.body'), 'client MUST read safeInput.body');
+  assert.ok(block.includes('defaultBody()'), 'client MUST compare against defaultBody()');
+  assert.ok(
+    block.includes("field: 'bodyDefault'"),
+    'client MUST push the bodyDefault warning'
+  );
+  // And the label constant exists (panel renders it generically).
+  assert.ok(
+    ejsSrc.includes('bodyDefault:'),
+    'client READY_WARNING_LABELS MUST define a bodyDefault label'
+  );
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);

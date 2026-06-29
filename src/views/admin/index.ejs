@@ -3647,7 +3647,8 @@
         coverAlt: 'coverAlt 空（建議補；不影響 baseline）',
         titleLength: 'title 長度 > 60（validator long-title soft warning）',
         descriptionLength: 'description 長度 > 160（validator long-description soft warning）',
-        titleEnLength: 'titleEn 長度 > 80（建議精簡；不擋 ready）'
+        titleEnLength: 'titleEn 長度 > 80（建議精簡；不擋 ready）',
+        bodyDefault: 'body 仍是預設範例，建議改成正式正文；不擋 ready'
       };
       var READY_UNSUPPORTED_REASONS = {
         'book-review': 'book-review 需 book.title / book.authors / book.publisher / affiliate.* 等欄位；Admin 表單未收集，第一版不建議直接切 ready。',
@@ -3665,6 +3666,10 @@
         var searchDescription = String(safeInput.searchDescription == null ? '' : safeInput.searchDescription).replace(/^\s+|\s+$/g, '');
         var coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).replace(/^\s+|\s+$/g, '');
         var titleEn = String(safeInput.titleEn == null ? '' : safeInput.titleEn).replace(/^\s+|\s+$/g, '');
+        // Phase 20260629-admin-body-default-warning-slice-a (mirror server):
+        //   empty body falls back to defaultBody() at export, so empty and the
+        //   untouched scaffold both count as "not yet written".
+        var bodyTrim = String(safeInput.body == null ? '' : safeInput.body).replace(/^\s+|\s+$/g, '');
         var contentKind = typeof safeInput.contentKind === 'string' ? safeInput.contentKind : '';
         var blocking = [];
         if (titleRaw === '') blocking.push({ field: 'title', label: READY_FIELD_LABELS.title });
@@ -3680,6 +3685,7 @@
         if (titleRaw.length > READY_MAX_TITLE_LEN) warnings.push({ field: 'titleLength', label: READY_WARNING_LABELS.titleLength });
         if (description.length > READY_MAX_DESCRIPTION_LEN) warnings.push({ field: 'descriptionLength', label: READY_WARNING_LABELS.descriptionLength });
         if (titleEn.length > READY_MAX_TITLE_EN_LEN) warnings.push({ field: 'titleEnLength', label: READY_WARNING_LABELS.titleEnLength });
+        if (bodyTrim === '' || bodyTrim === defaultBody().replace(/^\s+|\s+$/g, '')) warnings.push({ field: 'bodyDefault', label: READY_WARNING_LABELS.bodyDefault });
         var unsupported = [];
         if (READY_UNSUPPORTED_KINDS.indexOf(contentKind) >= 0) {
           unsupported.push({ contentKind: contentKind, reason: READY_UNSUPPORTED_REASONS[contentKind] });
