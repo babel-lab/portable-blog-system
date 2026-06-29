@@ -3208,5 +3208,57 @@ check('130 admin index.ejs client buildExportSummary limits mirror READY_MAX_* c
   );
 });
 
+// Phase 20260629-admin-normalize-tags-client-parity-slice-a:
+//   The Admin tag input is a comma string, normalized client-side by the inline
+//   normalizeTags() in index.ejs and server-side by normalizeTagsInput() in
+//   admin-markdown-export.js. The server behavior is exercised indirectly
+//   (buildExportSummary tag counter, smoke 86) but the CLIENT mirror had no
+//   parity lock. normalizeTags is inline EJS (not importable), so this locks
+//   its four core semantics — trim / drop-empty / dedupe / first-occurrence
+//   order — via stable key-substring scan of the extracted block (NOT
+//   full-function text). Pure EJS source string scan; no DOM, no execution.
+check('131 admin index.ejs client normalizeTags mirrors server trim/drop/dedupe/order', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const sig = 'function normalizeTags(raw) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain client `function normalizeTags(raw) {`');
+  assert.ok(
+    ejsSrc.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one client normalizeTags (no duplicate)'
+  );
+  let depth = 0;
+  let block = '';
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { block = ejsSrc.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(block, 'client normalizeTags block MUST be brace-balanced');
+
+  // 1. Splits the comma string into candidate tags (server normalizeTagsInput
+  //    does the same for its string branch).
+  assert.ok(block.includes("split(',')"), 'client normalizeTags MUST split on comma');
+  // 2. Trims each candidate (leading/trailing whitespace).
+  assert.ok(
+    block.includes('.replace(/^\\s+|\\s+$/g, \'\')'),
+    'client normalizeTags MUST trim each tag'
+  );
+  // 3. Drops empties after trim.
+  assert.ok(block.includes("s === ''"), 'client normalizeTags MUST drop empty tags');
+  // 4. Dedupes via a seen map (first occurrence wins).
+  assert.ok(
+    block.includes('Object.prototype.hasOwnProperty.call(seen, s)'),
+    'client normalizeTags MUST skip already-seen tags (dedupe)'
+  );
+  assert.ok(block.includes('seen[s] = true'), 'client normalizeTags MUST record seen tags');
+  // 5. Preserves first-occurrence order by pushing in input order.
+  assert.ok(block.includes('out.push(s)'), 'client normalizeTags MUST preserve order via out.push');
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
