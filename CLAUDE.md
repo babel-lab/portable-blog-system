@@ -206,9 +206,9 @@ See also（單一查詢入口）：
 - `docs/claude-md-ledger-archive/20260616-current-state-ledger-pointer-index.md`（完整 current state + 歷史 ledger pointer 索引；§5–§10 涵蓋 BLOG / ADMIN / Blogger / GitHub Pages / AdSense / GA4 / commerce / download / reverse UTM / FB sidecar / Phase 1 final）
 - `docs/20260628-claude-md-state-archive-docs-only-a.md`（本次 housekeeping 搬出之完整 phase commits / prior baseline chain / Admin Markdown 8-layer 100/100 smoke milestone 詳述）
 
-最新 frozen baseline（2026-06-29）：branch `main`、HEAD = origin/main = `61cefdd`（full `61cefdd3ad60e59beaef1e8a4acfb1d107cd6513`）、subject `docs(state): archive admin markdown history`、ahead/behind 0/0、working tree clean、index.lock absent（此 frozen pointer 不追 docs-only sync；actual HEAD 以 `git log -1` 為準）。Admin Markdown export/import hygiene 自 8-layer **100/100 milestone**（`a546ae9`）後持續加固至 **141/141**（titleEn 三刀 #115–126 + client-mirror parity #127–131 + body-default warning #132–135 + filename checklist #136–137 + coverAlt-without-cover warning #138–141；逐項見 archive §3 / §6）。Validation snapshot：`validate:content` 0/134/106、page-type validator 110/0、`check:admin-markdown-export` **141/141 PASS**、`build:github` PASS、`build:blogger` PASS。**無** live/backend/Admin/GA4/AdSense/Search Console/Blogger/Google Form/Google Drive 後台動作；repo **無**新增 secrets / Drive IDs / Form URLs / tokens / respondent data。
+最新 frozen baseline（2026-06-29）：branch `main`、HEAD = origin/main = `61cefdd`（full `61cefdd3ad60e59beaef1e8a4acfb1d107cd6513`）、subject `docs(state): archive admin markdown history`、ahead/behind 0/0、working tree clean、index.lock absent（此 frozen pointer 不追 docs-only sync；actual HEAD 以 `git log -1` 為準）。Admin Markdown export/import hygiene 自 8-layer **100/100 milestone**（`a546ae9`）後持續加固至 **145/145**（titleEn 三刀 #115–126 + client-mirror parity #127–131 + body-default warning #132–135 + filename checklist #136–137 + coverAlt-without-cover warning #138–141 + second-H1 fence-aware warning #142–145；逐項見 archive §3 / §6）。Validation snapshot：`validate:content` 0/134/106、page-type validator 110/0、`check:admin-markdown-export` **145/145 PASS**、`build:github` PASS、`build:blogger` PASS。**無** live/backend/Admin/GA4/AdSense/Search Console/Blogger/Google Form/Google Drive 後台動作；repo **無**新增 secrets / Drive IDs / Form URLs / tokens / respondent data。
 
-**Recent phase commits**（最近 3 條；#101–#126 全 slice 史見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §6，更早 commits 與 prior baseline chain 見 §1 / §2）：`2a20322` coverAlt-without-cover warning（#138–141：warning-only `coverAltWithoutCover`；cover 空 + coverAlt 有值 → warn、兩者都有值 / 都空 → 無 warn；不 blocking、不改 ready/export/frontmatter；server `analyzeReadyGap` + client mirror parity）/ `3ee58e8` filename ↔ target path checklist（#136–137：checklist 強調存檔檔名須與 target path / filename 完全一致、建議 Download 自動命名 `{date}-{slug}.md`；copy-only，affordance 保留）/ `433f8af` body default soft warning（#132–135：warning-only `bodyDefault`；default / blank / missing body → warn、modified body → 無 warn；server `analyzeReadyGap` + client mirror parity）。
+**Recent phase commits**（最近 3 條；#101–#126 全 slice 史見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §6，更早 commits 與 prior baseline chain 見 §1 / §2）：`cddd6e6` second-H1 fence-aware soft warning（#142–145：warning-only `bodySecondH1`；top-level `# ` outside fence → warn、`##` / `###` / `#text` / fenced code 內 `#` → 無 warn；不 blocking、不改 ready/export；server `analyzeReadyGap` + client mirror parity）/ `2a20322` coverAlt-without-cover warning（#138–141：warning-only `coverAltWithoutCover`；cover 空 + coverAlt 有值 → warn、兩者都有值 / 都空 → 無 warn；不 blocking、不改 ready/export/frontmatter；server `analyzeReadyGap` + client mirror parity）/ `3ee58e8` filename ↔ target path checklist（#136–137：checklist 強調存檔檔名須與 target path / filename 完全一致、建議 Download 自動命名 `{date}-{slug}.md`；copy-only，affordance 保留）。
 
 #### Core operating rules（每次 Session 必讀）
 
@@ -288,7 +288,7 @@ ADMIN dev-mode-only read-only dashboard ✅ landed（不進 prod build / 不 dep
 - K8 field auto-switch / auto-follow ✅ landed + dual-accepted
 - K9 multi-click determinism smoke ✅ browser-PASS（docs-only evidence）
 
-**Phase 1 Admin UI / Markdown draft export MVP（latest landed @ `2a20322`，2026-06-29；smoke **141/141**；8-layer **100/100 milestone** + 後續加固詳見 archive §3 / §6）**：
+**Phase 1 Admin UI / Markdown draft export MVP（latest landed @ `cddd6e6`，2026-06-29；smoke **145/145**；8-layer **100/100 milestone** + 後續加固詳見 archive §3 / §6）**：
 
 - Route `/admin/#new-post-draft`（dev-mode-only；不進 prod build；不 deploy；noindex）
 - Markdown draft export panel：copy markdown / download `.md` / target folder+path / copy path / copy validation command
@@ -296,7 +296,7 @@ ADMIN dev-mode-only read-only dashboard ✅ landed（不進 prod build / 不 dep
 - 早期 slice：SEO/cover draft fields、category/tag registry hints、draft output usability、browser smoke evidence（**caveat：source-level/static + helper-driven evidence only；非完整 browser-run smoke**）—— 逐刀 commit 見 archive §1
 - Manual import flow **8-layer regression net @ 100/100 smoke milestone**（#93–#100：markup → contract → button state → event hook → user-facing copy → status display × 2）+ 後續 #101–#126 持續加固（clipboard / empty-state / registry-hint / titleEn 三刀）；逐項 commit / 規則細節見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §3 / §6
 - Export 維持 `status: "draft"` + `draft: true`（**無** ready option，**無** repo write path）
-- Guard `check:admin-markdown-export` **141/141 PASS**
+- Guard `check:admin-markdown-export` **145/145 PASS**
 - Solo-admin / MD-file-based 模式：**無** DB、**無** login、**無** multi-user management
 
 ADMIN stage checkpoint = ✅ **idle freeze**。後續 session **不主動推進**（完整 browser-run smoke〔**不引入 Playwright / devDep**；不自行啟動 dev server〕/ B1·B3·B4·B5 / Admin richer fields / ready option / R2–R5 / SEO Dry-run edit / filter chip / warning badge / per-post prescription / write path〔Apply / Save / auto-fix〕/ loader aggregation migration / validator `--report-json` 等；**各須獨立 phase + user explicit approval；不直接實作**）。
