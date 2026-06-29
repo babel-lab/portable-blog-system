@@ -27,6 +27,7 @@ import {
   READY_UNSUPPORTED_CONTENT_KINDS,
   READY_MAX_TITLE_LEN,
   READY_MAX_DESCRIPTION_LEN,
+  READY_MAX_TITLE_EN_LEN,
   VALIDATION_COMMAND,
   TARGET_FOLDERS,
   VALID_SITES,
@@ -2974,6 +2975,49 @@ check('118 admin index.ejs client buildMarkdown mirrors titleEn passthrough (no 
 
   // Client reads input.titleEn (does not silently drop the field).
   assert.ok(clientBlock.includes('input.titleEn'), 'client buildMarkdown() MUST read input.titleEn');
+});
+
+// Phase 20260629-admin-titleEn-length-warning-slice-a:
+//   titleEn over-length raises a soft, Admin-only Ready-preflight warning
+//   (field 'titleEnLength', threshold READY_MAX_TITLE_EN_LEN). It is never
+//   blocking, never required, and never alters buildPostMarkdown output —
+//   these cases mirror the existing title-length pattern (case 49).
+check('119 analyzeReadyGap long titleEn → soft warning titleEnLength', () => {
+  const longEn = 'x'.repeat(READY_MAX_TITLE_EN_LEN + 1);
+  const r = analyzeReadyGap({ ...readyHappy, titleEn: longEn });
+  assert.ok(fieldNames(r.warnings).includes('titleEnLength'));
+  // soft only: must NOT appear in blocking, must NOT flip ok=false.
+  assert.ok(!fieldNames(r.blocking).includes('titleEnLength'));
+  assert.equal(r.ok, true);
+  assert.equal(r.summary, 'ready-candidate');
+});
+
+check('120 analyzeReadyGap empty / missing titleEn → no titleEnLength warning', () => {
+  const rMissing = analyzeReadyGap(readyHappy);
+  assert.ok(!fieldNames(rMissing.warnings).includes('titleEnLength'));
+  const rEmpty = analyzeReadyGap({ ...readyHappy, titleEn: '' });
+  assert.ok(!fieldNames(rEmpty.warnings).includes('titleEnLength'));
+  const rSpaces = analyzeReadyGap({ ...readyHappy, titleEn: '   ' });
+  assert.ok(!fieldNames(rSpaces.warnings).includes('titleEnLength'));
+});
+
+check('121 analyzeReadyGap titleEn at limit → no titleEnLength warning (boundary)', () => {
+  const atLimit = 'x'.repeat(READY_MAX_TITLE_EN_LEN);
+  const r = analyzeReadyGap({ ...readyHappy, titleEn: atLimit });
+  assert.ok(!fieldNames(r.warnings).includes('titleEnLength'));
+});
+
+check('122 analyzeReadyGap titleEn never blocking + does not affect title warning', () => {
+  // titleEn is optional: a long titleEn with an empty title still blocks on
+  // title (not titleEn), and a long title still warns on titleLength
+  // independently of titleEn.
+  const r = analyzeReadyGap({ ...readyHappy, title: '', titleEn: 'x'.repeat(READY_MAX_TITLE_EN_LEN + 1) });
+  assert.ok(fieldNames(r.blocking).includes('title'));
+  assert.ok(!fieldNames(r.blocking).includes('titleEn'));
+  assert.ok(!fieldNames(r.blocking).includes('titleEnLength'));
+  const r2 = analyzeReadyGap({ ...readyHappy, title: 'y'.repeat(READY_MAX_TITLE_LEN + 1) });
+  assert.ok(fieldNames(r2.warnings).includes('titleLength'));
+  assert.ok(!fieldNames(r2.warnings).includes('titleEnLength'));
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);

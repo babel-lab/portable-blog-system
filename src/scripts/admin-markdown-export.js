@@ -175,6 +175,12 @@ export function isExportReady(input) {
 export const READY_UNSUPPORTED_CONTENT_KINDS = ['book-review', 'download'];
 export const READY_MAX_TITLE_LEN = 60;
 export const READY_MAX_DESCRIPTION_LEN = 160;
+// Phase 20260629-admin-titleEn-length-warning-slice-a:
+//   Admin-only advisory ceiling for the optional titleEn field. There is no
+//   validate-content.js rule for titleEn length (the .md validator does not
+//   check it), so this is a soft Ready-preflight hint only — never blocking,
+//   never affects export. Mirrors the title (60) heuristic at a looser 80.
+export const READY_MAX_TITLE_EN_LEN = 80;
 
 const READY_FIELD_LABELS = {
   title: 'title（必填；validator missing-title）',
@@ -191,6 +197,7 @@ const READY_WARNING_LABELS = {
   coverAlt: 'coverAlt 空（建議補；不影響 baseline）',
   titleLength: 'title 長度 > 60（validator long-title soft warning）',
   descriptionLength: 'description 長度 > 160（validator long-description soft warning）',
+  titleEnLength: 'titleEn 長度 > 80（建議精簡；不擋 ready）',
 };
 
 const READY_UNSUPPORTED_REASONS = {
@@ -390,6 +397,7 @@ export function analyzeReadyGap(input) {
     safeInput.searchDescription == null ? '' : safeInput.searchDescription
   ).trim();
   const coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).trim();
+  const titleEn = String(safeInput.titleEn == null ? '' : safeInput.titleEn).trim();
   const contentKind = typeof safeInput.contentKind === 'string' ? safeInput.contentKind : '';
 
   const blocking = [];
@@ -415,6 +423,12 @@ export function analyzeReadyGap(input) {
   }
   if (description.length > READY_MAX_DESCRIPTION_LEN) {
     warnings.push({ field: 'descriptionLength', label: READY_WARNING_LABELS.descriptionLength });
+  }
+  // Phase 20260629-admin-titleEn-length-warning-slice-a:
+  //   titleEn is optional — empty / within-limit raises nothing; only an
+  //   over-length value adds a soft warning. Never blocking; never required.
+  if (titleEn.length > READY_MAX_TITLE_EN_LEN) {
+    warnings.push({ field: 'titleEnLength', label: READY_WARNING_LABELS.titleEnLength });
   }
 
   const unsupported = [];
