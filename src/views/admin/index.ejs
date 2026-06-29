@@ -1908,6 +1908,7 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-date">date</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <input type="date" id="npd-date" style="padding: 0.2rem; font-family: inherit;">
+            <button type="button" id="npd-today" style="padding: 0.2rem 0.5rem; margin-left: 0.25rem; font-family: inherit;" title="填入本機今天日期">今天</button>
             <span class="text-muted" style="font-size: 0.82em;">→ YYYY-MM-DD；預設今天</span>
           </td>
         </tr>
@@ -4244,6 +4245,21 @@
       [TITLE_EL, TITLE_EN_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]
         .filter(function (el) { return el; })
         .forEach(function (el) { el.addEventListener('input', debounceRecompute); });
+
+      // Phase 20260629-admin-today-date-shortcut-slice-a:
+      //   "今天" convenience button: fills #npd-date with today's local
+      //   YYYY-MM-DD via todayIso() (local parts; no toISOString — avoids
+      //   UTC date-skip near midnight) and dispatches an 'input' event so
+      //   the existing debounceRecompute path picks it up like any other
+      //   keystroke. Net-additive: the load-time auto-prefill at L~3549
+      //   stays intact, so initial ready/export gating is unchanged.
+      var TODAY_BTN = document.getElementById('npd-today');
+      if (TODAY_BTN && DATE_EL) {
+        TODAY_BTN.addEventListener('click', function () {
+          DATE_EL.value = todayIso();
+          DATE_EL.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      }
 
       // Phase 20260629-admin-tag-picker-site-aware-options-a:
       //   Site-aware tag datalist. Rebuild #npd-tags-options from the injected

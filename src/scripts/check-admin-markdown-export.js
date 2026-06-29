@@ -3567,5 +3567,133 @@ check('145 admin index.ejs client analyzeReadyGap mirrors bodySecondH1 (fence-aw
   );
 });
 
+// Phase 20260629-admin-today-date-shortcut-slice-a:
+//   Admin UI now offers a "今天" convenience button beside the date input.
+//   Click fills #npd-date with today's local YYYY-MM-DD (via the existing
+//   todayIso() helper, which uses local date parts — not toISOString — so it
+//   stays correct near midnight in any timezone) and dispatches an 'input'
+//   event so the existing debounceRecompute path picks it up. Net-additive:
+//   the load-time auto-prefill (L~3549) stays intact, so initial ready/export
+//   gating is unchanged. Pure EJS source string scan; no DOM, no execution.
+check('146 admin index.ejs date row has #npd-today button adjacent to #npd-date', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  const datePos = src.indexOf('id="npd-date"');
+  assert.ok(datePos > 0, 'index.ejs MUST contain `id="npd-date"`');
+  // Same <td> as the date input — locate the closing </td> after the date
+  // and require the today button to appear before it.
+  const tdClose = src.indexOf('</td>', datePos);
+  assert.ok(tdClose > datePos, 'date input MUST sit inside a closed <td>…</td>');
+  const tdSlice = src.slice(datePos, tdClose);
+  assert.ok(
+    tdSlice.includes('id="npd-today"'),
+    '#npd-today MUST live in the same <td> as #npd-date (adjacent placement)'
+  );
+  // Button must be a type=button (not a submit) and carry the "今天" label so
+  // it cannot silently swap into another affordance.
+  const todayPos = src.indexOf('id="npd-today"');
+  const tagStart = src.lastIndexOf('<button', todayPos);
+  assert.ok(tagStart > 0, '#npd-today MUST be inside a <button …> opening tag');
+  const tagEnd = src.indexOf('>', todayPos);
+  const tag = src.slice(tagStart, tagEnd + 1);
+  assert.ok(/type="button"/.test(tag), '#npd-today MUST carry `type="button"` (not submit)');
+  // The button text "今天" follows the opening tag.
+  const closeTag = src.indexOf('</button>', tagEnd);
+  assert.ok(closeTag > tagEnd, '#npd-today MUST close with </button>');
+  const label = src.slice(tagEnd + 1, closeTag).replace(/^\s+|\s+$/g, '');
+  assert.equal(label, '今天', '#npd-today text MUST be exactly `今天` (got `' + label + '`)');
+});
+
+check('147 admin index.ejs todayIso() uses local date parts (NOT toISOString)', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  const sig = 'function todayIso()';
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain `function todayIso()` helper');
+  assert.ok(
+    src.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one todayIso() (no duplicate)'
+  );
+  const openBrace = src.indexOf('{', sigPos);
+  let depth = 0;
+  let block = '';
+  for (let i = openBrace; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { block = src.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(block, 'todayIso() block MUST be brace-balanced');
+  // MUST use local date parts.
+  assert.ok(block.includes('getFullYear()'), 'todayIso() MUST use getFullYear()');
+  assert.ok(block.includes('getMonth()'), 'todayIso() MUST use getMonth()');
+  assert.ok(block.includes('getDate()'), 'todayIso() MUST use getDate()');
+  // MUST NOT use UTC-based date string (causes ±1 day skew across midnight).
+  assert.ok(
+    !/toISOString\s*\(/.test(block),
+    'todayIso() MUST NOT use toISOString() — local timezone parts only (UTC skew bug guard)'
+  );
+  assert.ok(
+    !/toJSON\s*\(/.test(block),
+    'todayIso() MUST NOT use toJSON() — same UTC skew concern as toISOString'
+  );
+});
+
+check('148 admin index.ejs #npd-today click handler writes value + dispatches input event', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  // TODO_BTN ref must exist + be wired with addEventListener('click', ...).
+  const refLit = "var TODAY_BTN = document.getElementById('npd-today')";
+  assert.ok(
+    src.includes(refLit),
+    `index.ejs MUST contain \`${refLit}\` reference (single source for today-button)`
+  );
+  const wireLit = "TODAY_BTN.addEventListener('click',";
+  const wirePos = src.indexOf(wireLit);
+  assert.ok(wirePos > 0, "index.ejs MUST wire `TODAY_BTN.addEventListener('click', ...)`");
+  // Slice ~400 chars after the wiring anchor — handler body is small.
+  const handlerSlice = src.slice(wirePos, wirePos + 400);
+  assert.ok(
+    handlerSlice.includes('DATE_EL.value = todayIso()'),
+    'click handler MUST assign `DATE_EL.value = todayIso()` (route through the local-parts helper, not a new date computation)'
+  );
+  // Dispatch an input event so the existing debounceRecompute listener fires.
+  assert.ok(
+    /DATE_EL\.dispatchEvent\(\s*new Event\(\s*['"]input['"]/.test(handlerSlice),
+    "click handler MUST dispatch an `input` Event on DATE_EL so debounceRecompute fires"
+  );
+  // Bubbling helps in case any future listener attaches at <body>; locks the
+  // pattern so a future minor edit can't accidentally drop bubbling.
+  assert.ok(
+    /bubbles\s*:\s*true/.test(handlerSlice),
+    'click handler MUST dispatch with `bubbles: true`'
+  );
+});
+
+check('149 admin index.ejs auto-prefill + input wiring for DATE_EL preserved', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  // Auto-prefill: conditional load-time write into DATE_EL.value (only when
+  // empty). This is what keeps Slice C net-additive — initial ready/export
+  // gating must not change. Lock the exact guard so a refactor cannot drop
+  // the `!DATE_EL.value` short-circuit and start clobbering Dean-typed values.
+  assert.ok(
+    src.includes('if (DATE_EL && !DATE_EL.value) DATE_EL.value = todayIso();'),
+    'index.ejs MUST preserve the conditional auto-prefill `if (DATE_EL && !DATE_EL.value) DATE_EL.value = todayIso();`'
+  );
+  // Existing input-event wiring (smoke #97 array) must still include DATE_EL,
+  // so the today button's dispatched 'input' event has a listener to fire.
+  assert.ok(
+    src.includes('[TITLE_EL, TITLE_EN_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]'),
+    'input-event wiring array MUST still include DATE_EL (debounceRecompute target)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
