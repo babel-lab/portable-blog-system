@@ -1901,7 +1901,7 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-slug">slug</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <input type="text" id="npd-slug" maxlength="80" placeholder="kebab-case，僅 a-z 0-9 -" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
-            <span class="text-muted" style="font-size: 0.82em;">→ 檔名 <code>{date}-{slug}.md</code>；不合法時 Download 按鈕會 disable</span>
+            <span class="text-muted" style="font-size: 0.82em;">→ 只填中段段名（不含 date、不含 .md、不含完整路徑）；lowercase kebab-case，例 <code>test-title</code>；系統自動組 <code>{date}-{slug}.md</code>；不合法時 Download 按鈕會 disable</span>
           </td>
         </tr>
         <tr>

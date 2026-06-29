@@ -3695,5 +3695,75 @@ check('149 admin index.ejs auto-prefill + input wiring for DATE_EL preserved', (
   );
 });
 
+// Phase 20260629-admin-slug-helper-copy-clarify-slice-a:
+//   Dean's hand-verification of Slice C surfaced a real UX gap: slug field
+//   helper did not explicitly tell new users that slug is ONLY the middle
+//   segment — not the date, not `.md`, not the full target path. Dean tried
+//   `testTitle` and `20260622-testTitle.md`; both fail sanitizeSlug, which
+//   left the Download button disabled with no actionable hint nearby.
+//
+//   The fix extends the existing slug hint <span> with negative constraints
+//   + a concrete `test-title` example. The format placeholder (`kebab-case，
+//   僅 a-z 0-9 -`) and the existing `{date}-{slug}.md` composition hint stay
+//   intact. No validation rule change, no filename / target-path rule change.
+//
+//   Smoke locks the new hint copy via stable key-phrase scan of the slug
+//   <td> block (NOT full-sentence text). Scope is the same <td> as #npd-slug
+//   so a future refactor that moves the hint into a sibling row would surface
+//   here rather than silently splitting the message Dean reads.
+//
+//   Pure EJS source string scan; no DOM, no execution.
+function extractSlugTdBlock() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  const slugPos = src.indexOf('id="npd-slug"');
+  assert.ok(slugPos > 0, 'index.ejs MUST contain `id="npd-slug"`');
+  const tdClose = src.indexOf('</td>', slugPos);
+  assert.ok(tdClose > slugPos, '#npd-slug MUST sit inside a closed <td>…</td>');
+  return src.slice(slugPos, tdClose + '</td>'.length);
+}
+
+check('150 admin index.ejs slug helper warns against date / .md / 完整路徑', () => {
+  const block = extractSlugTdBlock();
+  assert.ok(
+    block.includes('不含 date'),
+    'slug helper MUST warn `不含 date` (Dean tripped trying `20260622-testTitle.md` — date is auto-prepended)'
+  );
+  assert.ok(
+    block.includes('不含 .md'),
+    'slug helper MUST warn `不含 .md` (`.md` extension is auto-appended)'
+  );
+  assert.ok(
+    block.includes('不含完整路徑'),
+    'slug helper MUST warn `不含完整路徑` (target folder is fixed; only the middle segment goes in)'
+  );
+  assert.ok(
+    block.includes('kebab-case'),
+    'slug helper MUST surface `kebab-case` (matches sanitizeSlug rule + placeholder hint)'
+  );
+});
+
+check('151 admin index.ejs slug helper carries test-title example + {date}-{slug}.md pattern', () => {
+  const block = extractSlugTdBlock();
+  // Concrete kebab-case example Dean can copy as a starting point.
+  assert.ok(
+    block.includes('test-title'),
+    'slug helper MUST carry the `test-title` example (concrete lowercase kebab-case demo)'
+  );
+  // Composition hint MUST stay so users still see what filename the system
+  // assembles. Locks against a future refactor that drops the pattern when
+  // adding the negative-constraint copy.
+  assert.ok(
+    block.includes('{date}-{slug}.md'),
+    'slug helper MUST keep `{date}-{slug}.md` filename pattern (auto-composed; existing affordance)'
+  );
+  // Existing Download-disable behavior hint stays — no silent removal.
+  assert.ok(
+    block.includes('Download'),
+    'slug helper MUST keep the `Download` button reference (explains why the button stays disabled on invalid slug)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
