@@ -3765,5 +3765,63 @@ check('151 admin index.ejs slug helper carries test-title example + {date}-{slug
   );
 });
 
+// Phase 20260630-admin-date-helper-copy-clarify-slice-a:
+//   Mirror of slug helper slice #150 / #151. The `今天` button (#146) landed
+//   adjacent to #npd-date, but the date row hint copy stayed the terse
+//   `→ YYYY-MM-DD；預設今天` — it described neither the load-time auto-prefill
+//   nor the new button. Dean's hand-verification of Slice C surfaced that
+//   gap (the button was discoverable only by hovering its `title` attribute).
+//
+//   The fix extends the existing hint <span> to explicitly state (a) the
+//   load-time auto-prefill behaviour and (b) that the button refills to local
+//   today. No format change, no auto-prefill rule change, no recompute /
+//   target-path / filename change. Net-additive copy only.
+//
+//   Smoke scopes to the same <td> as #npd-date so a refactor that moves the
+//   hint into a sibling row would surface here rather than silently splitting
+//   the message Dean reads. Pure EJS source string scan; no DOM, no execution.
+function extractDateTdBlock() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  const datePos = src.indexOf('id="npd-date"');
+  assert.ok(datePos > 0, 'index.ejs MUST contain `id="npd-date"`');
+  const tdClose = src.indexOf('</td>', datePos);
+  assert.ok(tdClose > datePos, '#npd-date MUST sit inside a closed <td>…</td>');
+  return src.slice(datePos, tdClose + '</td>'.length);
+}
+
+check('152 admin index.ejs date helper mentions YYYY-MM-DD + 自動填 today behaviour', () => {
+  const block = extractDateTdBlock();
+  assert.ok(
+    block.includes('YYYY-MM-DD'),
+    'date helper MUST surface the `YYYY-MM-DD` format (matches DATE_RE + sanitizeDate)'
+  );
+  assert.ok(
+    block.includes('自動填'),
+    'date helper MUST describe the load-time auto-prefill behaviour (`if (DATE_EL && !DATE_EL.value) DATE_EL.value = todayIso()`)'
+  );
+  assert.ok(
+    block.includes('本機今天'),
+    'date helper MUST clarify that the prefilled value is local today (mirrors todayIso() local-parts contract, smoke #147)'
+  );
+});
+
+check('153 admin index.ejs date helper points at the 今天 refill button', () => {
+  const block = extractDateTdBlock();
+  // The hint copy must reference the 「今天」 button by label so Dean discovers
+  // it without hovering the button's title attribute. Smoke #146 already locks
+  // the button's existence + adjacency; this one locks that the helper copy
+  // tells users what it does.
+  assert.ok(
+    block.includes('今天'),
+    'date helper MUST reference the `今天` button label (matches #npd-today button)'
+  );
+  assert.ok(
+    block.includes('重填'),
+    'date helper MUST clarify the button refills the date (not just `預設今天`, which described the auto-prefill only)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
