@@ -3141,5 +3141,72 @@ check('128 admin index.ejs client analyzeRegistryHints keeps entry.site=[] no-co
   );
 });
 
+// Phase 20260629-admin-export-summary-client-parity-slice-a:
+//   buildExportSummary has a server version (smoke 76–86) and an index.ejs
+//   client mirror that feeds the digest strip + per-field counters. Case 126
+//   locked only the titleEn count + its paint; the OTHER counts (title /
+//   description / searchDescription / coverAlt / tags) and the limits object
+//   had no client-mirror parity lock. These two cases close that gap via
+//   key-substring scan (NOT full-function text, so cosmetic refactors stay
+//   free): #129 the full counts shape, #130 the limits → READY_MAX_* mapping.
+//   Pure EJS source string scan; no DOM, no execution.
+function extractClientBuildExportSummary() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const sig = 'function buildExportSummary(input) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain client `function buildExportSummary(input) {`');
+  assert.ok(
+    ejsSrc.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one client buildExportSummary (no duplicate)'
+  );
+  let depth = 0;
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return ejsSrc.slice(sigPos, i + 1);
+    }
+  }
+  assert.fail('client buildExportSummary opening brace MUST have a matching close');
+}
+
+check('129 admin index.ejs client buildExportSummary counts shape mirrors server (6 keys)', () => {
+  const block = extractClientBuildExportSummary();
+  // Each count key maps to the same length expression the server emits
+  // (admin-markdown-export.js buildExportSummary counts block).
+  const COUNTS = [
+    'title: titleRaw.length',
+    'titleEn: titleEn.length',
+    'description: description.length',
+    'searchDescription: searchDescription.length',
+    'coverAlt: coverAlt.length',
+    'tags: tags.length',
+  ];
+  for (const expr of COUNTS) {
+    assert.ok(
+      block.includes(expr),
+      'client buildExportSummary counts MUST include `' + expr + '` (server parity)'
+    );
+  }
+});
+
+check('130 admin index.ejs client buildExportSummary limits mirror READY_MAX_* constants', () => {
+  const block = extractClientBuildExportSummary();
+  // limits object mirrors the server (titleMax / descriptionMax only; the
+  // searchDescription / coverAlt counters are unlimited and titleEn uses
+  // READY_MAX_TITLE_EN_LEN directly at the paint site, not via summary.limits).
+  assert.ok(
+    block.includes('titleMax: READY_MAX_TITLE_LEN'),
+    'client limits MUST map titleMax to READY_MAX_TITLE_LEN'
+  );
+  assert.ok(
+    block.includes('descriptionMax: READY_MAX_DESCRIPTION_LEN'),
+    'client limits MUST map descriptionMax to READY_MAX_DESCRIPTION_LEN'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
