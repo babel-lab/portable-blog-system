@@ -358,6 +358,12 @@ export function buildExportSummary(input) {
     safeInput.searchDescription == null ? '' : safeInput.searchDescription
   ).trim();
   const coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).trim();
+  // Phase 20260629-admin-titleEn-summary-count-slice-a:
+  //   Track titleEn length in the at-a-glance digest, completing the optional
+  //   titleEn field's UX parity with title / description / searchDescription /
+  //   coverAlt. Read-only count; never affects buildPostMarkdown output or the
+  //   titleEn warning rule.
+  const titleEn = String(safeInput.titleEn == null ? '' : safeInput.titleEn).trim();
   const tags = normalizeTagsInput(safeInput.tags);
   return {
     site,
@@ -372,6 +378,7 @@ export function buildExportSummary(input) {
     ready,
     counts: {
       title: titleRaw.length,
+      titleEn: titleEn.length,
       description: description.length,
       searchDescription: searchDescription.length,
       coverAlt: coverAlt.length,

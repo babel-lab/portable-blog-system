@@ -1894,7 +1894,7 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-title-en">英文標題 titleEn</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <input type="text" id="npd-title-en" maxlength="120" placeholder="（optional）英文標題；寫入 frontmatter 的 titleEn，供既有模板/列表/詳頁顯示" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
-            <span class="text-muted" style="font-size: 0.82em;">選填；空白時仍輸出 <code>titleEn: ""</code>（不影響 title）</span>
+            <span class="text-muted" style="font-size: 0.82em;">選填；空白時仍輸出 <code>titleEn: ""</code>（不影響 title；目前 <span id="npd-count-title-en">0</span>/80，超過為 soft warning）</span>
           </td>
         </tr>
         <tr>
@@ -3519,6 +3519,7 @@
       var SUM_READY_EL = document.getElementById('npd-summary-ready');
       var SUM_TAGCOUNT_EL = document.getElementById('npd-summary-tagcount');
       var CNT_TITLE_EL = document.getElementById('npd-count-title');
+      var CNT_TITLE_EN_EL = document.getElementById('npd-count-title-en');
       var CNT_DESC_EL = document.getElementById('npd-count-description');
       var CNT_SEARCH_DESC_EL = document.getElementById('npd-count-search-description');
       var CNT_COVER_ALT_EL = document.getElementById('npd-count-cover-alt');
@@ -3819,6 +3820,8 @@
         var description = String(safeInput.description == null ? '' : safeInput.description).replace(/^\s+|\s+$/g, '');
         var searchDescription = String(safeInput.searchDescription == null ? '' : safeInput.searchDescription).replace(/^\s+|\s+$/g, '');
         var coverAlt = String(safeInput.coverAlt == null ? '' : safeInput.coverAlt).replace(/^\s+|\s+$/g, '');
+        // Phase 20260629-admin-titleEn-summary-count-slice-a (mirror server).
+        var titleEn = String(safeInput.titleEn == null ? '' : safeInput.titleEn).replace(/^\s+|\s+$/g, '');
         var tags = normalizeTags(safeInput.tags);
         return {
           site: site,
@@ -3833,6 +3836,7 @@
           ready: ready,
           counts: {
             title: titleRaw.length,
+            titleEn: titleEn.length,
             description: description.length,
             searchDescription: searchDescription.length,
             coverAlt: coverAlt.length,
@@ -3898,6 +3902,7 @@
           el.style.color = (typeof limit === 'number' && value > limit) ? '#856404' : '#555';
         }
         paintCounter(CNT_TITLE_EL, sum.counts.title, sum.limits.titleMax);
+        paintCounter(CNT_TITLE_EN_EL, sum.counts.titleEn, READY_MAX_TITLE_EN_LEN);
         paintCounter(CNT_DESC_EL, sum.counts.description, sum.limits.descriptionMax);
         paintCounter(CNT_SEARCH_DESC_EL, sum.counts.searchDescription, null);
         paintCounter(CNT_COVER_ALT_EL, sum.counts.coverAlt, null);

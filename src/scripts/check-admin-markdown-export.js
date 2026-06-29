@@ -3020,5 +3020,59 @@ check('122 analyzeReadyGap titleEn never blocking + does not affect title warnin
   assert.ok(!fieldNames(r2.warnings).includes('titleEnLength'));
 });
 
+// Phase 20260629-admin-titleEn-summary-count-slice-a:
+//   buildExportSummary now tracks titleEn length (counts.titleEn), completing
+//   the optional titleEn field's at-a-glance UX parity. Read-only count: never
+//   affects buildPostMarkdown output, the titleEn warning rule, or counts.title.
+check('123 buildExportSummary titleEn value → counts.titleEn (trimmed)', () => {
+  assert.equal(buildExportSummary({ ...happy, titleEn: 'ABC' }).counts.titleEn, 3);
+  assert.equal(buildExportSummary({ ...happy, titleEn: '  Trim Me  ' }).counts.titleEn, 7);
+});
+
+check('124 buildExportSummary empty / missing / whitespace titleEn → counts.titleEn 0', () => {
+  assert.equal(buildExportSummary(happy).counts.titleEn, 0); // key absent in input
+  assert.equal(buildExportSummary({ ...happy, titleEn: '' }).counts.titleEn, 0);
+  assert.equal(buildExportSummary({ ...happy, titleEn: '   ' }).counts.titleEn, 0);
+});
+
+check('125 buildExportSummary titleEn does not affect counts.title', () => {
+  const s = buildExportSummary({ ...happy, title: 'abcd', titleEn: 'English Title Here' });
+  assert.equal(s.counts.title, 4);
+  assert.equal(s.counts.titleEn, 18);
+});
+
+check('126 admin index.ejs client buildExportSummary mirrors titleEn count + paints it', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+
+  // Extract the client buildExportSummary(input) block via brace-count.
+  const sig = 'function buildExportSummary(input) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain `function buildExportSummary(input) {`');
+  let depth = 0;
+  let block = '';
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { block = ejsSrc.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(block, 'client buildExportSummary() block MUST be brace-balanced');
+
+  // Mirror parity: reads input.titleEn and emits counts.titleEn (server uses
+  // the same `titleEn: titleEn.length` shape).
+  assert.ok(block.includes('safeInput.titleEn'), 'client buildExportSummary() MUST read safeInput.titleEn');
+  assert.ok(block.includes('titleEn: titleEn.length'), 'client counts MUST include `titleEn: titleEn.length`');
+
+  // UI wiring: the renderer paints the titleEn counter against the /80 limit.
+  assert.ok(
+    ejsSrc.includes('paintCounter(CNT_TITLE_EN_EL, sum.counts.titleEn, READY_MAX_TITLE_EN_LEN)'),
+    'renderExportSummary MUST paint CNT_TITLE_EN_EL from sum.counts.titleEn'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
