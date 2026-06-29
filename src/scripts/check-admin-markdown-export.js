@@ -3074,5 +3074,72 @@ check('126 admin index.ejs client buildExportSummary mirrors titleEn count + pai
   );
 });
 
+// Phase 20260629-admin-registry-hint-client-parity-slice-a:
+//   analyzeRegistryHints has a server version (smoke 63–75 / 87 / 113–114) AND
+//   an index.ejs client mirror that IS surfaced in the Ready preflight panel
+//   (#npd-ready-registry-hints), but unlike its siblings (buildMarkdown → #110,
+//   buildExportSummary → #126, TARGET_FOLDERS/VALIDATION_COMMAND → #94) the
+//   client mirror had NO parity lock. A future edit to the server helper (as
+//   the titleEn slices touched analyzeReadyGap) could silently drift the mirror
+//   with no smoke to catch it. These two cases lock the client mirror's stable
+//   semantics — fields + hint kinds (#127) and the entry.site=[] no-constraint
+//   guard (#128) — via key-substring scan, NOT full-function text (so cosmetic
+//   refactors stay free). Pure EJS source string scan; no DOM, no execution.
+function extractClientAnalyzeRegistryHints() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const sig = 'function analyzeRegistryHints(input, registries) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain client `function analyzeRegistryHints(input, registries) {`');
+  assert.ok(
+    ejsSrc.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one client analyzeRegistryHints (no duplicate)'
+  );
+  let depth = 0;
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return ejsSrc.slice(sigPos, i + 1);
+    }
+  }
+  assert.fail('client analyzeRegistryHints opening brace MUST have a matching close');
+}
+
+check('127 admin index.ejs client analyzeRegistryHints mirrors fields + 4 hint kinds', () => {
+  const block = extractClientAnalyzeRegistryHints();
+  // Reads the same inputs as the server helper.
+  assert.ok(block.includes('safeInput.category'), 'client mirror MUST read safeInput.category');
+  assert.ok(block.includes('safeInput.tags'), 'client mirror MUST read safeInput.tags');
+  // Emits all four hint kinds the server helper defines (parity with smoke 63–75).
+  for (const kind of ['unknown-category', 'category-site-mismatch', 'unknown-tag', 'tag-site-mismatch']) {
+    assert.ok(
+      block.includes("kind: '" + kind + "'"),
+      'client mirror MUST emit hint kind `' + kind + '` (server parity)'
+    );
+  }
+});
+
+check('128 admin index.ejs client analyzeRegistryHints keeps entry.site=[] no-constraint guard', () => {
+  const block = extractClientAnalyzeRegistryHints();
+  // Both branches gate the mismatch on a NON-empty entry.site (length > 0),
+  // so site:[] is treated as "no constraint" — mirror of server cases 71 / 113 / 114.
+  assert.ok(
+    block.includes('cEntry.site.length > 0'),
+    'category branch MUST guard mismatch on cEntry.site.length > 0 (empty = no constraint)'
+  );
+  assert.ok(
+    block.includes('tEntry.site.length > 0'),
+    'tag branch MUST guard mismatch on tEntry.site.length > 0 (empty = no constraint)'
+  );
+  // And the mismatch itself is an indexOf(site) < 0 membership test on both branches.
+  assert.ok(
+    (block.match(/\.site\.indexOf\(site\) < 0/g) || []).length >= 2,
+    'both branches MUST test entry.site.indexOf(site) < 0 for the mismatch'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
