@@ -67,3 +67,26 @@ Manual import flow **8-layer regression net @ 100/100 smoke milestone**（5-step
 - 不得從本檔反向推導 source-level 行為（請以 repo source / git log 為準）
 - 未來 CLAUDE.md 若需再壓縮，請延續同樣模式：新 archive 檔放在 `docs/<YYYYMMDD>-claude-md-state-archive-docs-only-<seq>.md` 或 `docs/claude-md-ledger-archive/<seq>-*.md`
 - 本檔誕生時 **未**動 source / content / settings / package / dist；**未** 跑 build / dev server / npm install；**未** 操作 Blogger / GA4 / AdSense / Search Console / Google Form / Drive
+
+---
+
+## 6. 20260629 後續 slice history（smoke #101–#126；接續 §3 之 100/100 milestone）
+
+> 來源：CLAUDE.md §3a "ADMIN current state" line 300 之 #101–#105 逐 commit 敘事，及第二段 "Recent phase commits" 之 #113–#126 條目。CLAUDE.md 現只保留最新 baseline + 最近數條 pointer。docs baseline = `561f59e`（2026-06-29，`docs(state): sync titleEn summary baseline`）。
+
+8-layer net（§3）後之持續加固（clipboard / copy-buttons / import-export hint / empty-state 系列）：
+
+- `8505604` smoke **#101** — `copyTextToClipboard()` clipboard-side contract
+- `c6a5fa5` smoke **#102** — copy buttons caller okMsg
+- `41534c0` — markdown import / export hint 加固
+- `61b6e98` smoke **#104** — filename empty-state hint
+- `5b31879` smoke **#105** — summary target empty-state 色彩一致性（targetPath 空時與 filename/slug 同套 pending/red empty-state）
+
+registry-hint + titleEn 三刀（#113–#126）：
+
+- `cd60531` smoke **#113–114** — empty site registry hints；`entry.site=[]` 視為 no-constraint（category-only + mixed category+tag branch）
+- `96c4542` smoke **#115–118** — titleEn direct-through field（filled→`titleEn:"..."`/blank→`titleEn:""`；server+client `buildPostMarkdown` parity；case 110 由 static scaffold 改 interpolated、case 97 input-event array +`TITLE_EN_EL`）
+- `681263e` smoke **#119–122** — titleEn 長度 soft-warning（>80 warning-only / never blocking / never required；`READY_MAX_TITLE_EN_LEN=80`；`analyzeReadyGap` warning 分支 + generic panel renderer 自動顯示）
+- `d37ad0b` smoke **#123–126** — titleEn summary count（`buildExportSummary`+client mirror 加 `counts.titleEn`；blank/missing/whitespace→0；不影響 `counts.title`；表單加 1:1 live counter n/80）
+
+各刀皆獨立 commit + docs-only state sync；export 維持 `status:"draft"`+`draft:true`；**無** ready option / **無** repo write path / **無** build / deploy / dev server / **無** Blogger·Google·GA4·AdSense·Search Console 後台動作。

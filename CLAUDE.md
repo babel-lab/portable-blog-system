@@ -206,9 +206,9 @@ See also（單一查詢入口）：
 - `docs/claude-md-ledger-archive/20260616-current-state-ledger-pointer-index.md`（完整 current state + 歷史 ledger pointer 索引；§5–§10 涵蓋 BLOG / ADMIN / Blogger / GitHub Pages / AdSense / GA4 / commerce / download / reverse UTM / FB sidecar / Phase 1 final）
 - `docs/20260628-claude-md-state-archive-docs-only-a.md`（本次 housekeeping 搬出之完整 phase commits / prior baseline chain / Admin Markdown 8-layer 100/100 smoke milestone 詳述）
 
-最新 frozen baseline（2026-06-29）：branch `main`、HEAD = origin/main = `d37ad0b`（full `d37ad0bdfdd708018d91dfca4ce856d515974582`）、subject `fix(admin): count english title summary`、ahead/behind 0/0、working tree clean、index.lock absent。Phase 1 Admin UI / Markdown draft export MVP 持續最小推進（詳見下方 ADMIN current state）。Admin Markdown export/import hygiene 持續加固：8-layer **100/100 smoke milestone** 已於 `a546ae9` 達成，後續持續疊加 clipboard helper / copy-buttons caller / import-export hint / filename empty-state / summary target empty-state 等保護線；最新 titleEn summary count（`buildExportSummary`+client 加 `counts.titleEn`，blank/missing→0，限 80，smoke #123–126），smoke 已增至 **126/126**，詳述見上列 archive。Validation snapshot：`validate:content` 0/134/106、page-type validator 110/0、`check:admin-markdown-export` **126/126 PASS**、`build:github` PASS、`build:blogger` PASS。**無** live/backend/Admin/GA4/AdSense/Search Console/Blogger/Google Form/Google Drive 後台動作；repo **無**新增 secrets / Drive IDs / Form URLs / tokens / respondent data。
+最新 frozen baseline（2026-06-29）：branch `main`、HEAD = origin/main = `d37ad0b`（full `d37ad0bdfdd708018d91dfca4ce856d515974582`）、subject `fix(admin): count english title summary`、ahead/behind 0/0、working tree clean、index.lock absent。Admin Markdown export/import hygiene 自 8-layer **100/100 milestone**（`a546ae9`）後持續加固至 **126/126**（最新 titleEn 三刀 #115–126：direct-through / 長度 warning / summary count；逐項見 archive §3 / §6）。Validation snapshot：`validate:content` 0/134/106、page-type validator 110/0、`check:admin-markdown-export` **126/126 PASS**、`build:github` PASS、`build:blogger` PASS。**無** live/backend/Admin/GA4/AdSense/Search Console/Blogger/Google Form/Google Drive 後台動作；repo **無**新增 secrets / Drive IDs / Form URLs / tokens / respondent data。
 
-**Recent phase commits**（近期重點；更早 commits 與 prior baseline chain 全文見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §1 / §2）：`d37ad0b` titleEn summary count（`counts.titleEn`；blank/missing→0；smoke #123–126）/ `681263e` titleEn length warning（>80 warning-only / never blocking；smoke #119–122）/ `96c4542` titleEn direct-through field（filled→`titleEn:"..."`/blank→`titleEn:""`；smoke #115–118）/ `cd60531` cover empty site registry hints（smoke #113–114 — `entry.site=[]` no-constraint：category + mixed branch）/ `5b31879` color markdown summary target empty state（smoke #105）/ `61b6e98` lock markdown filename empty-state hint（smoke #104）/ `eeced20` sync admin markdown baseline / `41534c0` harden markdown import export hint。
+**Recent phase commits**（最近 3 條；#101–#126 全 slice 史見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §6，更早 commits 與 prior baseline chain 見 §1 / §2）：`d37ad0b` titleEn summary count（#123–126）/ `681263e` titleEn length warning（#119–122）/ `96c4542` titleEn direct-through field（#115–118）。
 
 #### Core operating rules（每次 Session 必讀）
 
@@ -288,23 +288,20 @@ ADMIN dev-mode-only read-only dashboard ✅ landed（不進 prod build / 不 dep
 - K8 field auto-switch / auto-follow ✅ landed + dual-accepted
 - K9 multi-click determinism smoke ✅ browser-PASS（docs-only evidence）
 
-**Phase 1 Admin UI / Markdown draft export MVP（latest landed @ `d37ad0b`，2026-06-29；hygiene smoke milestone = **100/100 / 8-layer regression net** + clipboard helper / copy-buttons / import-export-hint / filename empty-state / summary target empty-state 加固）**：
+**Phase 1 Admin UI / Markdown draft export MVP（latest landed @ `d37ad0b`，2026-06-29；smoke **126/126**；8-layer **100/100 milestone** + 後續加固詳見 archive §3 / §6）**：
 
 - Route `/admin/#new-post-draft`（dev-mode-only；不進 prod build；不 deploy；noindex）
-- Markdown draft export panel：copy markdown / download `.md` / show target folder + path / copy target path / copy validation command
+- Markdown draft export panel：copy markdown / download `.md` / target folder+path / copy path / copy validation command
 - Manual import checklist + ready preflight panel
-- SEO / cover draft fields（searchDescription / cover / coverAlt；`54233df` source + `c48d80d` docs-only smoke）
-- Category / tag registry hints（unknown / site-mismatch warnings；`5520724`）
-- Draft markdown output usability slice（`cdf521f`）
-- Browser smoke evidence record（`821ec38`，docs-only）—— **caveat：source-level/static + helper-driven evidence only；非完整 browser-run smoke；無 Vite dev server；無 screenshot**
-- Manual import flow **8-layer regression net @ 100/100 smoke milestone**（markup → contract → button state（initial + runtime）→ event hook → user-facing copy → status display × 2）已於 `a546ae9` smoke #100 達成；`8505604` smoke #101 接續 `copyTextToClipboard()` clipboard-side contract；`c6a5fa5` smoke #102 加固 copy buttons caller okMsg；`41534c0` 加固 markdown import / export hint；`61b6e98` smoke #104 鎖 filename empty-state hint；`5b31879` smoke #105 鎖 summary target empty-state 色彩一致性（targetPath 空時與 filename/slug 同套 pending/red empty-state）。逐項 commit / 規則細節見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §3
+- 早期 slice：SEO/cover draft fields、category/tag registry hints、draft output usability、browser smoke evidence（**caveat：source-level/static + helper-driven evidence only；非完整 browser-run smoke**）—— 逐刀 commit 見 archive §1
+- Manual import flow **8-layer regression net @ 100/100 smoke milestone**（#93–#100：markup → contract → button state → event hook → user-facing copy → status display × 2）+ 後續 #101–#126 持續加固（clipboard / empty-state / registry-hint / titleEn 三刀）；逐項 commit / 規則細節見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §3 / §6
 - Export 維持 `status: "draft"` + `draft: true`（**無** ready option，**無** repo write path）
 - Guard `check:admin-markdown-export` **126/126 PASS**
 - Solo-admin / MD-file-based 模式：**無** DB、**無** login、**無** multi-user management
 
-ADMIN stage checkpoint = ✅ **idle freeze**。後續 session **不主動推進**：完整 browser-run smoke for `/admin/#new-post-draft`（須由 Dean 本機手動開啟，或另開明確指令；**不引入 Playwright / devDep**；不自行啟動 dev server）/ B1 / B3 / B4 / B5 推進 / Admin richer fields / ready option（須 explicit approval；不直接實作）/ R2 overview / R3 健康 legend / R4 Categories·Tags 切分 / R5 cosmetic / SEO Dry-run edit / filter chip / warning badge / per-post prescription / write path（Apply / Save / auto-fix） / loader aggregation migration / validator JSON `--report-json`。各須獨立 phase + user explicit approval。
+ADMIN stage checkpoint = ✅ **idle freeze**。後續 session **不主動推進**（完整 browser-run smoke〔**不引入 Playwright / devDep**；不自行啟動 dev server〕/ B1·B3·B4·B5 / Admin richer fields / ready option / R2–R5 / SEO Dry-run edit / filter chip / warning badge / per-post prescription / write path〔Apply / Save / auto-fix〕/ loader aggregation migration / validator `--report-json` 等；**各須獨立 phase + user explicit approval；不直接實作**）。
 
-→ 詳：`docs/20260616-night-admin-stage-progress-checkpoint-and-next-action-map.md` / `docs/20260618-am-admin-*` / `docs/20260618-admin-k8-*` / `docs/20260618-admin-k9-*` / `docs/<YYYYMMDD>-admin-*`
+→ 詳：`docs/20260616-night-admin-stage-*` / `docs/20260618-admin-*` / `docs/<YYYYMMDD>-admin-*`
 
 #### Blogger AdSense / GitHub Pages AdSense current state
 
