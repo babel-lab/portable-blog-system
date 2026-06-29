@@ -1891,6 +1891,13 @@
           </td>
         </tr>
         <tr>
+          <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-title-en">英文標題 titleEn</label></td>
+          <td style="padding: 0.25rem 0.5rem;">
+            <input type="text" id="npd-title-en" maxlength="120" placeholder="（optional）英文標題；寫入 frontmatter 的 titleEn，供既有模板/列表/詳頁顯示" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
+            <span class="text-muted" style="font-size: 0.82em;">選填；空白時仍輸出 <code>titleEn: ""</code>（不影響 title）</span>
+          </td>
+        </tr>
+        <tr>
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-slug">slug</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <input type="text" id="npd-slug" maxlength="80" placeholder="kebab-case，僅 a-z 0-9 -" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
@@ -3460,6 +3467,7 @@
       var KIND_EL = document.getElementById('npd-contentkind');
       var PRIM_EL = document.getElementById('npd-primary');
       var TITLE_EL = document.getElementById('npd-title');
+      var TITLE_EN_EL = document.getElementById('npd-title-en');
       var SLUG_EL = document.getElementById('npd-slug');
       var DATE_EL = document.getElementById('npd-date');
       var CAT_EL = document.getElementById('npd-category');
@@ -3905,6 +3913,10 @@
         var description = String(input.description == null ? '' : input.description);
         var category = String(input.category == null ? '' : input.category).replace(/^\s+|\s+$/g, '');
         var tags = normalizeTags(input.tags);
+        // Phase 20260629-admin-titleEn-passthrough-slice-a:
+        //   Optional English title — direct-through field (mirror server
+        //   buildPostMarkdown). Empty value still emits `titleEn: ""`.
+        var titleEn = String(input.titleEn == null ? '' : input.titleEn).replace(/^\s+|\s+$/g, '');
         // Phase 20260627-admin-richer-fields-slice-a:
         //   Optional SEO / Cover scalars (mirror admin-markdown-export.js).
         var searchDescription = String(input.searchDescription == null ? '' : input.searchDescription).replace(/^\s+|\s+$/g, '');
@@ -3927,7 +3939,7 @@
         lines.push('primaryPlatform: ' + yamlEscapeScalar(prim));
         lines.push('');
         lines.push('title: ' + yamlEscapeScalar(titleForFm));
-        lines.push('titleEn: ""');
+        lines.push('titleEn: ' + yamlEscapeScalar(titleEn));
         lines.push('slug: ' + yamlEscapeScalar(slugForFm));
         lines.push('');
         lines.push('date: ' + yamlEscapeScalar(dateForFm));
@@ -3985,6 +3997,7 @@
           contentKind: KIND_EL.value,
           primaryPlatform: PRIM_EL.value,
           title: TITLE_EL.value,
+          titleEn: TITLE_EN_EL ? TITLE_EN_EL.value : '',
           slug: SLUG_EL.value,
           date: DATE_EL.value,
           category: CAT_EL.value,
@@ -4169,7 +4182,7 @@
       // Phase 20260627-admin-richer-fields-slice-a:
       //   Wire input events for the optional SEO / Cover fields so the Ready
       //   preflight panel + markdown preview recompute as Dean fills them.
-      [TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]
+      [TITLE_EL, TITLE_EN_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]
         .filter(function (el) { return el; })
         .forEach(function (el) { el.addEventListener('input', debounceRecompute); });
 

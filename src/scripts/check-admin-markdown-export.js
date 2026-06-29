@@ -1305,9 +1305,9 @@ check('96 admin index.ejs recompute() runtime re-gating preserved', () => {
 //     - change-event wiring MUST contain the exact 4-element array
 //       `[SITE_EL, KIND_EL, PRIM_EL, CAT_EL]` and the literal listener
 //       `addEventListener('change', recompute)` co-located with it.
-//     - input-event wiring MUST contain the exact 9-element array
-//       `[TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL,
-//        COVER_EL, COVER_ALT_EL, BODY_EL]` and the literal listener
+//     - input-event wiring MUST contain the exact 10-element array
+//       `[TITLE_EL, TITLE_EN_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL,
+//        SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]` and the listener
 //       `addEventListener('input', debounceRecompute)` co-located with it.
 //     - The wiring tail MUST end with a `recompute();` initial-paint call
 //       (after the input-event listener) so the first render is gated by
@@ -1356,7 +1356,7 @@ check('97 admin index.ejs recompute / debounceRecompute event wiring preserved',
 
   // 2. input-event wiring: exact 9-element array + co-located listener.
   const inputArr =
-    '[TITLE_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]';
+    '[TITLE_EL, TITLE_EN_EL, SLUG_EL, DATE_EL, TAGS_EL, DESC_EL, SEARCH_DESC_EL, COVER_EL, COVER_ALT_EL, BODY_EL]';
   const inputArrPos = tail.indexOf(inputArr);
   assert.ok(
     inputArrPos >= 0,
@@ -2621,8 +2621,8 @@ check('109 admin index.ejs #npd-summary-ready initial DOM matches runtime first-
 //   admin-markdown-export.js explicitly states: "This module has a mirror
 //   inline in src/views/admin/index.ejs (client script). Keep both in sync —
 //   the smoke locks the server-side version." Smoke #94 locks only the two
-//   manual-import constants (TARGET_FOLDERS / VALIDATION_COMMAND); the ~18
-//   static frontmatter scaffold lines the two surfaces emit (titleEn / author /
+//   manual-import constants (TARGET_FOLDERS / VALIDATION_COMMAND); the ~17
+//   static frontmatter scaffold lines the two surfaces emit (author /
 //   status / draft / canonical / publishTargets scaffold / all 8 blocks
 //   defaults) were never mirror-locked. The two surfaces are currently
 //   byte-identical (verified at smoke-authoring time), so this is a coverage
@@ -2633,13 +2633,13 @@ check('109 admin index.ejs #npd-summary-ready initial DOM matches runtime first-
 //
 //   Scope: only the STATIC (non-interpolated) scaffold lines emitted via the
 //   literal `lines.push('…')` form on BOTH surfaces. Interpolated lines (id /
-//   site / contentKind / title / slug / date / category / tags / description /
-//   cover / publishTargets enabled / blogger mode) are covered behaviorally by
-//   the server-side buildPostMarkdown smokes (#1–#25 / #53–#57) and are
-//   intentionally excluded — their values depend on input so a string scan
+//   site / contentKind / title / titleEn / slug / date / category / tags /
+//   description / cover / publishTargets enabled / blogger mode) are covered by
+//   the server-side buildPostMarkdown smokes (#1–#25 / #53–#57 / #115–#118)
+//   and are intentionally excluded — their values depend on input so a scan
 //   cannot lock them without re-implementing the helper.
 //
-//   Both surfaces single-quote the push argument (`lines.push('titleEn: ""')`),
+//   Both surfaces single-quote the push argument (`lines.push('author: "Dean"')`),
 //   so one literal substring matches both. The server file uses `lines.push`
 //   only inside buildPostMarkdown() (defaultBody() uses an array literal), so a
 //   whole-file substring check is unambiguous; the client side is scoped to the
@@ -2682,8 +2682,12 @@ check('110 admin buildMarkdown() client mirror frontmatter scaffold matches serv
   const clientBlock = extractClientBuildMarkdown();
 
   // Static frontmatter scaffold lines both surfaces MUST emit identically.
+  // NOTE: titleEn is intentionally NOT here — as of Phase
+  //   20260629-admin-titleEn-passthrough-slice-a it is an INTERPOLATED
+  //   direct-through field (`titleEn: ' + yamlEscapeScalar(titleEn)`), same
+  //   category as title / slug / description. Its parity + empty-default
+  //   (`titleEn: ""`) are locked behaviorally by cases 115–118 below.
   const SCAFFOLD = [
-    'titleEn: ""',
     'author: "Dean"',
     'status: "draft"',
     'draft: true',
@@ -2904,6 +2908,72 @@ check('114 analyzeRegistryHints mixed category + tag entry.site=[] → no hints'
   );
   assert.equal(r.hasHints, false);
   assert.deepEqual(r.hints, []);
+});
+
+// Phase 20260629-admin-titleEn-passthrough-slice-a:
+//   titleEn becomes an optional direct-through field (same convention as
+//   searchDescription / cover / coverAlt): filled → emitted; empty → still
+//   emits `titleEn: ""` (always-present key, matches new-post.js template).
+//   These behavioral cases replace the old static-scaffold lock that case 110
+//   carried for the hardcoded `titleEn: ""` line.
+check('115 buildPostMarkdown titleEn value → emitted in frontmatter', () => {
+  const md = buildPostMarkdown({ ...happy, titleEn: 'My English Title' });
+  assert.equal(matter(md).data.titleEn, 'My English Title');
+});
+
+check('116 buildPostMarkdown empty / missing titleEn → still emits titleEn: ""', () => {
+  // explicit empty
+  assert.equal(matter(buildPostMarkdown({ ...happy, titleEn: '' })).data.titleEn, '');
+  // whitespace-only collapses to empty
+  assert.equal(matter(buildPostMarkdown({ ...happy, titleEn: '   ' })).data.titleEn, '');
+  // key absent in input → key still present in output as ''
+  assert.ok(Object.prototype.hasOwnProperty.call(matter(buildPostMarkdown(happy)).data, 'titleEn'));
+  assert.equal(matter(buildPostMarkdown(happy)).data.titleEn, '');
+});
+
+check('117 buildPostMarkdown titleEn does not affect required title (and trims)', () => {
+  const md = buildPostMarkdown({ ...happy, title: '中文標題', titleEn: '  Trimmed EN  ' });
+  const d = matter(md).data;
+  assert.equal(d.title, '中文標題');
+  assert.equal(d.titleEn, 'Trimmed EN');
+});
+
+check('118 admin index.ejs client buildMarkdown mirrors titleEn passthrough (no static titleEn:"")', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const serverPath = resolve(here, 'admin-markdown-export.js');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const serverSrc = readFileSync(serverPath, 'utf8');
+
+  // Extract the client buildMarkdown(input) block via brace-count (same method
+  // as case 110) so the assertions cannot match another inline helper.
+  const sig = 'function buildMarkdown(input) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain `function buildMarkdown(input) {`');
+  let depth = 0;
+  let clientBlock = '';
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { clientBlock = ejsSrc.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(clientBlock, 'client buildMarkdown() block MUST be brace-balanced');
+
+  // Both surfaces emit the interpolated form (parity)…
+  const emit = "lines.push('titleEn: ' + yamlEscapeScalar(titleEn))";
+  assert.ok(clientBlock.includes(emit), 'client buildMarkdown() MUST emit interpolated titleEn (mirror server)');
+  assert.ok(serverSrc.includes(emit), 'server buildPostMarkdown() MUST emit interpolated titleEn');
+
+  // …and the OLD hardcoded static line is gone from both (would silently
+  // ignore Dean's titleEn input if it lingered on either surface).
+  assert.ok(!clientBlock.includes("lines.push('titleEn: \"\"')"), 'client MUST NOT keep static `titleEn: ""`');
+  assert.ok(!serverSrc.includes("lines.push('titleEn: \"\"')"), 'server MUST NOT keep static `titleEn: ""`');
+
+  // Client reads input.titleEn (does not silently drop the field).
+  assert.ok(clientBlock.includes('input.titleEn'), 'client buildMarkdown() MUST read input.titleEn');
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);

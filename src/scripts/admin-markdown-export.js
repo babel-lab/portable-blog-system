@@ -443,6 +443,13 @@ export function buildPostMarkdown(input) {
   //   Empty values still emit the key with "" (keeps preview shape stable so the
   //   Ready preflight panel mirrors what would land in content/{site}/posts/*.md).
   //   No upload / no file picker — plain text only (see Admin UI note).
+  // Phase 20260629-admin-titleEn-passthrough-slice-a:
+  //   Optional English title — direct-through field, same convention as
+  //   searchDescription / cover / coverAlt: accepted, trimmed, emitted as a
+  //   YAML string. Empty value still emits `titleEn: ""` (always-present key,
+  //   matches new-post.js template + keeps preview shape stable). Never affects
+  //   the required `title` field.
+  const titleEn = String(safeInput.titleEn == null ? '' : safeInput.titleEn).trim();
   const searchDescription = String(
     safeInput.searchDescription == null ? '' : safeInput.searchDescription
   ).trim();
@@ -476,7 +483,7 @@ export function buildPostMarkdown(input) {
   lines.push('primaryPlatform: ' + yamlEscapeScalar(primaryPlatform));
   lines.push('');
   lines.push('title: ' + yamlEscapeScalar(titleForFm));
-  lines.push('titleEn: ""');
+  lines.push('titleEn: ' + yamlEscapeScalar(titleEn));
   lines.push('slug: ' + yamlEscapeScalar(slugForFm));
   lines.push('');
   lines.push('date: ' + yamlEscapeScalar(dateForFm));
