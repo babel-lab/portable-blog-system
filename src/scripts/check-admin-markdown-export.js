@@ -3443,5 +3443,129 @@ check('141 admin index.ejs client analyzeReadyGap mirrors coverAltWithoutCover w
   );
 });
 
+// Phase 20260629-admin-body-second-h1-warning-slice-a:
+//   analyzeReadyGap raises a soft, fence-aware Admin-only Ready-preflight
+//   warning (field 'bodySecondH1') when the Markdown body contains a column-0
+//   `# ` ATX heading outside any fenced code block. The frontmatter title
+//   already becomes the page H1, so a body `# Heading` would double up.
+//   warning-only: never blocking, never alters buildPostMarkdown output.
+//   Lines containing `#` inside ``` / ~~~ fenced blocks (e.g. shell comments)
+//   MUST NOT trigger the warning. `##` / `###` etc. MUST NOT trigger either —
+//   only single-`#` ATX H1 at column 0 counts.
+check('142 analyzeReadyGap top-level # H1 outside fence → bodySecondH1 (warning-only)', () => {
+  const r = analyzeReadyGap({
+    ...readyHappyBody,
+    body: '## 簡介\n\n正文段落。\n\n# 另一個一級標題\n\n後續段落。\n',
+  });
+  assert.ok(fieldNames(r.warnings).includes('bodySecondH1'), 'top-level # H1 MUST warn');
+  // warning-only: never appears in blocking, never flips ok=false.
+  assert.ok(!fieldNames(r.blocking).includes('bodySecondH1'));
+  assert.equal(r.ok, true);
+  assert.equal(r.summary, 'ready-candidate');
+});
+
+check('143 analyzeReadyGap only ## / ### headings → no bodySecondH1 warning', () => {
+  // readyHappyBody body = '## 正文\n\n實際撰寫的內容，已非預設範例。' — no `# `.
+  const r1 = analyzeReadyGap(readyHappyBody);
+  assert.ok(!fieldNames(r1.warnings).includes('bodySecondH1'));
+  const r2 = analyzeReadyGap({
+    ...readyHappyBody,
+    body: '## 簡介\n\n### 細項\n\n#### 更深層\n\n沒有 `# ` 一級標題。\n',
+  });
+  assert.ok(!fieldNames(r2.warnings).includes('bodySecondH1'));
+  // `#text` (no space) must also NOT match — it is not an ATX heading.
+  const r3 = analyzeReadyGap({
+    ...readyHappyBody,
+    body: '## 段落\n\n#hashtag-not-heading\n\n結尾。\n',
+  });
+  assert.ok(!fieldNames(r3.warnings).includes('bodySecondH1'));
+});
+
+check('144 analyzeReadyGap # inside fenced code block (``` / ~~~) → no warning', () => {
+  // Backtick fence — shell comment is the canonical case.
+  const backtick = analyzeReadyGap({
+    ...readyHappyBody,
+    body: '## 步驟\n\n```bash\n# install deps\nnpm install\n```\n\n結尾。\n',
+  });
+  assert.ok(!fieldNames(backtick.warnings).includes('bodySecondH1'), 'backtick-fenced `#` MUST NOT warn');
+  // Tilde fence — same rule applies.
+  const tilde = analyzeReadyGap({
+    ...readyHappyBody,
+    body: '## 範例\n\n~~~text\n# heading inside tilde fence\n~~~\n\n結尾。\n',
+  });
+  assert.ok(!fieldNames(tilde.warnings).includes('bodySecondH1'), 'tilde-fenced `#` MUST NOT warn');
+  // Mixed: `#` inside fence is ignored, but a separate `#` outside the fence still warns.
+  const mixed = analyzeReadyGap({
+    ...readyHappyBody,
+    body: '## 段落\n\n```bash\n# comment\n```\n\n# 真的二級 H1\n\n結尾。\n',
+  });
+  assert.ok(fieldNames(mixed.warnings).includes('bodySecondH1'), 'outside-fence `#` MUST still warn even after a fenced `#`');
+});
+
+check('145 admin index.ejs client analyzeReadyGap mirrors bodySecondH1 (fence-aware)', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  // Client mirror helper MUST exist (single declaration; mirror pattern of #131 / #135 / #141).
+  const helperSig = 'function hasTopLevelH1OutsideFence(body) {';
+  const helperPos = ejsSrc.indexOf(helperSig);
+  assert.ok(helperPos > 0, 'index.ejs MUST contain client `function hasTopLevelH1OutsideFence(body) {`');
+  assert.ok(
+    ejsSrc.indexOf(helperSig, helperPos + helperSig.length) < 0,
+    'index.ejs MUST contain exactly one client hasTopLevelH1OutsideFence (no duplicate)'
+  );
+  // Brace-balanced extraction of the helper.
+  let depth = 0;
+  let helperBlock = '';
+  for (let i = helperPos + helperSig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { helperBlock = ejsSrc.slice(helperPos, i + 1); break; }
+    }
+  }
+  assert.ok(helperBlock, 'client hasTopLevelH1OutsideFence MUST be brace-balanced');
+  // Fence-aware signals: backtick / tilde detection + the inFence toggle.
+  assert.ok(helperBlock.includes("'`'") && helperBlock.includes("'~'"), 'helper MUST detect both backtick and tilde fences');
+  assert.ok(helperBlock.includes('inFence'), 'helper MUST track inFence state');
+  assert.ok(helperBlock.includes('>= 3'), 'helper MUST require >= 3 fence chars to open / close');
+  // Top-level `# ` detection: `#` followed by space at column 0.
+  assert.ok(helperBlock.includes("ch0 === '#'"), 'helper MUST gate on `#` at column 0');
+  assert.ok(helperBlock.includes("line.charAt(1) === ' '"), "helper MUST require ` ` after `#` (rules out `##` / `#text`)");
+
+  // analyzeReadyGap MUST call the helper and push the bodySecondH1 warning.
+  const sig = 'function analyzeReadyGap(input) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain client `function analyzeReadyGap(input) {`');
+  assert.ok(
+    ejsSrc.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one client analyzeReadyGap (no duplicate)'
+  );
+  let d2 = 0;
+  let block = '';
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') d2++;
+    else if (ch === '}') {
+      d2--;
+      if (d2 === 0) { block = ejsSrc.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(block, 'client analyzeReadyGap block MUST be brace-balanced');
+  assert.ok(
+    block.includes('hasTopLevelH1OutsideFence(safeInput.body)'),
+    'client analyzeReadyGap MUST call hasTopLevelH1OutsideFence(safeInput.body)'
+  );
+  assert.ok(
+    block.includes("field: 'bodySecondH1'"),
+    'client MUST push the bodySecondH1 warning'
+  );
+  assert.ok(
+    ejsSrc.includes('bodySecondH1:'),
+    'client READY_WARNING_LABELS MUST define a bodySecondH1 label'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

@@ -200,6 +200,7 @@ const READY_WARNING_LABELS = {
   titleEnLength: 'titleEn 長度 > 80（建議精簡；不擋 ready）',
   bodyDefault: 'body 仍是預設範例，建議改成正式正文；不擋 ready',
   coverAltWithoutCover: 'coverAlt 有值但 cover 空，建議補封面圖或清空 alt；不擋 ready',
+  bodySecondH1: 'body 出現另一個 `# ` 一級標題（title 已是頁面 H1，建議改用 `##`）；不擋 ready',
 };
 
 const READY_UNSUPPORTED_REASONS = {
@@ -393,6 +394,50 @@ export function buildExportSummary(input) {
   };
 }
 
+// Phase 20260629-admin-body-second-h1-warning-slice-a:
+//   Fence-aware scan for any top-level `# ` ATX heading inside the Markdown
+//   body. The frontmatter title already becomes the page H1, so a body
+//   `# Heading` doubles up. Lines starting with 3+ backticks / tildes open
+//   and close fenced code blocks (CommonMark-style, matching fence character);
+//   `# ` lines inside a fence (e.g. shell comments like `# install`) do NOT
+//   trigger the warning. Only `# ` at column 0 is treated as a heading —
+//   indented 1–3 space ATX (rare in Dean's drafts) is intentionally skipped.
+//   `##` / `###` etc. are not matched (they fail the `line[1] === ' '` check).
+function hasTopLevelH1OutsideFence(body) {
+  const text = String(body == null ? '' : body);
+  if (text === '') return false;
+  const lines = text.split('\n');
+  let inFence = false;
+  let fenceChar = '';
+  for (const line of lines) {
+    const ch0 = line.charAt(0);
+    if (inFence) {
+      if (ch0 === fenceChar) {
+        let n = 0;
+        while (n < line.length && line.charAt(n) === fenceChar) n++;
+        if (n >= 3) {
+          inFence = false;
+          fenceChar = '';
+        }
+      }
+      continue;
+    }
+    if (ch0 === '`' || ch0 === '~') {
+      let n = 0;
+      while (n < line.length && line.charAt(n) === ch0) n++;
+      if (n >= 3) {
+        inFence = true;
+        fenceChar = ch0;
+        continue;
+      }
+    }
+    if (ch0 === '#' && line.charAt(1) === ' ') {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function analyzeReadyGap(input) {
   const safeInput = input && typeof input === 'object' ? input : {};
   const titleRaw = String(safeInput.title == null ? '' : safeInput.title).trim();
@@ -457,6 +502,14 @@ export function analyzeReadyGap(input) {
   //   never required, never alters buildPostMarkdown output.
   if (bodyTrim === '' || bodyTrim === defaultBody().trim()) {
     warnings.push({ field: 'bodyDefault', label: READY_WARNING_LABELS.bodyDefault });
+  }
+  // Phase 20260629-admin-body-second-h1-warning-slice-a:
+  //   Fence-aware soft hint for a body-level `# ` ATX heading. warning-only;
+  //   never blocking; never alters buildPostMarkdown output. Scans the raw
+  //   body (not bodyTrim) so a leading-newline / TAB-prefixed scaffold still
+  //   gets the same column-0 fence/heading treatment as a clean body.
+  if (hasTopLevelH1OutsideFence(safeInput.body)) {
+    warnings.push({ field: 'bodySecondH1', label: READY_WARNING_LABELS.bodySecondH1 });
   }
 
   const unsupported = [];

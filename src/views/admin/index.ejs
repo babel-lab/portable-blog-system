@@ -3649,12 +3649,52 @@
         descriptionLength: 'description 長度 > 160（validator long-description soft warning）',
         titleEnLength: 'titleEn 長度 > 80（建議精簡；不擋 ready）',
         bodyDefault: 'body 仍是預設範例，建議改成正式正文；不擋 ready',
-        coverAltWithoutCover: 'coverAlt 有值但 cover 空，建議補封面圖或清空 alt；不擋 ready'
+        coverAltWithoutCover: 'coverAlt 有值但 cover 空，建議補封面圖或清空 alt；不擋 ready',
+        bodySecondH1: 'body 出現另一個 `# ` 一級標題（title 已是頁面 H1，建議改用 `##`）；不擋 ready'
       };
       var READY_UNSUPPORTED_REASONS = {
         'book-review': 'book-review 需 book.title / book.authors / book.publisher / affiliate.* 等欄位；Admin 表單未收集，第一版不建議直接切 ready。',
         'download': 'download contentKind 需 download.fileUrl + listing 策略；Admin 表單未收集，第一版不建議直接切 ready。'
       };
+      // Phase 20260629-admin-body-second-h1-warning-slice-a (mirror server):
+      //   Fence-aware scan for any top-level `# ` ATX heading in body. `#`
+      //   lines inside ``` / ~~~ fenced blocks (e.g. shell comments) do NOT
+      //   warn. Only column-0 `# ` matched; `##` / `###` skipped.
+      function hasTopLevelH1OutsideFence(body) {
+        var text = String(body == null ? '' : body);
+        if (text === '') return false;
+        var lines = text.split('\n');
+        var inFence = false;
+        var fenceChar = '';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          var ch0 = line.charAt(0);
+          if (inFence) {
+            if (ch0 === fenceChar) {
+              var nc = 0;
+              while (nc < line.length && line.charAt(nc) === fenceChar) nc++;
+              if (nc >= 3) {
+                inFence = false;
+                fenceChar = '';
+              }
+            }
+            continue;
+          }
+          if (ch0 === '`' || ch0 === '~') {
+            var no = 0;
+            while (no < line.length && line.charAt(no) === ch0) no++;
+            if (no >= 3) {
+              inFence = true;
+              fenceChar = ch0;
+              continue;
+            }
+          }
+          if (ch0 === '#' && line.charAt(1) === ' ') {
+            return true;
+          }
+        }
+        return false;
+      }
       function analyzeReadyGap(input) {
         var safeInput = input && typeof input === 'object' ? input : {};
         var titleRaw = String(safeInput.title == null ? '' : safeInput.title).replace(/^\s+|\s+$/g, '');
@@ -3688,6 +3728,7 @@
         if (description.length > READY_MAX_DESCRIPTION_LEN) warnings.push({ field: 'descriptionLength', label: READY_WARNING_LABELS.descriptionLength });
         if (titleEn.length > READY_MAX_TITLE_EN_LEN) warnings.push({ field: 'titleEnLength', label: READY_WARNING_LABELS.titleEnLength });
         if (bodyTrim === '' || bodyTrim === defaultBody().replace(/^\s+|\s+$/g, '')) warnings.push({ field: 'bodyDefault', label: READY_WARNING_LABELS.bodyDefault });
+        if (hasTopLevelH1OutsideFence(safeInput.body)) warnings.push({ field: 'bodySecondH1', label: READY_WARNING_LABELS.bodySecondH1 });
         var unsupported = [];
         if (READY_UNSUPPORTED_KINDS.indexOf(contentKind) >= 0) {
           unsupported.push({ contentKind: contentKind, reason: READY_UNSUPPORTED_REASONS[contentKind] });
