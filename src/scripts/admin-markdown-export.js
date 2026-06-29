@@ -199,6 +199,7 @@ const READY_WARNING_LABELS = {
   descriptionLength: 'description 長度 > 160（validator long-description soft warning）',
   titleEnLength: 'titleEn 長度 > 80（建議精簡；不擋 ready）',
   bodyDefault: 'body 仍是預設範例，建議改成正式正文；不擋 ready',
+  coverAltWithoutCover: 'coverAlt 有值但 cover 空，建議補封面圖或清空 alt；不擋 ready',
 };
 
 const READY_UNSUPPORTED_REASONS = {
@@ -430,6 +431,13 @@ export function analyzeReadyGap(input) {
   }
   if (coverAlt === '') {
     warnings.push({ field: 'coverAlt', label: READY_WARNING_LABELS.coverAlt });
+  }
+  // Phase 20260629-admin-cover-alt-without-cover-warning-slice-a:
+  //   coverAlt set while cover is empty — alt text for a non-existent cover.
+  //   warning-only consistency hint; the cover-empty case is independently
+  //   handled by the cover blocking rule above (this never adds blocking).
+  if (cover === '' && coverAlt !== '') {
+    warnings.push({ field: 'coverAltWithoutCover', label: READY_WARNING_LABELS.coverAltWithoutCover });
   }
   if (titleRaw.length > READY_MAX_TITLE_LEN) {
     warnings.push({ field: 'titleLength', label: READY_WARNING_LABELS.titleLength });

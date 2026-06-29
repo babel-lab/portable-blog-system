@@ -3378,5 +3378,70 @@ check('137 admin import checklist keeps Copy / Download / Copy target path affor
   }
 });
 
+// Phase 20260629-admin-cover-alt-without-cover-warning-slice-a:
+//   analyzeReadyGap now raises a soft consistency warning (field
+//   'coverAltWithoutCover') when coverAlt is set but cover is empty — alt text
+//   for a non-existent cover image. warning-only: never blocking, never alters
+//   buildPostMarkdown output. (cover-empty itself is still a separate blocking
+//   rule; this new field never adds to blocking.)
+check('138 analyzeReadyGap coverAlt set + cover empty → warning (not blocking)', () => {
+  const r = analyzeReadyGap({ ...readyHappy, cover: '', coverAlt: '封面替代文字' });
+  assert.ok(fieldNames(r.warnings).includes('coverAltWithoutCover'), 'alt-without-cover MUST warn');
+  // warning-only: the new field never appears in blocking.
+  assert.ok(!fieldNames(r.blocking).includes('coverAltWithoutCover'));
+  // (cover-empty independently blocks via the existing cover rule — expected,
+  //  unrelated to this warning.)
+  assert.ok(fieldNames(r.blocking).includes('cover'));
+});
+
+check('139 analyzeReadyGap coverAlt set + cover set → no coverAltWithoutCover warning', () => {
+  const r = analyzeReadyGap({ ...readyHappy, cover: 'https://x/c.jpg', coverAlt: '封面替代文字' });
+  assert.ok(!fieldNames(r.warnings).includes('coverAltWithoutCover'));
+});
+
+check('140 analyzeReadyGap coverAlt empty + cover empty → no coverAltWithoutCover warning', () => {
+  const r = analyzeReadyGap({ ...readyHappy, cover: '', coverAlt: '' });
+  assert.ok(!fieldNames(r.warnings).includes('coverAltWithoutCover'), 'empty alt MUST NOT trigger this rule');
+  // the empty coverAlt still raises its own existing warning (unchanged).
+  assert.ok(fieldNames(r.warnings).includes('coverAlt'));
+});
+
+check('141 admin index.ejs client analyzeReadyGap mirrors coverAltWithoutCover warning', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const sig = 'function analyzeReadyGap(input) {';
+  const sigPos = ejsSrc.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain client `function analyzeReadyGap(input) {`');
+  assert.ok(
+    ejsSrc.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one client analyzeReadyGap (no duplicate)'
+  );
+  let depth = 0;
+  let block = '';
+  for (let i = sigPos + sig.length - 1; i < ejsSrc.length; i++) {
+    const ch = ejsSrc[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { block = ejsSrc.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(block, 'client analyzeReadyGap block MUST be brace-balanced');
+  // Same cover-empty + coverAlt-set condition and warning field as the server.
+  assert.ok(
+    block.includes("cover === '' && coverAlt !== ''"),
+    'client MUST gate on cover empty + coverAlt set'
+  );
+  assert.ok(
+    block.includes("field: 'coverAltWithoutCover'"),
+    'client MUST push the coverAltWithoutCover warning'
+  );
+  assert.ok(
+    ejsSrc.includes('coverAltWithoutCover:'),
+    'client READY_WARNING_LABELS MUST define a coverAltWithoutCover label'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
