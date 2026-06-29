@@ -2614,5 +2614,107 @@ check('109 admin index.ejs #npd-summary-ready initial DOM matches runtime first-
   );
 });
 
+// Phase 20260629-admin-markdown-client-server-frontmatter-scaffold-parity-hygiene-a:
+//   #110 frontmatter scaffold parity between the client mirror buildMarkdown()
+//   (inline in src/views/admin/index.ejs) and the server helper
+//   buildPostMarkdown() (admin-markdown-export.js). The module header of
+//   admin-markdown-export.js explicitly states: "This module has a mirror
+//   inline in src/views/admin/index.ejs (client script). Keep both in sync —
+//   the smoke locks the server-side version." Smoke #94 locks only the two
+//   manual-import constants (TARGET_FOLDERS / VALIDATION_COMMAND); the ~18
+//   static frontmatter scaffold lines the two surfaces emit (titleEn / author /
+//   status / draft / canonical / publishTargets scaffold / all 8 blocks
+//   defaults) were never mirror-locked. The two surfaces are currently
+//   byte-identical (verified at smoke-authoring time), so this is a coverage
+//   guard — not a drift fix. It surfaces any future edit that changes a default
+//   on one surface (e.g. flips `adsenseTop: true`, renames `author`, drops a
+//   blocks key) without mirroring it, before Dean copies a preview that diverges
+//   from what the server helper + the rest of this smoke validate.
+//
+//   Scope: only the STATIC (non-interpolated) scaffold lines emitted via the
+//   literal `lines.push('…')` form on BOTH surfaces. Interpolated lines (id /
+//   site / contentKind / title / slug / date / category / tags / description /
+//   cover / publishTargets enabled / blogger mode) are covered behaviorally by
+//   the server-side buildPostMarkdown smokes (#1–#25 / #53–#57) and are
+//   intentionally excluded — their values depend on input so a string scan
+//   cannot lock them without re-implementing the helper.
+//
+//   Both surfaces single-quote the push argument (`lines.push('titleEn: ""')`),
+//   so one literal substring matches both. The server file uses `lines.push`
+//   only inside buildPostMarkdown() (defaultBody() uses an array literal), so a
+//   whole-file substring check is unambiguous; the client side is scoped to the
+//   brace-counted buildMarkdown() block for precision.
+//
+//   Pure source string scan; no DOM, no headless browser, no execution of
+//   either surface.
+check('110 admin buildMarkdown() client mirror frontmatter scaffold matches server buildPostMarkdown()', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const serverPath = resolve(here, 'admin-markdown-export.js');
+  const ejsSrc = readFileSync(ejsPath, 'utf8');
+  const serverSrc = readFileSync(serverPath, 'utf8');
+
+  // Extract the client buildMarkdown(input) block via brace-count from its
+  // unique signature, so the scaffold-line checks below cannot accidentally
+  // match `lines.push('…')` calls from another inline helper (e.g. buildSnippet).
+  function extractClientBuildMarkdown() {
+    const sig = 'function buildMarkdown(input) {';
+    const sigPos = ejsSrc.indexOf(sig);
+    assert.ok(sigPos > 0, 'index.ejs MUST contain `function buildMarkdown(input) {`');
+    const dupPos = ejsSrc.indexOf(sig, sigPos + sig.length);
+    assert.ok(
+      dupPos < 0,
+      'index.ejs MUST contain exactly one `function buildMarkdown(input) {` (no duplicates expected)'
+    );
+    const openBrace = sigPos + sig.length - 1;
+    let depth = 0;
+    for (let i = openBrace; i < ejsSrc.length; i++) {
+      const ch = ejsSrc[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return ejsSrc.slice(sigPos, i + 1);
+      }
+    }
+    assert.fail('client buildMarkdown() opening brace MUST have a matching close');
+  }
+
+  const clientBlock = extractClientBuildMarkdown();
+
+  // Static frontmatter scaffold lines both surfaces MUST emit identically.
+  const SCAFFOLD = [
+    'titleEn: ""',
+    'author: "Dean"',
+    'status: "draft"',
+    'draft: true',
+    'canonical: "auto"',
+    'publishTargets:',
+    '  github:',
+    '    mode: "full"',
+    '  blogger:',
+    'blocks:',
+    '  toc: false',
+    '  adsenseTop: true',
+    '  adsenseMiddle: false',
+    '  adsenseBottom: true',
+    '  hashtags: true',
+    '  socialFollow: true',
+    '  relatedPosts: true',
+    '  sidebar: true',
+  ];
+
+  for (const lit of SCAFFOLD) {
+    const pushCall = "lines.push('" + lit + "')";
+    assert.ok(
+      clientBlock.includes(pushCall),
+      'client buildMarkdown() (index.ejs) MUST emit `' + pushCall + '` (frontmatter scaffold parity with server)'
+    );
+    assert.ok(
+      serverSrc.includes(pushCall),
+      'server buildPostMarkdown() (admin-markdown-export.js) MUST emit `' + pushCall + '` (frontmatter scaffold parity with client mirror)'
+    );
+  }
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
