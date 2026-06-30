@@ -3984,5 +3984,73 @@ check('157 admin index.ejs category helper makes no tags-style free-text claims'
   );
 });
 
+// Phase 20260630-admin-registry-ownership-guard-slice-a:
+//   Registry entries (categories.json / tags.json) remain user-owned. The Admin
+//   draft-export surface *warns / hints* about unknown category / tag, but it
+//   MUST NEVER persist a registry file — no fs write, no fetch/POST/PUT/PATCH,
+//   no "auto-add unknown tag to tags.json" convenience. Registry changes happen
+//   by hand in VS Code, validated by validate-content.js. These two cases pin
+//   that ownership boundary on both sides of the mirror:
+//     #158 — server module admin-markdown-export.js has no registry write path.
+//     #159 — the UI only reads a server-derived registry snapshot and points
+//            Dean at the JSON files; it offers no Add/Edit/Delete/Save/Apply.
+//   Test-only guard. No UI / copy / behaviour / markdown-output change. Pure
+//   source string scan; no DOM, no headless browser. Regexes are scoped to the
+//   registry JSON write path (case-sensitive POST|PUT|PATCH so the `post`
+//   contentKind enum + prose "post" never false-trip) to avoid full-text noise.
+check('158 admin-markdown-export.js never writes the category / tag registry JSON', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const serverPath = resolve(here, 'admin-markdown-export.js');
+  const serverSrc = readFileSync(serverPath, 'utf8');
+  // (a) No filesystem write API anywhere in the pure module.
+  assert.ok(
+    !/\b(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream)\s*\(/.test(serverSrc),
+    'admin-markdown-export.js MUST contain no fs write call (module is pure string assembly)'
+  );
+  // (b) No network mutation call anywhere in the pure module.
+  assert.ok(
+    !/\b(fetch|XMLHttpRequest|axios)\s*\(/.test(serverSrc),
+    'admin-markdown-export.js MUST issue no fetch / XHR (no remote registry persist path)'
+  );
+  // (c) Targeted: no mutation verb (fs write OR uppercase HTTP method) sitting
+  //     within ~120 chars of categories.json / tags.json. Case-sensitive
+  //     POST|PUT|PATCH keeps the `post` enum + prose "post" from false-tripping.
+  const registryWritePath =
+    /(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream|POST|PUT|PATCH)[\s\S]{0,120}(categories|tags)\.json/;
+  assert.ok(
+    !registryWritePath.test(serverSrc),
+    'admin-markdown-export.js MUST NOT pair any write/POST/PUT/PATCH verb with categories.json / tags.json (registry stays user-owned)'
+  );
+});
+
+check('159 admin index.ejs keeps the category/tag registry user-owned (read-only snapshot, no persist UI)', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  // (a) Read-only registry snapshot is injected from server-derived data; it is
+  //     a read-model for hint alignment, not a write path.
+  assert.ok(
+    src.includes('window.NPD_REGISTRY'),
+    'index.ejs MUST keep the read-only registry snapshot (window.NPD_REGISTRY) for hint alignment'
+  );
+  // (b) The registry panel offers no mutation control and points Dean at the
+  //     JSON files for any add / edit.
+  assert.ok(
+    /本區無 Add \/ Edit \/ Delete \/ Save \/ Apply 按鈕/.test(src),
+    'index.ejs registry panel MUST state it has no Add/Edit/Delete/Save/Apply button'
+  );
+  assert.ok(
+    src.includes('增刪分類 / 標籤請手改'),
+    'index.ejs MUST direct Dean to hand-edit categories.json / tags.json for registry changes'
+  );
+  // (c) The tags helper still surfaces that a fresh tag is NOT auto-written —
+  //     registry ownership, mirrors #155 from the ownership angle.
+  const tagsBlock = extractTagsTdBlock();
+  assert.ok(
+    tagsBlock.includes('不會自動寫入') && tagsBlock.includes('tags.json'),
+    'tags helper MUST keep the "新 tag 不會自動寫入 tags.json" ownership caveat'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
