@@ -4120,5 +4120,79 @@ check('161 Admin source embeds no service credential constant (UI + export modul
   }
 });
 
+// Phase 20260630-admin-markdown-output-boundary-guard-slice-a:
+//   Lock the raw frontmatter/body BOUNDARY of buildPostMarkdown's output and
+//   confirm UI helper / registry hint copy never leaks into the exported
+//   markdown. Earlier cases parse the output with gray-matter (#1–#12) or scope
+//   the literal draft lines (#92), but none asserts on the *raw string shape*:
+//   that the file opens with a `---` fence, has a closing `---` fence, and the
+//   body lands strictly after that closing fence. Recent slices added a lot of
+//   UI-side helper / registry copy (#150–#159); these two cases pin that none of
+//   that copy can drift into the markdown the author copies into VS Code.
+//   Test-only; no export-function / UI / copy change. Output is generated from
+//   controlled fixtures (NOT a source scan), so legitimate article bodies are
+//   never mis-flagged.
+check('162 buildPostMarkdown output has a clean frontmatter/body boundary', () => {
+  // Cover both the default-body path and an explicit user body.
+  for (const inp of [happy, { ...happy, body: '## 自訂\n\n正文段落。\n' }]) {
+    const md = buildPostMarkdown(inp);
+    // (a) Opens with the YAML frontmatter fence on its own first line.
+    assert.ok(
+      md.startsWith('---\n'),
+      'markdown MUST start with the `---` frontmatter fence (input: ' + JSON.stringify(inp) + ')'
+    );
+    // (b) A closing fence exists after the opening one.
+    const fmEnd = md.indexOf('\n---', 3);
+    assert.ok(fmEnd > 0, 'markdown MUST contain a closing `---` frontmatter fence');
+    // (c) Required frontmatter fields live inside the frontmatter region only.
+    const frontmatter = md.slice(0, fmEnd);
+    for (const key of ['title:', 'slug:', 'date:', 'category:', 'tags:']) {
+      assert.ok(
+        new RegExp('^' + key, 'm').test(frontmatter),
+        '`' + key + '` MUST appear in the frontmatter region'
+      );
+    }
+    // (d) Body content appears strictly AFTER the closing fence.
+    const afterClose = md.slice(fmEnd);
+    const bodyMarker = inp.body ? '## 自訂' : '## 簡介';
+    assert.ok(
+      afterClose.includes(bodyMarker),
+      'body (`' + bodyMarker + '`) MUST appear after the closing frontmatter fence'
+    );
+    // Cross-check: the body marker must NOT sit inside the frontmatter region.
+    assert.ok(
+      !frontmatter.includes(bodyMarker),
+      'body marker MUST NOT leak into the frontmatter region'
+    );
+  }
+});
+
+check('163 UI helper / registry hint copy never leaks into exported markdown', () => {
+  // UI-only strings introduced by the helper / registry-hint slices (#150–#159).
+  // None belongs in the markdown file the author pastes into VS Code. Generated
+  // from controlled fixtures (default body + explicit body), so a real article
+  // body never trips this. `categories.json` / `tags.json` carry the `.json`
+  // suffix so the frontmatter `category:` / `tags:` keys never false-match.
+  const FORBIDDEN = [
+    'NPD_REGISTRY',
+    '輔助提示',
+    '非硬性限制',
+    '不會自動寫入',
+    'unknown-category',
+    'unknown-tag',
+    'categories.json',
+    'tags.json',
+  ];
+  for (const inp of [happy, { ...happy, body: '## 自訂\n\n正文段落，沒有任何提示文案。\n' }]) {
+    const md = buildPostMarkdown(inp);
+    for (const token of FORBIDDEN) {
+      assert.ok(
+        !md.includes(token),
+        'exported markdown MUST NOT contain UI helper / registry copy `' + token + '` (input: ' + JSON.stringify(inp) + ')'
+      );
+    }
+  }
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
