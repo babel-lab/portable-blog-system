@@ -14,8 +14,8 @@ tags:
   - "static-site"
 description: "什麼是 Design Token？它是跨設計與開發的樣式變數系統。本文用最簡單的方式，帶你理解 Design Token 如何解決 UI 設計與前端工程之間的同步痛點，打造易改易擴的元件庫。"
 searchDescription: "每次改版顏色、字體都要設計與工程手動對齊？Design Token 就是為了解決這個痛點而生的「樣式變數集」。3 分鐘快速理解 Design Token 的核心概念與跨平台維護優勢。"
-cover: ""
-coverAlt: ""
+cover: "/images/placeholders/cover-placeholder.svg"
+coverAlt: "什麼是Design Token? cover placeholder"
 status: "ready"
 draft: false
 canonical: "auto"
