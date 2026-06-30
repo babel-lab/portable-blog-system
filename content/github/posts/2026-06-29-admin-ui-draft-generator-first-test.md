@@ -5,7 +5,7 @@ contentKind: "tech-note"
 primaryPlatform: "github"
 
 title: "Admin UI 草稿產生器第一次實測紀錄"
-titleEn: ""
+titleEn: "Admin UI Draft Generator First Test Notes"
 slug: "admin-ui-draft-generator-first-test"
 
 date: "2026-06-29"
