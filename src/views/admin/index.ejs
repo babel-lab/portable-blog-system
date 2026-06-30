@@ -2052,6 +2052,24 @@
         <strong>target folder</strong>，才算進入 repo。
         Copy markdown / Download / Copy target path 共用同一驗證（title + slug + date 必須合法）；不合法時三顆都會被 disable。
       </p>
+      <%# Phase 20260630-admin-markdown-export-artifact-hygiene-reminder-a:
+          Test-artifact hygiene reminder — short-form UI callout mirroring
+          docs/20260630-admin-markdown-export-artifact-hygiene-reminder.md.
+          Pure display copy; no JS bind / no fetch / no Apply / no fs write.
+          Reminds Dean that the exported .md is a test artifact by default,
+          must not land in production content trees or deploy clone, and that
+          promotion to a formal draft requires opening a separate
+          formal-draft-intake / content commit slice. -%>
+      <div class="npd-artifact-hygiene"
+           style="margin: 0 0 0.55rem; padding: 0.55rem 0.7rem; background: #fff4e5; border: 1px solid #f0c674; border-radius: 3px; font-size: 0.82em; color: #7a4b0a;">
+        <div style="font-weight: 600; margin-bottom: 0.2rem;">⚠️ 匯出 <code>.md</code> 預設是 <strong>test artifact</strong></div>
+        <p style="margin: 0; line-height: 1.6;">
+          本助手匯出的 <code>.md</code> 預設視為 <strong>test artifact</strong>；
+          <strong>請勿直接放入</strong> <code>content/github/posts/</code>、<code>content/blogger/posts/</code>、<code>content/settings/</code> 或 <strong>deploy clone</strong>。
+          若要轉為正式 draft，請<strong>另開 formal draft intake / content slice</strong>，先通過 <code>npm run validate:content</code> 後再 commit；
+          細節見 <code>docs/20260630-admin-markdown-export-artifact-hygiene-reminder.md</code>。
+        </p>
+      </div>
       <table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
         <tbody>
           <tr>

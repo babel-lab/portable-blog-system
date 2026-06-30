@@ -4194,5 +4194,37 @@ check('163 UI helper / registry hint copy never leaks into exported markdown', (
   }
 });
 
+// Phase 20260630-admin-markdown-export-artifact-hygiene-reminder-a:
+//   Lock the short-form artifact-hygiene reminder inside the Manual import flow
+//   block. Mirrors docs/20260630-admin-markdown-export-artifact-hygiene-reminder.md:
+//   exported .md is a test artifact by default; production content trees and the
+//   deploy clone are off-limits; promotion to a formal draft requires a separate
+//   formal-draft-intake / content slice. Pure EJS source scan; no DOM, no
+//   execution. Scope reuses extractImportFlowBlock() (see #136) so the reminder
+//   is physically inside the manual-import flow where Dean's eye lands before
+//   pasting into VS Code.
+check('164 admin import flow includes test-artifact hygiene reminder copy', () => {
+  const block = extractImportFlowBlock();
+  assert.ok(block.includes('test artifact'), 'hygiene reminder MUST mark export as test artifact');
+  assert.ok(block.includes('formal draft intake'), 'hygiene reminder MUST point Dean to formal draft intake / content slice');
+  assert.ok(block.includes('content/github/posts/'), 'hygiene reminder MUST name content/github/posts/ as off-limits');
+  assert.ok(block.includes('content/blogger/posts/'), 'hygiene reminder MUST name content/blogger/posts/ as off-limits');
+  assert.ok(block.includes('content/settings/'), 'hygiene reminder MUST name content/settings/ as off-limits');
+  assert.ok(block.includes('deploy clone'), 'hygiene reminder MUST name deploy clone as off-limits');
+  assert.ok(block.includes('validate:content'), 'hygiene reminder MUST point Dean to npm run validate:content');
+});
+
+check('165 hygiene reminder lives in dedicated wrapper class (npd-artifact-hygiene)', () => {
+  // Wrapper class lets future styling / scope changes target the reminder
+  // directly without grep-by-copy. Confirms the reminder is its own DOM block,
+  // not folded into a sibling paragraph where it could silently disappear in a
+  // future refactor.
+  const block = extractImportFlowBlock();
+  assert.ok(
+    block.includes('class="npd-artifact-hygiene"') || block.includes("class='npd-artifact-hygiene'"),
+    'hygiene reminder MUST live in a dedicated wrapper (class="npd-artifact-hygiene") for future styling / scope'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
