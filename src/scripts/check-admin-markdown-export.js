@@ -4052,5 +4052,73 @@ check('159 admin index.ejs keeps the category/tag registry user-owned (read-only
   );
 });
 
+// Phase 20260630-admin-offline-mutation-guard-slice-a:
+//   The Admin draft-export surface is a *local, offline, static* helper. It
+//   assembles markdown strings the author copies into VS Code by hand — it must
+//   never grow a way to push data off the machine or to a backend. #158 already
+//   pins the export module against fetch/XHR + registry fs writes from the
+//   registry-ownership angle; these two cases widen that to the whole surface,
+//   on the transport + credential axes that #158 / #159 do not assert:
+//     #160 — neither the UI (index.ejs) nor the export module ships any external
+//            mutation transport (fetch / XHR / axios / sendBeacon / WebSocket /
+//            EventSource / <form> submit / POST-style method literal). This is the
+//            first guard that pins index.ejs's *whole-file* transport behaviour
+//            (#159 only scoped the registry panel sub-region).
+//     #161 — neither file embeds a service credential constant (client_secret /
+//            access_token / refresh_token / private_key / Authorization / Bearer).
+//   Test-only guard. No UI / copy / behaviour / markdown-output change. Pure
+//   source string scan; no DOM, no headless browser, no network. Patterns are
+//   deliberately specific (credential literals, not bare "token" / "secret" /
+//   "credential") so the legitimate red-line prose — e.g. "永不含 token /
+//   credential" and SCSS "color token" mentions — never false-trips.
+const ADMIN_SURFACE_FILES = () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return [
+    { label: 'index.ejs', src: readFileSync(resolve(here, '..', 'views', 'admin', 'index.ejs'), 'utf8') },
+    { label: 'admin-markdown-export.js', src: readFileSync(resolve(here, 'admin-markdown-export.js'), 'utf8') },
+  ];
+};
+
+check('160 Admin source ships no external mutation transport (UI + export module)', () => {
+  const files = ADMIN_SURFACE_FILES();
+  // Transport primitives that could send data off the machine. Absent in both
+  // files today; this locks that. `axios` / `sendBeacon` / `WebSocket` /
+  // `EventSource` are net-new vs #158 (which only checked fetch / XHR / axios on
+  // the export module).
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(|navigator\s*\.\s*sendBeacon/;
+  for (const { label, src } of files) {
+    assert.ok(
+      !transport.test(src),
+      `${label} MUST contain no network transport primitive (fetch / XHR / axios / sendBeacon / WebSocket / EventSource)`
+    );
+  }
+  // The UI must additionally carry no HTML form submit and no explicit uppercase
+  // HTTP mutation method literal. Case-sensitive POST|PUT|PATCH|DELETE keeps the
+  // `post` contentKind enum + prose "post" from false-tripping.
+  const ejs = files.find((f) => f.label === 'index.ejs').src;
+  assert.ok(
+    !/<form\b/i.test(ejs),
+    'index.ejs MUST contain no <form> element (no form-submit data egress path)'
+  );
+  assert.ok(
+    !/\bmethod\s*:\s*['"`](POST|PUT|PATCH|DELETE)['"`]/.test(ejs),
+    'index.ejs MUST declare no POST/PUT/PATCH/DELETE request method literal'
+  );
+});
+
+check('161 Admin source embeds no service credential constant (UI + export module)', () => {
+  const files = ADMIN_SURFACE_FILES();
+  // Specific credential literals only — NOT bare "token" / "secret" / "credential",
+  // which appear legitimately as red-line prose / design-token mentions. All six
+  // verified absent in both files at write time.
+  const credential = /client_secret|access_token|refresh_token|private_key|Authorization\s*:|\bBearer\s+[A-Za-z0-9._-]/;
+  for (const { label, src } of files) {
+    assert.ok(
+      !credential.test(src),
+      `${label} MUST embed no service credential constant (client_secret / access_token / refresh_token / private_key / Authorization / Bearer)`
+    );
+  }
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
