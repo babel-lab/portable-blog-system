@@ -3823,5 +3823,75 @@ check('153 admin index.ejs date helper points at the 今天 refill button', () =
   );
 });
 
+// Phase 20260630-admin-tags-helper-copy-clarify-slice-a:
+//   The tags datalist (npd-tags-options) lists tags.json ids filtered to the
+//   selected site. Per #129 (site-aware) + free-text input, Dean CAN type a
+//   tag not in the list — Ready preflight then surfaces unknown-tag warning.
+//   The prior hint copy stated "不在清單內仍可手動輸入 (...)" but did NOT
+//   spell out two adjacent invariants Dean asked about:
+//     (a) the datalist is hint-only / not a strict select — i.e. registry
+//         binding is soft, the input is the source of truth
+//     (b) typing a fresh tag does NOT auto-register it into tags.json —
+//         registry stays user-owned; Admin never writes settings files
+//
+//   The fix appends both clauses into the same hint <span>. No DOM / input
+//   behaviour change, no datalist source change, no validator change, no
+//   markdown output change. Net-additive copy only.
+//
+//   Smoke scopes to the same <td> as #npd-tags so a refactor that moves the
+//   hint into a sibling row would surface here rather than silently splitting
+//   the message Dean reads. Pure EJS source string scan; no DOM, no execution.
+function extractTagsTdBlock() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  const tagsPos = src.indexOf('id="npd-tags"');
+  assert.ok(tagsPos > 0, 'index.ejs MUST contain `id="npd-tags"`');
+  const tdClose = src.indexOf('</td>', tagsPos);
+  assert.ok(tdClose > tagsPos, '#npd-tags MUST sit inside a closed <td>…</td>');
+  return src.slice(tagsPos, tdClose + '</td>'.length);
+}
+
+check('154 admin index.ejs tags helper clarifies datalist is hint-only (not a hard limit)', () => {
+  const block = extractTagsTdBlock();
+  // Mirrors the input type=text + list=npd-tags-options contract (free text
+  // stays allowed; datalist is suggestion-only). Without this clause, Dean
+  // could read "datalist 依目前 site 列出 ..." as a strict whitelist.
+  assert.ok(
+    block.includes('輔助提示'),
+    'tags helper MUST mark the datalist as `輔助提示` (hint-only, not a strict select)'
+  );
+  assert.ok(
+    block.includes('非硬性限制'),
+    'tags helper MUST state `非硬性限制` (input remains free text; datalist binding is soft)'
+  );
+  // Existing free-text + warning hint MUST stay so Dean still sees what
+  // happens when typing outside the list.
+  assert.ok(
+    block.includes('不在清單內仍可手動輸入'),
+    'tags helper MUST keep `不在清單內仍可手動輸入` (free-text path is still surfaced)'
+  );
+  assert.ok(
+    block.includes('unknown-tag'),
+    'tags helper MUST keep `unknown-tag` warning reference (matches validator + Ready preflight)'
+  );
+});
+
+check('155 admin index.ejs tags helper warns that a new tag is NOT auto-registered', () => {
+  const block = extractTagsTdBlock();
+  // Admin is read-only for settings files (see §3a red lines + check-admin-
+  // governance-aggregation contract). The hint MUST tell Dean that typing a
+  // brand-new tag in this input does NOT mutate tags.json — registry stays
+  // user-owned; he must edit tags.json + re-run validate:content himself.
+  assert.ok(
+    block.includes('不會自動寫入'),
+    'tags helper MUST warn `不會自動寫入` (typing a fresh tag does NOT auto-register)'
+  );
+  assert.ok(
+    block.includes('tags.json'),
+    'tags helper MUST name `tags.json` as the registry file (so Dean knows where to edit when he wants to add the tag)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
