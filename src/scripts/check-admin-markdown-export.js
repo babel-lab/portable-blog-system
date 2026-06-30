@@ -3893,5 +3893,96 @@ check('155 admin index.ejs tags helper warns that a new tag is NOT auto-register
   );
 });
 
+// Phase 20260630-admin-category-registry-bound-guard-slice-a:
+//   The tags field (#npd-tags) is a free-text <input> bound to a datalist hint,
+//   so its helper legitimately says "datalist 是輔助提示 / 非硬性限制 / 不在清單內
+//   仍可手動輸入 / 新 tag 不會自動寫入 tags.json" (#154-155). The category field
+//   (#npd-category) is a DIFFERENT control model: a registry-bound <select>
+//   sourced from categories.json — the UI itself is the hard limit (you can only
+//   pick a defined category or leave it empty). The two MUST NOT converge by
+//   accident: a future refactor that copy-pastes the tags helper wording onto
+//   category, or swaps the <select> for a tags-style free-text <input>+datalist,
+//   would silently change category from "registry-bound" to "free text". That is
+//   a design decision (own phase + explicit approval), never a drive-by edit.
+//
+//   These two cases pin the current registry-bound reality:
+//     #156 — control stays a <select> (no <input id="npd-category">, no list= /
+//            <datalist in the category <td>).
+//     #157 — helper copy carries NO tags-style free-text claims, while keeping
+//            the existing registry / categories.json / unknown-category copy.
+//
+//   Test-only guard. No UI behaviour change, no copy change, no markdown output
+//   change. Pure EJS source string scan; no DOM, no headless browser.
+//   Scope is the category value <td> (the cell holding the <select> + helper
+//   span) so a refactor that moves the hint into a sibling row surfaces here.
+function extractCategoryTdBlock() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  const src = readFileSync(ejsPath, 'utf8');
+  const catIdPos = src.indexOf('id="npd-category"');
+  assert.ok(catIdPos > 0, 'index.ejs MUST contain an element with `id="npd-category"`');
+  const tdOpen = src.lastIndexOf('<td', catIdPos);
+  assert.ok(tdOpen >= 0 && tdOpen < catIdPos, '#npd-category MUST sit inside an opening <td');
+  const tdClose = src.indexOf('</td>', catIdPos);
+  assert.ok(tdClose > catIdPos, '#npd-category MUST sit inside a closed <td>…</td>');
+  return src.slice(tdOpen, tdClose + '</td>'.length);
+}
+
+check('156 admin index.ejs category row stays a registry-bound <select> (not tags-style free text)', () => {
+  const block = extractCategoryTdBlock();
+  // The control MUST be a <select id="npd-category">, never an <input>. A
+  // <select> can only emit a defined category (or empty) — the registry binding
+  // is hard, by construction. Swapping to <input> would silently allow arbitrary
+  // category strings, which is a separate design decision.
+  assert.ok(
+    block.includes('<select id="npd-category"'),
+    '#npd-category MUST stay a `<select>` (registry-bound; UI is the hard limit)'
+  );
+  assert.ok(
+    block.indexOf('<input id="npd-category"') < 0,
+    '#npd-category MUST NOT become an <input> (that would convert it to free text)'
+  );
+  // The category <td> MUST carry no tags-style autocomplete plumbing — a
+  // `list=` / `<datalist` here would mean it had been turned into the soft,
+  // hint-only model the tags field uses.
+  assert.ok(
+    !/list=/.test(block),
+    'category <td> MUST NOT carry a `list=` binding (that is the tags-style datalist model)'
+  );
+  assert.ok(
+    !block.includes('<datalist'),
+    'category <td> MUST NOT contain a `<datalist>` (registry-bound select, not autocomplete hint)'
+  );
+});
+
+check('157 admin index.ejs category helper makes no tags-style free-text claims', () => {
+  const block = extractCategoryTdBlock();
+  // The tags helper (#154-155) legitimately says these — because tags is free
+  // text. Category is a <select>; copying this wording would mislead Dean into
+  // thinking he can type an arbitrary category, so it MUST be absent here.
+  assert.ok(
+    !block.includes('非硬性限制'),
+    'category helper MUST NOT claim `非硬性限制` (the <select> IS a hard limit)'
+  );
+  assert.ok(
+    !block.includes('不在清單內仍可手動'),
+    'category helper MUST NOT claim `不在清單內仍可手動輸入` (free-text path does not exist for a <select>)'
+  );
+  assert.ok(
+    !block.includes('不會自動寫入'),
+    'category helper MUST NOT carry the `不會自動寫入 …json` auto-register caveat (implies free-text entry)'
+  );
+  // Keep the existing correct registry copy so this guard also locks the
+  // registry-bound framing already shipped (matches #112).
+  assert.ok(
+    block.includes('categories.json'),
+    'category helper MUST keep naming `categories.json` as the source registry'
+  );
+  assert.ok(
+    block.includes('unknown-category'),
+    'category helper MUST keep the `unknown-category` Ready-preflight reference'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
