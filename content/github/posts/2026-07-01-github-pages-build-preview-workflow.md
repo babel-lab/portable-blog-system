@@ -18,8 +18,8 @@ tags:
   - "vite"
   - "static-site"
 
-description: "記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。"
-searchDescription: "GitHub Pages 本機建置與預覽流程草稿，包含 npm run dev、npm run build 與 npm run preview 三段流程的用途與檢查重點。"
+description: "記錄 portable blog system 的 GitHub Pages 本機工作流程：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，並整理 Admin UI / Markdown 匯出流程的實作重點。"
+searchDescription: "GitHub Pages 本機建置與預覽流程筆記，包含 npm run dev、npm run build 與 npm run preview 三段流程的用途與檢查重點。"
 
 cover: ""
 coverAlt: "GitHub Pages 本機建置與預覽流程筆記"
