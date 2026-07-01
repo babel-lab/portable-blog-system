@@ -2175,7 +2175,14 @@
       <div style="margin-top: 0.6rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
         <button type="button" id="npd-copy-gap"
                 style="padding: 0.3rem 0.65rem; border: 1px solid #2c5282; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.82em; font-weight: 600; color: #2c5282;">Copy ready-gap report</button>
-        <span class="text-muted" style="font-size: 0.78em;">→ 複製上方 blocking / soft warnings / contentKind 提示 / registry 對齊提示 的<strong>純文字</strong>報告到剪貼簿（clipboard-only；不寫 repo、不上傳、不 fetch）；空白項顯示「無」；狀態顯示於上方 import flow 的訊息列</span>
+        <%# Phase 20260701-admin-ready-gap-copy-local-status-slice2b:
+            Local status beside the button. The shared #npd-flow-status sits far
+            up next to the manual-import-flow group; a ready-gap copy's success
+            message landing there read as a dead button. This span surfaces the
+            same 2s-clear feedback right here via showGapStatus(). Clipboard-only
+            — DOM text only, no repo write / upload / fetch. -%>
+        <span id="npd-gap-status" style="font-size: 0.8em;" aria-live="polite"></span>
+        <span class="text-muted" style="font-size: 0.78em;">→ 複製上方 blocking / soft warnings / contentKind 提示 / registry 對齊提示 的<strong>純文字</strong>報告到剪貼簿（clipboard-only；不寫 repo、不上傳、不 fetch）；空白項顯示「無」；狀態顯示於此按鈕旁</span>
       </div>
     </div>
   </div>
@@ -3537,6 +3544,10 @@
       var COPY_PATH_BTN = document.getElementById('npd-copy-path');
       var COPY_CMD_BTN = document.getElementById('npd-copy-cmd');
       var FLOW_STATUS_EL = document.getElementById('npd-flow-status');
+      // Phase 20260701-admin-ready-gap-copy-local-status-slice2b:
+      //   Local status sink for the Copy ready-gap report button; see
+      //   showGapStatus() below. DOM-text only (no fs / fetch / write path).
+      var GAP_STATUS_EL = document.getElementById('npd-gap-status');
       // Phase 20260701-admin-ready-gap-report-copy-slice-a:
       //   Copy ready-gap report button (Ready preflight panel). Clipboard-only;
       //   reuses copyTextToClipboard() → showFlowStatus (#npd-flow-status).
@@ -4269,12 +4280,34 @@
           if (FLOW_STATUS_EL.textContent === msg) FLOW_STATUS_EL.textContent = '';
         }, 2000);
       }
-      function copyTextToClipboard(text, okMsg) {
+      // Phase 20260701-admin-ready-gap-copy-local-status-slice2b:
+      //   Local status for the Copy ready-gap report button. #npd-flow-status
+      //   sits next to the manual-import-flow buttons (Copy target path / Copy
+      //   validation command), far from the Ready preflight panel — so a
+      //   ready-gap copy's "已複製" landed out of the user's eyeline and read
+      //   as a dead button. This mirrors showFlowStatus's 2s-clear contract
+      //   onto #npd-gap-status beside the button. DOM-text only; no fs / fetch.
+      function showGapStatus(msg, isErr) {
+        if (!GAP_STATUS_EL) return;
+        GAP_STATUS_EL.textContent = msg;
+        GAP_STATUS_EL.style.color = isErr ? '#a00' : '#080';
+        setTimeout(function () {
+          if (GAP_STATUS_EL.textContent === msg) GAP_STATUS_EL.textContent = '';
+        }, 2000);
+      }
+      // Phase 20260701-admin-ready-gap-copy-local-status-slice2b:
+      //   statusFn selects which status sink receives success / failure
+      //   feedback. Omitted (Copy target path / Copy validation command) →
+      //   defaults to showFlowStatus (#npd-flow-status) so existing buttons are
+      //   byte-for-runtime unchanged. Copy ready-gap report passes showGapStatus
+      //   so its feedback lands beside the button instead of far away.
+      function copyTextToClipboard(text, okMsg, statusFn) {
+        var notify = typeof statusFn === 'function' ? statusFn : showFlowStatus;
         if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
           navigator.clipboard.writeText(text).then(function () {
-            showFlowStatus(okMsg, false);
+            notify(okMsg, false);
           }).catch(function () {
-            showFlowStatus('複製失敗，請手動選取', true);
+            notify('複製失敗，請手動選取', true);
           });
         } else {
           // execCommand fallback via temporary textarea (no fs / fetch).
@@ -4289,10 +4322,10 @@
             var ok = false;
             try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
             document.body.removeChild(ta);
-            if (ok) showFlowStatus(okMsg, false);
-            else showFlowStatus('複製失敗，請手動選取', true);
+            if (ok) notify(okMsg, false);
+            else notify('複製失敗，請手動選取', true);
           } catch (e) {
-            showFlowStatus('複製失敗，請手動選取', true);
+            notify('複製失敗，請手動選取', true);
           }
         }
       }
@@ -4315,7 +4348,7 @@
       //   copyTextToClipboard() helper. No repo write, no upload, no fetch.
       if (COPY_GAP_BTN) {
         COPY_GAP_BTN.addEventListener('click', function () {
-          copyTextToClipboard(buildReadyGapReport(readInput()), '已複製 ready-gap report');
+          copyTextToClipboard(buildReadyGapReport(readInput()), '已複製 ready-gap report', showGapStatus);
         });
       }
 

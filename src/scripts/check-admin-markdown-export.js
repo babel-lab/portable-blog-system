@@ -1813,12 +1813,15 @@ check('101 admin index.ejs copyTextToClipboard() clipboard contract preserved', 
     '`copyTextToClipboard()` fallback path MUST invoke `document.execCommand(\'copy\')`'
   );
 
-  // 3. Success delegation: showFlowStatus(okMsg, false). The caller-passed
-  // okMsg MUST flow through unmodified — locks param-passthrough so a
-  // future refactor that hardcodes '已複製' or '已複製 (Copied)' would
-  // surface here. Appears in BOTH modern (.then) and fallback (if ok)
-  // branches; locking exactly 2 occurrences ensures both paths intact.
-  const successLit = 'showFlowStatus(okMsg, false)';
+  // 3. Success delegation: notify(okMsg, false). Since slice2b the helper
+  // routes through a `notify` sink (default showFlowStatus; showGapStatus for
+  // the Copy ready-gap report button — see section 6 + smokes #189/#195/#196).
+  // The caller-passed okMsg MUST still flow through unmodified — locks
+  // param-passthrough so a future refactor that hardcodes '已複製' or
+  // '已複製 (Copied)' would surface here. Appears in BOTH modern (.then) and
+  // fallback (if ok) branches; locking exactly 2 occurrences ensures both
+  // paths intact.
+  const successLit = 'notify(okMsg, false)';
   const successCount = (block.match(new RegExp(successLit.replace(/[(){}.]/g, '\\$&'), 'g')) || []).length;
   assert.equal(
     successCount,
@@ -1826,7 +1829,7 @@ check('101 admin index.ejs copyTextToClipboard() clipboard contract preserved', 
     `\`copyTextToClipboard()\` MUST call \`${successLit}\` exactly 2 times (modern .then + fallback if-ok); found ${successCount}`
   );
 
-  // 4. Failure literal: showFlowStatus('複製失敗，請手動選取', true).
+  // 4. Failure literal: notify('複製失敗，請手動選取', true).
   // Exact string (no `…後 Ctrl+C` suffix — that suffix belongs to the
   // showStatus-based clipboard helpers elsewhere in the file). MUST occur
   // exactly 3 times inside this helper:
@@ -1835,7 +1838,7 @@ check('101 admin index.ejs copyTextToClipboard() clipboard contract preserved', 
   //   (3) outer `try/catch` envelope on createElement / DOM exception.
   // Counting drift surfaces any path that silently goes to no-op or to
   // a different message.
-  const failureLit = "showFlowStatus('複製失敗，請手動選取', true)";
+  const failureLit = "notify('複製失敗，請手動選取', true)";
   const failureCount = (block.match(new RegExp(failureLit.replace(/[(){}.，]/g, '\\$&'), 'g')) || []).length;
   assert.equal(
     failureCount,
@@ -1858,6 +1861,16 @@ check('101 admin index.ejs copyTextToClipboard() clipboard contract preserved', 
   assert.ok(
     catchCount >= 2,
     `\`copyTextToClipboard()\` MUST have matching catch blocks for each try; found ${catchCount} \`catch (\` occurrences`
+  );
+
+  // 6. Default status sink (slice2b): the `notify` alias MUST default to
+  // showFlowStatus when no statusFn is passed, so the two 2-arg callers
+  // (Copy target path / Copy validation command) keep routing to
+  // #npd-flow-status exactly as before. This locks "不破壞既有 #npd-flow-status"
+  // at the helper level; per-button routing is locked by #189 / #195 / #196.
+  assert.ok(
+    /var notify = typeof statusFn === 'function' \? statusFn : showFlowStatus/.test(block),
+    "`copyTextToClipboard()` MUST default its status sink to `showFlowStatus` (2-arg callers unchanged)"
   );
 });
 
@@ -4678,8 +4691,8 @@ check('189 admin index.ejs Copy ready-gap report is clipboard-only (reuses copyT
   // Handler wiring: clipboard-only via the vetted helper + shared input reader.
   assert.ok(src.includes("COPY_GAP_BTN.addEventListener('click'"), 'gap button MUST be wired');
   assert.ok(
-    /copyTextToClipboard\(buildReadyGapReport\(readInput\(\)\), '已複製 ready-gap report'\)/.test(src),
-    'gap handler MUST copy buildReadyGapReport(readInput()) via copyTextToClipboard (clipboard-only)'
+    /copyTextToClipboard\(buildReadyGapReport\(readInput\(\)\), '已複製 ready-gap report', showGapStatus\)/.test(src),
+    'gap handler MUST copy buildReadyGapReport(readInput()) via copyTextToClipboard, routing to the local showGapStatus sink (clipboard-only)'
   );
   assert.ok(src.includes('function readInput()'), 'readInput() MUST exist as the shared form reader');
   assert.ok(src.includes('var input = readInput();'), 'recompute() MUST read form state via readInput()');
@@ -4759,6 +4772,136 @@ check('193 buildReadyGapReport export contract line always draft (defense-in-dep
   const d = matter(buildPostMarkdown(pretend)).data;
   assert.equal(d.status, 'draft');
   assert.equal(d.draft, true);
+});
+
+// Phase 20260701-admin-ready-gap-copy-local-status-slice2b:
+//   UX follow-up to the Copy ready-gap report button. Before slice2b the
+//   button's success message surfaced only in #npd-flow-status, which lives
+//   far up next to the manual-import-flow group (Copy target path / Copy
+//   validation command) — so clicking the gap button beside the Ready
+//   preflight panel showed no nearby feedback and read as a dead button.
+//   Slice2b adds a local #npd-gap-status span beside the button and a
+//   showGapStatus() sink; copyTextToClipboard() gained an optional statusFn
+//   (default showFlowStatus) so the gap button routes to the local sink while
+//   the two 2-arg callers stay on #npd-flow-status unchanged.
+//
+//   These smokes lock (per the slice brief):
+//     #194  local status element sits beside the button (same panel + row)
+//     #195  gap handler routes to showGapStatus + the sink's display contract
+//     #196  shared #npd-flow-status + other copy buttons not regressed
+//     #197  no new write path / network / credential on the Admin surface
+//   Pure EJS/source string scan; no DOM, no headless browser.
+check('194 admin index.ejs Copy ready-gap report has a local status element beside the button', () => {
+  const src = readyGapEjsSrc();
+  const panelStart = src.indexOf('class="npd-ready-preflight"');
+  assert.ok(panelStart > 0, 'index.ejs MUST contain the Ready preflight panel');
+  const panelEnd = src.indexOf('Phase 20260615-night-1-admin-ia-shell-implementation-a', panelStart);
+  assert.ok(panelEnd > panelStart, 'panel scan boundary MUST resolve');
+  const panel = src.slice(panelStart, panelEnd);
+  // The local status element must live in the SAME panel as the button — not
+  // the far-away #npd-flow-status next to the manual-import-flow group (which
+  // sits above the panel and is therefore outside this slice).
+  assert.ok(panel.includes('id="npd-gap-status"'), '#npd-gap-status MUST live inside the Ready preflight panel');
+  assert.ok(!panel.includes('id="npd-flow-status"'), '#npd-flow-status MUST remain outside the Ready preflight panel (far from the gap button)');
+  const btnPos = panel.indexOf('id="npd-copy-gap"');
+  const statusPos = panel.indexOf('id="npd-gap-status"');
+  assert.ok(btnPos > 0, '#npd-copy-gap button MUST exist in the panel');
+  assert.ok(statusPos > btnPos, '#npd-gap-status MUST render right after the #npd-copy-gap button (beside it)');
+  // Both must share one container row so the feedback is visually adjacent.
+  const rowStart = panel.lastIndexOf('<div', btnPos);
+  const rowEnd = panel.indexOf('</div>', statusPos);
+  assert.ok(rowStart >= 0 && rowStart < btnPos && rowEnd > statusPos, 'button + local status MUST share one container row');
+  // a11y parity with #npd-flow-status: the local status announces politely.
+  assert.ok(
+    /id="npd-gap-status"[^>]*aria-live="polite"|aria-live="polite"[^>]*id="npd-gap-status"/.test(panel),
+    '#npd-gap-status MUST carry aria-live="polite" (a11y parity with #npd-flow-status)'
+  );
+});
+
+check('195 admin index.ejs ready-gap copy handler routes feedback to the local showGapStatus sink', () => {
+  const src = readyGapEjsSrc();
+  // Handler passes showGapStatus as the status sink (3rd arg) so success /
+  // failure lands beside the button, not in #npd-flow-status.
+  assert.ok(
+    /copyTextToClipboard\(buildReadyGapReport\(readInput\(\)\), '已複製 ready-gap report', showGapStatus\)/.test(src),
+    'gap handler MUST route feedback to showGapStatus (local status sink)'
+  );
+  // showGapStatus mirrors showFlowStatus's display contract onto #npd-gap-status.
+  const sig = 'function showGapStatus(';
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain `function showGapStatus(`');
+  assert.ok(src.indexOf(sig, sigPos + sig.length) < 0, 'index.ejs MUST contain exactly one `function showGapStatus(` (no duplicate)');
+  const openBrace = src.indexOf('{', sigPos);
+  assert.ok(openBrace > sigPos, '`function showGapStatus(...)` MUST have an opening `{`');
+  let depth = 0;
+  let block = '';
+  for (let i = openBrace; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) { block = src.slice(sigPos, i + 1); break; } }
+  }
+  assert.ok(block, 'showGapStatus block MUST be brace-balanced');
+  assert.ok(block.includes('GAP_STATUS_EL'), 'showGapStatus MUST target GAP_STATUS_EL (#npd-gap-status)');
+  assert.ok(block.includes("'#a00'"), "showGapStatus MUST use '#a00' for error color (parity with showFlowStatus)");
+  assert.ok(block.includes("'#080'"), "showGapStatus MUST use '#080' for success color (parity with showFlowStatus)");
+  assert.ok(/setTimeout\([^]*?,\s*2000\)/.test(block), 'showGapStatus MUST auto-clear via setTimeout(..., 2000)');
+  assert.ok(block.includes('GAP_STATUS_EL.textContent === msg'), 'showGapStatus MUST guard the auto-clear with `GAP_STATUS_EL.textContent === msg`');
+  // GAP_STATUS_EL is bound to the local element.
+  assert.ok(
+    src.includes("var GAP_STATUS_EL = document.getElementById('npd-gap-status')"),
+    'GAP_STATUS_EL MUST bind to #npd-gap-status'
+  );
+});
+
+check('196 admin index.ejs shared #npd-flow-status + other copy buttons not regressed by the local gap status', () => {
+  const src = readyGapEjsSrc();
+  // Shared flow-status element + helper remain.
+  assert.ok(src.includes('id="npd-flow-status"'), '#npd-flow-status element MUST remain');
+  assert.ok(src.includes('function showFlowStatus('), 'showFlowStatus MUST remain');
+  // copyTextToClipboard default sink is still showFlowStatus (2-arg callers
+  // route to flow-status exactly as before slice2b).
+  assert.ok(
+    /var notify = typeof statusFn === 'function' \? statusFn : showFlowStatus/.test(src),
+    'copyTextToClipboard default status sink MUST remain showFlowStatus (2-arg callers unchanged)'
+  );
+  // The two manual-import-flow copy buttons stay 2-arg (no non-default sink).
+  assert.ok(src.includes("copyTextToClipboard(tp, '已複製 path')"), 'Copy target path MUST stay 2-arg → flow-status');
+  assert.ok(src.includes("copyTextToClipboard(VALIDATION_COMMAND, '已複製指令')"), 'Copy validation command MUST stay 2-arg → flow-status');
+  assert.ok(!/copyTextToClipboard\(tp, '已複製 path',/.test(src), 'Copy target path MUST NOT route to a non-default sink');
+  assert.ok(!/copyTextToClipboard\(VALIDATION_COMMAND, '已複製指令',/.test(src), 'Copy validation command MUST NOT route to a non-default sink');
+  // Copy markdown / Download buttons (separate showStatus path) still present.
+  assert.ok(src.includes('id="npd-copy"'), 'Copy markdown button MUST remain');
+  assert.ok(src.includes('id="npd-download"'), 'Download .md button MUST remain');
+});
+
+check('197 admin index.ejs local gap status adds no write path / network / credential', () => {
+  const files = ADMIN_SURFACE_FILES();
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(|navigator\s*\.\s*sendBeacon/;
+  const credential = /client_secret|access_token|refresh_token|private_key|Authorization\s*:|\bBearer\s+[A-Za-z0-9._-]/;
+  // Call-parens required so a doc comment mentioning `fs.writeFile /` does not
+  // false-positive; storage sinks matched by bare identifier (none expected).
+  const writePath = /\b(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream)\s*\(|\b(localStorage|sessionStorage|indexedDB)\b/;
+  for (const { label, src } of files) {
+    assert.ok(!transport.test(src), label + ' MUST carry no network transport primitive');
+    assert.ok(!credential.test(src), label + ' MUST embed no service credential constant');
+    assert.ok(!writePath.test(src), label + ' MUST introduce no client/server write path (fs write / web storage)');
+  }
+  // showGapStatus itself is DOM-text only: textContent / style / setTimeout —
+  // never a transport or storage sink.
+  const src = readyGapEjsSrc();
+  const sig = 'function showGapStatus(';
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain `function showGapStatus(`');
+  const openBrace = src.indexOf('{', sigPos);
+  let depth = 0;
+  let block = '';
+  for (let i = openBrace; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) { block = src.slice(sigPos, i + 1); break; } }
+  }
+  assert.ok(block, 'showGapStatus block MUST be brace-balanced');
+  assert.ok(!transport.test(block) && !writePath.test(block), 'showGapStatus MUST be DOM-text only (no transport / storage)');
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
