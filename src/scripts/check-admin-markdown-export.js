@@ -4226,5 +4226,134 @@ check('165 hygiene reminder lives in dedicated wrapper class (npd-artifact-hygie
   );
 });
 
+// Phase 20260701-c1-1-admin-github-draft-metadata-contract-bridge:
+//   Bridge coverage — proves that a github tech-note draft produced by the
+//   Admin flow (buildPostMarkdown, the real production helper) satisfies the
+//   SAME registry-bound frontmatter contract that check-github-draft-metadata.js
+//   enforces on the hand-authored committed draft. The two smokes previously
+//   covered disjoint surfaces: this smoke tested buildPostMarkdown against a
+//   synthetic REGS fixture, while check-github-draft-metadata.js tested a real
+//   committed file against the real registry — nobody proved buildPostMarkdown
+//   output passes the real-registry contract. These cases close that gap.
+//
+//   Boundaries (mirrors CLAUDE.md red lines):
+//   - Reads the REAL registries (content/settings/{categories,tags}.json) but
+//     never writes them. Additive / fixture-isolated: does NOT change
+//     admin-markdown-export.js, check-github-draft-metadata.js, or any content.
+//   - Assertions duplicate check-github-draft-metadata.js contract semantics on
+//     purpose (they are two independent guards) rather than importing it — that
+//     script is an executable smoke, not a library, and importing it would run
+//     its process.exit path.
+{
+  const here = dirname(fileURLToPath(import.meta.url));
+  const root = resolve(here, '..', '..');
+  const categories = JSON.parse(
+    readFileSync(resolve(root, 'content', 'settings', 'categories.json'), 'utf8')
+  );
+  const tagsRegistry = JSON.parse(
+    readFileSync(resolve(root, 'content', 'settings', 'tags.json'), 'utf8')
+  );
+
+  // registry lookup by id-or-slug (mirrors check-github-draft-metadata.js)
+  const resolveEntry = (registry, key) => {
+    if (typeof key !== 'string' || key.trim() === '') return null;
+    const k = key.trim();
+    return registry.find((e) => e && (e.id === k || e.slug === k)) ?? null;
+  };
+  const siteIncludesGithub = (entry) =>
+    !!(entry && Array.isArray(entry.site) && entry.site.includes('github'));
+
+  // Red-line forbidden / non-existent tags — must never appear in a github draft.
+  const FORBIDDEN_TAGS = new Set([
+    'admin-ui',
+    'design-token',
+    'blogger',
+    'download',
+    'markdown',
+  ]);
+
+  // Admin flow input: a github tech-note using registry-valid category + tags
+  // (tech-note category site=[github,blogger]; github/vite tags site=[github]).
+  const githubDraftInput = {
+    site: 'github',
+    contentKind: 'tech-note',
+    primaryPlatform: 'github',
+    title: 'GitHub 技術文 draft 契約橋接測試',
+    titleEn: 'GitHub Draft Contract Bridge Test',
+    slug: 'admin-github-draft-contract-bridge',
+    date: '2026-07-01',
+    category: 'tech-note',
+    tags: 'github, vite',
+    description: 'Admin flow 產生的 github tech-note draft，用於驗證 GitHub draft metadata contract。',
+  };
+  const bridgeFm = matter(buildPostMarkdown(githubDraftInput)).data;
+
+  check('166 bridge: Admin github draft parses to a plain frontmatter object', () => {
+    assert.ok(
+      bridgeFm && typeof bridgeFm === 'object' && !Array.isArray(bridgeFm),
+      'frontmatter 應為物件'
+    );
+  });
+
+  check('167 bridge: site / primaryPlatform / contentKind are github tech-note', () => {
+    assert.equal(bridgeFm.site, 'github');
+    assert.equal(bridgeFm.primaryPlatform, 'github');
+    assert.equal(bridgeFm.contentKind, 'tech-note');
+  });
+
+  check('168 bridge: category is registry-bound and site[] includes github', () => {
+    assert.ok(
+      typeof bridgeFm.category === 'string' && bridgeFm.category.trim() !== '',
+      'category 應為非空字串'
+    );
+    const entry = resolveEntry(categories, bridgeFm.category);
+    assert.ok(entry, `category "${bridgeFm.category}" 不存在於 categories.json registry`);
+    assert.ok(
+      siteIncludesGithub(entry),
+      `category "${bridgeFm.category}" 之 site[] 未含 github（實得 ${JSON.stringify(entry.site)}）`
+    );
+  });
+
+  check('169 bridge: tags is a non-empty array', () => {
+    assert.ok(
+      Array.isArray(bridgeFm.tags) && bridgeFm.tags.length > 0,
+      `tags 應為非空陣列（實得 ${JSON.stringify(bridgeFm.tags)}）`
+    );
+  });
+
+  check('170 bridge: every tag is registry-bound and site[] includes github', () => {
+    for (const t of bridgeFm.tags ?? []) {
+      const entry = resolveEntry(tagsRegistry, t);
+      assert.ok(entry, `tag "${t}" 不存在於 tags.json registry`);
+      assert.ok(
+        siteIncludesGithub(entry),
+        `tag "${t}" 之 site[] 未含 github（實得 ${JSON.stringify(entry.site)}）`
+      );
+    }
+  });
+
+  check('171 bridge: no forbidden / non-existent tag is used', () => {
+    for (const t of bridgeFm.tags ?? []) {
+      assert.ok(
+        !FORBIDDEN_TAGS.has(t),
+        `tag "${t}" 屬紅線禁用 / 不存在 tag，不得用於 github draft`
+      );
+    }
+  });
+
+  check('172 bridge: status/draft contract consistent (status draft ⇔ draft true)', () => {
+    assert.equal(bridgeFm.status, 'draft');
+    assert.equal(bridgeFm.draft, true);
+  });
+
+  check('173 bridge: publishTargets.github.enabled === true', () => {
+    assert.equal(bridgeFm.publishTargets?.github?.enabled, true);
+  });
+
+  check('174 bridge: publishTargets.blogger.enabled is not true', () => {
+    assert.notEqual(bridgeFm.publishTargets?.blogger?.enabled, true);
+  });
+}
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
