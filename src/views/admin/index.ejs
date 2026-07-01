@@ -1976,6 +1976,55 @@
             <span class="text-muted" style="font-size: 0.82em;">→ 例：<code>github, vite, static-site</code>；datalist 依目前 <code>site</code> 列出 <code>tags.json</code> 中該 site 合法的 tag id（僅輔助提示、非硬性限制；新 tag 不會自動寫入 <code>tags.json</code>），不在清單內仍可手動輸入（Ready preflight 會顯示 unknown-tag / site-mismatch warning）</span>
           </td>
         </tr>
+        <%# Phase 20260701-admin-site-registry-reference-display-slice-b:
+            Read-only reference block — lists the categories / tags that are valid
+            for the currently selected #npd-site, so Dean can see the legal registry
+            values up-front (before mistyping a tag or picking a cross-site category).
+            DISPLAY-ONLY helper: no <input> / <select> / name — it never enters
+            recompute() or the export, does NOT constrain the free-text #npd-tags,
+            and does NOT turn the registry-bound #npd-category <select> into free
+            text. Same registry sources as the site-aware datalist / category select
+            (sys.categories.list + tagUsage.perTag); it does NOT write tags.json /
+            categories.json. Initial paint = default site (github); the inline
+            renderSiteRegistryReference(site) rebuilds #npd-site-registry-ref when
+            #npd-site changes (additive listener; does not touch CAT_EL / the tags
+            datalist / PRIM_EL / recompute). -%>
+        <tr>
+          <td colspan="2" style="padding: 0.3rem 0.5rem 0.5rem;">
+            <div class="npd-site-registry-ref-wrap" style="background: #fff; border: 1px dashed #c5d6e8; border-radius: 4px; padding: 0.5rem 0.65rem; font-size: 0.8em;">
+              <div style="font-weight: 600; color: #1f2d3d; margin-bottom: 0.3rem;">目前 <code>site</code> 合法 category / tag 參考
+                <span class="section-tag tag-readonly" style="font-size: 0.72em; font-weight: 500; margin-left: 0.3rem;">read-only</span>
+              </div>
+              <div id="npd-site-registry-ref">
+                <%
+                  var npdRefSite = 'github';
+                  var npdRefCats = (sys && sys.categories && Array.isArray(sys.categories.list)) ? sys.categories.list : [];
+                  var npdRefTags = (typeof tagUsage === 'object' && tagUsage && Array.isArray(tagUsage.perTag)) ? tagUsage.perTag : [];
+                  var npdRefCatParts = [];
+                  npdRefCats.forEach(function(c) {
+                    var cid = (typeof c.id === 'string' && c.id) ? c.id : (typeof c.slug === 'string' ? c.slug : '');
+                    if (cid === '') return;
+                    var csite = Array.isArray(c.site) ? c.site : [];
+                    if (csite.length > 0 && csite.indexOf(npdRefSite) < 0) return;
+                    var cname = (typeof c.name === 'string' && c.name) ? c.name : cid;
+                    npdRefCatParts.push(csite.length ? (cid + ' — ' + cname + ' [' + csite.join('/') + ']') : (cid + ' — ' + cname));
+                  });
+                  var npdRefTagParts = [];
+                  npdRefTags.forEach(function(t) {
+                    var tid = (typeof t.id === 'string' && t.id) ? t.id : (typeof t.slug === 'string' ? t.slug : '');
+                    if (tid === '') return;
+                    var tsite = Array.isArray(t.site) ? t.site : [];
+                    if (tsite.length > 0 && tsite.indexOf(npdRefSite) < 0) return;
+                    npdRefTagParts.push(tsite.length ? (tid + ' [' + tsite.join('/') + ']') : tid);
+                  });
+                %>
+                <div style="margin-bottom: 0.25rem;"><strong>categories：</strong><%= npdRefCatParts.length ? npdRefCatParts.join('、') : '（此 site 無合法 category）' %></div>
+                <div><strong>tags：</strong><%= npdRefTagParts.length ? npdRefTagParts.join('、') : '（此 site 無合法 tag）' %></div>
+              </div>
+              <div class="text-muted" style="margin-top: 0.3rem; font-size: 0.95em;">僅供參考；<code>[scope]</code> 為該項適用的 site。此區塊<strong>不會自動寫入</strong> <code>categories.json</code> / <code>tags.json</code>，也不限制自由輸入（<code>category</code> 仍為 registry-bound <code>&lt;select&gt;</code>、<code>tags</code> 仍可自由輸入）。</div>
+            </div>
+          </td>
+        </tr>
         <tr>
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-description">description</label></td>
           <td style="padding: 0.25rem 0.5rem;">
@@ -4497,6 +4546,48 @@
       }
       SITE_EL.addEventListener('change', function () { renderCategoryOptions(SITE_EL.value); recompute(); });
       renderCategoryOptions(SITE_EL.value);
+
+      // Phase 20260701-admin-site-registry-reference-display-slice-b:
+      //   Read-only reference block: rebuild #npd-site-registry-ref to list the
+      //   categories / tags valid for the selected site. DISPLAY-ONLY — reuses the
+      //   injected REGISTRY_SNAPSHOT (no new fetch / registry source), writes only
+      //   its own innerHTML, and never touches CAT_EL / the tags datalist / PRIM_EL
+      //   / recompute(). Additive SITE_EL listener registered after the site-aware
+      //   filtering + primaryPlatform-follow handlers, so their order / recompute
+      //   timing is unchanged. Mirrors the server-side initial paint (default github).
+      var SITE_REGISTRY_REF_EL = document.getElementById('npd-site-registry-ref');
+      function renderSiteRegistryReference(site) {
+        if (!SITE_REGISTRY_REF_EL) return;
+        var picked = VALID_SITES.indexOf(site) >= 0 ? site : 'github';
+        var regCats = Array.isArray(REGISTRY_SNAPSHOT.categories) ? REGISTRY_SNAPSHOT.categories : [];
+        var regTags = Array.isArray(REGISTRY_SNAPSHOT.tags) ? REGISTRY_SNAPSHOT.tags : [];
+        var catParts = [];
+        for (var i = 0; i < regCats.length; i++) {
+          var c = regCats[i] || {};
+          var cid = (typeof c.id === 'string' && c.id) ? c.id : (typeof c.slug === 'string' ? c.slug : '');
+          if (cid === '') continue;
+          var csite = Array.isArray(c.site) ? c.site : [];
+          if (csite.length > 0 && csite.indexOf(picked) < 0) continue;
+          var cname = (typeof c.name === 'string' && c.name) ? c.name : cid;
+          catParts.push(csite.length ? (cid + ' — ' + cname + ' [' + csite.join('/') + ']') : (cid + ' — ' + cname));
+        }
+        var tagParts = [];
+        for (var j = 0; j < regTags.length; j++) {
+          var t = regTags[j] || {};
+          var tid = (typeof t.id === 'string' && t.id) ? t.id : (typeof t.slug === 'string' ? t.slug : '');
+          if (tid === '') continue;
+          var tsite = Array.isArray(t.site) ? t.site : [];
+          if (tsite.length > 0 && tsite.indexOf(picked) < 0) continue;
+          tagParts.push(tsite.length ? (tid + ' [' + tsite.join('/') + ']') : tid);
+        }
+        var catText = catParts.length ? catParts.join('、') : '（此 site 無合法 category）';
+        var tagText = tagParts.length ? tagParts.join('、') : '（此 site 無合法 tag）';
+        SITE_REGISTRY_REF_EL.innerHTML =
+          '<div style="margin-bottom: 0.25rem;"><strong>categories：</strong>' + escAttr(catText) + '</div>' +
+          '<div><strong>tags：</strong>' + escAttr(tagText) + '</div>';
+      }
+      SITE_EL.addEventListener('change', function () { renderSiteRegistryReference(SITE_EL.value); });
+      renderSiteRegistryReference(SITE_EL.value);
 
       recompute();
     })();

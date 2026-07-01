@@ -4904,5 +4904,145 @@ check('197 admin index.ejs local gap status adds no write path / network / crede
   assert.ok(!transport.test(block) && !writePath.test(block), 'showGapStatus MUST be DOM-text only (no transport / storage)');
 });
 
+// Phase 20260701-admin-site-registry-reference-display-slice-b:
+//   Slice B adds a DISPLAY-ONLY reference block under the tags row that lists the
+//   categories / tags valid for the currently selected #npd-site, reusing the
+//   already-injected REGISTRY_SNAPSHOT. These smokes pin: (a) the block markup +
+//   hint-only copy, (b) the inline renderSiteRegistryReference() contract, (c) its
+//   #npd-site wiring, (d) that it stays display-only (no input / no export entry),
+//   (e) that the pre-existing site-aware filtering + primaryPlatform auto-follow
+//   are not regressed, and (f) that no write path / network / credential is added.
+//   Pure EJS/JS source-string scans (mirror smoke 111 / 175-177); no headless DOM.
+function slice_b_ejs_src() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  return readFileSync(ejsPath, 'utf8');
+}
+function slice_b_extract_fn(src, sig) {
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, `index.ejs MUST contain \`${sig}\``);
+  const dupPos = src.indexOf(sig, sigPos + sig.length);
+  assert.ok(dupPos < 0, `index.ejs MUST contain exactly one \`${sig}\` (no IIFE duplicates)`);
+  const openBrace = src.indexOf('{', sigPos);
+  let depth = 0;
+  for (let i = openBrace; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) return src.slice(sigPos, i + 1); }
+  }
+  assert.fail(`\`${sig}\` opening brace MUST have a matching close`);
+}
+
+check('198 admin index.ejs site-registry reference block markup + hint-only copy present', () => {
+  const src = slice_b_ejs_src();
+  const wrapPos = src.indexOf('class="npd-site-registry-ref-wrap"');
+  assert.ok(wrapPos > 0, 'index.ejs MUST contain the `npd-site-registry-ref-wrap` reference block');
+  const containerPos = src.indexOf('id="npd-site-registry-ref"');
+  assert.ok(containerPos > wrapPos, 'reference block MUST contain the `#npd-site-registry-ref` render container');
+  // Bound the block region to the reference wrap + its row (up to the next field).
+  const regionEnd = src.indexOf('<label for="npd-description"', wrapPos);
+  assert.ok(regionEnd > wrapPos, 'reference block MUST precede the description field row');
+  const region = src.slice(wrapPos, regionEnd);
+  assert.ok(region.includes('read-only'), 'reference block MUST carry a read-only tag');
+  assert.ok(
+    region.includes('不會自動寫入') && region.includes('categories.json') && region.includes('tags.json'),
+    'reference block MUST state it does NOT auto-write categories.json / tags.json (hint-only guarantee)'
+  );
+  assert.ok(
+    region.includes('categories：') && region.includes('tags：'),
+    'reference block MUST label both a categories line and a tags line'
+  );
+  // Server-side initial paint is default-github scoped (mirror datalist smoke 111).
+  assert.ok(
+    region.includes("var npdRefSite = 'github'"),
+    "reference block server paint MUST scope to default site via `var npdRefSite = 'github'`"
+  );
+  assert.ok(
+    /indexOf\(npdRefSite\)\s*<\s*0\)\s*return/.test(region),
+    'reference block server paint MUST skip cat/tag whose site list excludes the default site'
+  );
+});
+
+check('199 admin index.ejs renderSiteRegistryReference() reuses REGISTRY_SNAPSHOT, touches only its own block', () => {
+  const src = slice_b_ejs_src();
+  const block = slice_b_extract_fn(src, 'function renderSiteRegistryReference(');
+  assert.ok(
+    block.includes('REGISTRY_SNAPSHOT.categories') && block.includes('REGISTRY_SNAPSHOT.tags'),
+    'renderSiteRegistryReference() MUST source from the injected REGISTRY_SNAPSHOT (no new registry / fetch)'
+  );
+  assert.ok(
+    /indexOf\(picked\)\s*<\s*0\)\s*continue/.test(block),
+    'renderSiteRegistryReference() MUST filter cat/tag whose site list excludes the selected site'
+  );
+  assert.ok(
+    block.includes('SITE_REGISTRY_REF_EL.innerHTML'),
+    'renderSiteRegistryReference() MUST write only `SITE_REGISTRY_REF_EL.innerHTML` (its own block)'
+  );
+  // MUST NOT reach into the site-aware controls / recompute the render is additive to.
+  for (const forbidden of ['CAT_EL', 'TAGS_DATALIST_EL', 'PRIM_EL', 'recompute(']) {
+    assert.ok(
+      !block.includes(forbidden),
+      `renderSiteRegistryReference() MUST NOT touch \`${forbidden}\` (display-only; no side effects on existing controls)`
+    );
+  }
+});
+
+check('200 admin index.ejs renderSiteRegistryReference wired to #npd-site change + init', () => {
+  const src = slice_b_ejs_src();
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderSiteRegistryReference\(SITE_EL\.value\)/.test(src),
+    'renderSiteRegistryReference MUST be wired to #npd-site `change` (re-scope reference on site switch)'
+  );
+  assert.ok(
+    /\n\s*renderSiteRegistryReference\(SITE_EL\.value\);/.test(src),
+    'renderSiteRegistryReference(SITE_EL.value) MUST be called once at init (first paint github-scoped)'
+  );
+});
+
+check('201 admin index.ejs site-registry reference block is display-only (no input / no export entry)', () => {
+  const src = slice_b_ejs_src();
+  const wrapPos = src.indexOf('class="npd-site-registry-ref-wrap"');
+  assert.ok(wrapPos > 0, 'index.ejs MUST contain the reference block');
+  const regionEnd = src.indexOf('<label for="npd-description"', wrapPos);
+  assert.ok(regionEnd > wrapPos, 'reference block MUST precede the description field row');
+  const region = src.slice(wrapPos, regionEnd);
+  assert.ok(!/<input\b/.test(region), 'reference block MUST NOT contain an <input> (display-only; never enters recompute / export)');
+  assert.ok(!/<select\b/.test(region), 'reference block MUST NOT contain a <select> (display-only)');
+  assert.ok(!/<textarea\b/.test(region), 'reference block MUST NOT contain a <textarea> (display-only)');
+  assert.ok(!/\sname="/.test(region), 'reference block MUST NOT carry a name= attribute (would imply a submittable field)');
+});
+
+check('202 admin index.ejs slice B does not regress site-aware filtering / primaryPlatform auto-follow', () => {
+  const src = slice_b_ejs_src();
+  // The pre-existing site-aware controls + their #npd-site wiring MUST still exist.
+  assert.ok(src.includes('function renderCategoryOptions('), 'renderCategoryOptions MUST still exist (category site-aware select)');
+  assert.ok(src.includes('function renderTagOptions('), 'renderTagOptions MUST still exist (tag datalist site-aware)');
+  assert.ok(src.includes('function syncPrimaryToSite('), 'syncPrimaryToSite MUST still exist (primaryPlatform auto-follow)');
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderCategoryOptions\(SITE_EL\.value\)\s*;\s*recompute\(\)/.test(src),
+    'renderCategoryOptions MUST stay wired to #npd-site change with its trailing recompute() (unchanged)'
+  );
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*syncPrimaryToSite\(SITE_EL\.value\)/.test(src),
+    'syncPrimaryToSite MUST stay wired to #npd-site change (unchanged)'
+  );
+  // #npd-category stays a registry-bound <select>; #npd-tags stays free-text.
+  assert.ok(src.includes('<select id="npd-category"'), '#npd-category MUST remain a <select> (registry-bound)');
+  const tagsIdPos = src.indexOf('id="npd-tags"');
+  const tagsTag = src.slice(src.lastIndexOf('<', tagsIdPos), src.indexOf('>', tagsIdPos) + 1);
+  assert.ok(/^<input\b/.test(tagsTag) && /type="text"/.test(tagsTag), '#npd-tags MUST remain a free-text <input>');
+});
+
+check('203 admin index.ejs site-registry reference adds no write path / network / credential', () => {
+  const src = slice_b_ejs_src();
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(|navigator\s*\.\s*sendBeacon/;
+  const credential = /client_secret|access_token|refresh_token|private_key|Authorization\s*:|\bBearer\s+[A-Za-z0-9._-]/;
+  const writePath = /\b(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream)\s*\(|\b(localStorage|sessionStorage|indexedDB)\b/;
+  const block = slice_b_extract_fn(src, 'function renderSiteRegistryReference(');
+  assert.ok(!transport.test(block), 'renderSiteRegistryReference() MUST carry no network transport primitive');
+  assert.ok(!credential.test(block), 'renderSiteRegistryReference() MUST embed no service credential');
+  assert.ok(!writePath.test(block), 'renderSiteRegistryReference() MUST introduce no write path (fs write / web storage)');
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
