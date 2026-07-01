@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>GitHub Pages 本機建置與預覽流程筆記 | Portable Blog System</title>
 
-      <meta name="description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。" />
+      <meta name="description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，並整理 Admin UI / Markdown 匯出流程的實作重點。" />
     <meta name="author" content="Dean" />
     <meta name="robots" content="index, follow" />
     <meta name="keywords" content="github, vite, static-site" />
@@ -13,15 +13,15 @@
     <meta property="article:modified_time" content="2026-07-01" />
     <meta property="og:type" content="article" />
     <meta property="og:title" content="GitHub Pages 本機建置與預覽流程筆記 | Portable Blog System" />
-    <meta property="og:description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。" />
+    <meta property="og:description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，並整理 Admin UI / Markdown 匯出流程的實作重點。" />
     <meta property="og:url" content="https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/" />
     <meta property="og:site_name" content="Portable Blog System" />
     <meta property="og:locale" content="zh_TW" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="GitHub Pages 本機建置與預覽流程筆記 | Portable Blog System" />
-    <meta name="twitter:description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。" />
+    <meta name="twitter:description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，並整理 Admin UI / Markdown 匯出流程的實作重點。" />
     <link rel="canonical" href="https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/" />
-    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","@id":"https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/","headline":"GitHub Pages 本機建置與預覽流程筆記","description":"記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。","datePublished":"2026-07-01","dateModified":"2026-07-01","author":{"@type":"Person","name":"Dean"},"mainEntityOfPage":"https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/","inLanguage":"zh-Hant","articleSection":"技術筆記","isPartOf":{"@type":"Blog","@id":"https://babel-lab.github.io/portable-blog-system/","name":"Portable Blog System","url":"https://babel-lab.github.io/portable-blog-system/","inLanguage":"zh-Hant"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","@id":"https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/","headline":"GitHub Pages 本機建置與預覽流程筆記","description":"記錄 portable blog system 的 GitHub Pages 本機工作流程：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，並整理 Admin UI / Markdown 匯出流程的實作重點。","datePublished":"2026-07-01","dateModified":"2026-07-01","author":{"@type":"Person","name":"Dean"},"mainEntityOfPage":"https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/","inLanguage":"zh-Hant","articleSection":"技術筆記","isPartOf":{"@type":"Blog","@id":"https://babel-lab.github.io/portable-blog-system/","name":"Portable Blog System","url":"https://babel-lab.github.io/portable-blog-system/","inLanguage":"zh-Hant"}}</script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-C77SMPF8VD"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
