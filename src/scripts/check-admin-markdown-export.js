@@ -4456,5 +4456,59 @@ check('177 admin index.ejs renderCategoryOptions wired to #npd-site change + ini
   );
 });
 
+// Phase 20260701-admin-primary-platform-auto-follow-site-a:
+//   #178-179 pin primaryPlatform auto-follow-site. Before this slice #npd-primary
+//   kept its independent default (github) when #npd-site switched to blogger, so
+//   a fresh blogger draft silently exported primaryPlatform: github. The new
+//   syncPrimaryToSite(site) helper mirrors #npd-primary onto the selected site
+//   (github → github, blogger → blogger) on every change + at init, while leaving
+//   the site-aware category <select> (#175-177) and tag datalist (#111) intact.
+//   Static EJS source scan; no DOM / headless browser (mirrors #111 / #176-177).
+check('178 admin index.ejs syncPrimaryToSite mirrors #npd-primary onto the selected site', () => {
+  const src = readAdminEjsSrc();
+  const sig = 'function syncPrimaryToSite(';
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain `function syncPrimaryToSite(`');
+  assert.ok(
+    src.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one `function syncPrimaryToSite(`'
+  );
+  // Identity map: PRIM_EL.value becomes the chosen site (github→github,
+  // blogger→blogger), guarded so an unknown site falls back to github rather
+  // than writing a bogus primaryPlatform.
+  assert.ok(
+    /PRIM_EL\.value\s*=\s*VALID_SITES\.indexOf\(site\)\s*>=\s*0\s*\?\s*site\s*:\s*'github'/.test(src),
+    'syncPrimaryToSite MUST set PRIM_EL.value to the selected site (github→github / blogger→blogger) with a github fallback'
+  );
+  // No new egress: the follow is a plain <select> value assignment, not a write
+  // path — #npd-primary stays a manual <select> (no fetch / XHR introduced here).
+  assert.ok(
+    /if\s*\(!PRIM_EL\)\s*return;/.test(src),
+    'syncPrimaryToSite MUST no-op when #npd-primary is absent (defensive guard)'
+  );
+});
+
+check('179 admin index.ejs syncPrimaryToSite wired to #npd-site change + init; category/tag site-aware not regressed', () => {
+  const src = readAdminEjsSrc();
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*syncPrimaryToSite\(SITE_EL\.value\)/.test(src),
+    'syncPrimaryToSite MUST be wired to #npd-site `change` (follow primaryPlatform on site switch)'
+  );
+  assert.ok(
+    /\n\s*syncPrimaryToSite\(SITE_EL\.value\);/.test(src),
+    'syncPrimaryToSite(SITE_EL.value) MUST be called once at init (first paint site-aligned)'
+  );
+  // No regression: the site-aware category <select> stays wired (#175-177) and
+  // the tag datalist stays site-aware (#111) — all three coexist under #npd-site.
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderCategoryOptions\(SITE_EL\.value\)/.test(src),
+    'category <select> site-aware wiring MUST remain (renderCategoryOptions change handler; no regression)'
+  );
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderTagOptions\(SITE_EL\.value\)/.test(src),
+    'tag datalist site-aware wiring MUST remain (renderTagOptions change handler; no regression)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

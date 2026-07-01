@@ -4322,6 +4322,26 @@
       SITE_EL.addEventListener('change', function () { renderTagOptions(SITE_EL.value); });
       renderTagOptions(SITE_EL.value);
 
+      // Phase 20260701-admin-primary-platform-auto-follow-site-a:
+      //   primaryPlatform auto-follows #npd-site. Before this, #npd-primary kept
+      //   its independent default (github) when Dean switched #npd-site to
+      //   blogger, so a fresh blogger draft silently exported
+      //   primaryPlatform: github — a site !== primaryPlatform mismatch that only
+      //   surfaced later in the .md. syncPrimaryToSite(site) sets #npd-primary to
+      //   the same github|blogger value on every site change; #npd-primary stays
+      //   a manual <select> afterwards (its own change listener via the
+      //   [SITE_EL, KIND_EL, PRIM_EL, CAT_EL] recompute wiring above still fires),
+      //   so this only removes the stale default, not the deliberate override.
+      //   Registered before the category change handler so the follow lands
+      //   before that handler's trailing recompute() reads PRIM_EL.value. No new
+      //   write path / fetch / fs — a value assignment on an existing <select>.
+      function syncPrimaryToSite(site) {
+        if (!PRIM_EL) return;
+        PRIM_EL.value = VALID_SITES.indexOf(site) >= 0 ? site : 'github';
+      }
+      SITE_EL.addEventListener('change', function () { syncPrimaryToSite(SITE_EL.value); });
+      syncPrimaryToSite(SITE_EL.value);
+
       // Phase 20260701-admin-category-select-site-aware-options-a:
       //   Site-aware category <select>. Mirror of the server default-github
       //   option filter + the renderTagOptions pattern: rebuild #npd-category
