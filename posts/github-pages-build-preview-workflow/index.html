@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GitHub Pages 本機建置與預覽流程筆記 | Portable Blog System</title>
+
+      <meta name="description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。" />
+    <meta name="author" content="Dean" />
+    <meta name="robots" content="index, follow" />
+    <meta name="keywords" content="github, vite, static-site" />
+    <meta property="article:published_time" content="2026-07-01" />
+    <meta property="article:modified_time" content="2026-07-01" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="GitHub Pages 本機建置與預覽流程筆記 | Portable Blog System" />
+    <meta property="og:description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。" />
+    <meta property="og:url" content="https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/" />
+    <meta property="og:site_name" content="Portable Blog System" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="GitHub Pages 本機建置與預覽流程筆記 | Portable Blog System" />
+    <meta name="twitter:description" content="記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。" />
+    <link rel="canonical" href="https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","@id":"https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/","headline":"GitHub Pages 本機建置與預覽流程筆記","description":"記錄 portable blog system 的 GitHub Pages 本機工作流程草稿：dev 本機預覽、build 產出靜態站、preview 檢查 dist 結果，作為後續 Admin UI / Markdown 匯出流程的測試內容。","datePublished":"2026-07-01","dateModified":"2026-07-01","author":{"@type":"Person","name":"Dean"},"mainEntityOfPage":"https://babel-lab.github.io/portable-blog-system/posts/github-pages-build-preview-workflow/","inLanguage":"zh-Hant","articleSection":"技術筆記","isPartOf":{"@type":"Blog","@id":"https://babel-lab.github.io/portable-blog-system/","name":"Portable Blog System","url":"https://babel-lab.github.io/portable-blog-system/","inLanguage":"zh-Hant"}}</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-C77SMPF8VD"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-C77SMPF8VD');
+    </script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2445077695943759" crossorigin="anonymous"></script>
+    <script type="module" crossorigin src="../../assets/entry-CS6SReMr.js"></script>
+    <link rel="stylesheet" crossorigin href="../../assets/entry-BBn3QW-O.css">
+  </head>
+  <body class="lab-site lab-site--github">
+    <header class="lab-header" data-sticky-header>
+  <div class="lab-container lab-header__inner">
+    <a class="lab-header__brand" href="/portable-blog-system/">Portable Blog System</a>
+    <button type="button" class="lab-header__menu-button" data-drawer-open aria-controls="lab-drawer" aria-expanded="false" aria-label="開啟選單" hidden>
+      <span aria-hidden="true">≡</span>
+    </button>
+    
+<nav class="lab-nav" aria-label="主選單">
+  
+  <a class="lab-nav__link" href="/portable-blog-system/">首頁</a>
+  
+  <a class="lab-nav__link" href="/portable-blog-system/posts/">文章</a>
+  
+  <a class="lab-nav__link" href="/portable-blog-system/categories/">分類</a>
+  
+  <a class="lab-nav__link" href="/portable-blog-system/tags/">標籤</a>
+  
+</nav>
+
+
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+<article class="lab-article">
+  <header class="lab-article__header lab-container">
+    <p class="lab-article__category">tech-note</p>
+    <h1 class="lab-article__title">GitHub Pages 本機建置與預覽流程筆記</h1>
+    
+    <p class="lab-article__title-en">GitHub Pages Local Build and Preview Workflow Notes</p>
+    
+    <p class="lab-article__meta">
+      <time datetime="2026-07-01">2026-07-01</time>
+      
+      
+      ·
+      <span>Dean</span>
+      
+    </p>
+  </header>
+<div class="lab-container">
+
+<ins class="adsbygoogle lab-ad-slot lab-ad-slot--articleAd1"
+     style="display:block"
+     data-ad-client="ca-pub-2445077695943759"
+     data-ad-slot="7549133677"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+</div>
+
+  
+<div class="lab-container">
+
+<ins class="adsbygoogle lab-ad-slot lab-ad-slot--articleAd2"
+     style="display:block"
+     data-ad-client="ca-pub-2445077695943759"
+     data-ad-slot="7465373194"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+</div>
+
+                    <div class="lab-container">
+
+<ins class="adsbygoogle lab-ad-slot lab-ad-slot--articleAd3"
+     style="display:block"
+     data-ad-client="ca-pub-2445077695943759"
+     data-ad-slot="3751770373"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+</div>
+
+  
+  <div class="lab-container">
+    
+
+
+  </div>
+  
+
+                  <div class="lab-container">
+
+<ins class="adsbygoogle lab-ad-slot lab-ad-slot--articleAd4"
+     style="display:block"
+     data-ad-client="ca-pub-2445077695943759"
+     data-ad-slot="7035489397"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+</div>
+
+  <div class="lab-article__body lab-container">
+    <h2>前言</h2>
+<p>這篇筆記記錄 portable blog system 的 GitHub Pages 本機工作流程，同時作為 Admin UI / Markdown 匯出流程的測試內容。</p>
+<p>本文只描述本機端的 build 與 preview 流程，不涉及 deploy 或 gh-pages 實際發布。實際 deploy 邊界會在文末單獨說明，避免把本機檢查跟正式發布混為一談。</p>
+<h2>適用情境</h2>
+<p>這份筆記適合以下情況閱讀：</p>
+<ul>
+<li>剛把一篇 Markdown 草稿改到一個段落，想在本機看看它排版起來長什麼樣子。</li>
+<li>準備把 <code>dist</code> 產出交給部署流程前，想先在本機確認產物沒有明顯破版或缺頁。</li>
+<li>在測試 Admin UI 匯出的 Markdown 是否能被正常讀入、解析、渲染。</li>
+</ul>
+<p>如果只是要改文字內容、還沒到要看整站樣子的階段，其實不一定每次都要跑完整流程；先用 <code>npm run dev</code> 邊改邊看通常就足夠了。</p>
+<h2>本地開發流程</h2>
+<p>GitHub 靜態站第一版提供三個常用指令，彼此分工不同：</p>
+<pre><code class="language-bash">npm run dev       # 本機即時預覽，邊改邊看
+npm run build     # 產出靜態站到 dist
+npm run preview   # 在本機檢視 build 後的 dist 結果
+</code></pre>
+<p><code>npm run dev</code> 用於本機預覽 GitHub 靜態站與 Design System 頁，適合寫作與調樣式時邊改邊看。</p>
+<p><code>npm run build</code> 把整站產出到 <code>dist</code>，作為後續輸出的來源。</p>
+<p><code>npm run preview</code> 用於在本機檢視 build 後的 <code>dist</code> 結果，確認實際產物與 dev 模式看到的一致。</p>
+<h3>build 前檢查</h3>
+<p>在跑 build 之前，通常先確認內容層沒有問題再往下走。這一版主要靠 <code>validate:content</code> 做內容檢查：</p>
+<pre><code class="language-bash">npm run validate:content
+</code></pre>
+<p>重點看的是 error 數是否為 0；warning 可以視情況接受，但不應該因為這次改動而多出新的 error。草稿文章（<code>status: draft</code> / <code>draft: true</code>）會被排除在正式輸出之外，所以它不會進 <code>dist</code>，也不會影響正式站的呈現。</p>
+<h3>preview 檢查</h3>
+<p>build 完成後，用 preview 檢視 <code>dist</code> 時，主要確認幾個頁面是否正常：</p>
+<ul>
+<li>首頁與文章列表頁的卡片是否正常排列。</li>
+<li>文章詳細頁的標題、日期、內文與各區塊是否完整。</li>
+<li>分類頁與標籤頁是否列出對應文章。</li>
+<li>草稿文章是否依 status 正確被過濾，沒有意外出現在正式輸出裡。</li>
+</ul>
+<p>preview 看到的是真正要交出去的產物，所以這一步比 dev 模式更接近「上線後的樣子」。</p>
+<h3>deploy 邊界</h3>
+<p>這份筆記到 preview 為止。實際的 deploy（推送到 gh-pages、更新 GitHub Pages 線上站）屬於另一個獨立步驟，需要另外的授權與檢查流程，不在本機工作流程的範圍內。</p>
+<p>換句話說：本機可以放心反覆 build / preview，因為這些動作都不會碰到線上站；只有明確進入 deploy 步驟時，產物才會真正對外發布。</p>
+<h2>常見錯誤</h2>
+<p>草稿階段常遇到的幾個狀況：</p>
+<ul>
+<li>改完內容忘了先跑 <code>validate:content</code>，結果 build 後才發現 frontmatter 少了必要欄位。</li>
+<li>以為草稿沒出現在列表頁是 bug，其實是 draft 過濾正常運作的結果。</li>
+<li>把 dev 模式看到的畫面當成最終產物，忽略了要用 preview 檢查 <code>dist</code>。</li>
+</ul>
+<h2>Checklist</h2>
+<p>一份給自己用的簡易草稿檢查清單：</p>
+<ul>
+<li>[ ] 內容已存檔，frontmatter 欄位完整。</li>
+<li>[ ] <code>npm run validate:content</code> 為 0 error。</li>
+<li>[ ] 需要看整站時已跑 <code>npm run build</code>。</li>
+<li>[ ] 用 <code>npm run preview</code> 確認 <code>dist</code> 產物正常。</li>
+<li>[ ] 草稿文章確實被過濾，未出現在正式輸出。</li>
+<li>[ ] deploy 為獨立步驟，本機階段不觸碰 gh-pages。</li>
+</ul>
+<h2>結論</h2>
+<p>這篇筆記整理了 GitHub Pages 本機 build 與 preview 的基本流程。後續可再補齊實際操作紀錄與截圖，並把 deploy 步驟的檢查一併整理進來。</p>
+
+  </div>
+
+                      
+                      <div class="lab-container">
+
+<ins class="adsbygoogle lab-ad-slot lab-ad-slot--articleAd5"
+     style="display:block"
+     data-ad-client="ca-pub-2445077695943759"
+     data-ad-slot="7582284302"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+</div>
+
+            
+                <div class="lab-container">
+
+<ins class="adsbygoogle lab-ad-slot lab-ad-slot--articleAd6"
+     style="display:block"
+     data-ad-client="ca-pub-2445077695943759"
+     data-ad-slot="3892656977"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+</div>
+  
+        
+                  
+  <div class="lab-container">
+    <ul class="lab-hashtags">
+      
+      <li><span class="lab-hashtag">#github</span></li>
+      
+      <li><span class="lab-hashtag">#vite</span></li>
+      
+      <li><span class="lab-hashtag">#static-site</span></li>
+      
+    </ul>
+  </div>
+  
+  
+  <div class="lab-container">
+    
+
+
+  </div>
+  
+</article>
+<nav class="lab-prev-next lab-article-bottom-nav" aria-label="文章導覽">
+  
+  <a class="lab-prev-next__prev lab-article-bottom-nav__link lab-article-bottom-nav__link--prev" href="/portable-blog-system/posts/what-is-design-token/" data-ga4-event="click_other_link" data-ga4-param-surface="github_pages" data-ga4-param-click_area="article_bottom_nav" data-ga4-param-nav_direction="previous" data-ga4-param-post_slug="github-pages-build-preview-workflow" data-ga4-param-target_slug="what-is-design-token" data-ga4-param-target_url="/portable-blog-system/posts/what-is-design-token/" data-ga4-param-link_label="什麼是Design Token?">
+    <span class="lab-prev-next__label">上一篇</span>
+    <span class="lab-prev-next__title">什麼是Design Token?</span>
+  </a>
+  
+  
+  <a class="lab-prev-next__home lab-article-bottom-nav__link lab-article-bottom-nav__link--home" href="/portable-blog-system/" data-ga4-event="click_other_link" data-ga4-param-surface="github_pages" data-ga4-param-click_area="article_bottom_nav" data-ga4-param-nav_direction="home" data-ga4-param-post_slug="github-pages-build-preview-workflow" data-ga4-param-target_slug="home" data-ga4-param-target_url="/portable-blog-system/" data-ga4-param-link_label="回首頁">
+    <span class="lab-prev-next__label">回首頁</span>
+  </a>
+</nav>
+
+    </main>
+    <footer class="lab-footer">
+  <div class="lab-container">
+    © 2026 Portable Blog System. Built for GitHub Pages + Blogger export.
+            <nav class="lab-footer__links" aria-label="揭露與政策">
+            <a class="lab-footer__link" href="/portable-blog-system/privacy/">隱私權政策</a>
+            <a class="lab-footer__link" href="/portable-blog-system/affiliate-disclosure/">聯盟揭露</a>
+          </nav>
+      </div>
+</footer>
+
+    <aside id="lab-drawer" class="lab-mobile-drawer" data-mobile-drawer
+       role="dialog" aria-modal="true" aria-hidden="true" aria-label="行動選單">
+  <button type="button" class="lab-mobile-drawer__close" data-drawer-close aria-label="關閉選單">×</button>
+  
+  <nav class="lab-mobile-drawer__nav" aria-label="行動選單導覽">
+    
+    <a class="lab-mobile-drawer__link" href="/portable-blog-system/">首頁</a>
+    
+    <a class="lab-mobile-drawer__link" href="/portable-blog-system/posts/">文章</a>
+    
+    <a class="lab-mobile-drawer__link" href="/portable-blog-system/categories/">分類</a>
+    
+    <a class="lab-mobile-drawer__link" href="/portable-blog-system/tags/">標籤</a>
+    
+  </nav>
+  
+</aside>
+<div class="lab-overlay" data-drawer-overlay hidden></div>
+
+    <button class="lab-back-to-top" data-back-to-top type="button" aria-label="回到頁面上方">↑</button>
+  </body>
+</html>
