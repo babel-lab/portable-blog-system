@@ -1916,19 +1916,30 @@
           <td style="padding: 0.25rem 0.5rem; vertical-align: top;"><label for="npd-category">category</label></td>
           <td style="padding: 0.25rem 0.5rem;">
             <select id="npd-category" style="padding: 0.25rem; font-family: inherit;">
-              <option value="">— 空（先不填） —</option>
+              <%# Phase 20260701-admin-category-select-site-aware-options-a:
+                  Site-aware category select. Initial paint filters to the default
+                  site (github) so a fresh GitHub draft only offers github-allowed
+                  categories (currently tech-note). The inline renderCategoryOptions(site)
+                  rebuilds these options when #npd-site changes — preserving a still-valid
+                  choice or falling back to the first available category for the new site.
+                  Registry-bound options only (no free text) per smoke #156-157; mirrors
+                  the tag datalist default-github filter. -%>
               <%
+                var npdCatDefaultSite = 'github';
                 var sysCats = (sys && sys.categories && Array.isArray(sys.categories.list)) ? sys.categories.list : [];
                 sysCats.forEach(function(c) {
                   var cid = typeof c.id === 'string' ? c.id : '';
                   if (cid === '') return;
+                  var cSiteArr = Array.isArray(c.site) ? c.site : [];
+                  if (cSiteArr.length > 0 && cSiteArr.indexOf(npdCatDefaultSite) < 0) return;
                   var cname = typeof c.name === 'string' ? c.name : cid;
-                  var csites = Array.isArray(c.site) ? c.site.join(',') : '';
+                  var csites = cSiteArr.join('/');
+                  var clabel = csites ? (cid + ' — ' + cname + ' [' + csites + ']') : (cid + ' — ' + cname);
               %>
-                <option value="<%= cid %>" data-site="<%= csites %>"><%= cid %> — <%= cname %><% if (csites) { %> [<%= csites %>]<% } %></option>
+                <option value="<%= cid %>"><%= clabel %></option>
               <% }); %>
             </select>
-            <span class="text-muted" style="font-size: 0.82em;">→ 來源 <code>categories.json</code>；draft export 不擋，但 Ready preflight 會顯示 <code>unknown-category</code> / <code>category-site-mismatch</code> warning（與 tags 一致）</span>
+            <span class="text-muted" style="font-size: 0.82em;">→ 來源 <code>categories.json</code>；依目前 <code>site</code> 只列出該 site 合法的 category（github 目前為 <code>tech-note</code>），切換 site 會重建並自動選該 site 第一個可用 category；draft export 不擋，Ready preflight 仍會顯示 <code>unknown-category</code> / <code>category-site-mismatch</code> warning（與 tags 一致）</span>
           </td>
         </tr>
         <tr>
@@ -3475,7 +3486,7 @@
       JSON-encoded via JSON.stringify so no inline JS escaping concerns. -%>
   <script>
     window.NPD_REGISTRY = (function () {
-      var cats = <%- JSON.stringify(((sys && sys.categories && Array.isArray(sys.categories.list)) ? sys.categories.list : []).map(function(c) { return { id: c.id || '', slug: c.slug || '', site: Array.isArray(c.site) ? c.site : [] }; })) %>;
+      var cats = <%- JSON.stringify(((sys && sys.categories && Array.isArray(sys.categories.list)) ? sys.categories.list : []).map(function(c) { return { id: c.id || '', slug: c.slug || '', name: c.name || '', site: Array.isArray(c.site) ? c.site : [] }; })) %>;
       var tags = <%- JSON.stringify(((typeof tagUsage === 'object' && tagUsage && Array.isArray(tagUsage.perTag)) ? tagUsage.perTag : []).map(function(t) { return { id: t.id || '', slug: t.slug || '', site: Array.isArray(t.site) ? t.site : [] }; })) %>;
       return { categories: cats, tags: tags };
     })();
@@ -4310,6 +4321,50 @@
       }
       SITE_EL.addEventListener('change', function () { renderTagOptions(SITE_EL.value); });
       renderTagOptions(SITE_EL.value);
+
+      // Phase 20260701-admin-category-select-site-aware-options-a:
+      //   Site-aware category <select>. Mirror of the server default-github
+      //   option filter + the renderTagOptions pattern: rebuild #npd-category
+      //   options from REGISTRY_SNAPSHOT.categories whenever #npd-site changes,
+      //   preserving a still-valid selection or falling back to the first
+      //   available category for the new site (an invalid / cross-site value
+      //   resets rather than lingering as a category-site-mismatch). Stays a
+      //   registry-bound <select> — CAT_EL.innerHTML holds <option>s only, no
+      //   free-text input, per smoke #156-157. recompute() runs right after the
+      //   rebuild so the markdown preview + Ready preflight reflect the (possibly
+      //   reset) category on the same tick as the site switch.
+      function renderCategoryOptions(site) {
+        if (!CAT_EL) return;
+        var picked = VALID_SITES.indexOf(site) >= 0 ? site : 'github';
+        var regCats = Array.isArray(REGISTRY_SNAPSHOT.categories) ? REGISTRY_SNAPSHOT.categories : [];
+        var prev = CAT_EL.value;
+        var available = [];
+        for (var i = 0; i < regCats.length; i++) {
+          var c = regCats[i] || {};
+          var cid = (typeof c.id === 'string' && c.id) ? c.id : (typeof c.slug === 'string' ? c.slug : '');
+          if (cid === '') continue;
+          var sites = Array.isArray(c.site) ? c.site : [];
+          if (sites.length > 0 && sites.indexOf(picked) < 0) continue;
+          var cname = (typeof c.name === 'string' && c.name) ? c.name : cid;
+          available.push({ id: cid, name: cname, sites: sites });
+        }
+        var out = '';
+        for (var j = 0; j < available.length; j++) {
+          var a = available[j];
+          var label = a.sites.length
+            ? (a.id + ' — ' + a.name + ' [' + a.sites.join('/') + ']')
+            : (a.id + ' — ' + a.name);
+          out += '<option value="' + escAttr(a.id) + '">' + escAttr(label) + '</option>';
+        }
+        CAT_EL.innerHTML = out;
+        var stillValid = false;
+        for (var k = 0; k < available.length; k++) {
+          if (available[k].id === prev) { stillValid = true; break; }
+        }
+        CAT_EL.value = stillValid ? prev : (available.length ? available[0].id : '');
+      }
+      SITE_EL.addEventListener('change', function () { renderCategoryOptions(SITE_EL.value); recompute(); });
+      renderCategoryOptions(SITE_EL.value);
 
       recompute();
     })();

@@ -4355,5 +4355,106 @@ check('165 hygiene reminder lives in dedicated wrapper class (npd-artifact-hygie
   });
 }
 
+// Phase 20260701-admin-category-select-site-aware-options-a:
+//   Lock the category <select>'s new site-aware behaviour, alongside the
+//   registry-bound-select invariant already pinned by #156-157. Dean's spec:
+//   switching #npd-site rebuilds #npd-category to only the categories the target
+//   site allows (github → tech-note; blogger → its own set), and a selection
+//   that is invalid for the new site falls back to that site's FIRST available
+//   category. The control never becomes free text (no <input>, no datalist), and
+//   the tag datalist stays site-aware (no regression). Pure EJS source string
+//   scan; no DOM, no headless browser (mirrors the tag-picker guard #111).
+function readAdminEjsSrc() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return readFileSync(resolve(here, '..', 'views', 'admin', 'index.ejs'), 'utf8');
+}
+
+check('175 admin index.ejs category <select> server options filter to default github site', () => {
+  const block = extractCategoryTdBlock();
+  // Control stays a registry-bound <select>, not a free-text input (re-lock the
+  // control model alongside the new site-aware option loop).
+  assert.ok(
+    block.includes('<select id="npd-category"'),
+    '#npd-category MUST stay a <select> (registry-bound)'
+  );
+  assert.ok(
+    block.indexOf('<input id="npd-category"') < 0,
+    '#npd-category MUST NOT become a free-text <input>'
+  );
+  assert.ok(
+    !/list=/.test(block) && !block.includes('<datalist'),
+    'category <td> MUST NOT adopt the tags-style datalist model'
+  );
+  // Server-side option loop default-filters to github so a fresh GitHub draft is
+  // never offered a Blogger-only category (book-review / download / life-note).
+  assert.ok(
+    /npdCatDefaultSite\s*=\s*'github'/.test(block),
+    'category server loop MUST default-filter to github (npdCatDefaultSite)'
+  );
+  assert.ok(
+    /indexOf\(npdCatDefaultSite\)\s*<\s*0/.test(block),
+    'category server loop MUST skip categories whose site[] excludes the default site'
+  );
+  // The empty "先不填" placeholder is intentionally gone (site-aware model always
+  // auto-selects a real category); it must not silently return.
+  assert.ok(
+    block.indexOf('<option value="">') < 0,
+    'category <select> MUST NOT reintroduce an empty <option value=""> (auto-select first available)'
+  );
+});
+
+check('176 admin index.ejs inline renderCategoryOptions(site) is site-aware with first-available fallback', () => {
+  const src = readAdminEjsSrc();
+  const sig = 'function renderCategoryOptions(';
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain `function renderCategoryOptions(`');
+  assert.ok(
+    src.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one `function renderCategoryOptions(`'
+  );
+  assert.ok(
+    /REGISTRY_SNAPSHOT\.categories/.test(src),
+    'renderCategoryOptions MUST source options from REGISTRY_SNAPSHOT.categories'
+  );
+  assert.ok(
+    /sites\.indexOf\(picked\)\s*<\s*0/.test(src),
+    'renderCategoryOptions MUST skip categories whose site[] excludes the selected site'
+  );
+  assert.ok(
+    /CAT_EL\.innerHTML\s*=/.test(src),
+    'renderCategoryOptions MUST rewrite CAT_EL.innerHTML (rebuild the <select> options, not a datalist)'
+  );
+  assert.ok(
+    /stillValid\s*\?\s*prev\s*:\s*\(available\.length\s*\?\s*available\[0\]\.id/.test(src),
+    'renderCategoryOptions MUST preserve a still-valid selection else fall back to the first available category'
+  );
+});
+
+check('177 admin index.ejs renderCategoryOptions wired to #npd-site change + init; tag site-aware not regressed', () => {
+  const src = readAdminEjsSrc();
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderCategoryOptions\(SITE_EL\.value\)/.test(src),
+    'renderCategoryOptions MUST be wired to #npd-site `change` (re-scope categories on site switch)'
+  );
+  assert.ok(
+    /\n\s*renderCategoryOptions\(SITE_EL\.value\);/.test(src),
+    'renderCategoryOptions(SITE_EL.value) MUST be called once at init (first paint github-scoped)'
+  );
+  assert.ok(
+    /name:\s*c\.name\s*\|\|\s*''/.test(src),
+    'NPD_REGISTRY categories snapshot MUST include name (for the client <option> label)'
+  );
+  // No regression: the tag datalist stays site-aware (renderTagOptions intact +
+  // wired), so the two site-aware controls coexist.
+  assert.ok(
+    src.includes('function renderTagOptions('),
+    'tag datalist site-aware renderTagOptions MUST remain (no regression)'
+  );
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderTagOptions\(SITE_EL\.value\)/.test(src),
+    'renderTagOptions MUST remain wired to #npd-site change (no regression)'
+  );
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
