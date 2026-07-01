@@ -25,6 +25,9 @@ import {
   analyzeRegistryHints,
   buildExportSummary,
   buildReadyGapReport,
+  suggestSlugFromTitle,
+  SLUG_MAX_LEN,
+  VALID_SLUG_RE,
   READY_GAP_REPORT_HEADER,
   READY_GAP_DRAFT_CONTRACT,
   READY_UNSUPPORTED_CONTENT_KINDS,
@@ -5298,6 +5301,489 @@ check('216 admin index.ejs C1 adds no write path / network / credential', () => 
   assert.ok(!transport.test(block), 'renderTagsRegistryHint MUST carry no network transport primitive');
   assert.ok(!credential.test(block), 'renderTagsRegistryHint MUST embed no service credential');
   assert.ok(!writePath.test(block), 'renderTagsRegistryHint MUST introduce no write path (fs write / web storage)');
+});
+
+// Phase 20260701-admin-slug-suggestion-helper-slice-a:
+//   Slice A adds a display-only slug-suggestion strip below the #npd-slug
+//   input. Server helper suggestSlugFromTitle({ title, titleEn }) proposes a
+//   kebab-case slug with titleEn precedence, no pinyin / romanization, and no
+//   side effects. Client mirror + a Copy suggested slug button (clipboard-only)
+//   render the same result in the Admin UI. Smokes below pin:
+//     (a) server helper export + contract (titleEn precedence, CJK fallback,
+//         null/undefined safety, hyphen collapse, maxlength 80, VALID_SLUG_RE),
+//     (b) DOM presence + placement (after #npd-slug input, inside same <td>),
+//     (c) client mirror source patterns match server behavior,
+//     (d) renderSlugSuggestion() defined + called from recompute(),
+//     (e) renderSlugSuggestion() isolation (no writes to SLUG_EL, no
+//         innerHTML, no other refs, no recompute() call),
+//     (f) Copy button clipboard-only wiring (no fetch / no write path),
+//     (g) prior slices (C1 / Slice B / category filter / primaryPlatform /
+//         Copy markdown / Download / Copy target path / Copy validation /
+//         Copy ready-gap) not regressed,
+//     (h) export contract unchanged: status:"draft" + draft:true across 6
+//         representative shapes (title-only / titleEn-only / CJK+titleEn /
+//         CJK-only / all-empty / hyphen-boundary slug).
+function slug_suggest_ejs_src() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  return readFileSync(ejsPath, 'utf8');
+}
+function slug_suggest_extract_fn(src, sig) {
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, `index.ejs MUST contain \`${sig}\``);
+  const dupPos = src.indexOf(sig, sigPos + sig.length);
+  assert.ok(dupPos < 0, `index.ejs MUST contain exactly one \`${sig}\` (no IIFE duplicates)`);
+  const openBrace = src.indexOf('{', sigPos);
+  let depth = 0;
+  for (let i = openBrace; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) return src.slice(sigPos, i + 1); }
+  }
+  assert.fail(`\`${sig}\` opening brace MUST have a matching close`);
+}
+
+check('217 admin-markdown-export.js exports suggestSlugFromTitle + SLUG_MAX_LEN', () => {
+  assert.equal(typeof suggestSlugFromTitle, 'function', 'suggestSlugFromTitle MUST be an exported function');
+  assert.equal(SLUG_MAX_LEN, 80, 'SLUG_MAX_LEN MUST equal 80 (aligns with #npd-slug maxlength="80")');
+  const r = suggestSlugFromTitle({ title: 'My Post' });
+  assert.ok(r && typeof r === 'object', 'suggestSlugFromTitle MUST return an object');
+  assert.ok('suggested' in r && 'source' in r, 'return MUST expose `suggested` and `source` keys');
+});
+
+check('218 suggestSlugFromTitle: titleEn takes precedence over title', () => {
+  const r = suggestSlugFromTitle({ title: 'My Post', titleEn: 'English Title' });
+  assert.deepEqual(r, { suggested: 'english-title', source: 'titleEn' });
+  // Even when title is also usable, titleEn wins.
+  const r2 = suggestSlugFromTitle({ title: 'Something Else', titleEn: 'Winner' });
+  assert.deepEqual(r2, { suggested: 'winner', source: 'titleEn' });
+});
+
+check('219 suggestSlugFromTitle: fallback to title when titleEn empty or unslugifiable', () => {
+  assert.deepEqual(suggestSlugFromTitle({ title: 'My Post', titleEn: '' }), { suggested: 'my-post', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'My Post', titleEn: '   ' }), { suggested: 'my-post', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'My Post', titleEn: '!!!' }), { suggested: 'my-post', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'My Post', titleEn: '中文' }), { suggested: 'my-post', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'My Post' }), { suggested: 'my-post', source: 'title' });
+});
+
+check('220 suggestSlugFromTitle: CJK / symbols are DROPPED (no pinyin, no romanization)', () => {
+  assert.deepEqual(suggestSlugFromTitle({ title: '中文標題' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '中文', titleEn: '' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '中文', titleEn: 'English' }), { suggested: 'english', source: 'titleEn' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '!!!' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '。、；！' }), { suggested: '', source: 'none' });
+  // Phase 20260702 title-ascii-only-fallback: mixed titles no longer expose
+  // stray ASCII fragments. Was `hello-world`; now `''` — the UI shows guidance.
+  assert.deepEqual(
+    suggestSlugFromTitle({ title: 'Hello 中文 World' }),
+    { suggested: '', source: 'none' }
+  );
+});
+
+check('221 suggestSlugFromTitle: null / undefined / empty input is safe', () => {
+  assert.deepEqual(suggestSlugFromTitle(null), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle(undefined), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({}), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: null, titleEn: undefined }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '', titleEn: '' }), { suggested: '', source: 'none' });
+});
+
+check('222 suggestSlugFromTitle: hyphen collapse / trim / maxlength 80 / VALID_SLUG_RE', () => {
+  // Hyphen collapse + trim.
+  assert.deepEqual(suggestSlugFromTitle({ title: 'A  B---C' }), { suggested: 'a-b-c', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '--Foo--' }), { suggested: 'foo', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '   spaced   out   ' }), { suggested: 'spaced-out', source: 'title' });
+  // Uppercase folded.
+  assert.deepEqual(suggestSlugFromTitle({ title: 'CamelCase Post' }), { suggested: 'camelcase-post', source: 'title' });
+  // Maxlength 80 with hyphen boundary.
+  const long = 'word '.repeat(30).trim(); // "word word ... word" — length ~ 149
+  const r = suggestSlugFromTitle({ title: long });
+  assert.ok(r.suggested.length > 0 && r.suggested.length <= SLUG_MAX_LEN, `long input MUST be <= ${SLUG_MAX_LEN} chars; got ${r.suggested.length}`);
+  assert.ok(!r.suggested.startsWith('-') && !r.suggested.endsWith('-'), 'output MUST NOT start/end with hyphen');
+  assert.ok(VALID_SLUG_RE.test(r.suggested), 'output MUST pass VALID_SLUG_RE');
+  // 81-char single word without hyphens still truncates to 80 chars.
+  const longNoHyphen = 'a'.repeat(200);
+  const r2 = suggestSlugFromTitle({ title: longNoHyphen });
+  assert.equal(r2.suggested.length, SLUG_MAX_LEN, 'unhyphenated long input truncates to SLUG_MAX_LEN');
+  assert.ok(VALID_SLUG_RE.test(r2.suggested), 'truncated output MUST pass VALID_SLUG_RE');
+  // Output never contains date / .md / '/'.
+  for (const input of ['2026-06-27 my post', 'my post.md', 'foo/bar/baz']) {
+    const rr = suggestSlugFromTitle({ title: input });
+    assert.ok(!/\.md/.test(rr.suggested), `output MUST NOT contain '.md'; got "${rr.suggested}" from "${input}"`);
+    assert.ok(!/\//.test(rr.suggested), `output MUST NOT contain '/'; got "${rr.suggested}" from "${input}"`);
+    // Date-like leading YYYY-MM-DD would be a false positive here (input '2026-06-27...' → '2026-06-27-my-post');
+    // the contract is that the helper does not INJECT a date, not that inputs can't already look date-like.
+  }
+});
+
+check('223 admin index.ejs slug-suggestion DOM present (wrapper + text span + Copy button + status)', () => {
+  const src = slug_suggest_ejs_src();
+  // Wrapper.
+  const wrapPos = src.indexOf('id="npd-slug-suggestion"');
+  assert.ok(wrapPos > 0, 'index.ejs MUST contain `#npd-slug-suggestion` wrapper');
+  const wrapTagStart = src.lastIndexOf('<', wrapPos);
+  const wrapTagEnd = src.indexOf('>', wrapPos);
+  const wrapTag = src.slice(wrapTagStart, wrapTagEnd + 1);
+  assert.ok(/^<div\b/.test(wrapTag), 'wrapper MUST be a <div>');
+  assert.ok(/aria-live="polite"/.test(wrapTag), 'wrapper MUST carry `aria-live="polite"`');
+  assert.ok(/display:\s*none/.test(wrapTag), 'wrapper MUST default to `display: none` (empty-form → hidden)');
+  // Text span.
+  const textPos = src.indexOf('id="npd-slug-suggestion-text"');
+  assert.ok(textPos > 0, 'index.ejs MUST contain `#npd-slug-suggestion-text` span');
+  assert.ok(textPos > wrapPos, 'text span MUST be inside wrapper (source order)');
+  // Copy button.
+  const btnPos = src.indexOf('id="npd-copy-slug-suggest"');
+  assert.ok(btnPos > 0, 'index.ejs MUST contain `#npd-copy-slug-suggest` button');
+  const btnTagStart = src.lastIndexOf('<', btnPos);
+  const btnTagEnd = src.indexOf('>', btnPos);
+  const btnTag = src.slice(btnTagStart, btnTagEnd + 1);
+  assert.ok(/^<button\b/.test(btnTag), 'copy MUST be a <button>');
+  assert.ok(/\btype="button"/.test(btnTag), 'copy button MUST have type="button" (not submit)');
+  assert.ok(/\bdisabled\b/.test(btnTag), 'copy button MUST default to disabled (empty form)');
+  assert.ok(/\baria-disabled="true"/.test(btnTag), 'copy button MUST default to aria-disabled="true"');
+  assert.ok(/\bdata-suggested=""/.test(btnTag), 'copy button MUST carry `data-suggested=""` default');
+  // Status.
+  const statusPos = src.indexOf('id="npd-slug-suggest-status"');
+  assert.ok(statusPos > 0, 'index.ejs MUST contain `#npd-slug-suggest-status` span');
+});
+
+check('224 admin index.ejs slug-suggestion placed after #npd-slug input, before #npd-date row', () => {
+  const src = slug_suggest_ejs_src();
+  const slugInputPos = src.indexOf('id="npd-slug"');
+  const wrapPos = src.indexOf('id="npd-slug-suggestion"');
+  const dateInputPos = src.indexOf('id="npd-date"');
+  assert.ok(slugInputPos > 0, '#npd-slug input MUST still exist');
+  assert.ok(wrapPos > 0, '#npd-slug-suggestion wrapper MUST exist');
+  assert.ok(dateInputPos > 0, '#npd-date input MUST still exist');
+  assert.ok(wrapPos > slugInputPos, 'suggestion wrapper MUST appear AFTER #npd-slug input');
+  assert.ok(wrapPos < dateInputPos, 'suggestion wrapper MUST appear BEFORE #npd-date row (still inside slug <td>)');
+});
+
+check('225 admin index.ejs client mirror slugifyForSuggestion + suggestSlugFromTitle defined; source patterns match server', () => {
+  const src = slug_suggest_ejs_src();
+  assert.ok(src.includes('function slugifyForSuggestion('), 'client mirror slugifyForSuggestion MUST be defined');
+  assert.ok(src.includes('function suggestSlugFromTitle('), 'client mirror suggestSlugFromTitle MUST be defined');
+  const slugifyBlock = slug_suggest_extract_fn(src, 'function slugifyForSuggestion(');
+  // Same character class + collapse + trim pattern.
+  assert.ok(slugifyBlock.includes(".replace(/[^a-z0-9\\s-]/g, ' ')"), 'client slugify MUST drop non-[a-z0-9\\s-] chars (same as server)');
+  assert.ok(slugifyBlock.includes(".replace(/\\s+/g, '-')"), 'client slugify MUST collapse whitespace to hyphen');
+  assert.ok(slugifyBlock.includes(".replace(/-+/g, '-')"), 'client slugify MUST collapse consecutive hyphens');
+  assert.ok(slugifyBlock.includes(".replace(/^-+|-+$/g, '')"), 'client slugify MUST trim leading/trailing hyphens');
+  assert.ok(slugifyBlock.includes('SLUG_SUGGEST_MAX_LEN'), 'client slugify MUST use SLUG_SUGGEST_MAX_LEN cap');
+  assert.ok(slugifyBlock.includes('SLUG_RE.test'), 'client slugify MUST re-validate against SLUG_RE (mirror of VALID_SLUG_RE)');
+  assert.ok(slugifyBlock.includes(".toLowerCase()"), 'client slugify MUST toLowerCase');
+  // Server SLUG_MAX_LEN and client cap match.
+  assert.ok(src.includes('var SLUG_SUGGEST_MAX_LEN = 80'), 'client SLUG_SUGGEST_MAX_LEN MUST equal 80 (matches server SLUG_MAX_LEN)');
+  const suggestBlock = slug_suggest_extract_fn(src, 'function suggestSlugFromTitle(');
+  assert.ok(/candidateEn\s*=\s*slugifyForSuggestion\(titleEnRaw\)/.test(suggestBlock), 'client MUST try titleEn first');
+  assert.ok(/candidate\s*=\s*slugifyForSuggestion\(titleRaw\)/.test(suggestBlock), 'client MUST fall back to title');
+  assert.ok(suggestBlock.includes("source: 'titleEn'"), 'client MUST expose source: titleEn');
+  assert.ok(suggestBlock.includes("source: 'title'"), 'client MUST expose source: title');
+  assert.ok(suggestBlock.includes("source: 'none'"), 'client MUST expose source: none');
+});
+
+check('226 admin index.ejs renderSlugSuggestion() defined + wired via recompute()', () => {
+  const src = slug_suggest_ejs_src();
+  assert.ok(src.includes('function renderSlugSuggestion('), 'renderSlugSuggestion MUST be defined');
+  assert.ok(
+    /renderSlugSuggestion\(input\)\s*;/.test(src),
+    'renderSlugSuggestion MUST be called from recompute() with the local `input`'
+  );
+  // Wiring: TITLE_EL / TITLE_EN_EL / SLUG_EL already in the debounceRecompute list;
+  // this slice does not touch that list.
+  assert.ok(
+    /\[TITLE_EL,\s*TITLE_EN_EL,\s*SLUG_EL,\s*DATE_EL,\s*TAGS_EL,[^\]]*\][\s\S]{0,120}el\.addEventListener\('input',\s*debounceRecompute\)/.test(src),
+    'TITLE_EL / TITLE_EN_EL / SLUG_EL MUST stay in the debounceRecompute wiring list (drives suggestion updates)'
+  );
+});
+
+check('227 admin index.ejs renderSlugSuggestion() isolation: never writes SLUG_EL / no other refs / no recompute()', () => {
+  const src = slug_suggest_ejs_src();
+  const block = slug_suggest_extract_fn(src, 'function renderSlugSuggestion(');
+  // Forbidden: any mention of SLUG_EL / OUT_EL / other form-level refs / recompute call.
+  for (const forbidden of [
+    'SLUG_EL',
+    'OUT_EL',
+    'FN_EL',
+    'TARGET_PATH_EL',
+    'TARGET_FOLDER_EL',
+    'READY_REGISTRY_EL',
+    'READY_BLOCKING_EL',
+    'READY_WARNINGS_EL',
+    'READY_UNSUPPORTED_EL',
+    'READY_SUMMARY_EL',
+    'SUM_SLUG_EL',
+    'SUM_FILENAME_EL',
+    'SUM_TARGET_EL',
+    'SUM_READY_EL',
+    'SUM_SITE_EL',
+    'SUM_KIND_EL',
+    'SUM_TAGCOUNT_EL',
+    'TAGS_HINT_EL',
+    'SITE_REGISTRY_REF_EL',
+    'CAT_EL',
+    'PRIM_EL',
+    'TITLE_EL',
+    'TITLE_EN_EL',
+    'DATE_EL',
+    'TAGS_EL',
+    'DESC_EL',
+    'BODY_EL',
+    'STATUS_EL',
+    'COPY_BTN',
+    'DL_BTN',
+    'COPY_PATH_BTN',
+    'COPY_CMD_BTN',
+    'COPY_GAP_BTN',
+    'recompute(',
+  ]) {
+    assert.ok(
+      !block.includes(forbidden),
+      `renderSlugSuggestion MUST NOT touch \`${forbidden}\` (display-only; scoped to its own DOM)`
+    );
+  }
+  // Writes only to its own DOM.
+  assert.ok(block.includes('SLUG_SUGGEST_TEXT_EL.textContent'), 'renderSlugSuggestion MUST write to `SLUG_SUGGEST_TEXT_EL.textContent`');
+  assert.ok(!/SLUG_SUGGEST_TEXT_EL\.innerHTML/.test(block), 'renderSlugSuggestion MUST NOT use innerHTML');
+  assert.ok(!/SLUG_SUGGEST_EL\.innerHTML/.test(block), 'renderSlugSuggestion MUST NOT use innerHTML on wrapper');
+  // Auto-fill / apply patterns explicitly forbidden.
+  assert.ok(!/SLUG_EL\.value\s*=/.test(block), 'renderSlugSuggestion MUST NOT auto-fill SLUG_EL.value');
+  assert.ok(!/SLUG_EL\.setAttribute\s*\(\s*['"]value['"]/.test(block), 'renderSlugSuggestion MUST NOT set SLUG_EL value attribute');
+  // 4 UI states present in copy.
+  assert.ok(block.includes('建議 slug：'), '`建議 slug：` copy MUST exist (empty-slug + differs branches)');
+  assert.ok(block.includes('已與建議相符'), '`已與建議相符` copy MUST exist (matches branch)');
+  assert.ok(block.includes('不會覆蓋現有 slug'), '`不會覆蓋現有 slug` copy MUST exist (differs branch)');
+  assert.ok(block.includes('請在 titleEn 填英文短句'), '`請在 titleEn 填英文短句` guidance copy MUST exist (no-suggestion branch)');
+  // No blocking / red wording.
+  for (const forbidden of ['READY', 'PASS', 'BLOCKING', 'blocking', "'#a00'", "'#721c24'"]) {
+    assert.ok(
+      !block.includes(forbidden),
+      `renderSlugSuggestion MUST NOT use blocking / gating / red wording \`${forbidden}\``
+    );
+  }
+});
+
+check('228 admin index.ejs Copy suggested slug button — clipboard-only wiring (reads dataset.suggested)', () => {
+  const src = slug_suggest_ejs_src();
+  // Handler pattern.
+  assert.ok(
+    /COPY_SLUG_SUGGEST_BTN\.addEventListener\('click',\s*function\s*\(\s*\)\s*\{/.test(src),
+    'Copy suggested slug button MUST have a click handler'
+  );
+  // Reads dataset.suggested (populated by renderSlugSuggestion; no direct SLUG_EL read).
+  assert.ok(
+    src.includes('COPY_SLUG_SUGGEST_BTN.dataset.suggested'),
+    'click handler MUST read `dataset.suggested` (not SLUG_EL)'
+  );
+  // Uses the vetted clipboard helper, sinks status to the local strip.
+  assert.ok(
+    /copyTextToClipboard\(suggested,\s*'已複製建議 slug',\s*showSlugSuggestStatus\)/.test(src),
+    'click handler MUST call copyTextToClipboard(suggested, ..., showSlugSuggestStatus) (clipboard-only, local status)'
+  );
+  // Handler section MUST NOT write to SLUG_EL nor call recompute().
+  const handlerStart = src.indexOf("COPY_SLUG_SUGGEST_BTN.addEventListener('click'");
+  const handlerEnd = src.indexOf('});', handlerStart);
+  const handlerBlock = src.slice(handlerStart, handlerEnd + 3);
+  assert.ok(!/SLUG_EL\.value\s*=/.test(handlerBlock), 'click handler MUST NOT auto-fill SLUG_EL.value');
+  assert.ok(!/recompute\(/.test(handlerBlock), 'click handler MUST NOT call recompute() (no side-effect on preview)');
+  // No Apply button anywhere.
+  assert.ok(!src.includes('id="npd-apply-slug-suggest"'), 'MUST NOT introduce an Apply button');
+  assert.ok(!/apply.*suggested.*slug/i.test(src.slice(src.indexOf('renderSlugSuggestion(input);'))), 'MUST NOT wire an "apply suggested slug" flow');
+});
+
+check('229 admin index.ejs slug suggestion adds no fetch / XHR / WebSocket / sendBeacon / credential / write path', () => {
+  const src = slug_suggest_ejs_src();
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(|navigator\s*\.\s*sendBeacon/;
+  const credential = /client_secret|access_token|refresh_token|private_key|Authorization\s*:|\bBearer\s+[A-Za-z0-9._-]/;
+  const writePath = /\b(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream)\s*\(|\b(localStorage|sessionStorage|indexedDB)\b/;
+  const renderBlock = slug_suggest_extract_fn(src, 'function renderSlugSuggestion(');
+  const slugifyBlock = slug_suggest_extract_fn(src, 'function slugifyForSuggestion(');
+  const suggestBlock = slug_suggest_extract_fn(src, 'function suggestSlugFromTitle(');
+  const statusBlock = slug_suggest_extract_fn(src, 'function showSlugSuggestStatus(');
+  for (const [name, block] of [
+    ['renderSlugSuggestion', renderBlock],
+    ['slugifyForSuggestion', slugifyBlock],
+    ['suggestSlugFromTitle (client mirror)', suggestBlock],
+    ['showSlugSuggestStatus', statusBlock],
+  ]) {
+    assert.ok(!transport.test(block), `${name} MUST carry no network transport primitive`);
+    assert.ok(!credential.test(block), `${name} MUST embed no service credential`);
+    assert.ok(!writePath.test(block), `${name} MUST introduce no write path (fs write / web storage)`);
+  }
+});
+
+check('230 admin index.ejs slug suggestion does NOT regress C1 / Slice B / category filter / primaryPlatform / prior copy buttons', () => {
+  const src = slug_suggest_ejs_src();
+  // C1 tag inline hint.
+  assert.ok(src.includes('id="npd-tags-registry-hint"'), 'C1 #npd-tags-registry-hint MUST remain');
+  assert.ok(src.includes('function renderTagsRegistryHint('), 'C1 renderTagsRegistryHint MUST remain');
+  // Slice B site registry reference.
+  assert.ok(src.includes('class="npd-site-registry-ref-wrap"'), 'Slice B reference wrap MUST remain');
+  assert.ok(src.includes('function renderSiteRegistryReference('), 'Slice B renderSiteRegistryReference MUST remain');
+  // Category site-aware filter.
+  assert.ok(src.includes('<select id="npd-category"'), 'category select MUST remain');
+  assert.ok(src.includes('function renderCategoryOptions('), 'renderCategoryOptions MUST remain');
+  // primaryPlatform auto-follow.
+  assert.ok(src.includes('function syncPrimaryToSite('), 'syncPrimaryToSite MUST remain');
+  // Copy markdown / Download / Copy target path / Copy validation / Copy ready-gap.
+  assert.ok(src.includes('id="npd-copy"'), '#npd-copy MUST remain');
+  assert.ok(src.includes('id="npd-download"'), '#npd-download MUST remain');
+  assert.ok(src.includes('id="npd-copy-path"'), '#npd-copy-path MUST remain');
+  assert.ok(src.includes('id="npd-copy-cmd"'), '#npd-copy-cmd MUST remain');
+  assert.ok(src.includes('id="npd-copy-gap"'), '#npd-copy-gap MUST remain');
+  assert.ok(src.includes('id="npd-gap-status"'), '#npd-gap-status MUST remain');
+  assert.ok(src.includes('function buildReadyGapReport('), 'buildReadyGapReport client mirror MUST remain');
+  // Ready preflight aggregate.
+  assert.ok(src.includes('id="npd-ready-registry-hints"'), 'Ready preflight aggregate MUST remain');
+  assert.ok(src.includes('function renderRegistryHints('), 'renderRegistryHints MUST remain');
+  // Tags stay free-text + datalist.
+  const tagsPos = src.indexOf('id="npd-tags"');
+  const tagsTag = src.slice(src.lastIndexOf('<', tagsPos), src.indexOf('>', tagsPos) + 1);
+  assert.ok(/^<input\b/.test(tagsTag), '#npd-tags MUST remain a free-text <input>');
+  assert.ok(/list="npd-tags-options"/.test(tagsTag), '#npd-tags MUST keep its datalist wiring');
+});
+
+// Phase 20260702-admin-slug-suggestion-title-ascii-only-fallback-slice-a:
+//   #232–#237 pin the title-fallback-ASCII-only rule + disabled-visual rules.
+//   User-reported: `我的測試PO文` used to suggest `po`, which is misleading. New
+//   contract: if title contains ANY non-ASCII (CJK / kana / hangul / fullwidth
+//   punct / accented Latin), skip the title branch entirely and return
+//   `{ '', 'none' }`. titleEn precedence remains; when titleEn produces a
+//   valid slug (even if title is CJK), that still wins. Disabled Copy button
+//   MUST look non-clickable (opacity 0.5 + not-allowed cursor + no hover fill).
+check('232 suggestSlugFromTitle: title fallback rejects any non-ASCII (no fragment extraction)', () => {
+  // Primary bug case: mixed CJK + ASCII title MUST NOT extract stray ASCII.
+  assert.deepEqual(suggestSlugFromTitle({ title: '我的測試PO文' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '什麼是Design Token?' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'AI 工具介紹' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'UI Design 心得' }), { suggested: '', source: 'none' });
+  // Kana / Hangul / fullwidth punctuation also disqualify title.
+  assert.deepEqual(suggestSlugFromTitle({ title: 'こんにちは World' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: '안녕 World' }), { suggested: '', source: 'none' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'Hello（World）' }), { suggested: '', source: 'none' });
+});
+
+check('233 suggestSlugFromTitle: pure-ASCII title still succeeds (regression guard for #219)', () => {
+  assert.deepEqual(suggestSlugFromTitle({ title: 'My Test Post' }), { suggested: 'my-test-post', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'CamelCase Post' }), { suggested: 'camelcase-post', source: 'title' });
+  assert.deepEqual(suggestSlugFromTitle({ title: 'A  B---C' }), { suggested: 'a-b-c', source: 'title' });
+  // Pure-ASCII punctuation is stripped normally (still yields a slug).
+  assert.deepEqual(suggestSlugFromTitle({ title: 'Hello, World!' }), { suggested: 'hello-world', source: 'title' });
+});
+
+check('234 suggestSlugFromTitle: titleEn precedence unchanged when title has CJK', () => {
+  // titleEn still wins even when title is CJK-only or CJK-mixed.
+  assert.deepEqual(
+    suggestSlugFromTitle({ title: '我的測試PO文', titleEn: 'My Actual English Title' }),
+    { suggested: 'my-actual-english-title', source: 'titleEn' }
+  );
+  assert.deepEqual(
+    suggestSlugFromTitle({ title: '什麼是Design Token?', titleEn: 'What is a Design Token' }),
+    { suggested: 'what-is-a-design-token', source: 'titleEn' }
+  );
+  assert.deepEqual(
+    suggestSlugFromTitle({ title: '中文標題', titleEn: 'English Test Title' }),
+    { suggested: 'english-test-title', source: 'titleEn' }
+  );
+  // titleEn permissive: strips CJK inside titleEn and still succeeds (unchanged).
+  assert.deepEqual(
+    suggestSlugFromTitle({ title: '中文', titleEn: 'English 中文 Title' }),
+    { suggested: 'english-title', source: 'titleEn' }
+  );
+});
+
+check('235 admin index.ejs client mirror contains matching containsNonAscii + title-fallback gate', () => {
+  const src = slug_suggest_ejs_src();
+  // Non-ASCII regex source pattern (must match server /[^\x00-\x7f]/).
+  assert.ok(
+    /SLUG_SUGGEST_NON_ASCII_RE\s*=\s*\/\[\^\\x00-\\x7f\]\//.test(src),
+    'client MUST define SLUG_SUGGEST_NON_ASCII_RE = /[^\\x00-\\x7f]/ (matches server NON_ASCII_RE)'
+  );
+  assert.ok(src.includes('function containsNonAscii('), 'client mirror MUST define containsNonAscii');
+  const suggestBlock = slug_suggest_extract_fn(src, 'function suggestSlugFromTitle(');
+  // The gate MUST short-circuit BEFORE slugifyForSuggestion(titleRaw).
+  assert.ok(
+    /if\s*\(\s*containsNonAscii\(titleRaw\)\s*\)\s*return\s*\{\s*suggested:\s*''\s*,\s*source:\s*'none'\s*\}\s*;/.test(suggestBlock),
+    'client suggestSlugFromTitle MUST short-circuit `if (containsNonAscii(titleRaw)) return { suggested: "", source: "none" }` before the title slugify'
+  );
+  // The gate MUST NOT apply to titleEn (titleEn permissive per spec).
+  assert.ok(
+    !/containsNonAscii\(titleEnRaw\)/.test(suggestBlock),
+    'client suggestSlugFromTitle MUST NOT gate titleEn on non-ASCII (permissive per spec)'
+  );
+});
+
+check('236 admin index.ejs Copy suggested slug disabled visual (opacity + cursor + non-clickable hover)', () => {
+  const src = slug_suggest_ejs_src();
+  // Disabled visual rule.
+  assert.ok(
+    /#npd-copy-slug-suggest:disabled\s*\{[^}]*opacity:\s*0\.5[^}]*\}/.test(src),
+    'CSS MUST define `#npd-copy-slug-suggest:disabled { opacity: 0.5; ... }`'
+  );
+  assert.ok(
+    /#npd-copy-slug-suggest:disabled\s*\{[^}]*cursor:\s*not-allowed[^}]*\}/.test(src),
+    'CSS MUST define `#npd-copy-slug-suggest:disabled { cursor: not-allowed; ... }`'
+  );
+  // Hover fill guarded by :not(:disabled) so disabled state never looks clickable.
+  assert.ok(
+    /#npd-copy-slug-suggest:hover:not\(:disabled\)\s*\{/.test(src),
+    'CSS MUST gate hover fill behind :not(:disabled)'
+  );
+  // No unqualified `#npd-copy-slug-suggest:hover {` rule (which would apply even when disabled).
+  assert.ok(
+    !/#npd-copy-slug-suggest:hover\s*\{/.test(src.replace(/#npd-copy-slug-suggest:hover:not\(:disabled\)\s*\{/g, '')),
+    'CSS MUST NOT declare an unqualified `#npd-copy-slug-suggest:hover {` rule'
+  );
+});
+
+check('237 admin index.ejs renderSlugSuggestion keeps disabled + aria-disabled in sync (3 branches)', () => {
+  const src = slug_suggest_ejs_src();
+  const block = slug_suggest_extract_fn(src, 'function renderSlugSuggestion(');
+  // Every `COPY_SLUG_SUGGEST_BTN.disabled = X` MUST be paired with a matching
+  // aria-disabled setAttribute in the same branch. Count both occurrences and
+  // require parity (3 branches: empty form / no-suggestion / has-suggestion).
+  const disabledSets = (block.match(/COPY_SLUG_SUGGEST_BTN\.disabled\s*=/g) || []).length;
+  const ariaSets = (block.match(/COPY_SLUG_SUGGEST_BTN\.setAttribute\(\s*'aria-disabled'/g) || []).length;
+  assert.ok(disabledSets >= 3, `renderSlugSuggestion MUST toggle .disabled in >=3 branches (empty / no-suggestion / has-suggestion); got ${disabledSets}`);
+  assert.equal(disabledSets, ariaSets, `.disabled and aria-disabled MUST be set the same number of times (got ${disabledSets} vs ${ariaSets})`);
+  // Both empty-form and no-suggestion branches MUST disable Copy.
+  assert.ok(
+    /titleRaw === ''\s*&&\s*titleEnRaw === ''[\s\S]{0,500}COPY_SLUG_SUGGEST_BTN\.disabled\s*=\s*true[\s\S]{0,200}setAttribute\(\s*'aria-disabled',\s*'true'\s*\)/.test(block),
+    'empty-form branch MUST set both .disabled = true AND aria-disabled = "true"'
+  );
+  assert.ok(
+    /result\.suggested === ''[\s\S]{0,500}COPY_SLUG_SUGGEST_BTN\.disabled\s*=\s*true[\s\S]{0,200}setAttribute\(\s*'aria-disabled',\s*'true'\s*\)/.test(block),
+    'no-suggestion branch MUST set both .disabled = true AND aria-disabled = "true"'
+  );
+  // Has-suggestion branch MUST enable Copy.
+  assert.ok(
+    /COPY_SLUG_SUGGEST_BTN\.disabled\s*=\s*false[\s\S]{0,200}setAttribute\(\s*'aria-disabled',\s*'false'\s*\)/.test(block),
+    'has-suggestion branch MUST set both .disabled = false AND aria-disabled = "false"'
+  );
+});
+
+check('238 admin-markdown-export export contract unchanged: status:"draft" + draft:true across 8 shapes (slice A + title-ascii fallback)', () => {
+  const shapes = [
+    { ...happy },                                                    // baseline
+    { ...happy, title: 'English Only', titleEn: '' },                // title-only
+    { ...happy, title: '', titleEn: 'Only English Title' },          // titleEn-only
+    { ...happy, title: '中文標題', titleEn: 'English Fallback' },      // CJK + titleEn
+    { ...happy, title: '純中文', titleEn: '' },                        // CJK-only
+    { ...happy, title: '', titleEn: '' },                            // both empty
+    { ...happy, title: '我的測試PO文', titleEn: '' },                 // CJK-mixed w/ stray ASCII (title-ascii fallback case)
+    { ...happy, title: '什麼是Design Token?', titleEn: '' },         // CJK-mixed with ASCII phrase (title-ascii fallback case)
+  ];
+  for (const shape of shapes) {
+    const md = buildPostMarkdown(shape);
+    const parsed = matter(md);
+    assert.equal(parsed.data.status, 'draft', `status MUST stay "draft" for title="${shape.title}" titleEn="${shape.titleEn}"`);
+    assert.equal(parsed.data.draft, true, `draft MUST stay true for title="${shape.title}" titleEn="${shape.titleEn}"`);
+  }
+  // Sanity: server helper never appears in the frontmatter output.
+  const md0 = buildPostMarkdown(happy);
+  assert.ok(!md0.includes('suggested:'), 'buildPostMarkdown MUST NOT emit any `suggested:` field');
+  assert.ok(!md0.includes('source: titleEn'), 'buildPostMarkdown MUST NOT emit `source:` field');
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);

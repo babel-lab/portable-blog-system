@@ -83,6 +83,71 @@ function sanitizeSlug(raw) {
   return s;
 }
 
+// Phase 20260701-admin-slug-suggestion-helper-slice-a:
+//   Pure helper that proposes a kebab-case slug from titleEn / title. Never
+//   writes, never influences export; UI uses it read-only for display + a
+//   Copy button. Returns { suggested, source } where source is
+//   'titleEn' | 'title' | 'none'.
+//
+// Rules (mirrored by the client inline helper in src/views/admin/index.ejs):
+//   - Try titleEn first; if titleEn slugifies to non-empty and passes
+//     VALID_SLUG_RE and length <= SLUG_MAX_LEN → source: 'titleEn'.
+//   - Else try title; same criteria → source: 'title'.
+//   - Else → { suggested: '', source: 'none' }.
+//   - CJK / non-ASCII characters are DROPPED (no pinyin, no romanization).
+//     If both title and titleEn slugify to '', returns 'none'.
+//   - Output never contains a date, never contains '.md', never contains '/'.
+//   - Output is a suggestion only. Never influences buildPostFilename /
+//     buildTargetPath / isExportReady / analyzeReadyGap / buildPostMarkdown.
+export const SLUG_MAX_LEN = 80;
+
+function slugifyForSuggestion(raw) {
+  const stripped = String(raw == null ? '' : raw)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (stripped === '') return '';
+  let capped = stripped;
+  if (capped.length > SLUG_MAX_LEN) {
+    capped = capped.slice(0, SLUG_MAX_LEN);
+    const lastHyphen = capped.lastIndexOf('-');
+    if (lastHyphen > 0) capped = capped.slice(0, lastHyphen);
+    capped = capped.replace(/^-+|-+$/g, '');
+  }
+  if (capped === '') return '';
+  if (!VALID_SLUG_RE.test(capped)) return '';
+  return capped;
+}
+
+// Phase 20260702-admin-slug-suggestion-title-ascii-only-fallback-slice-a:
+//   Title fallback MUST NOT strip CJK / non-ASCII characters to expose stray
+//   ASCII fragments (e.g. `我的測試PO文` → `po`, `什麼是Design Token?` →
+//   `design-token`). Those fragments are semantically weak and mislead the
+//   author. If title contains ANY non-ASCII code point, skip the title branch
+//   and return `{ '', 'none' }` — the UI then shows the "填 titleEn / 手動
+//   輸入" guidance. titleEn's own slugify path is unchanged (titleEn is
+//   author-authored English by intent; stray non-ASCII there stays permissive).
+const NON_ASCII_RE = /[^\x00-\x7f]/;
+function containsNonAscii(raw) {
+  return NON_ASCII_RE.test(String(raw == null ? '' : raw));
+}
+
+export function suggestSlugFromTitle(input) {
+  const safeInput = input && typeof input === 'object' ? input : {};
+  const titleEnRaw = String(safeInput.titleEn == null ? '' : safeInput.titleEn);
+  const titleRaw = String(safeInput.title == null ? '' : safeInput.title);
+  const candidateEn = slugifyForSuggestion(titleEnRaw);
+  if (candidateEn !== '') return { suggested: candidateEn, source: 'titleEn' };
+  // Title fallback requires ASCII-only (no CJK / non-ASCII). Mixed input like
+  // `我的測試PO文` would otherwise yield `po`; skip to 'none' instead.
+  if (containsNonAscii(titleRaw)) return { suggested: '', source: 'none' };
+  const candidate = slugifyForSuggestion(titleRaw);
+  if (candidate !== '') return { suggested: candidate, source: 'title' };
+  return { suggested: '', source: 'none' };
+}
+
 function sanitizeDate(raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (s === '') return '';

@@ -180,6 +180,13 @@
   .settings-files { columns: 2 12rem; column-gap: 1.25rem; font-size: 0.85em; margin: 0; padding-left: 1.1rem; }
   .settings-files li { break-inside: avoid; }
   .settings-files code { background: #f3f4f6; padding: 0 3px; border-radius: 2px; }
+  /* Phase 20260701-admin-slug-suggestion-helper-slice-a + 20260702 disabled-visual-slice:
+     Copy suggested slug button visual states. Mirrors .payload-copy-btn:disabled
+     (opacity 0.5 + not-allowed cursor); hover only lights up when enabled so
+     the disabled state does not read as clickable. Reuses existing #2c5282
+     admin blue token — no new palette entries. */
+  #npd-copy-slug-suggest:disabled { opacity: 0.5; cursor: not-allowed; }
+  #npd-copy-slug-suggest:hover:not(:disabled) { background: #eaf2fc; }
 </style>
 </head>
 <body>
@@ -1902,6 +1909,20 @@
           <td style="padding: 0.25rem 0.5rem;">
             <input type="text" id="npd-slug" maxlength="80" placeholder="kebab-case，僅 a-z 0-9 -" style="width: 100%; padding: 0.25rem; box-sizing: border-box;">
             <span class="text-muted" style="font-size: 0.82em;">→ 只填中段段名（不含 date、不含 .md、不含完整路徑）；lowercase kebab-case，例 <code>test-title</code>；系統自動組 <code>{date}-{slug}.md</code>；不合法時 Download 按鈕會 disable</span>
+            <%# Phase 20260701-admin-slug-suggestion-helper-slice-a:
+                Display-only slug suggestion strip — derives a kebab-case
+                candidate from titleEn > title (mirrored by
+                admin-markdown-export.js suggestSlugFromTitle). Copy-only; no
+                Apply; never writes SLUG_EL; never touches export contract. -%>
+            <div id="npd-slug-suggestion" aria-live="polite"
+                 style="display: none; margin-top: 0.3rem; padding: 0.35rem 0.5rem; background: #f4f7fb; border: 1px dashed #c5d6e8; border-radius: 3px; font-size: 0.8em;">
+              <span id="npd-slug-suggestion-text" style="color: #1f4e79;"></span>
+              <button type="button" id="npd-copy-slug-suggest" disabled aria-disabled="true"
+                      data-suggested=""
+                      style="margin-left: 0.5rem; padding: 0.15rem 0.5rem; border: 1px solid #2c5282; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #2c5282;"
+                      title="複製建議 slug（不會覆蓋現有 slug 欄位）">Copy suggested slug</button>
+              <span id="npd-slug-suggest-status" style="margin-left: 0.4rem; font-size: 0.82em;" aria-live="polite"></span>
+            </div>
           </td>
         </tr>
         <tr>
@@ -3614,6 +3635,16 @@
       //   Copy ready-gap report button (Ready preflight panel). Clipboard-only;
       //   reuses copyTextToClipboard() → showFlowStatus (#npd-flow-status).
       var COPY_GAP_BTN = document.getElementById('npd-copy-gap');
+      // Phase 20260701-admin-slug-suggestion-helper-slice-a:
+      //   Display-only slug suggestion strip (wrapper + text span + Copy
+      //   button + local status). renderSlugSuggestion below only writes text
+      //   / display / disabled / dataset — never touches SLUG_EL or the
+      //   markdown export path. Copy button reads dataset.suggested and calls
+      //   the vetted copyTextToClipboard() helper (clipboard-only).
+      var SLUG_SUGGEST_EL = document.getElementById('npd-slug-suggestion');
+      var SLUG_SUGGEST_TEXT_EL = document.getElementById('npd-slug-suggestion-text');
+      var COPY_SLUG_SUGGEST_BTN = document.getElementById('npd-copy-slug-suggest');
+      var SLUG_SUGGEST_STATUS_EL = document.getElementById('npd-slug-suggest-status');
       // Phase 20260627-admin-ready-preflight-panel-implementation-a:
       //   Ready preflight panel elements (read-only hint surface).
       //   Mirror of admin-markdown-export.js analyzeReadyGap (smoke 40-52).
@@ -4309,6 +4340,11 @@
         //   At-a-glance summary strip + per-field char counters. Mirrors
         //   admin-markdown-export.js buildExportSummary (smoke 76-86).
         renderExportSummary(buildExportSummary(input));
+        // Phase 20260701-admin-slug-suggestion-helper-slice-a:
+        //   Display-only slug suggestion strip (below #npd-slug helper span).
+        //   Copy-only; never auto-fills SLUG_EL.value; never influences the
+        //   markdown export path.
+        renderSlugSuggestion(input);
       }
 
       function fallbackCopy() {
@@ -4663,6 +4699,127 @@
         TAGS_HINT_EL.style.display = '';
         TAGS_HINT_EL.style.color = '#1f4e79';
         TAGS_HINT_EL.textContent = '⚠ ' + parts.join('；');
+      }
+
+      // Phase 20260701-admin-slug-suggestion-helper-slice-a:
+      //   Client mirror of admin-markdown-export.js suggestSlugFromTitle +
+      //   slugifyForSuggestion. Pure functions; no DOM read/write inside these
+      //   two helpers themselves — only the renderSlugSuggestion() below binds
+      //   the result to the slug-suggestion strip.
+      var SLUG_SUGGEST_MAX_LEN = 80;
+      function slugifyForSuggestion(raw) {
+        var stripped = String(raw == null ? '' : raw)
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, ' ')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        if (stripped === '') return '';
+        var capped = stripped;
+        if (capped.length > SLUG_SUGGEST_MAX_LEN) {
+          capped = capped.slice(0, SLUG_SUGGEST_MAX_LEN);
+          var lastHyphen = capped.lastIndexOf('-');
+          if (lastHyphen > 0) capped = capped.slice(0, lastHyphen);
+          capped = capped.replace(/^-+|-+$/g, '');
+        }
+        if (capped === '') return '';
+        if (!SLUG_RE.test(capped)) return '';
+        return capped;
+      }
+      // Phase 20260702-admin-slug-suggestion-title-ascii-only-fallback-slice-a:
+      //   Client mirror of admin-markdown-export.js containsNonAscii + updated
+      //   suggestSlugFromTitle. Title fallback rejects any non-ASCII input to
+      //   avoid extracting stray ASCII fragments from CJK-mixed titles.
+      var SLUG_SUGGEST_NON_ASCII_RE = /[^\x00-\x7f]/;
+      function containsNonAscii(raw) {
+        return SLUG_SUGGEST_NON_ASCII_RE.test(String(raw == null ? '' : raw));
+      }
+      function suggestSlugFromTitle(input) {
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var titleEnRaw = String(safeInput.titleEn == null ? '' : safeInput.titleEn);
+        var titleRaw = String(safeInput.title == null ? '' : safeInput.title);
+        var candidateEn = slugifyForSuggestion(titleEnRaw);
+        if (candidateEn !== '') return { suggested: candidateEn, source: 'titleEn' };
+        if (containsNonAscii(titleRaw)) return { suggested: '', source: 'none' };
+        var candidate = slugifyForSuggestion(titleRaw);
+        if (candidate !== '') return { suggested: candidate, source: 'title' };
+        return { suggested: '', source: 'none' };
+      }
+      // Phase 20260701-admin-slug-suggestion-helper-slice-a:
+      //   Local status sink for the Copy suggested slug button. Mirrors
+      //   showFlowStatus / showGapStatus 2s-clear contract. DOM-text only.
+      function showSlugSuggestStatus(msg, isErr) {
+        if (!SLUG_SUGGEST_STATUS_EL) return;
+        SLUG_SUGGEST_STATUS_EL.textContent = msg;
+        SLUG_SUGGEST_STATUS_EL.style.color = isErr ? '#a00' : '#080';
+        setTimeout(function () {
+          if (SLUG_SUGGEST_STATUS_EL.textContent === msg) SLUG_SUGGEST_STATUS_EL.textContent = '';
+        }, 2000);
+      }
+      // Phase 20260701-admin-slug-suggestion-helper-slice-a:
+      //   renderSlugSuggestion — display-only. Writes at most to:
+      //     - SLUG_SUGGEST_EL.style.display
+      //     - SLUG_SUGGEST_TEXT_EL.textContent
+      //     - COPY_SLUG_SUGGEST_BTN.disabled / aria-disabled / dataset.suggested
+      //   NEVER touches SLUG_EL, OUT_EL, or any other form / summary / preflight
+      //   surface. NEVER uses innerHTML. NEVER auto-fills the slug input.
+      //   Four UI states:
+      //     - title + titleEn 都空 → hide (no noise on empty form)
+      //     - has suggestion, slug 欄位空 → 建議 slug：xxx
+      //     - has suggestion, slug 欄位 === xxx → slug 已與建議相符：xxx
+      //     - has suggestion, slug 欄位有其他值 → 建議 slug：xxx（不會覆蓋現有 slug）
+      //     - 有輸入但無法產生建議（CJK / 符號 only）→ 顯示 titleEn 引導文案，Copy disabled
+      function renderSlugSuggestion(input) {
+        if (!SLUG_SUGGEST_EL || !SLUG_SUGGEST_TEXT_EL || !COPY_SLUG_SUGGEST_BTN) return;
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var titleRaw = String(safeInput.title == null ? '' : safeInput.title).replace(/^\s+|\s+$/g, '');
+        var titleEnRaw = String(safeInput.titleEn == null ? '' : safeInput.titleEn).replace(/^\s+|\s+$/g, '');
+        var currentSlugRaw = String(safeInput.slug == null ? '' : safeInput.slug).replace(/^\s+|\s+$/g, '');
+        // Empty form → hide.
+        if (titleRaw === '' && titleEnRaw === '') {
+          SLUG_SUGGEST_EL.style.display = 'none';
+          SLUG_SUGGEST_TEXT_EL.textContent = '';
+          COPY_SLUG_SUGGEST_BTN.disabled = true;
+          COPY_SLUG_SUGGEST_BTN.setAttribute('aria-disabled', 'true');
+          COPY_SLUG_SUGGEST_BTN.dataset.suggested = '';
+          return;
+        }
+        var result = suggestSlugFromTitle({ title: titleRaw, titleEn: titleEnRaw });
+        if (result.suggested === '') {
+          // No slug producible (CJK-only / symbols-only) — show guidance, disable Copy.
+          SLUG_SUGGEST_EL.style.display = '';
+          SLUG_SUGGEST_TEXT_EL.style.color = '#1f4e79';
+          SLUG_SUGGEST_TEXT_EL.textContent = '暫無 slug 建議：請在 titleEn 填英文短句，或手動輸入 kebab-case slug';
+          COPY_SLUG_SUGGEST_BTN.disabled = true;
+          COPY_SLUG_SUGGEST_BTN.setAttribute('aria-disabled', 'true');
+          COPY_SLUG_SUGGEST_BTN.dataset.suggested = '';
+          return;
+        }
+        SLUG_SUGGEST_EL.style.display = '';
+        SLUG_SUGGEST_TEXT_EL.style.color = '#1f4e79';
+        COPY_SLUG_SUGGEST_BTN.disabled = false;
+        COPY_SLUG_SUGGEST_BTN.setAttribute('aria-disabled', 'false');
+        COPY_SLUG_SUGGEST_BTN.dataset.suggested = result.suggested;
+        if (currentSlugRaw === '') {
+          SLUG_SUGGEST_TEXT_EL.textContent = '建議 slug：' + result.suggested + '（來源：' + result.source + '）';
+        } else if (currentSlugRaw === result.suggested) {
+          SLUG_SUGGEST_TEXT_EL.textContent = 'slug 已與建議相符：' + result.suggested;
+        } else {
+          SLUG_SUGGEST_TEXT_EL.textContent = '建議 slug：' + result.suggested + '（不會覆蓋現有 slug）';
+        }
+      }
+      // Phase 20260701-admin-slug-suggestion-helper-slice-a:
+      //   Copy suggested slug — clipboard-only. Reads dataset.suggested
+      //   (populated by renderSlugSuggestion above) and calls the vetted
+      //   copyTextToClipboard() helper. Never touches SLUG_EL / OUT_EL /
+      //   markdown export path.
+      if (COPY_SLUG_SUGGEST_BTN) {
+        COPY_SLUG_SUGGEST_BTN.addEventListener('click', function () {
+          if (COPY_SLUG_SUGGEST_BTN.disabled) return;
+          var suggested = COPY_SLUG_SUGGEST_BTN.dataset.suggested || '';
+          if (suggested === '') { showSlugSuggestStatus('尚無建議 slug', true); return; }
+          copyTextToClipboard(suggested, '已複製建議 slug', showSlugSuggestStatus);
+        });
       }
 
       recompute();
