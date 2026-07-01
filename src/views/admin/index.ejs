@@ -1974,6 +1974,19 @@
               <% }); %>
             </datalist>
             <span class="text-muted" style="font-size: 0.82em;">→ 例：<code>github, vite, static-site</code>；datalist 依目前 <code>site</code> 列出 <code>tags.json</code> 中該 site 合法的 tag id（僅輔助提示、非硬性限制；新 tag 不會自動寫入 <code>tags.json</code>），不在清單內仍可手動輸入（Ready preflight 會顯示 unknown-tag / site-mismatch warning）</span>
+            <%# Phase 20260701-admin-tag-registry-inline-hint-slice-c1:
+                Inline registry hint below the tags input — mirrors the tags-only
+                subset of analyzeRegistryHints(input, REGISTRY_SNAPSHOT) so the
+                author sees unknown-tag / tag-site-mismatch feedback right by the
+                field, not only in the Ready preflight aggregate. DISPLAY-ONLY:
+                does NOT gate export (契約仍 status:"draft" + draft:true), does
+                NOT change #npd-ready-registry-hints (Ready preflight aggregate
+                still lists the full hint set — no dedupe), does NOT touch the
+                tags datalist / #npd-category. Empty tags → hidden via
+                display:none (no layout jump). No READY / PASS wording —
+                describes registry alignment only. -%>
+            <div id="npd-tags-registry-hint" aria-live="polite"
+                 style="display: none; margin-top: 0.2rem; font-size: 0.78em;"></div>
           </td>
         </tr>
         <%# Phase 20260701-admin-site-registry-reference-display-slice-b:
@@ -4286,7 +4299,12 @@
         renderReadyPreflight(analyzeReadyGap(input));
         // Phase 20260627-admin-category-tag-registry-hints-implementation-a:
         //   Registry alignment hints (read-only; never gates export).
-        renderRegistryHints(analyzeRegistryHints(input, REGISTRY_SNAPSHOT));
+        // Phase 20260701-admin-tag-registry-inline-hint-slice-c1:
+        //   Lifted into a local var so the tags-only inline hint reuses the same
+        //   computed result (no double compute; no new registry source).
+        var regHintsResult = analyzeRegistryHints(input, REGISTRY_SNAPSHOT);
+        renderRegistryHints(regHintsResult);
+        renderTagsRegistryHint(regHintsResult, input);
         // Phase 20260627-admin-draft-markdown-output-usability-slice-a:
         //   At-a-glance summary strip + per-field char counters. Mirrors
         //   admin-markdown-export.js buildExportSummary (smoke 76-86).
@@ -4588,6 +4606,64 @@
       }
       SITE_EL.addEventListener('change', function () { renderSiteRegistryReference(SITE_EL.value); });
       renderSiteRegistryReference(SITE_EL.value);
+
+      // Phase 20260701-admin-tag-registry-inline-hint-slice-c1:
+      //   Inline mirror of the tags-only subset of analyzeRegistryHints() into
+      //   #npd-tags-registry-hint below the tags input. Reuses the reg object
+      //   already computed by recompute() (no double compute; no new registry
+      //   source). Read-only display: never mutates buildMarkdown output
+      //   (status stays draft), never touches #npd-ready-registry-hints (Ready
+      //   preflight aggregate stays intact — no dedupe), never touches the tags
+      //   datalist / CAT_EL / PRIM_EL. Empty tags → hidden (no layout jump).
+      //   No READY / PASS wording — describes registry alignment only. Site /
+      //   tags-input listeners are the pre-existing recompute() wiring
+      //   (SITE_EL 'change' + TAGS_EL 'input' → debounceRecompute); no new
+      //   listener registered here.
+      var TAGS_HINT_EL = document.getElementById('npd-tags-registry-hint');
+      function renderTagsRegistryHint(rh, input) {
+        if (!TAGS_HINT_EL) return;
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var tagsList = normalizeTags(safeInput.tags);
+        if (tagsList.length === 0) {
+          TAGS_HINT_EL.style.display = 'none';
+          TAGS_HINT_EL.textContent = '';
+          return;
+        }
+        var regTags = Array.isArray(REGISTRY_SNAPSHOT.tags) ? REGISTRY_SNAPSHOT.tags : [];
+        if (regTags.length === 0) {
+          TAGS_HINT_EL.style.display = '';
+          TAGS_HINT_EL.style.color = '#666';
+          TAGS_HINT_EL.textContent = '（registry 為空，跳過對齊檢查）';
+          return;
+        }
+        var hints = (rh && Array.isArray(rh.hints)) ? rh.hints : [];
+        var unknown = [];
+        var mismatch = [];
+        for (var i = 0; i < hints.length; i++) {
+          var h = hints[i];
+          if (!h || h.field !== 'tags') continue;
+          if (h.kind === 'unknown-tag') unknown.push(h);
+          else if (h.kind === 'tag-site-mismatch') mismatch.push(h);
+        }
+        if (unknown.length === 0 && mismatch.length === 0) {
+          TAGS_HINT_EL.style.display = '';
+          TAGS_HINT_EL.style.color = '#155724';
+          TAGS_HINT_EL.textContent = '✓ ' + tagsList.length + ' 個 tag 皆在 tags.json 且符合目前 site';
+          return;
+        }
+        var parts = [];
+        if (unknown.length > 0) {
+          parts.push('未在 tags.json：' + unknown.map(function (h) { return h.value; }).join('、'));
+        }
+        for (var m = 0; m < mismatch.length; m++) {
+          var hm = mismatch[m];
+          var allowed = Array.isArray(hm.siteAllowed) ? hm.siteAllowed.join(',') : '';
+          parts.push('site mismatch：' + hm.value + '（允許 site=[' + allowed + ']，目前 site=' + hm.siteCurrent + '）');
+        }
+        TAGS_HINT_EL.style.display = '';
+        TAGS_HINT_EL.style.color = '#1f4e79';
+        TAGS_HINT_EL.textContent = '⚠ ' + parts.join('；');
+      }
 
       recompute();
     })();

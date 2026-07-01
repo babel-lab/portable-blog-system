@@ -5044,5 +5044,261 @@ check('203 admin index.ejs site-registry reference adds no write path / network 
   assert.ok(!writePath.test(block), 'renderSiteRegistryReference() MUST introduce no write path (fs write / web storage)');
 });
 
+// Phase 20260701-admin-tag-registry-inline-hint-slice-c1:
+//   C1 adds a display-only inline hint node (`#npd-tags-registry-hint`) below
+//   the tags <input>, mirroring the tags-only subset of the pre-existing
+//   analyzeRegistryHints() result already computed in recompute(). Ready
+//   preflight aggregate (`#npd-ready-registry-hints`) stays intact (no dedupe);
+//   tags stay free-text + datalist (no <select>); export contract unchanged
+//   (status:"draft" + draft:true). These smokes pin: (a) node presence +
+//   relative order (after #npd-tags, before Slice B reference block),
+//   (b) renderTagsRegistryHint() contract + recompute() wiring + tags-only
+//   filter, (c) hint copy for unknown-tag / tag-site-mismatch,
+//   (d) empty / all-valid states carry no blocking wording, (e) tags free-text
+//   + datalist not regressed, (f) Slice B + site-aware category filtering +
+//   primaryPlatform auto-follow not regressed, (g) shared copy buttons still
+//   wired, (h) no write path / network / credential added.
+function c1_ejs_src() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ejsPath = resolve(here, '..', 'views', 'admin', 'index.ejs');
+  return readFileSync(ejsPath, 'utf8');
+}
+function c1_extract_fn(src, sig) {
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, `index.ejs MUST contain \`${sig}\``);
+  const dupPos = src.indexOf(sig, sigPos + sig.length);
+  assert.ok(dupPos < 0, `index.ejs MUST contain exactly one \`${sig}\` (no IIFE duplicates)`);
+  const openBrace = src.indexOf('{', sigPos);
+  let depth = 0;
+  for (let i = openBrace; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) return src.slice(sigPos, i + 1); }
+  }
+  assert.fail(`\`${sig}\` opening brace MUST have a matching close`);
+}
+
+check('204 admin index.ejs #npd-tags-registry-hint node present', () => {
+  const src = c1_ejs_src();
+  const pos = src.indexOf('id="npd-tags-registry-hint"');
+  assert.ok(pos > 0, 'index.ejs MUST contain the inline hint node `#npd-tags-registry-hint`');
+  // Bound the enclosing tag on either side.
+  const tagOpen = src.lastIndexOf('<', pos);
+  const tagClose = src.indexOf('>', pos);
+  assert.ok(tagOpen > 0 && tagClose > pos, 'inline hint node MUST be a well-formed tag');
+  const openTag = src.slice(tagOpen, tagClose + 1);
+  assert.ok(/^<div\b/.test(openTag), 'inline hint node MUST be a <div> (display-only container)');
+  assert.ok(/aria-live="polite"/.test(openTag), 'inline hint node MUST carry `aria-live="polite"` for a11y updates');
+  assert.ok(/display:\s*none/.test(openTag), 'inline hint node MUST default to `display: none` (empty tags → hidden; no layout jump)');
+});
+
+check('205 admin index.ejs #npd-tags-registry-hint placed after #npd-tags, before Slice B reference block', () => {
+  const src = c1_ejs_src();
+  const tagsInputPos = src.indexOf('id="npd-tags"');
+  const hintPos = src.indexOf('id="npd-tags-registry-hint"');
+  const refWrapPos = src.indexOf('class="npd-site-registry-ref-wrap"');
+  assert.ok(tagsInputPos > 0, '#npd-tags input MUST still exist');
+  assert.ok(hintPos > 0, '#npd-tags-registry-hint node MUST exist');
+  assert.ok(refWrapPos > 0, 'Slice B reference wrap MUST still exist');
+  assert.ok(hintPos > tagsInputPos, '#npd-tags-registry-hint MUST appear AFTER #npd-tags input');
+  assert.ok(hintPos < refWrapPos, '#npd-tags-registry-hint MUST appear BEFORE Slice B reference wrap');
+});
+
+check('206 admin index.ejs renderTagsRegistryHint() function defined; TAGS_HINT_EL bound to #npd-tags-registry-hint', () => {
+  const src = c1_ejs_src();
+  assert.ok(
+    src.includes("var TAGS_HINT_EL = document.getElementById('npd-tags-registry-hint')"),
+    'TAGS_HINT_EL MUST be bound via `document.getElementById(\'npd-tags-registry-hint\')`'
+  );
+  const block = c1_extract_fn(src, 'function renderTagsRegistryHint(');
+  assert.ok(block.length > 0, 'renderTagsRegistryHint block MUST be brace-balanced');
+});
+
+check('207 admin index.ejs renderTagsRegistryHint() called from recompute() with the reused reg result', () => {
+  const src = c1_ejs_src();
+  // recompute() lifts analyzeRegistryHints() into a local var, so the tags
+  // inline hint and the Ready preflight aggregate share one computation.
+  assert.ok(
+    /var regHintsResult\s*=\s*analyzeRegistryHints\(input,\s*REGISTRY_SNAPSHOT\)\s*;/.test(src),
+    'recompute() MUST lift `analyzeRegistryHints(input, REGISTRY_SNAPSHOT)` into `regHintsResult` (single compute)'
+  );
+  assert.ok(
+    /renderRegistryHints\(regHintsResult\)\s*;/.test(src),
+    'Ready preflight aggregate MUST still be fed via `renderRegistryHints(regHintsResult)` (unchanged surface)'
+  );
+  assert.ok(
+    /renderTagsRegistryHint\(regHintsResult,\s*input\)\s*;/.test(src),
+    'inline hint MUST be fed via `renderTagsRegistryHint(regHintsResult, input)` from recompute()'
+  );
+});
+
+check('208 admin index.ejs renderTagsRegistryHint() is tags-only; never touches category / other surfaces', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderTagsRegistryHint(');
+  // Only tags-family kinds are consumed; category kinds are never referenced.
+  assert.ok(block.includes("'unknown-tag'"), 'renderTagsRegistryHint MUST consume `unknown-tag` hints');
+  assert.ok(block.includes("'tag-site-mismatch'"), 'renderTagsRegistryHint MUST consume `tag-site-mismatch` hints');
+  assert.ok(!block.includes('unknown-category'), 'renderTagsRegistryHint MUST NOT reference `unknown-category` (tags-only)');
+  assert.ok(!block.includes('category-site-mismatch'), 'renderTagsRegistryHint MUST NOT reference `category-site-mismatch` (tags-only)');
+  assert.ok(/h\.field\s*!==\s*'tags'/.test(block), 'renderTagsRegistryHint MUST filter hints by `field === "tags"` (skip non-tag hints)');
+  // MUST NOT reach into other surfaces / recompute the render is additive to.
+  for (const forbidden of [
+    'READY_REGISTRY_EL',
+    'READY_BLOCKING_EL',
+    'READY_WARNINGS_EL',
+    'READY_UNSUPPORTED_EL',
+    'READY_SUMMARY_EL',
+    'CAT_EL',
+    'TAGS_DATALIST_EL',
+    'SITE_REGISTRY_REF_EL',
+    'PRIM_EL',
+    'OUT_EL',
+    'recompute(',
+  ]) {
+    assert.ok(
+      !block.includes(forbidden),
+      `renderTagsRegistryHint MUST NOT touch \`${forbidden}\` (display-only; no side effects on other surfaces)`
+    );
+  }
+  // Writes only to its own element (textContent + style; no innerHTML).
+  assert.ok(block.includes('TAGS_HINT_EL.textContent'), 'renderTagsRegistryHint MUST write to `TAGS_HINT_EL.textContent`');
+  assert.ok(!/TAGS_HINT_EL\.innerHTML/.test(block), 'renderTagsRegistryHint MUST NOT use innerHTML (avoid html injection surface)');
+});
+
+check('209 admin index.ejs renderTagsRegistryHint() copy covers unknown-tag + site-mismatch', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderTagsRegistryHint(');
+  // Unknown-tag copy phrase.
+  assert.ok(block.includes('未在 tags.json'), 'renderTagsRegistryHint MUST include `未在 tags.json` copy for unknown tags');
+  // Site-mismatch copy phrase.
+  assert.ok(block.includes('site mismatch'), 'renderTagsRegistryHint MUST include `site mismatch` copy for cross-site tags');
+  assert.ok(block.includes('允許 site='), 'site-mismatch copy MUST show `允許 site=[...]`');
+  assert.ok(block.includes('目前 site='), 'site-mismatch copy MUST show `目前 site=` (current selected site)');
+  // Warning glyph, non-red color (深藍 #1f4e79 — 與 Slice B / preflight hint 同色系).
+  assert.ok(block.includes("'⚠ '"), 'unknown / mismatch branch MUST prefix with ⚠ (warning glyph, not error)');
+  assert.ok(block.includes("'#1f4e79'"), 'unknown / mismatch branch MUST use non-red color `#1f4e79` (never red / error)');
+});
+
+check('210 admin index.ejs renderTagsRegistryHint() empty / all-valid states carry no blocking wording', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderTagsRegistryHint(');
+  // Empty-tags path hides the node so no misleading empty label is emitted.
+  assert.ok(
+    /tagsList\.length\s*===\s*0[\s\S]{0,120}TAGS_HINT_EL\.style\.display\s*=\s*'none'/.test(block),
+    'empty-tags branch MUST hide the node via `display = "none"` (no layout jump; no misleading label)'
+  );
+  // All-valid branch: describes registry alignment, not export gating.
+  assert.ok(block.includes('皆在 tags.json'), 'all-valid branch MUST describe registry alignment (皆在 tags.json)');
+  // Blocking / gating wording MUST NOT appear anywhere in the render.
+  for (const forbidden of ['READY', 'PASS', 'BLOCKING', 'blocking', 'PASSED', 'READY!', 'ready 通過', '已就緒']) {
+    assert.ok(
+      !block.includes(forbidden),
+      `renderTagsRegistryHint MUST NOT use blocking / gating wording \`${forbidden}\` (describes registry alignment only)`
+    );
+  }
+  // No red error color inside the render.
+  assert.ok(!block.includes("'#a00'"), 'renderTagsRegistryHint MUST NOT use error red `#a00`');
+  assert.ok(!block.includes("'#721c24'"), 'renderTagsRegistryHint MUST NOT use blocking dark red `#721c24`');
+});
+
+check('211 admin index.ejs C1 does not regress tags free-text + datalist hint-only', () => {
+  const src = c1_ejs_src();
+  const tagsIdPos = src.indexOf('id="npd-tags"');
+  assert.ok(tagsIdPos > 0, '#npd-tags MUST still exist');
+  const tagsTag = src.slice(src.lastIndexOf('<', tagsIdPos), src.indexOf('>', tagsIdPos) + 1);
+  assert.ok(/^<input\b/.test(tagsTag), '#npd-tags MUST remain a free-text <input> (never <select>)');
+  assert.ok(/type="text"/.test(tagsTag), '#npd-tags MUST keep `type="text"`');
+  assert.ok(/list="npd-tags-options"/.test(tagsTag), '#npd-tags MUST keep its `list="npd-tags-options"` datalist wiring');
+  // Datalist still present + function that rebuilds it still present.
+  assert.ok(src.includes('<datalist id="npd-tags-options">'), 'datalist #npd-tags-options MUST still exist');
+  assert.ok(src.includes('function renderTagOptions('), 'renderTagOptions (site-aware datalist) MUST still exist');
+  // Input event still wired to debounceRecompute (so hint updates on tag typing).
+  assert.ok(
+    /\[TITLE_EL,\s*TITLE_EN_EL,\s*SLUG_EL,\s*DATE_EL,\s*TAGS_EL,[^\]]*\][\s\S]{0,120}el\.addEventListener\('input',\s*debounceRecompute\)/.test(src),
+    'TAGS_EL MUST stay in the debounceRecompute input-wiring list (drives inline hint updates)'
+  );
+});
+
+check('212 admin index.ejs C1 does not regress Slice B site registry reference block', () => {
+  const src = c1_ejs_src();
+  // Slice B reference block markup + copy + wiring intact.
+  assert.ok(src.includes('class="npd-site-registry-ref-wrap"'), 'Slice B reference wrap MUST still exist');
+  assert.ok(src.includes('id="npd-site-registry-ref"'), 'Slice B #npd-site-registry-ref container MUST still exist');
+  assert.ok(src.includes('目前 <code>site</code> 合法 category / tag 參考'), 'Slice B section title MUST remain unchanged');
+  assert.ok(src.includes('function renderSiteRegistryReference('), 'renderSiteRegistryReference MUST still exist');
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderSiteRegistryReference\(SITE_EL\.value\)/.test(src),
+    'renderSiteRegistryReference MUST stay wired to #npd-site change'
+  );
+  assert.ok(
+    /\n\s*renderSiteRegistryReference\(SITE_EL\.value\);/.test(src),
+    'renderSiteRegistryReference MUST still be called once at init'
+  );
+});
+
+check('213 admin index.ejs C1 does not regress category site-aware filtering + primaryPlatform auto-follow', () => {
+  const src = c1_ejs_src();
+  assert.ok(src.includes('<select id="npd-category"'), '#npd-category MUST remain a <select> (registry-bound)');
+  assert.ok(src.includes('function renderCategoryOptions('), 'renderCategoryOptions MUST still exist');
+  assert.ok(src.includes('function syncPrimaryToSite('), 'syncPrimaryToSite MUST still exist');
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderCategoryOptions\(SITE_EL\.value\)\s*;\s*recompute\(\)/.test(src),
+    'renderCategoryOptions MUST stay wired to #npd-site change with trailing recompute()'
+  );
+  assert.ok(
+    /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*syncPrimaryToSite\(SITE_EL\.value\)/.test(src),
+    'syncPrimaryToSite MUST stay wired to #npd-site change'
+  );
+});
+
+check('214 admin index.ejs C1 does not regress Ready preflight aggregate / Copy ready-gap / Copy markdown / Download / target path / validation command', () => {
+  const src = c1_ejs_src();
+  // Ready preflight aggregate hint span + its render function still present.
+  assert.ok(src.includes('id="npd-ready-registry-hints"'), 'Ready preflight aggregate `#npd-ready-registry-hints` MUST remain');
+  assert.ok(src.includes('function renderRegistryHints('), 'renderRegistryHints (aggregate render) MUST remain');
+  // Copy ready-gap report button + its local status sink.
+  assert.ok(src.includes('id="npd-copy-gap"'), 'Copy ready-gap report button `#npd-copy-gap` MUST remain');
+  assert.ok(src.includes('id="npd-gap-status"'), 'Local gap status `#npd-gap-status` MUST remain');
+  assert.ok(src.includes('function buildReadyGapReport('), 'buildReadyGapReport (client mirror) MUST remain');
+  // Copy markdown / Download .md buttons.
+  assert.ok(src.includes('id="npd-copy"'), 'Copy markdown button `#npd-copy` MUST remain');
+  assert.ok(src.includes('id="npd-download"'), 'Download .md button `#npd-download` MUST remain');
+  // Manual-import-flow: Copy target path + Copy validation command (both stay
+  // 2-arg → default #npd-flow-status sink).
+  assert.ok(src.includes('id="npd-copy-path"'), 'Copy target path button `#npd-copy-path` MUST remain');
+  assert.ok(src.includes('id="npd-copy-cmd"'), 'Copy validation command button `#npd-copy-cmd` MUST remain');
+  assert.ok(src.includes("copyTextToClipboard(tp, '已複製 path')"), 'Copy target path MUST stay 2-arg → flow-status');
+  assert.ok(src.includes("copyTextToClipboard(VALIDATION_COMMAND, '已複製指令')"), 'Copy validation command MUST stay 2-arg → flow-status');
+});
+
+check('215 admin-markdown-export export contract unchanged: status:"draft" + draft:true (C1 is display-only)', () => {
+  // C1 is a pure UI slice; buildPostMarkdown() on the server MUST still emit
+  // status:"draft" + draft:true across the four representative input shapes
+  // (all-valid tags, unknown tag, site-mismatch tag, empty tags).
+  const shapes = [
+    { ...happy, tags: 'github, vite' },
+    { ...happy, tags: 'github, vite, not-in-registry-tag' },
+    { ...happy, site: 'blogger', tags: 'github' }, // github tag on blogger site
+    { ...happy, tags: '' },
+  ];
+  for (const shape of shapes) {
+    const md = buildPostMarkdown(shape);
+    const parsed = matter(md);
+    assert.equal(parsed.data.status, 'draft', `status MUST stay "draft" for tags="${shape.tags}" site="${shape.site}"`);
+    assert.equal(parsed.data.draft, true, `draft MUST stay true for tags="${shape.tags}" site="${shape.site}"`);
+  }
+});
+
+check('216 admin index.ejs C1 adds no write path / network / credential', () => {
+  const src = c1_ejs_src();
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(|navigator\s*\.\s*sendBeacon/;
+  const credential = /client_secret|access_token|refresh_token|private_key|Authorization\s*:|\bBearer\s+[A-Za-z0-9._-]/;
+  const writePath = /\b(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream)\s*\(|\b(localStorage|sessionStorage|indexedDB)\b/;
+  const block = c1_extract_fn(src, 'function renderTagsRegistryHint(');
+  assert.ok(!transport.test(block), 'renderTagsRegistryHint MUST carry no network transport primitive');
+  assert.ok(!credential.test(block), 'renderTagsRegistryHint MUST embed no service credential');
+  assert.ok(!writePath.test(block), 'renderTagsRegistryHint MUST introduce no write path (fs write / web storage)');
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
