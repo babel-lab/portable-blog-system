@@ -24,6 +24,9 @@ import {
   analyzeReadyGap,
   analyzeRegistryHints,
   buildExportSummary,
+  buildReadyGapReport,
+  READY_GAP_REPORT_HEADER,
+  READY_GAP_DRAFT_CONTRACT,
   READY_UNSUPPORTED_CONTENT_KINDS,
   READY_MAX_TITLE_LEN,
   READY_MAX_DESCRIPTION_LEN,
@@ -4508,6 +4511,254 @@ check('179 admin index.ejs syncPrimaryToSite wired to #npd-site change + init; c
     /SITE_EL\.addEventListener\(\s*'change'\s*,\s*function\s*\(\s*\)\s*\{\s*renderTagOptions\(SITE_EL\.value\)/.test(src),
     'tag datalist site-aware wiring MUST remain (renderTagOptions change handler; no regression)'
   );
+});
+
+// Phase 20260701-admin-ready-gap-report-copy-slice-a:
+//   buildReadyGapReport — plain-text, clipboard-only Ready-gap digest for the
+//   "Copy ready-gap report" button. These cases lock:
+//     - required fields (site / contentKind / title / slug / filename /
+//       targetPath) + draft-contract reminder appear in the report
+//     - blocking / soft warnings / contentKind hints / registry hints surface
+//     - empty sections render 「無」 (never blank)
+//     - read-only invariant (never flips export off status:"draft" + draft:true)
+//     - the UI button lives inside the Ready preflight panel
+//     - clipboard-only (no fs write / fetch / XHR / sendBeacon / credentials)
+//     - existing Copy markdown / Download / target path / validation command +
+//       category site-aware / tag datalist site-aware / primaryPlatform
+//       auto-follow are NOT regressed
+//     - client inline mirror parity with the server helper
+function readyGapEjsSrc() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return readFileSync(resolve(here, '..', 'views', 'admin', 'index.ejs'), 'utf8');
+}
+
+check('180 buildReadyGapReport happy ready-candidate → required fields + draft contract present', () => {
+  const rep = buildReadyGapReport({ ...readyHappy, body: '## 正文\n\n實際撰寫的內容。' }, REGS);
+  assert.ok(rep.includes('=== ' + READY_GAP_REPORT_HEADER + ' ==='), 'report MUST carry the header');
+  assert.ok(rep.includes('summary: ready-candidate'), 'summary line MUST reflect analyzeReadyGap');
+  assert.ok(rep.includes('site: github'));
+  assert.ok(rep.includes('contentKind: tech-note'));
+  assert.ok(rep.includes('title: 測試標題'));
+  assert.ok(rep.includes('slug: test-post'));
+  assert.ok(rep.includes('filename: 2026-06-27-test-post.md'));
+  assert.ok(rep.includes('targetPath: content/github/posts/2026-06-27-test-post.md'));
+  assert.ok(rep.includes(READY_GAP_DRAFT_CONTRACT), 'draft-contract reminder MUST be present verbatim');
+  assert.ok(rep.includes('status:"draft" + draft:true'), 'contract MUST state export stays draft');
+  // ready-candidate fixture (with body) has nothing blocking / warning.
+  assert.ok(/\[Blocking（ready 前必補）\]\n無/.test(rep), 'no blocking → 無');
+  assert.ok(/\[Soft warnings（建議補；不擋 ready）\]\n無/.test(rep), 'no warnings → 無');
+});
+
+check('181 buildReadyGapReport surfaces blocking + soft warnings + registry hints', () => {
+  const rep = buildReadyGapReport(
+    {
+      site: 'github',
+      contentKind: 'tech-note',
+      title: 'T',
+      slug: 'ok-slug',
+      date: '2026-06-27',
+      category: 'made-up-cat',
+      tags: 'made-up-tag',
+      description: '',
+      cover: '',
+      searchDescription: '',
+    },
+    REGS
+  );
+  assert.ok(rep.includes('summary: keep-draft'));
+  // blocking: description + cover (labels from READY_FIELD_LABELS)
+  assert.ok(rep.includes('- description（SEO 摘要'), 'blocking MUST list description');
+  assert.ok(rep.includes('- cover（封面圖'), 'blocking MUST list cover');
+  // soft warning: empty searchDescription
+  assert.ok(rep.includes('- searchDescription 空'), 'warnings MUST list searchDescription');
+  // registry hints: unknown category + unknown tag
+  assert.ok(rep.includes('unknown-category warning'), 'registry hints MUST flag unknown category');
+  assert.ok(rep.includes('unknown-tag warning'), 'registry hints MUST flag unknown tag');
+});
+
+check('182 buildReadyGapReport never renders a blank line directly under a section header', () => {
+  // Empty sections MUST show 「無」, never blank — check across several states.
+  const HEADERS = [
+    '[Blocking（ready 前必補）]',
+    '[Soft warnings（建議補；不擋 ready）]',
+    '[contentKind 提示]',
+    '[registry 對齊提示]',
+  ];
+  const fixtures = [
+    null,
+    undefined,
+    {},
+    { ...readyHappy, body: '## 正文\n\n內容。' },
+    { ...readyHappy, contentKind: 'download' },
+    { site: 'github', category: 'made-up', tags: 'a,b', title: '', slug: '', date: '' },
+  ];
+  for (const inp of fixtures) {
+    const rep = buildReadyGapReport(inp, REGS);
+    for (const header of HEADERS) {
+      const idx = rep.indexOf(header + '\n');
+      assert.ok(idx >= 0, 'report MUST contain section header ' + header);
+      const firstLine = rep.slice(idx + header.length + 1).split('\n')[0];
+      assert.notEqual(
+        firstLine.trim(),
+        '',
+        header + ' MUST render content (無 when empty), never a blank line (input: ' + JSON.stringify(inp) + ')'
+      );
+    }
+  }
+});
+
+check('183 buildReadyGapReport empty title / slug / filename / targetPath → 無 (not blank)', () => {
+  const rep = buildReadyGapReport(
+    { site: 'github', contentKind: 'tech-note', title: '', slug: 'BAD SLUG', date: 'nope' },
+    REGS
+  );
+  assert.ok(rep.includes('title: 無'), 'empty title → 無');
+  assert.ok(rep.includes('slug: 無'), 'invalid slug → 無');
+  assert.ok(rep.includes('filename: 無'), 'no filename → 無');
+  assert.ok(rep.includes('targetPath: 無'), 'no targetPath → 無');
+});
+
+check('184 buildReadyGapReport unsupported contentKind download surfaces in contentKind hints', () => {
+  const rep = buildReadyGapReport(
+    { ...readyHappy, contentKind: 'download', body: '## x\n\ny' },
+    REGS
+  );
+  assert.ok(rep.includes('summary: keep-draft'));
+  assert.ok(/\[contentKind 提示\]\n- download：/.test(rep), 'download hint MUST be listed with reason');
+  assert.ok(rep.includes('download contentKind 需'), 'reason text MUST be included');
+});
+
+check('185 buildReadyGapReport null / undefined → no throw; draft contract + empty sections 無', () => {
+  for (const v of [null, undefined]) {
+    assert.doesNotThrow(() => buildReadyGapReport(v));
+    const rep = buildReadyGapReport(v);
+    assert.ok(rep.includes('status:"draft" + draft:true'));
+    assert.ok(rep.includes('site: github'), 'site falls back to github');
+    assert.ok(rep.includes('[contentKind 提示]\n無'));
+    assert.ok(rep.includes('[registry 對齊提示]\n無'));
+  }
+});
+
+check('186 buildReadyGapReport does not alter buildPostMarkdown output (status stays draft)', () => {
+  const inputs = [
+    readyHappy,
+    { ...readyHappy, contentKind: 'download' },
+    { ...readyHappy, status: 'ready', draft: false },
+    {},
+    null,
+  ];
+  for (const inp of inputs) {
+    buildReadyGapReport(inp, REGS);
+    const d = matter(buildPostMarkdown(inp)).data;
+    assert.equal(d.status, 'draft', 'status must remain draft after building the report');
+    assert.equal(d.draft, true, 'draft must remain true after building the report');
+  }
+});
+
+check('187 buildReadyGapReport registries optional → no throw; registry section 無', () => {
+  // Omit registries entirely — analyzeRegistryHints yields no hints → 無.
+  const rep = buildReadyGapReport({ ...happy, category: 'made-up', tags: 'made-up' });
+  assert.ok(rep.includes('[registry 對齊提示]\n無'), 'no registries → registry hints 無');
+});
+
+check('188 admin index.ejs Copy ready-gap report button lives inside the Ready preflight panel', () => {
+  const src = readyGapEjsSrc();
+  const panelStart = src.indexOf('class="npd-ready-preflight"');
+  assert.ok(panelStart > 0, 'index.ejs MUST contain the Ready preflight panel');
+  // Panel scan ends at the next major IA-shell section marker after it.
+  const panelEnd = src.indexOf('Phase 20260615-night-1-admin-ia-shell-implementation-a', panelStart);
+  assert.ok(panelEnd > panelStart, 'panel scan boundary MUST resolve');
+  const panel = src.slice(panelStart, panelEnd);
+  assert.ok(panel.includes('id="npd-copy-gap"'), 'button #npd-copy-gap MUST live in the Ready preflight panel');
+  assert.ok(panel.includes('Copy ready-gap report'), 'button label MUST read "Copy ready-gap report"');
+});
+
+check('189 admin index.ejs Copy ready-gap report is clipboard-only (reuses copyTextToClipboard; no transport / credentials)', () => {
+  const src = readyGapEjsSrc();
+  // Handler wiring: clipboard-only via the vetted helper + shared input reader.
+  assert.ok(src.includes("COPY_GAP_BTN.addEventListener('click'"), 'gap button MUST be wired');
+  assert.ok(
+    /copyTextToClipboard\(buildReadyGapReport\(readInput\(\)\), '已複製 ready-gap report'\)/.test(src),
+    'gap handler MUST copy buildReadyGapReport(readInput()) via copyTextToClipboard (clipboard-only)'
+  );
+  assert.ok(src.includes('function readInput()'), 'readInput() MUST exist as the shared form reader');
+  assert.ok(src.includes('var input = readInput();'), 'recompute() MUST read form state via readInput()');
+  // No network transport / credential constant anywhere in the Admin surface.
+  const files = ADMIN_SURFACE_FILES();
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(|navigator\s*\.\s*sendBeacon/;
+  const credential = /client_secret|access_token|refresh_token|private_key|Authorization\s*:|\bBearer\s+[A-Za-z0-9._-]/;
+  for (const { label, src: s } of files) {
+    assert.ok(!transport.test(s), label + ' MUST carry no network transport primitive');
+    assert.ok(!credential.test(s), label + ' MUST embed no service credential constant');
+  }
+});
+
+check('190 admin index.ejs client buildReadyGapReport mirrors the server helper', () => {
+  const src = readyGapEjsSrc();
+  const sig = 'function buildReadyGapReport(input) {';
+  const sigPos = src.indexOf(sig);
+  assert.ok(sigPos > 0, 'index.ejs MUST contain client `function buildReadyGapReport(input) {`');
+  assert.ok(
+    src.indexOf(sig, sigPos + sig.length) < 0,
+    'index.ejs MUST contain exactly one client buildReadyGapReport (no duplicate)'
+  );
+  let depth = 0;
+  let block = '';
+  for (let i = sigPos + sig.length - 1; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { block = src.slice(sigPos, i + 1); break; }
+    }
+  }
+  assert.ok(block, 'client buildReadyGapReport block MUST be brace-balanced');
+  // Composes over the same three read-only analyzers as the server helper.
+  assert.ok(block.includes('buildExportSummary(input)'), 'client MUST compose buildExportSummary');
+  assert.ok(block.includes('analyzeReadyGap(input)'), 'client MUST compose analyzeReadyGap');
+  assert.ok(block.includes('analyzeRegistryHints(input, REGISTRY_SNAPSHOT)'), 'client MUST compose analyzeRegistryHints');
+  assert.ok(block.includes('READY_GAP_REPORT_HEADER'), 'client MUST use the shared header constant');
+  assert.ok(block.includes('READY_GAP_DRAFT_CONTRACT'), 'client MUST push the draft-contract line');
+  assert.ok(block.includes('readyGapList'), 'client MUST use readyGapList for section bodies (無 empty-state)');
+  assert.ok(block.includes('readyGapNone'), 'client MUST use readyGapNone for scalar 無 empty-state');
+  // Header + contract constants must match the server literals byte-for-byte.
+  assert.ok(
+    src.includes("var READY_GAP_REPORT_HEADER = '" + READY_GAP_REPORT_HEADER + "';"),
+    'client header constant MUST equal server READY_GAP_REPORT_HEADER'
+  );
+  assert.ok(
+    src.includes("var READY_GAP_DRAFT_CONTRACT = '" + READY_GAP_DRAFT_CONTRACT + "';"),
+    'client contract constant MUST equal server READY_GAP_DRAFT_CONTRACT'
+  );
+});
+
+check('191 admin index.ejs existing export affordances not regressed by the gap button', () => {
+  const src = readyGapEjsSrc();
+  assert.ok(src.includes('id="npd-copy"'), 'Copy markdown button MUST remain');
+  assert.ok(src.includes('id="npd-download"'), 'Download button MUST remain');
+  assert.ok(src.includes('id="npd-copy-path"'), 'Copy target path button MUST remain');
+  assert.ok(src.includes('id="npd-copy-cmd"'), 'Copy validation command button MUST remain');
+  assert.ok(src.includes("copyTextToClipboard(tp, '已複製 path')"), 'Copy target path handler intact');
+  assert.ok(src.includes("copyTextToClipboard(VALIDATION_COMMAND, '已複製指令')"), 'Copy validation command handler intact');
+});
+
+check('192 admin index.ejs category / tag / primaryPlatform site-aware wiring not regressed', () => {
+  const src = readyGapEjsSrc();
+  assert.ok(/renderCategoryOptions\(SITE_EL\.value\)/.test(src), 'category site-aware wiring MUST remain');
+  assert.ok(/renderTagOptions\(SITE_EL\.value\)/.test(src), 'tag datalist site-aware wiring MUST remain');
+  assert.ok(/syncPrimaryToSite\(SITE_EL\.value\)/.test(src), 'primaryPlatform auto-follow wiring MUST remain');
+});
+
+check('193 buildReadyGapReport export contract line always draft (defense-in-depth vs pretend-ready)', () => {
+  // Even for an input that pretends to be ready, the report advertises draft.
+  const pretend = { ...readyHappy, status: 'ready', draft: false, body: '## 正文\n\n內容。' };
+  const rep = buildReadyGapReport(pretend, REGS);
+  assert.ok(rep.includes(READY_GAP_DRAFT_CONTRACT));
+  assert.ok(rep.includes('status:"draft" + draft:true'));
+  // And the export itself still lands draft.
+  const d = matter(buildPostMarkdown(pretend)).data;
+  assert.equal(d.status, 'draft');
+  assert.equal(d.draft, true);
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);

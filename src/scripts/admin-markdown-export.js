@@ -522,6 +522,72 @@ export function analyzeReadyGap(input) {
   return { ok, blocking, warnings, unsupported, summary };
 }
 
+// Phase 20260701-admin-ready-gap-report-copy-slice-a:
+//   buildReadyGapReport — assembles a plain-text, clipboard-only digest of the
+//   New Post Draft Ready preflight state for the "Copy ready-gap report" button.
+//   It is pure string composition over the three existing read-only analyzers
+//   (buildExportSummary / analyzeReadyGap / analyzeRegistryHints); the report is
+//   meant to be copied to the clipboard and pasted into notes — nothing is
+//   written to the repo, uploaded, or sent over the network.
+//
+//   IMPORTANT — safety invariants:
+//   - Pure: no fs / fetch / IO; never throws on null / undefined input.
+//   - Read-only: never mutates buildPostMarkdown output (export stays
+//     status:"draft" + draft:true regardless of what the report says).
+//   - Every list section renders the literal 「無」 when empty (never blank) so a
+//     pasted report is unambiguous; the status/draft contract line is always
+//     present and always states the export stays draft.
+//   - This helper has an inline mirror in src/views/admin/index.ejs (client
+//     script). Keep both in sync — the smoke locks the server-side version and
+//     the client-side presence / parity.
+export const READY_GAP_REPORT_HEADER = 'Admin New Post Draft — Ready-gap report';
+export const READY_GAP_DRAFT_CONTRACT =
+  'status/draft 契約：匯出永遠 status:"draft" + draft:true（Admin 不切 ready / published）';
+
+function readyGapNone(value) {
+  const s = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  return s === '' ? '無' : s;
+}
+
+function readyGapList(arr, fmt) {
+  if (!Array.isArray(arr) || arr.length === 0) return '無';
+  return arr.map((item) => '- ' + fmt(item)).join('\n');
+}
+
+export function buildReadyGapReport(input, registries) {
+  const summary = buildExportSummary(input);
+  const gap = analyzeReadyGap(input);
+  const reg = analyzeRegistryHints(input, registries);
+  const safeInput = input && typeof input === 'object' ? input : {};
+  const title = String(safeInput.title == null ? '' : safeInput.title)
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const lines = [];
+  lines.push('=== ' + READY_GAP_REPORT_HEADER + ' ===');
+  lines.push('summary: ' + gap.summary);
+  lines.push('site: ' + readyGapNone(summary.site));
+  lines.push('contentKind: ' + readyGapNone(summary.contentKind));
+  lines.push('title: ' + readyGapNone(title));
+  lines.push('slug: ' + readyGapNone(summary.slug));
+  lines.push('filename: ' + readyGapNone(summary.filename));
+  lines.push('targetPath: ' + readyGapNone(summary.targetPath));
+  lines.push(READY_GAP_DRAFT_CONTRACT);
+  lines.push('');
+  lines.push('[Blocking（ready 前必補）]');
+  lines.push(readyGapList(gap.blocking, (b) => b.label));
+  lines.push('');
+  lines.push('[Soft warnings（建議補；不擋 ready）]');
+  lines.push(readyGapList(gap.warnings, (w) => w.label));
+  lines.push('');
+  lines.push('[contentKind 提示]');
+  lines.push(readyGapList(gap.unsupported, (u) => u.contentKind + '：' + u.reason));
+  lines.push('');
+  lines.push('[registry 對齊提示]');
+  lines.push(readyGapList(reg.hints, (h) => h.label));
+  return lines.join('\n');
+}
+
 export function buildPostMarkdown(input) {
   const safeInput = input && typeof input === 'object' ? input : {};
   const site = pickEnum(safeInput.site, VALID_SITES, 'github');

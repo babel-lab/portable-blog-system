@@ -2164,6 +2164,19 @@
         其它欄位（如 <code>book.*</code> / <code>download.*</code> / <code>affiliate.*</code>）仍需存到 <code>content/{site}/posts/</code> 後用 VS Code 編 frontmatter 補上。
         registry 對齊提示僅做 read-only 對照：unknown category / unknown tag / site-mismatch 皆 <strong>不擋 draft export</strong>，仍由 <code>npm run validate:content</code> 為 ground truth。
       </p>
+      <%# Phase 20260701-admin-ready-gap-report-copy-slice-a:
+          Copy ready-gap report — clipboard-only button. Copies a plain-text
+          digest (site / contentKind / title / slug / filename / targetPath /
+          blocking / soft warnings / contentKind hints / registry hints +
+          draft-contract reminder) built by admin-markdown-export.js
+          buildReadyGapReport(). Empty sections render 「無」, never blank.
+          Clipboard-only — no repo write, no upload, no fetch. Reuses the vetted
+          copyTextToClipboard() helper; status surfaces in #npd-flow-status. -%>
+      <div style="margin-top: 0.6rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        <button type="button" id="npd-copy-gap"
+                style="padding: 0.3rem 0.65rem; border: 1px solid #2c5282; background: #fff; border-radius: 3px; cursor: pointer; font-size: 0.82em; font-weight: 600; color: #2c5282;">Copy ready-gap report</button>
+        <span class="text-muted" style="font-size: 0.78em;">→ 複製上方 blocking / soft warnings / contentKind 提示 / registry 對齊提示 的<strong>純文字</strong>報告到剪貼簿（clipboard-only；不寫 repo、不上傳、不 fetch）；空白項顯示「無」；狀態顯示於上方 import flow 的訊息列</span>
+      </div>
     </div>
   </div>
 
@@ -3524,6 +3537,10 @@
       var COPY_PATH_BTN = document.getElementById('npd-copy-path');
       var COPY_CMD_BTN = document.getElementById('npd-copy-cmd');
       var FLOW_STATUS_EL = document.getElementById('npd-flow-status');
+      // Phase 20260701-admin-ready-gap-report-copy-slice-a:
+      //   Copy ready-gap report button (Ready preflight panel). Clipboard-only;
+      //   reuses copyTextToClipboard() → showFlowStatus (#npd-flow-status).
+      var COPY_GAP_BTN = document.getElementById('npd-copy-gap');
       // Phase 20260627-admin-ready-preflight-panel-implementation-a:
       //   Ready preflight panel elements (read-only hint surface).
       //   Mirror of admin-markdown-export.js analyzeReadyGap (smoke 40-52).
@@ -3986,6 +4003,52 @@
         paintCounter(CNT_SEARCH_DESC_EL, sum.counts.searchDescription, null);
         paintCounter(CNT_COVER_ALT_EL, sum.counts.coverAlt, null);
       }
+      // Phase 20260701-admin-ready-gap-report-copy-slice-a:
+      //   Client mirror of admin-markdown-export.js buildReadyGapReport.
+      //   Smoke locks the server-side version + this client presence / parity.
+      //   Pure string composition over buildExportSummary / analyzeReadyGap /
+      //   analyzeRegistryHints — read-only; never mutates buildMarkdown output
+      //   (export stays status:"draft" + draft:true). Empty sections render 「無」.
+      var READY_GAP_REPORT_HEADER = 'Admin New Post Draft — Ready-gap report';
+      var READY_GAP_DRAFT_CONTRACT = 'status/draft 契約：匯出永遠 status:"draft" + draft:true（Admin 不切 ready / published）';
+      function readyGapNone(value) {
+        var s = String(value == null ? '' : value).replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+        return s === '' ? '無' : s;
+      }
+      function readyGapList(arr, fmt) {
+        if (!Array.isArray(arr) || arr.length === 0) return '無';
+        return arr.map(function (item) { return '- ' + fmt(item); }).join('\n');
+      }
+      function buildReadyGapReport(input) {
+        var summary = buildExportSummary(input);
+        var gap = analyzeReadyGap(input);
+        var reg = analyzeRegistryHints(input, REGISTRY_SNAPSHOT);
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var title = String(safeInput.title == null ? '' : safeInput.title).replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+        var lines = [];
+        lines.push('=== ' + READY_GAP_REPORT_HEADER + ' ===');
+        lines.push('summary: ' + gap.summary);
+        lines.push('site: ' + readyGapNone(summary.site));
+        lines.push('contentKind: ' + readyGapNone(summary.contentKind));
+        lines.push('title: ' + readyGapNone(title));
+        lines.push('slug: ' + readyGapNone(summary.slug));
+        lines.push('filename: ' + readyGapNone(summary.filename));
+        lines.push('targetPath: ' + readyGapNone(summary.targetPath));
+        lines.push(READY_GAP_DRAFT_CONTRACT);
+        lines.push('');
+        lines.push('[Blocking（ready 前必補）]');
+        lines.push(readyGapList(gap.blocking, function (b) { return b.label; }));
+        lines.push('');
+        lines.push('[Soft warnings（建議補；不擋 ready）]');
+        lines.push(readyGapList(gap.warnings, function (w) { return w.label; }));
+        lines.push('');
+        lines.push('[contentKind 提示]');
+        lines.push(readyGapList(gap.unsupported, function (u) { return u.contentKind + '：' + u.reason; }));
+        lines.push('');
+        lines.push('[registry 對齊提示]');
+        lines.push(readyGapList(reg.hints, function (h) { return h.label; }));
+        return lines.join('\n');
+      }
       function missingReason(missing) {
         if (!missing || missing.length === 0) return '';
         var labels = { title: 'title', slug: 'slug (僅 a-z 0-9 -)', date: 'date (YYYY-MM-DD)' };
@@ -4080,8 +4143,12 @@
         setTimeout(function () { if (STATUS_EL.textContent === msg) STATUS_EL.textContent = ''; }, 2000);
       }
 
-      function recompute() {
-        var input = {
+      // Phase 20260701-admin-ready-gap-report-copy-slice-a:
+      //   readInput — single source of truth for the current form state. Used by
+      //   recompute() (markdown preview + preflight) and the Copy ready-gap
+      //   report handler so both read exactly the same fields. Read-only DOM read.
+      function readInput() {
+        return {
           site: SITE_EL.value,
           contentKind: KIND_EL.value,
           primaryPlatform: PRIM_EL.value,
@@ -4100,6 +4167,9 @@
           coverAlt: COVER_ALT_EL ? COVER_ALT_EL.value : '',
           body: BODY_EL.value
         };
+      }
+      function recompute() {
+        var input = readInput();
         OUT_EL.value = buildMarkdown(input);
         var fn = buildFilename(input.date, input.slug);
         var ready = isExportReady(input.title, input.slug, input.date);
@@ -4237,6 +4307,15 @@
       if (COPY_CMD_BTN) {
         COPY_CMD_BTN.addEventListener('click', function () {
           copyTextToClipboard(VALIDATION_COMMAND, '已複製指令');
+        });
+      }
+      // Phase 20260701-admin-ready-gap-report-copy-slice-a:
+      //   Copy ready-gap report — clipboard-only. Builds the plain-text digest
+      //   from the current form state and copies it via the vetted
+      //   copyTextToClipboard() helper. No repo write, no upload, no fetch.
+      if (COPY_GAP_BTN) {
+        COPY_GAP_BTN.addEventListener('click', function () {
+          copyTextToClipboard(buildReadyGapReport(readInput()), '已複製 ready-gap report');
         });
       }
 
