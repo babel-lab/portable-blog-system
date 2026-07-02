@@ -2078,6 +2078,15 @@
           <td style="padding: 0.25rem 0.5rem;">
             <textarea id="npd-description" rows="2" maxlength="160" placeholder="60–160 字內的文章摘要（將進入 og:description / meta description / JSON-LD）" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
             <span class="text-muted" style="font-size: 0.78em;">→ <span id="npd-count-description">0</span>/160（超過為 long-description soft warning，不擋 export）</span>
+            <%# Phase 20260702-admin-description-length-hint-slice-b:
+                Read-only SEO length assessment below the description field.
+                Classifies the current length against the recommended range
+                (60–160 chars) reusing the count already in buildExportSummary.
+                DISPLAY-ONLY: never gates export (契約仍 status:"draft" + draft:true),
+                never adds a new ready-gap warning (description>160 soft warning is
+                unchanged), no write path. Empty → hidden (no layout jump). -%>
+            <div id="npd-len-hint-description" aria-live="polite"
+                 style="display: none; margin-top: 0.2rem; font-size: 0.78em;"></div>
           </td>
         </tr>
         <%# Phase 20260627-admin-richer-fields-slice-a:
@@ -2098,6 +2107,15 @@
           <td style="padding: 0.25rem 0.5rem;">
             <textarea id="npd-search-description" rows="2" maxlength="160" placeholder="（optional）給搜尋引擎 / Blogger 搜尋說明用的摘要；空白時不會擋 export，但 ready preflight 會 warning" style="width: 100%; padding: 0.25rem; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
             <span class="text-muted" style="font-size: 0.82em;">→ 通常與 <code>description</code> 不同；空白時 Blogger 後台可手動補（目前 <span id="npd-count-search-description">0</span> 字）</span>
+            <%# Phase 20260702-admin-description-length-hint-slice-b:
+                Read-only SEO length assessment below searchDescription, same
+                recommended-range classification as description. searchDescription
+                stays optional — empty is handled by the ready-preflight
+                searchDescription-empty warning, so an empty field hides this hint
+                (no duplicate empty nag). DISPLAY-ONLY; no export gating; no write
+                path; no new ready-gap warning. -%>
+            <div id="npd-len-hint-search-description" aria-live="polite"
+                 style="display: none; margin-top: 0.2rem; font-size: 0.82em;"></div>
           </td>
         </tr>
         <tr>
@@ -3688,6 +3706,12 @@
       var CNT_DESC_EL = document.getElementById('npd-count-description');
       var CNT_SEARCH_DESC_EL = document.getElementById('npd-count-search-description');
       var CNT_COVER_ALT_EL = document.getElementById('npd-count-cover-alt');
+      // Phase 20260702-admin-description-length-hint-slice-b:
+      //   Read-only SEO length-assessment hint elements (below description /
+      //   searchDescription). Display-only; painted from the existing
+      //   buildExportSummary counts — no new compute, no write path.
+      var LEN_HINT_DESC_EL = document.getElementById('npd-len-hint-description');
+      var LEN_HINT_SEARCH_DESC_EL = document.getElementById('npd-len-hint-search-description');
       if (!SITE_EL || !OUT_EL || !COPY_BTN || !DL_BTN) return;
 
       var VALID_SITES = ['github', 'blogger'];
@@ -3796,6 +3820,11 @@
       var READY_UNSUPPORTED_KINDS = ['book-review', 'download'];
       var READY_MAX_TITLE_LEN = 60;
       var READY_MAX_DESCRIPTION_LEN = 160;
+      // Phase 20260702-admin-description-length-hint-slice-b:
+      //   Recommended SEO lower bound for description-type fields (display-only
+      //   length hint). NOT wired into analyzeReadyGap — below-min is a soft
+      //   qualitative hint, never a ready-preflight warning nor an export gate.
+      var READY_REC_MIN_DESCRIPTION_LEN = 60;
       // Phase 20260629-admin-titleEn-length-warning-slice-a (mirror server).
       var READY_MAX_TITLE_EN_LEN = 80;
       var READY_FIELD_LABELS = {
@@ -4120,6 +4149,40 @@
         paintCounter(CNT_DESC_EL, sum.counts.description, sum.limits.descriptionMax);
         paintCounter(CNT_SEARCH_DESC_EL, sum.counts.searchDescription, null);
         paintCounter(CNT_COVER_ALT_EL, sum.counts.coverAlt, null);
+        // Phase 20260702-admin-description-length-hint-slice-b:
+        //   Qualitative SEO length assessment reusing the same sum.counts (no
+        //   new compute). Read-only; never gates export; never adds a ready-gap
+        //   warning. Empty (len 0) → hidden so no duplicate empty nag.
+        renderLengthHint(LEN_HINT_DESC_EL, sum.counts.description, READY_REC_MIN_DESCRIPTION_LEN, READY_MAX_DESCRIPTION_LEN);
+        renderLengthHint(LEN_HINT_SEARCH_DESC_EL, sum.counts.searchDescription, READY_REC_MIN_DESCRIPTION_LEN, READY_MAX_DESCRIPTION_LEN);
+      }
+      // Phase 20260702-admin-description-length-hint-slice-b:
+      //   Read-only SEO length classifier for description-type fields. Writes
+      //   only its own element's textContent + style (no innerHTML). Never
+      //   mutates buildMarkdown output (export stays status:"draft" + draft:true),
+      //   never touches the Ready preflight aggregate / counters / other fields.
+      //   len 0 → hidden; below recMin → neutral 偏短 hint; within range → green
+      //   ✓; over recMax → warning ⚠ (same soft tone as long-description). No
+      //   READY / PASS gating wording.
+      function renderLengthHint(el, len, recMin, recMax) {
+        if (!el) return;
+        var n = typeof len === 'number' && len >= 0 ? len : 0;
+        if (n === 0) {
+          el.style.display = 'none';
+          el.textContent = '';
+          return;
+        }
+        el.style.display = '';
+        if (n > recMax) {
+          el.style.color = '#856404';
+          el.textContent = '⚠ 目前 ' + n + ' 字，超過建議上限 ' + recMax + '（soft，不擋 export）';
+        } else if (n < recMin) {
+          el.style.color = '#555';
+          el.textContent = '偏短：目前 ' + n + ' 字，建議 ' + recMin + '–' + recMax + ' 字（不擋 export）';
+        } else {
+          el.style.color = '#155724';
+          el.textContent = '✓ 長度適中：目前 ' + n + ' 字（建議 ' + recMin + '–' + recMax + '）';
+        }
       }
       // Phase 20260701-admin-ready-gap-report-copy-slice-a:
       //   Client mirror of admin-markdown-export.js buildReadyGapReport.

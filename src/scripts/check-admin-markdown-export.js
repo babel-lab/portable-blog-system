@@ -5935,5 +5935,129 @@ check('245 admin index.ejs renderCategoryRegistryHint() adds no fetch / XHR / We
   assert.ok(!writePath.test(block), 'renderCategoryRegistryHint MUST introduce no write path (fs write / web storage)');
 });
 
+// Phase 20260702-admin-description-length-hint-slice-b:
+//   Adds two display-only SEO length-assessment hint nodes below the
+//   description / searchDescription fields (#npd-len-hint-description /
+//   #npd-len-hint-search-description). Classifies current length against the
+//   recommended range (READY_REC_MIN_DESCRIPTION_LEN..READY_MAX_DESCRIPTION_LEN)
+//   reusing the count already in buildExportSummary — no new compute, no new
+//   ready-gap warning, no export contract change (status:"draft" + draft:true),
+//   no write path. These smokes pin: (a) node presence + placement, (b)
+//   renderLengthHint() contract + recompute()/renderExportSummary wiring,
+//   (c) classification copy + empty-hidden + no blocking wording, (d) the
+//   recommended-min is NOT wired into analyzeReadyGap (hint-only), (e) export
+//   contract unchanged for long description / searchDescription.
+check('246 admin index.ejs description / searchDescription length-hint nodes present', () => {
+  const src = c1_ejs_src();
+  for (const id of ['npd-len-hint-description', 'npd-len-hint-search-description']) {
+    const pos = src.indexOf('id="' + id + '"');
+    assert.ok(pos > 0, 'index.ejs MUST contain the length-hint node `#' + id + '`');
+    const tagOpen = src.lastIndexOf('<', pos);
+    const tagClose = src.indexOf('>', pos);
+    const openTag = src.slice(tagOpen, tagClose + 1);
+    assert.ok(/^<div\b/.test(openTag), '`#' + id + '` MUST be a <div> (display-only container)');
+    assert.ok(/aria-live="polite"/.test(openTag), '`#' + id + '` MUST carry `aria-live="polite"`');
+    assert.ok(/display:\s*none/.test(openTag), '`#' + id + '` MUST default to `display: none` (empty → hidden; no layout jump)');
+  }
+});
+
+check('247 admin index.ejs length-hint nodes placed after their count spans', () => {
+  const src = c1_ejs_src();
+  const descCountPos = src.indexOf('id="npd-count-description"');
+  const descHintPos = src.indexOf('id="npd-len-hint-description"');
+  const searchCountPos = src.indexOf('id="npd-count-search-description"');
+  const searchHintPos = src.indexOf('id="npd-len-hint-search-description"');
+  assert.ok(descCountPos > 0 && descHintPos > descCountPos, 'description length-hint MUST appear AFTER #npd-count-description');
+  assert.ok(searchCountPos > 0 && searchHintPos > searchCountPos, 'searchDescription length-hint MUST appear AFTER #npd-count-search-description');
+  // description hint stays with the description field (before searchDescription field).
+  assert.ok(descHintPos < searchCountPos, 'description length-hint MUST appear before the searchDescription field');
+});
+
+check('248 admin index.ejs renderLengthHint() defined; hint els + recommended-min constant present', () => {
+  const src = c1_ejs_src();
+  assert.ok(
+    src.includes("var LEN_HINT_DESC_EL = document.getElementById('npd-len-hint-description')"),
+    'LEN_HINT_DESC_EL MUST be bound to #npd-len-hint-description'
+  );
+  assert.ok(
+    src.includes("var LEN_HINT_SEARCH_DESC_EL = document.getElementById('npd-len-hint-search-description')"),
+    'LEN_HINT_SEARCH_DESC_EL MUST be bound to #npd-len-hint-search-description'
+  );
+  assert.ok(/var READY_REC_MIN_DESCRIPTION_LEN\s*=\s*60\s*;/.test(src), 'READY_REC_MIN_DESCRIPTION_LEN = 60 MUST be defined');
+  const block = c1_extract_fn(src, 'function renderLengthHint(');
+  assert.ok(block.length > 0, 'renderLengthHint block MUST be brace-balanced');
+});
+
+check('249 admin index.ejs renderLengthHint() fed from renderExportSummary with reused sum.counts', () => {
+  const src = c1_ejs_src();
+  assert.ok(
+    /renderLengthHint\(LEN_HINT_DESC_EL,\s*sum\.counts\.description,\s*READY_REC_MIN_DESCRIPTION_LEN,\s*READY_MAX_DESCRIPTION_LEN\)\s*;/.test(src),
+    'description length-hint MUST be fed via `renderLengthHint(LEN_HINT_DESC_EL, sum.counts.description, READY_REC_MIN_DESCRIPTION_LEN, READY_MAX_DESCRIPTION_LEN)`'
+  );
+  assert.ok(
+    /renderLengthHint\(LEN_HINT_SEARCH_DESC_EL,\s*sum\.counts\.searchDescription,\s*READY_REC_MIN_DESCRIPTION_LEN,\s*READY_MAX_DESCRIPTION_LEN\)\s*;/.test(src),
+    'searchDescription length-hint MUST be fed via `renderLengthHint(LEN_HINT_SEARCH_DESC_EL, sum.counts.searchDescription, ...)`'
+  );
+});
+
+check('250 admin index.ejs renderLengthHint() copy + empty-hidden + display-only; no blocking wording', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderLengthHint(');
+  // Empty (len 0) hides the node — no duplicate empty nag / no layout jump.
+  assert.ok(
+    /n === 0[\s\S]{0,120}el\.style\.display\s*=\s*'none'/.test(block),
+    'len 0 branch MUST hide the node via `display = "none"`'
+  );
+  // Three qualitative bands.
+  assert.ok(block.includes('超過建議上限'), 'over-max branch MUST describe `超過建議上限`');
+  assert.ok(block.includes('偏短'), 'below-min branch MUST describe `偏短`');
+  assert.ok(block.includes('長度適中'), 'in-range branch MUST describe `長度適中`');
+  // Warning band uses the same soft warning color as paintCounter over-limit.
+  assert.ok(block.includes("'#856404'"), 'over-max branch MUST use soft warning color `#856404`');
+  assert.ok(block.includes("'#155724'"), 'in-range branch MUST use green `#155724`');
+  // Display-only: writes only its own element (textContent + style; no innerHTML).
+  assert.ok(block.includes('el.textContent'), 'renderLengthHint MUST write to `el.textContent`');
+  assert.ok(!/\.innerHTML/.test(block), 'renderLengthHint MUST NOT use innerHTML');
+  // No side effects on other surfaces.
+  for (const forbidden of [
+    'READY_REGISTRY_EL', 'READY_BLOCKING_EL', 'READY_WARNINGS_EL', 'READY_SUMMARY_EL',
+    'CATEGORY_HINT_EL', 'TAGS_HINT_EL', 'CAT_EL', 'PRIM_EL', 'OUT_EL', 'recompute(',
+    'buildPostMarkdown', 'localStorage', 'sessionStorage', 'fetch(',
+  ]) {
+    assert.ok(!block.includes(forbidden), `renderLengthHint MUST NOT touch \`${forbidden}\` (display-only)`);
+  }
+  // No blocking / gating / error wording.
+  for (const forbidden of ['READY', 'PASS', 'BLOCKING', 'blocking', '必填', "'#a00'", "'#721c24'"]) {
+    assert.ok(!block.includes(forbidden), `renderLengthHint MUST NOT use blocking / error wording \`${forbidden}\``);
+  }
+});
+
+check('251 length hint is NOT a ready-gap warning + export contract unchanged for long description / searchDescription', () => {
+  const src = c1_ejs_src();
+  // The recommended-min MUST NOT be wired into the ready-gap analysis — the
+  // hint is qualitative-only, never a ready-preflight warning nor an export gate.
+  const gapBlock = c1_extract_fn(src, 'function analyzeReadyGap(');
+  assert.ok(
+    !gapBlock.includes('READY_REC_MIN_DESCRIPTION_LEN'),
+    'analyzeReadyGap MUST NOT reference READY_REC_MIN_DESCRIPTION_LEN (length hint is not a ready-gap warning)'
+  );
+  assert.ok(
+    !src.includes('searchDescriptionLength'),
+    'MUST NOT introduce a `searchDescriptionLength` ready-gap warning key'
+  );
+  // Export contract unchanged even when description / searchDescription exceed
+  // the recommended range.
+  const longText = 'x'.repeat(200);
+  for (const shape of [
+    { ...happy, description: longText },
+    { ...happy, searchDescription: longText },
+    { ...happy, description: 'short', searchDescription: 'short' },
+  ]) {
+    const parsed = matter(buildPostMarkdown(shape));
+    assert.equal(parsed.data.status, 'draft', 'status MUST stay "draft"');
+    assert.equal(parsed.data.draft, true, 'draft MUST stay true');
+  }
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);
