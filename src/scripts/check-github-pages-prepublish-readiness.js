@@ -38,8 +38,16 @@ import { spawnSync } from 'node:child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const SOURCE_ROOT = path.resolve(__dirname, '..', '..');
-const DEPLOY_CLONE = path.resolve(SOURCE_ROOT, '..', 'portable-blog-deploy');
+// Test-only env overrides for fixture-based smoke（僅本專案 smoke 使用；
+// 未設定時維持 real-repo 預設路徑，default behavior 不變）。
+const ENV_SOURCE = process.env.PB_PREPUBLISH_SOURCE_ROOT;
+const ENV_DEPLOY = process.env.PB_PREPUBLISH_DEPLOY_CLONE;
+const SOURCE_ROOT = ENV_SOURCE && ENV_SOURCE.length > 0
+  ? path.resolve(ENV_SOURCE)
+  : path.resolve(__dirname, '..', '..');
+const DEPLOY_CLONE = ENV_DEPLOY && ENV_DEPLOY.length > 0
+  ? path.resolve(ENV_DEPLOY)
+  : path.resolve(SOURCE_ROOT, '..', 'portable-blog-deploy');
 
 const SOURCE_BRANCH_EXPECTED = 'main';
 const SOURCE_REMOTE_REF = 'origin/main';
