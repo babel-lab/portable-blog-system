@@ -288,16 +288,11 @@ ADMIN dev-mode-only read-only dashboard ✅ landed（不進 prod build / 不 dep
 - K8 field auto-switch / auto-follow ✅ landed + dual-accepted
 - K9 multi-click determinism smoke ✅ browser-PASS（docs-only evidence）
 
-**Phase 1 Admin UI / Markdown draft export MVP（latest landed @ `a255689`，2026-06-30；smoke **157/157**；8-layer **100/100 milestone** + 後續加固詳見 archive §3 / §6）**：
+**Phase 1 Admin UI / Markdown draft export MVP** ✅ landed（latest `a255689`，2026-06-30；smoke 157/157；8-layer 100/100 milestone + #101–#257 加固鏈；逐刀 / 逐項 smoke / hardening 歷史 archived in `docs/20260628-claude-md-state-archive-docs-only-a.md` §1 / §3 / §6，本段不再展開）：
 
-- Route `/admin/#new-post-draft`（dev-mode-only；不進 prod build；不 deploy；noindex）
-- Markdown draft export panel：copy markdown / download `.md` / target folder+path / copy path / copy validation command
-- Manual import checklist + ready preflight panel
-- 早期 slice：SEO/cover draft fields、category/tag registry hints、draft output usability、browser smoke evidence（**caveat：source-level/static + helper-driven evidence only；非完整 browser-run smoke**）—— 逐刀 commit 見 archive §1
-- Manual import flow **8-layer regression net @ 100/100 smoke milestone**（#93–#100：markup → contract → button state → event hook → user-facing copy → status display × 2）+ 後續 #101–#126 持續加固（clipboard / empty-state / registry-hint / titleEn 三刀）；逐項 commit / 規則細節見 `docs/20260628-claude-md-state-archive-docs-only-a.md` §3 / §6
-- Export 維持 `status: "draft"` + `draft: true`（**無** ready option，**無** repo write path）
-- Guard `check:admin-markdown-export` **256/256 PASS**（含 #156–157 category registry-bound guard：鎖 category 仍為 `<select id="npd-category">`、helper 無 tags-style free-text 文案；**category 改 free-text/datalist 尚未批准**，須 user 明確同意 + 另開 phase）
-- Solo-admin / MD-file-based 模式：**無** DB、**無** login、**無** multi-user management
+- Route `/admin/#new-post-draft`（dev-only；不進 prod build；不 deploy；noindex）；export panel（copy markdown / download `.md` / target path / copy path / copy validation command）+ manual import checklist + ready preflight + SEO/cover draft fields + category/tag registry hints + titleEn 三刀 均已 landed
+- Export contract 維持 `status:"draft"` + `draft:true`（**無** ready option、**無** repo write path）；guard `check:admin-markdown-export` **256/256 PASS**（含 category registry-bound：`<select id="npd-category">` 鎖定；改 free-text/datalist 未批准，須另開 phase）
+- Solo-admin / MD-file-based：**無** DB / **無** login / **無** multi-user；smoke evidence 為 source-level/static + helper-driven（非完整 browser-run smoke）
 
 ADMIN stage checkpoint = ✅ **idle freeze**。後續 session **不主動推進**（完整 browser-run smoke〔**不引入 Playwright / devDep**；不自行啟動 dev server〕/ B1·B3·B4·B5 / Admin richer fields / ready option / R2–R5 / SEO Dry-run edit / filter chip / warning badge / per-post prescription / write path〔Apply / Save / auto-fix〕/ loader aggregation migration / validator `--report-json` 等；**各須獨立 phase + user explicit approval；不直接實作**）。
 
