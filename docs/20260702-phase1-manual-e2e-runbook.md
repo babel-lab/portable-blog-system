@@ -46,7 +46,7 @@ new-post-draft 目前支援的欄位：
 
 - 字數計數與 SEO 長度提示（description / searchDescription 建議 60–160）
 - slug 建議（copy-only，不會覆蓋你填的 slug）
-- **slug collision 提示**：若你的 slug 與目前 content 中既有文章重複，會出現 ⚠（這是 `validate:content` 之 `duplicate-slug` ERROR 的早期鏡像）
+- **slug collision 提示**：若你的 slug 與**載入當下 content 快照**中既有文章重複，會出現 ⚠。此為**較廣的早期提示**——Admin 快照含 `draft` 等所有狀態，而 `validate:content` 之 `duplicate-slug` **僅在 ready / published 之間判定**；因此此 hint 可能比 validator **較早 / 較廣**示警（例如撞到一篇仍是 `draft` 的文章），權威仍以 `validate:content` 為準
 - category / tag registry 對齊提示、目前 site 合法 category / tag 參考
 - Ready preflight panel：列出離「可轉 ready」還缺哪些 blocking / warning
 
@@ -75,13 +75,12 @@ content/{site}/posts/{date}-{slug}.md
 npm run validate:content
 ```
 
-此時你的新檔還是 `draft`，所以 **validator 不會實質驗證它**（會被當「未驗證」跳過）。這一步的意義是：
+此時你的新檔還是 `draft`，所以 **validator 不會實質驗證它**。事實上新 draft 會在**載入階段就被 loader 過濾掉**（`load-posts.js` 只收 `ready` / `published`），根本不進 validator，因此連 `duplicate-slug` 這類全集合檢查也掃不到它。這一步的意義是：
 
-- 確認你**沒有破壞**既有 ready / published 文章
-- 確認**沒有觸發全域錯誤**（例如與既有文章 `duplicate-slug`）
+- 確認你**沒有破壞**既有 `ready` / `published` 文章（此步驗的是既有語料 baseline，**不是**你的新 draft 本身）
 - 期望結果：0 error（warning 數量與既有 baseline 相符即可）
 
-> ⚠️ 不要因為「這步過了」就以為新文章已通過驗證——draft 根本沒被驗。真正的驗證在 Step 7。
+> ⚠️ 不要因為「這步過了」就以為新文章已通過驗證——draft 根本沒被載入、沒被驗。**包含 `duplicate-slug` 在內**的權威驗證，要等你在 Step 6 手動轉 `ready` 之後、於 Step 7 才會真正發生。
 
 ### Step 6 — 在 VS Code 手動轉 ready
 
