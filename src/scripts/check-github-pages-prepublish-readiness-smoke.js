@@ -20,6 +20,9 @@
 //   3. deploy-wrong-branch        → exit 1（deploy repo 在錯 branch）
 //   4. source-dirty               → exit 1（source repo 有 uncommitted change）
 //   5. missing-required-docs      → exit 1（source repo 缺 C1 checklist 或 snapshot doc）
+//   6. source-ahead-of-remote     → exit 1（local commit 未同步至 origin/main）
+//   7. source-index-lock-present  → exit 1（source .git/index.lock 存在）
+//   8. deploy-index-lock-present  → exit 1（deploy .git/index.lock 存在）
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, unlinkSync, existsSync } from 'node:fs';
@@ -227,6 +230,84 @@ try {
     assertExit('missing-required-docs', r, 1, (out) => ({
       ok: containsLine(out, '[FAIL] source: required doc present'),
       detail: containsLine(out, '[FAIL] source: required doc present') ? 'flagged missing docs' : 'no [FAIL] source: required doc present line',
+    }));
+  }
+
+  // Case 6: source ahead of origin/main
+  //   Build baseline source repo + pin origin/main to first commit, then add a
+  //   second commit locally so ahead/behind == 1/0. Docs are committed in the
+  //   *first* commit so origin/main already knows about them; HEAD advances
+  //   past origin/main.
+  {
+    const sourceRoot = path.join(smokeRoot, 'c6-source');
+    const deployClone = path.join(smokeRoot, 'c6-deploy');
+    buildRepo(sourceRoot, 'main');
+    writeRequiredDocs(sourceRoot);
+    git(sourceRoot, ['add', '-A']);
+    git(sourceRoot, ['commit', '-q', '-m', 'docs']);
+    // Pin origin/main here so the following extra commit becomes ahead=1
+    const baseHead = git(sourceRoot, ['rev-parse', 'HEAD']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', baseHead.stdout.trim()]);
+    // Extra local commit → ahead of origin/main
+    writeFileSync(path.join(sourceRoot, 'extra.txt'), 'ahead\n', 'utf-8');
+    git(sourceRoot, ['add', 'extra.txt']);
+    git(sourceRoot, ['commit', '-q', '-m', 'extra local commit']);
+    buildRepo(deployClone, 'gh-pages');
+    const r = runGuard(sourceRoot, deployClone);
+    assertExit('source-ahead-of-remote', r, 1, (out) => ({
+      ok:
+        containsLine(out, '[FAIL] source: HEAD == origin/main') ||
+        containsLine(out, '[FAIL] source: ahead/behind == 0/0'),
+      detail:
+        containsLine(out, '[FAIL] source: ahead/behind == 0/0')
+          ? 'flagged ahead/behind'
+          : containsLine(out, '[FAIL] source: HEAD == origin/main')
+            ? 'flagged HEAD divergence'
+            : 'no [FAIL] source: ahead/behind or HEAD line',
+    }));
+  }
+
+  // Case 7: source .git/index.lock present
+  {
+    const sourceRoot = path.join(smokeRoot, 'c7-source');
+    const deployClone = path.join(smokeRoot, 'c7-deploy');
+    buildRepo(sourceRoot, 'main');
+    writeRequiredDocs(sourceRoot);
+    git(sourceRoot, ['add', '-A']);
+    git(sourceRoot, ['commit', '-q', '-m', 'docs']);
+    const h = git(sourceRoot, ['rev-parse', 'HEAD']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', h.stdout.trim()]);
+    buildRepo(deployClone, 'gh-pages');
+    // Plant an index.lock in source
+    writeFileSync(path.join(sourceRoot, '.git', 'index.lock'), '', 'utf-8');
+    const r = runGuard(sourceRoot, deployClone);
+    assertExit('source-index-lock-present', r, 1, (out) => ({
+      ok: containsLine(out, '[FAIL] source: .git/index.lock absent'),
+      detail: containsLine(out, '[FAIL] source: .git/index.lock absent')
+        ? 'flagged source index.lock'
+        : 'no [FAIL] source: .git/index.lock line',
+    }));
+  }
+
+  // Case 8: deploy .git/index.lock present
+  {
+    const sourceRoot = path.join(smokeRoot, 'c8-source');
+    const deployClone = path.join(smokeRoot, 'c8-deploy');
+    buildRepo(sourceRoot, 'main');
+    writeRequiredDocs(sourceRoot);
+    git(sourceRoot, ['add', '-A']);
+    git(sourceRoot, ['commit', '-q', '-m', 'docs']);
+    const h = git(sourceRoot, ['rev-parse', 'HEAD']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', h.stdout.trim()]);
+    buildRepo(deployClone, 'gh-pages');
+    // Plant an index.lock in deploy
+    writeFileSync(path.join(deployClone, '.git', 'index.lock'), '', 'utf-8');
+    const r = runGuard(sourceRoot, deployClone);
+    assertExit('deploy-index-lock-present', r, 1, (out) => ({
+      ok: containsLine(out, '[FAIL] deploy: .git/index.lock absent'),
+      detail: containsLine(out, '[FAIL] deploy: .git/index.lock absent')
+        ? 'flagged deploy index.lock'
+        : 'no [FAIL] deploy: .git/index.lock line',
     }));
   }
 } finally {
