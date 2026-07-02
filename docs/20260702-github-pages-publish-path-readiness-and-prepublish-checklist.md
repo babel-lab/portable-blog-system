@@ -1,0 +1,209 @@
+# GitHub Pages Publish-Path Readiness & Pre-Publish Checklist（docs-only）
+
+**Phase**：`20260702-c1-github-pages-publish-path-readiness-and-prepublish-checklist-docs-only`
+**Date**：2026-07-02（新 Claude session，接續 Phase 1 Manual E2E PASS）
+**Type**：docs-only / read-only 整理。**不** build、**不** deploy、**不**碰 gh-pages、**不**碰 deploy clone、**不**進 Phase 2、**不**建立真實文章、**不**改 content / settings / src / CLAUDE.md。
+
+---
+
+## 1. Purpose / Scope
+
+把「一篇 GitHub post 從 repo（`content/github/posts/*.md`）走到 GitHub Pages LIVE」的**發布前路徑**整理成單一 readiness + checklist 文件，作為未來實際發布時的操作對照。
+
+**本文件明確不是**：
+
+- 不是正式 publish（不改任何文章 `status`）
+- 不是 deploy（不跑 build、不 push gh-pages）
+- 不是 Phase 2
+- 不是既有 runbook 的取代 —— 本文件為「當前狀態下的收斂入口 + pre-publish gate」，把散落的既有文件串成一條線。
+
+**權威來源文件（本文件只引用、不重寫其細節）**：
+
+| 文件 | 角色 |
+|---|---|
+| `docs/github-deploy.md`（F-01） | GitHub Pages 部署 runbook（方案 C = 同 repo + gh-pages 手動 copy；build / dist 產物表 / gh-pages 步驟 / 上線後驗證） |
+| `docs/publish-workflow.md` §3–§4 | 整體 build 順序（validate → build → build:sitemap） |
+| `docs/checklists/github-deploy-checklist.md` | 操作型勾選清單（上線後 functional / assets / mobile / console） |
+| `docs/20260701-github-draft-publish-readiness-checklist.md` | 單篇 draft → ready/published 的 metadata / SEO / 內容 gate |
+| `docs/20260701-github-draft-metadata-smoke.md` | frontmatter contract smoke（11 條斷言，direct-node） |
+| `docs/20260702-phase1-manual-e2e-runbook.md` | Phase 1 手動 E2E（Admin draft export → 手動落地 → 手動轉 ready）已 PASS 紀錄 |
+
+⚠️ **Deploy clone 邊界**：`/d/github/blog-new/portable-blog-deploy`（gh-pages）本輪**未讀取、未進入、未觸碰**；其當前 branch / commit / 乾淨度在本文件視為 **UNKNOWN，不猜測**（見 §7）。
+
+---
+
+## 2. Current known baseline（2026-07-02）
+
+| 項目 | 值 |
+|---|---|
+| source repo | `/d/github/blog-new/portable-blog-system` |
+| branch | `main` |
+| HEAD == origin/main | `5a85d7d`（`docs(state): record Dean manual Phase 1 E2E PASS`） |
+| ahead / behind | `0 / 0` |
+| working tree | clean |
+| `.git/index.lock` | absent |
+| Phase 1 Manual E2E Happy Path | ✅ PASS（Dean 手動，2026-07-02 15:47–16:12） |
+| `validate:content` baseline（draft 階段） | `0 error / 135 warning / 107 post` |
+| `validate:content`（ready 測試曾達） | `0 error / 137 warning / 108 post`（測試文章轉 ready 時；已刪回 baseline） |
+| 測試檔 `content/github/posts/2026-07-02-phase1-e2e-manual-test-1547.md` | 已刪除 / 未 commit / 不存在 |
+
+`content/github/posts/` 現況（非 fixture，read-only 盤點）：
+
+| status | 篇數 | 檔案 |
+|---|---|---|
+| `published` | 1 | `2026-07-01-github-pages-build-preview-workflow.md` |
+| `ready` | 3 | `20260504-github-pages-blog-planning.md` / `20260504-portable-blog-system-mvp.md` / `2026-06-30-what-is-design-token.md` |
+| `draft` | 1 | `2026-06-29-admin-ui-draft-generator-first-test.md` |
+
+（另有 `20260504-github-pages-blog-planning.fb.md` = FB sidecar，非文章本體。）
+
+> production expected warning = 1（`page-noindex-in-listings` @ `20260504-portable-blog-system-mvp.md`，intentional hold，非 blocker）；其餘 warnings 全來自 `content/validation-fixtures/`。
+
+---
+
+## 3. Status contract（發布狀態合約）
+
+| status | 意義 | 是否被 validator 正式檢查 | 是否為 build/publish 候選 |
+|---|---|---|---|
+| `draft`（`draft: true`） | 草稿 | 被過濾，不進正式輸出 | ❌ 否 |
+| `ready`（`draft: false`） | 定稿、可正式檢查 | ✅ 是（gate 較嚴） | ✅ 是 |
+| `published`（`draft: false`） | 已發布 | ✅ 是 | ✅（已上線內容） |
+| `archived` | 封存 | —— | 依設定不進列表 |
+
+**契約鐵則**：
+
+- **Admin UI（`/admin/#new-post-draft`）永遠只輸出 `status: "draft"` + `draft: true`**；無 ready option、無 repo write path。
+- `draft → ready → published` 的 flip **只能由 Dean 手動編輯 frontmatter**，Claude 不自動 flip。
+- flip 後 validator gate 較嚴，warning 數可能上升（如 baseline 135 → ready 137）；**只要 error 維持 0 即通過**。
+
+---
+
+## 4. Pre-publish checklist（單篇文章：draft/ready → 準備發布）
+
+> 逐篇對照；勾選項為人工 checklist，非自動化。細部 metadata gate 見 `docs/20260701-github-draft-publish-readiness-checklist.md`。
+
+**4.1 Frontmatter contract**
+
+- [ ] `site` / `primaryPlatform` = `github`
+- [ ] `contentKind` 為合法列舉（`post` / `tech-note` / `book-review` / `download` / `comic` / `life-note` / `page`）
+- [ ] `title` / `titleEn` / `slug` 皆非空；slug 無與現有文章碰撞
+- [ ] `date` / `updated` 合理
+- [ ] `publishTargets.github.enabled === true`；`publishTargets.blogger.enabled` 維持 `false`（除非另開 Blogger slice）
+
+**4.2 Category / Tags registry**
+
+- [ ] `category` 存在於 `content/settings/categories.json`，且該 entry `site[]` 含 `github`
+- [ ] `tags` 全存在於 `content/settings/tags.json`，且各 entry `site[]` 含 `github`；無紅線禁用 tag
+
+**4.3 Cover / SEO 欄位**
+
+- [ ] `description` 已填、非佔位；長度未過長（`long-description` soft warning 為參考）
+- [ ] `searchDescription` 已填（空不擋 ready，建議補）
+- [ ] `cover` / `coverAlt` 一致性：有 `cover` → `coverAlt` 需有意義描述；`cover` 空 → 建議 `coverAlt` 一併清空
+
+**4.4 內容完整性**
+
+- [ ] body 為正式正文，非 Admin export 預設 scaffold
+- [ ] body 內無第二個 `# ` 一級標題（frontmatter `title` 已是頁面 H1）
+
+**4.5 全站回歸（發布前 baseline 未回退）**
+
+- [ ] `npm run validate:content` → **0 error**（未新增 error 即通過；warning 上升可接受）
+- [ ] 無測試檔 / 暫存 `.md` 殘留於 `content/github/posts/`
+- [ ] `git status --short` clean（除本次刻意的 frontmatter flip 外無雜項）
+
+**4.6 發布決策 gate（Dean 手動）**
+
+- [ ] Dean 已確認這篇要 `ready` / `published`
+- [ ] Dean 已明確授權「是否真的進 build」
+- [ ] Dean 已明確授權「是否真的進 deploy（push gh-pages）」
+
+---
+
+## 5. Command checklist（future step only — 本輪一律不執行）
+
+> ⚠️ 以下所有指令皆為**未來實際發布時**的建議順序，**本輪全部不執行**。列出僅供對照。權威流程見 `docs/github-deploy.md` §4–§5 與 `docs/publish-workflow.md` §3。
+
+**5.1 發布前驗證（未來；read-mostly，validate 不寫檔）**
+
+```bash
+# 【本輪不執行】single-draft frontmatter contract smoke
+node src/scripts/check-github-draft-metadata.js      # 預期 11 / 0（斷言綁特定 draft，flip 後需同步調整）
+
+# 【本輪不執行】全站驗證 —— 只要有 error 就停止
+npm run validate:content                              # 必須 0 error
+```
+
+**5.2 build（未來；會寫 `dist/`）**
+
+```bash
+# 【本輪不執行】
+npm run build                # vite build + prebuild(build-github) + postbuild(build:sitemap)
+npm run build:sitemap        # ⚠️ 若單獨跑，必須在 build 之後（vite emptyOutDir 會清 dist）
+npm run preview              # 本機檢查 dist（不啟長駐 dev server；檢查後關閉）
+```
+
+`dist/` 產物齊全性對照見 `docs/github-deploy.md` §4 表。
+
+**5.3 deploy（未來；會碰 gh-pages / deploy clone）**
+
+```bash
+# 【本輪不執行 + 須 Dean explicit approval + deploy clone 狀態需先確認】
+# 詳細步驟見 docs/github-deploy.md §5.4（增量更新）：
+#   cd ../portable-blog-deploy → rm -rf ./* → cp -r ../portable-blog-system/dist/* . → touch .nojekyll
+#   → git add . → git commit -m "deploy: <hash> snapshot" → git push origin gh-pages
+```
+
+**5.4 上線後驗證（未來）**
+
+- 見 `docs/github-deploy.md` §7 + `docs/checklists/github-deploy-checklist.md`（functional / assets / mobile / console / SEO）。
+
+---
+
+## 6. Responsibility split（權責分工）
+
+| 動作 | 負責 |
+|---|---|
+| 決定哪篇文章 `ready` / `published` | **Dean 手動**（改 frontmatter） |
+| 是否允許 build | **Dean 明確授權** |
+| 是否允許 deploy（push gh-pages） | **Dean 明確授權** |
+| 碰 gh-pages / deploy clone | **Dean**（或經 Dean 授權後 Claude 依 runbook 執行） |
+| Blogger / Google / GA4 / AdSense / Search Console 後台 | **Dean 手動**（Claude 永不登入） |
+| checklist / readiness 整理 / diff review / docs-only 記錄 | **Claude** |
+| frontmatter contract smoke / validate 讀取（經授權時） | **Claude**（read/validate 層；不 flip status） |
+
+---
+
+## 7. Stop conditions（遇到即停止，不猜測）
+
+- 🛑 `validate:content` 出現任何 **error** → 停止，回報，不發布。
+- 🛑 working tree **不乾淨**（非預期的 dirty / 有殘留測試檔） → 停止，回報。
+- 🛑 Dean **未明確說 build** → 不 build。
+- 🛑 Dean **未明確說 deploy** → 不 deploy。
+- 🛑 **deploy clone 狀態未知** → 停止，不進入、不讀取、不猜測其 branch / commit / 乾淨度；需 Dean 指示後才處理。
+- 🛑 出現 `.git/index.lock` / baseline 不符 → 停止回報，不自行修正。
+
+---
+
+## 8. Next-step options（本輪不選、不啟動）
+
+- **A.** 只完成本 checklist 並 commit 此 docs（docs-only；可選 CLAUDE.md 極小 state sync，另議）。
+- **B.** 之後由 Dean 指定**一篇真實文章**進入 ready candidate → 走 §4 pre-publish checklist（單篇）。
+- **C.** 之後**另開 session** 做 read-only build readiness（檢查 build script / dist 產物路徑對照，仍不實際 deploy）。
+
+→ 三者互斥於「是否觸發 build/deploy」；A 為最保守，B 推進單篇完成度，C 為 build-path 前置稽核。**本輪僅產出本文件，等 Dean 確認 diff。**
+
+---
+
+## 9. 本 phase 邊界（self-check）
+
+- 唯一 file change：新增本檔 `docs/20260702-github-pages-publish-path-readiness-and-prepublish-checklist.md`
+- 未改 `src/` / `content/` / `content/settings/` / `CLAUDE.md` / `MEMORY.md` / `memory/`
+- 未碰 deploy clone / gh-pages / dist
+- 未跑 build / deploy / regression smoke；未啟動 dev server
+- 未改 Blogger / Google / GA4 / AdSense / Search Console
+- 未引入 Playwright / 新 devDependency；未進 Phase 2
+
+---
+
+（本文件結束）
