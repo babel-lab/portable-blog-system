@@ -153,6 +153,23 @@ npm run preview          # 本機預覽 build 結果（optional）
 
 ---
 
+## 6. Execution result / 實測結果（2026-07-02，Dean 手動）
+
+Dean 依本 runbook 手動跑完一次最小 E2E（Admin→content→validate→ready）：
+
+- 測試時間：2026-07-02 15:47–16:12
+- 測試檔（已刪除）：`content/github/posts/2026-07-02-phase1-e2e-manual-test-1547.md`
+- Admin 匯出：`status: "draft"` + `draft: true`（export contract 成立）
+- Step 5 draft 階段 `npm run validate:content`：**`0 error / 135 warning / 107 post`**（新 draft 未被 loader / validator 載入）
+- Step 6 手動轉 `status: "ready"` + `draft: false`
+- Step 7 ready 階段 `npm run validate:content`：**`0 error / 137 warning / 108 post`**（該篇正式納入驗證，hard gate `0 error` 維持）
+- dev preview 首頁 + Admin Posts 皆可見測試文章「Phase 1 E2E Manual Test 1547」
+- 測試後 Dean 已刪除測試檔，working tree 回 clean baseline；刪檔後 `npm run validate:content` 回到 **`0 error / 135 warning / 107 post`**
+
+判定：**Phase 1 Manual E2E Happy Path PASS**。全程為 Dean 手動；Admin 未自動寫入 repo，未觸碰 build / deploy / Blogger / GA4 / AdSense / Google 後台。
+
+---
+
 ## See also
 
 - `docs/20260524-blogger-github-publishing-runbook.md`（Blogger / GitHub 發布向 runbook；本 runbook 專注 Admin→content→validate→ready 上游流程）
