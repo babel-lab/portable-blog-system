@@ -206,4 +206,22 @@ npm run preview              # 本機檢查 dist（不啟長駐 dev server；檢
 
 ---
 
+## 10. Automated verification pointer
+
+Before any future GitHub Pages publish/deploy slice, run the read-only guard pair:
+
+```bash
+npm run check:github-pages-prepublish
+npm run check:github-pages-prepublish-smoke
+```
+
+Expected baseline:
+
+- `check:github-pages-prepublish` → `16/16 PASS`
+- `check:github-pages-prepublish-smoke` → `8/8 PASS`
+
+These checks are read-only. They do not build, deploy, publish, fetch, or pull. They only verify source/deploy repo baseline invariants (branch / HEAD / clean / ahead·behind / `.git/index.lock` absence / required docs present) and self-test the guard itself against seven failure fixtures.
+
+---
+
 （本文件結束）
