@@ -5786,5 +5786,154 @@ check('238 admin-markdown-export export contract unchanged: status:"draft" + dra
   assert.ok(!md0.includes('source: titleEn'), 'buildPostMarkdown MUST NOT emit `source:` field');
 });
 
+// Phase 20260702-admin-category-registry-inline-hint-slice-a:
+//   Mirror of the tags-only inline hint (slice-c1) for the category field.
+//   Adds a display-only inline hint node (`#npd-category-registry-hint`) below
+//   the category <select>, surfacing the category-only subset of the
+//   analyzeRegistryHints() result already computed in recompute(). #npd-category
+//   STAYS a registry-bound <select> (no free-text / datalist). Ready preflight
+//   aggregate (`#npd-ready-registry-hints`) + tags inline hint stay intact;
+//   export contract unchanged (status:"draft" + draft:true). These smokes pin:
+//   (a) node presence + relative order (after #npd-category, before #npd-tags),
+//   (b) renderCategoryRegistryHint() contract + recompute() wiring + category-only
+//   filter, (c) hint copy for unknown-category / category-site-mismatch,
+//   (d) empty / all-valid states carry no blocking wording, (e) #npd-category
+//   stays a <select> (no free-text / datalist), (f) no write path / network /
+//   credential added. Reuses c1_ejs_src() + c1_extract_fn() (generic helpers).
+check('239 admin index.ejs #npd-category-registry-hint node present', () => {
+  const src = c1_ejs_src();
+  const pos = src.indexOf('id="npd-category-registry-hint"');
+  assert.ok(pos > 0, 'index.ejs MUST contain the inline hint node `#npd-category-registry-hint`');
+  const tagOpen = src.lastIndexOf('<', pos);
+  const tagClose = src.indexOf('>', pos);
+  assert.ok(tagOpen > 0 && tagClose > pos, 'inline hint node MUST be a well-formed tag');
+  const openTag = src.slice(tagOpen, tagClose + 1);
+  assert.ok(/^<div\b/.test(openTag), 'inline hint node MUST be a <div> (display-only container)');
+  assert.ok(/aria-live="polite"/.test(openTag), 'inline hint node MUST carry `aria-live="polite"` for a11y updates');
+  assert.ok(/display:\s*none/.test(openTag), 'inline hint node MUST default to `display: none` (empty category → hidden; no layout jump)');
+});
+
+check('240 admin index.ejs #npd-category-registry-hint placed after #npd-category select, before #npd-tags input', () => {
+  const src = c1_ejs_src();
+  const catSelectPos = src.indexOf('<select id="npd-category"');
+  const hintPos = src.indexOf('id="npd-category-registry-hint"');
+  const tagsInputPos = src.indexOf('id="npd-tags"');
+  assert.ok(catSelectPos > 0, '#npd-category select MUST still exist');
+  assert.ok(hintPos > 0, '#npd-category-registry-hint node MUST exist');
+  assert.ok(tagsInputPos > 0, '#npd-tags input MUST still exist');
+  assert.ok(hintPos > catSelectPos, '#npd-category-registry-hint MUST appear AFTER #npd-category select');
+  assert.ok(hintPos < tagsInputPos, '#npd-category-registry-hint MUST appear BEFORE #npd-tags input');
+});
+
+check('241 admin index.ejs renderCategoryRegistryHint() function defined; CATEGORY_HINT_EL bound to #npd-category-registry-hint', () => {
+  const src = c1_ejs_src();
+  assert.ok(
+    src.includes("var CATEGORY_HINT_EL = document.getElementById('npd-category-registry-hint')"),
+    'CATEGORY_HINT_EL MUST be bound via `document.getElementById(\'npd-category-registry-hint\')`'
+  );
+  const block = c1_extract_fn(src, 'function renderCategoryRegistryHint(');
+  assert.ok(block.length > 0, 'renderCategoryRegistryHint block MUST be brace-balanced');
+});
+
+check('242 admin index.ejs renderCategoryRegistryHint() called from recompute() with the reused reg result', () => {
+  const src = c1_ejs_src();
+  // recompute() lifts analyzeRegistryHints() into a local var, so the category
+  // inline hint, the tags inline hint, and the Ready preflight aggregate share
+  // one computation.
+  assert.ok(
+    /var regHintsResult\s*=\s*analyzeRegistryHints\(input,\s*REGISTRY_SNAPSHOT\)\s*;/.test(src),
+    'recompute() MUST lift `analyzeRegistryHints(input, REGISTRY_SNAPSHOT)` into `regHintsResult` (single compute)'
+  );
+  assert.ok(
+    /renderTagsRegistryHint\(regHintsResult,\s*input\)\s*;/.test(src),
+    'tags inline hint MUST still be fed via `renderTagsRegistryHint(regHintsResult, input)` (unchanged surface)'
+  );
+  assert.ok(
+    /renderCategoryRegistryHint\(regHintsResult,\s*input\)\s*;/.test(src),
+    'category inline hint MUST be fed via `renderCategoryRegistryHint(regHintsResult, input)` from recompute()'
+  );
+});
+
+check('243 admin index.ejs renderCategoryRegistryHint() is category-only; never touches tags / other surfaces; #npd-category stays a <select>', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderCategoryRegistryHint(');
+  // Only category-family kinds are consumed; tag kinds are never referenced.
+  assert.ok(block.includes("'unknown-category'"), 'renderCategoryRegistryHint MUST consume `unknown-category` hints');
+  assert.ok(block.includes("'category-site-mismatch'"), 'renderCategoryRegistryHint MUST consume `category-site-mismatch` hints');
+  assert.ok(!block.includes("'unknown-tag'"), 'renderCategoryRegistryHint MUST NOT reference `unknown-tag` (category-only)');
+  assert.ok(!block.includes("'tag-site-mismatch'"), 'renderCategoryRegistryHint MUST NOT reference `tag-site-mismatch` (category-only)');
+  assert.ok(/h\.field\s*!==\s*'category'/.test(block), 'renderCategoryRegistryHint MUST filter hints by `field === "category"` (skip non-category hints)');
+  // MUST NOT reach into other surfaces / recompute the render is additive to.
+  for (const forbidden of [
+    'READY_REGISTRY_EL',
+    'READY_BLOCKING_EL',
+    'READY_WARNINGS_EL',
+    'READY_UNSUPPORTED_EL',
+    'READY_SUMMARY_EL',
+    'TAGS_HINT_EL',
+    'TAGS_DATALIST_EL',
+    'SITE_REGISTRY_REF_EL',
+    'CAT_EL',
+    'PRIM_EL',
+    'OUT_EL',
+    'recompute(',
+  ]) {
+    assert.ok(
+      !block.includes(forbidden),
+      `renderCategoryRegistryHint MUST NOT touch \`${forbidden}\` (display-only; no side effects on other surfaces)`
+    );
+  }
+  // Writes only to its own element (textContent + style; no innerHTML).
+  assert.ok(block.includes('CATEGORY_HINT_EL.textContent'), 'renderCategoryRegistryHint MUST write to `CATEGORY_HINT_EL.textContent`');
+  assert.ok(!/CATEGORY_HINT_EL\.innerHTML/.test(block), 'renderCategoryRegistryHint MUST NOT use innerHTML (avoid html injection surface)');
+  // #npd-category stays a registry-bound <select> (no free-text / datalist).
+  const catSelPos = src.indexOf('<select id="npd-category"');
+  assert.ok(catSelPos > 0, '#npd-category MUST remain a <select>');
+  const catTag = src.slice(src.lastIndexOf('<', catSelPos), src.indexOf('>', catSelPos) + 1);
+  assert.ok(/^<select\b/.test(catTag), '#npd-category MUST remain a <select> element');
+  assert.ok(!/list=/.test(catTag), '#npd-category MUST NOT gain a datalist binding (stays registry-bound select)');
+});
+
+check('244 admin index.ejs renderCategoryRegistryHint() copy covers unknown-category + site-mismatch; states carry no blocking wording', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderCategoryRegistryHint(');
+  // Empty-category path hides the node so no misleading empty label is emitted.
+  assert.ok(
+    /category === ''[\s\S]{0,120}CATEGORY_HINT_EL\.style\.display\s*=\s*'none'/.test(block),
+    'empty-category branch MUST hide the node via `display = "none"` (no layout jump; no misleading label)'
+  );
+  // Unknown-category copy phrase.
+  assert.ok(block.includes('未在 categories.json'), 'renderCategoryRegistryHint MUST include `未在 categories.json` copy for unknown category');
+  // Site-mismatch copy phrase.
+  assert.ok(block.includes('site mismatch'), 'renderCategoryRegistryHint MUST include `site mismatch` copy for cross-site category');
+  assert.ok(block.includes('允許 site='), 'site-mismatch copy MUST show `允許 site=[...]`');
+  assert.ok(block.includes('目前 site='), 'site-mismatch copy MUST show `目前 site=` (current selected site)');
+  // All-valid branch: describes registry alignment, not export gating.
+  assert.ok(block.includes('在 categories.json 且符合目前 site'), 'all-valid branch MUST describe registry alignment (在 categories.json 且符合目前 site)');
+  assert.ok(block.includes("'⚠ '"), 'unknown / mismatch branch MUST prefix with ⚠ (warning glyph, not error)');
+  assert.ok(block.includes("'#1f4e79'"), 'unknown / mismatch branch MUST use non-red color `#1f4e79` (never red / error)');
+  // Blocking / gating wording MUST NOT appear anywhere in the render.
+  for (const forbidden of ['READY', 'PASS', 'BLOCKING', 'blocking', 'PASSED', 'READY!', 'ready 通過', '已就緒']) {
+    assert.ok(
+      !block.includes(forbidden),
+      `renderCategoryRegistryHint MUST NOT use blocking / gating wording \`${forbidden}\` (describes registry alignment only)`
+    );
+  }
+  // No red error color inside the render.
+  assert.ok(!block.includes("'#a00'"), 'renderCategoryRegistryHint MUST NOT use error red `#a00`');
+  assert.ok(!block.includes("'#721c24'"), 'renderCategoryRegistryHint MUST NOT use blocking dark red `#721c24`');
+});
+
+check('245 admin index.ejs renderCategoryRegistryHint() adds no fetch / XHR / WebSocket / credential / write path', () => {
+  const src = c1_ejs_src();
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(|navigator\s*\.\s*sendBeacon/;
+  const credential = /client_secret|access_token|refresh_token|private_key|Authorization\s*:|\bBearer\s+[A-Za-z0-9._-]/;
+  const writePath = /\b(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream)\s*\(|\b(localStorage|sessionStorage|indexedDB)\b/;
+  const block = c1_extract_fn(src, 'function renderCategoryRegistryHint(');
+  assert.ok(!transport.test(block), 'renderCategoryRegistryHint MUST carry no network transport primitive');
+  assert.ok(!credential.test(block), 'renderCategoryRegistryHint MUST embed no service credential');
+  assert.ok(!writePath.test(block), 'renderCategoryRegistryHint MUST introduce no write path (fs write / web storage)');
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

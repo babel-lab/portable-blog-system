@@ -1961,6 +1961,20 @@
               <% }); %>
             </select>
             <span class="text-muted" style="font-size: 0.82em;">→ 來源 <code>categories.json</code>；依目前 <code>site</code> 只列出該 site 合法的 category（github 目前為 <code>tech-note</code>），切換 site 會重建並自動選該 site 第一個可用 category；draft export 不擋，Ready preflight 仍會顯示 <code>unknown-category</code> / <code>category-site-mismatch</code> warning（與 tags 一致）</span>
+            <%# Phase 20260702-admin-category-registry-inline-hint-slice-a:
+                Inline registry hint below the category <select> — mirrors the
+                category-only subset of analyzeRegistryHints(input, REGISTRY_SNAPSHOT)
+                so the author sees unknown-category / category-site-mismatch feedback
+                right by the field, not only in the Ready preflight aggregate.
+                DISPLAY-ONLY: does NOT gate export (契約仍 status:"draft" + draft:true),
+                does NOT change #npd-ready-registry-hints (Ready preflight aggregate
+                still lists the full hint set — no dedupe), does NOT touch the tags
+                inline hint / #npd-category options / Slice B reference block, and
+                does NOT turn the registry-bound #npd-category <select> into free
+                text. Empty category → hidden via display:none (no layout jump).
+                No READY / PASS wording — describes registry alignment only. -%>
+            <div id="npd-category-registry-hint" aria-live="polite"
+                 style="display: none; margin-top: 0.2rem; font-size: 0.78em;"></div>
           </td>
         </tr>
         <tr>
@@ -4336,6 +4350,11 @@
         var regHintsResult = analyzeRegistryHints(input, REGISTRY_SNAPSHOT);
         renderRegistryHints(regHintsResult);
         renderTagsRegistryHint(regHintsResult, input);
+        // Phase 20260702-admin-category-registry-inline-hint-slice-a:
+        //   Category-only inline hint reuses the same regHintsResult (no double
+        //   compute; no new registry source). Additive to renderTagsRegistryHint;
+        //   never touches the Ready preflight aggregate surface.
+        renderCategoryRegistryHint(regHintsResult, input);
         // Phase 20260627-admin-draft-markdown-output-usability-slice-a:
         //   At-a-glance summary strip + per-field char counters. Mirrors
         //   admin-markdown-export.js buildExportSummary (smoke 76-86).
@@ -4699,6 +4718,64 @@
         TAGS_HINT_EL.style.display = '';
         TAGS_HINT_EL.style.color = '#1f4e79';
         TAGS_HINT_EL.textContent = '⚠ ' + parts.join('；');
+      }
+
+      // Phase 20260702-admin-category-registry-inline-hint-slice-a:
+      //   Inline mirror of the category-only subset of analyzeRegistryHints()
+      //   into #npd-category-registry-hint below the category <select>. Reuses
+      //   the reg object already computed by recompute() (no double compute; no
+      //   new registry source). Read-only display: never mutates buildMarkdown
+      //   output (status stays draft), never touches #npd-ready-registry-hints
+      //   (Ready preflight aggregate stays intact — no dedupe), never touches the
+      //   tags inline hint / #npd-category options / Slice B reference block.
+      //   Empty category → hidden (no layout jump). No READY / PASS wording —
+      //   describes registry alignment only. The category value arrives via the
+      //   passed-in input (collected from the <select>), so this render reads no
+      //   DOM control directly. Site / #npd-category listeners are the pre-existing
+      //   recompute() wiring; no new listener registered here.
+      var CATEGORY_HINT_EL = document.getElementById('npd-category-registry-hint');
+      function renderCategoryRegistryHint(rh, input) {
+        if (!CATEGORY_HINT_EL) return;
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var category = String(safeInput.category == null ? '' : safeInput.category).replace(/^\s+|\s+$/g, '');
+        if (category === '') {
+          CATEGORY_HINT_EL.style.display = 'none';
+          CATEGORY_HINT_EL.textContent = '';
+          return;
+        }
+        var regCats = Array.isArray(REGISTRY_SNAPSHOT.categories) ? REGISTRY_SNAPSHOT.categories : [];
+        if (regCats.length === 0) {
+          CATEGORY_HINT_EL.style.display = '';
+          CATEGORY_HINT_EL.style.color = '#666';
+          CATEGORY_HINT_EL.textContent = '（registry 為空，跳過對齊檢查）';
+          return;
+        }
+        var hints = (rh && Array.isArray(rh.hints)) ? rh.hints : [];
+        var unknown = null;
+        var mismatch = null;
+        for (var i = 0; i < hints.length; i++) {
+          var h = hints[i];
+          if (!h || h.field !== 'category') continue;
+          if (h.kind === 'unknown-category') unknown = h;
+          else if (h.kind === 'category-site-mismatch') mismatch = h;
+        }
+        if (!unknown && !mismatch) {
+          CATEGORY_HINT_EL.style.display = '';
+          CATEGORY_HINT_EL.style.color = '#155724';
+          CATEGORY_HINT_EL.textContent = '✓ category "' + category + '" 在 categories.json 且符合目前 site';
+          return;
+        }
+        var parts = [];
+        if (unknown) {
+          parts.push('未在 categories.json：' + unknown.value);
+        }
+        if (mismatch) {
+          var allowed = Array.isArray(mismatch.siteAllowed) ? mismatch.siteAllowed.join(',') : '';
+          parts.push('site mismatch：' + mismatch.value + '（允許 site=[' + allowed + ']，目前 site=' + mismatch.siteCurrent + '）');
+        }
+        CATEGORY_HINT_EL.style.display = '';
+        CATEGORY_HINT_EL.style.color = '#1f4e79';
+        CATEGORY_HINT_EL.textContent = '⚠ ' + parts.join('；');
       }
 
       // Phase 20260701-admin-slug-suggestion-helper-slice-a:
