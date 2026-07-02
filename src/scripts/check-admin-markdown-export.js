@@ -6059,5 +6059,140 @@ check('251 length hint is NOT a ready-gap warning + export contract unchanged fo
   }
 });
 
+// Phase 20260702-admin-slug-collision-hint-slice-c1:
+//   Adds a display-only slug collision early-warning below the slug field
+//   (#npd-slug-collision-hint). Injects a render-time snapshot
+//   (window.NPD_EXISTING_SLUGS) of admin-loaded real posts (loader globs ONLY
+//   content/{github,blogger}/posts/*.md → validation-fixtures / templates
+//   excluded by construction). renderSlugCollisionHint() shows a non-blocking ⚠
+//   ONLY on a global slug match (mirrors validate-content.js duplicate-slug,
+//   cross-site); empty / invalid / no-collision → hidden (no green ✓). It is an
+//   EARLY MIRROR of the existing validator ERROR — not a new rule, not the
+//   authority. Display-only: writes its own textContent (no innerHTML), never
+//   writes SLUG_EL, never gates export (status:"draft" + draft:true), no write
+//   path. These smokes pin: (a) injection shape + read-only, (b) node presence +
+//   placement, (c) function contract + recompute wiring, (d) collision logic +
+//   copy + no-noise hidden states + global match, (e) display-only side effects,
+//   (f) export contract + slug-suggestion copy-only not regressed.
+check('252 admin index.ejs injects window.NPD_EXISTING_SLUGS from admin-loaded posts (read-only; fixtures/templates excluded by loader glob)', () => {
+  const src = c1_ejs_src();
+  const pos = src.indexOf('window.NPD_EXISTING_SLUGS =');
+  assert.ok(pos > 0, 'index.ejs MUST inject `window.NPD_EXISTING_SLUGS`');
+  const block = src.slice(pos, pos + 500);
+  assert.ok(block.includes('JSON.stringify'), 'snapshot MUST be JSON.stringify-serialized (no inline JS escaping concern)');
+  assert.ok(/Array\.isArray\(posts\)\s*\?\s*posts/.test(block), 'snapshot MUST source from the admin loader `posts` array');
+  assert.ok(block.includes('.filter(') && block.includes(".trim()"), 'snapshot MUST filter to non-empty trimmed slugs');
+  assert.ok(block.includes('p.slug') && block.includes('p.sourceSite') && block.includes('p.status'), 'snapshot entries MUST carry slug / site (sourceSite) / status');
+  // Read-only: no fetch / no new scan / no fixture or template path referenced.
+  assert.ok(!/\bfetch\s*\(|XMLHttpRequest|fast-glob|readdir/.test(block), 'snapshot injection MUST NOT fetch / rescan the filesystem');
+  assert.ok(!/validation-fixtures|templates/.test(block), 'snapshot injection MUST NOT reference validation-fixtures / templates (loader glob already excludes them)');
+});
+
+check('253 admin index.ejs #npd-slug-collision-hint node present + placed after slug field', () => {
+  const src = c1_ejs_src();
+  const pos = src.indexOf('id="npd-slug-collision-hint"');
+  assert.ok(pos > 0, 'index.ejs MUST contain `#npd-slug-collision-hint`');
+  const openTag = src.slice(src.lastIndexOf('<', pos), src.indexOf('>', pos) + 1);
+  assert.ok(/^<div\b/.test(openTag), 'collision hint MUST be a <div> (display-only container)');
+  assert.ok(/aria-live="polite"/.test(openTag), 'collision hint MUST carry `aria-live="polite"`');
+  assert.ok(/display:\s*none/.test(openTag), 'collision hint MUST default to `display: none` (hidden until a real collision)');
+  // Placement: after the slug input + the slug-suggestion strip, before tags.
+  const slugInputPos = src.indexOf('id="npd-slug"');
+  const suggestPos = src.indexOf('id="npd-slug-suggestion"');
+  const tagsPos = src.indexOf('id="npd-tags"');
+  assert.ok(slugInputPos > 0 && pos > slugInputPos, 'collision hint MUST appear AFTER #npd-slug input');
+  assert.ok(suggestPos > 0 && pos > suggestPos, 'collision hint MUST appear AFTER the slug-suggestion strip');
+  assert.ok(tagsPos > 0 && pos < tagsPos, 'collision hint MUST appear before the tags field');
+});
+
+check('254 admin index.ejs renderSlugCollisionHint() defined + bound + wired from recompute after renderSlugSuggestion', () => {
+  const src = c1_ejs_src();
+  assert.ok(
+    src.includes("var SLUG_COLLISION_EL = document.getElementById('npd-slug-collision-hint')"),
+    'SLUG_COLLISION_EL MUST be bound to #npd-slug-collision-hint'
+  );
+  assert.ok(
+    /var EXISTING_SLUGS = Array\.isArray\(window\.NPD_EXISTING_SLUGS\)\s*\?\s*window\.NPD_EXISTING_SLUGS\s*:\s*\[\]/.test(src),
+    'EXISTING_SLUGS MUST read window.NPD_EXISTING_SLUGS with array fallback'
+  );
+  const block = c1_extract_fn(src, 'function renderSlugCollisionHint(');
+  assert.ok(block.length > 0, 'renderSlugCollisionHint block MUST be brace-balanced');
+  // Wired in recompute, immediately after the slug suggestion render.
+  assert.ok(
+    /renderSlugSuggestion\(input\);[\s\S]{0,400}renderSlugCollisionHint\(input\);/.test(src),
+    'renderSlugCollisionHint(input) MUST be called from recompute() after renderSlugSuggestion(input)'
+  );
+});
+
+check('255 admin index.ejs renderSlugCollisionHint() collision logic + copy + no-noise hidden states + global match', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderSlugCollisionHint(');
+  // Empty / invalid slug → hidden (guarded by SLUG_RE).
+  assert.ok(
+    /slug === ''\s*\|\|\s*!SLUG_RE\.test\(slug\)[\s\S]{0,120}display\s*=\s*'none'/.test(block),
+    'empty / invalid slug MUST hide the hint via display = "none"'
+  );
+  // No-collision → hidden (no green ✓, no UI noise).
+  assert.ok(
+    /hits\.length === 0[\s\S]{0,120}display\s*=\s*'none'/.test(block),
+    'no-collision (hits 0) MUST hide the hint via display = "none"'
+  );
+  assert.ok(!block.includes("'#155724'"), 'collision hint MUST NOT emit a green ✓ state (#155724) — hidden when no collision');
+  assert.ok(!block.includes('✓'), 'collision hint MUST NOT emit a ✓ glyph (only a ⚠ on real collision)');
+  // Collision → ⚠ warning + soft warning color.
+  assert.ok(block.includes("'⚠"), 'collision branch MUST prefix with ⚠');
+  assert.ok(block.includes("'#856404'"), 'collision branch MUST use soft warning color `#856404` (never red / error)');
+  assert.ok(!block.includes("'#a00'") && !block.includes("'#721c24'"), 'collision hint MUST NOT use error red');
+  // Global match (mirrors validate-content.js duplicate-slug): match on slug only,
+  // NOT filtered by the current form's site.
+  assert.ok(block.includes('e.slug === slug'), 'match MUST compare on slug equality');
+  assert.ok(!/\.site\s*===/.test(block), 'match MUST NOT gate on site equality (global slug, cross-site)');
+  // Copy: snapshot framing + validate:content authority + duplicate-slug link.
+  assert.ok(block.includes('載入當下'), 'copy MUST frame this as a point-in-time content snapshot（載入當下）');
+  assert.ok(block.includes('duplicate-slug'), 'copy MUST reference the validator duplicate-slug ERROR it mirrors');
+  assert.ok(block.includes('validate'), 'copy MUST note validate:content stays the authority');
+});
+
+check('256 admin index.ejs renderSlugCollisionHint() is display-only; no side effects / no write path', () => {
+  const src = c1_ejs_src();
+  const block = c1_extract_fn(src, 'function renderSlugCollisionHint(');
+  assert.ok(block.includes('SLUG_COLLISION_EL.textContent'), 'MUST write to `SLUG_COLLISION_EL.textContent`');
+  assert.ok(!/SLUG_COLLISION_EL\.innerHTML/.test(block), 'MUST NOT use innerHTML');
+  for (const forbidden of [
+    'SLUG_EL', 'OUT_EL', 'SLUG_SUGGEST_EL', 'SLUG_SUGGEST_TEXT_EL', 'COPY_SLUG_SUGGEST_BTN',
+    'READY_REGISTRY_EL', 'CATEGORY_HINT_EL', 'TAGS_HINT_EL', 'PRIM_EL', 'CAT_EL',
+    'recompute(', 'buildPostMarkdown', 'buildMarkdown',
+  ]) {
+    assert.ok(!block.includes(forbidden), `renderSlugCollisionHint MUST NOT touch \`${forbidden}\` (display-only)`);
+  }
+  const transport = /\b(fetch|XMLHttpRequest|axios|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(/;
+  const writePath = /\b(writeFileSync|writeFile|appendFile|createWriteStream)\s*\(|\b(localStorage|sessionStorage|indexedDB)\b/;
+  assert.ok(!transport.test(block), 'MUST carry no network transport primitive');
+  assert.ok(!writePath.test(block), 'MUST introduce no write path (fs write / web storage)');
+});
+
+check('257 slug collision hint does NOT change export contract / slug-suggestion copy-only behavior', () => {
+  const src = c1_ejs_src();
+  // Slug suggestion helpers + copy-only contract intact.
+  assert.ok(src.includes('function renderSlugSuggestion('), 'renderSlugSuggestion MUST remain');
+  assert.ok(src.includes('function suggestSlugFromTitle('), 'suggestSlugFromTitle MUST remain');
+  assert.ok(src.includes('id="npd-copy-slug-suggest"'), 'slug-suggestion Copy button MUST remain');
+  assert.ok(!src.includes('id="npd-apply-slug"'), 'MUST NOT introduce a slug Apply button');
+  // Export contract unchanged even when the slug collides with an existing post.
+  const collidingSlug = 'we-media-myself2';
+  for (const shape of [
+    { ...happy, slug: collidingSlug },
+    { ...happy, slug: 'github-pages-blog-planning' },
+  ]) {
+    const parsed = matter(buildPostMarkdown(shape));
+    assert.equal(parsed.data.status, 'draft', 'status MUST stay "draft"');
+    assert.equal(parsed.data.draft, true, 'draft MUST stay true');
+  }
+  // Server export helper carries no slug-collision / snapshot logic (client-only feature).
+  const exportSrc = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'admin-markdown-export.js'), 'utf8');
+  assert.ok(!exportSrc.includes('NPD_EXISTING_SLUGS'), 'admin-markdown-export.js MUST NOT reference the client snapshot');
+  assert.ok(!exportSrc.includes('duplicate-slug'), 'admin-markdown-export.js MUST NOT gain duplicate-slug logic');
+});
+
 console.log(`\n${passed} / ${passed + failed} PASS${failed ? ` (${failed} FAIL)` : ''}`);
 process.exit(failed === 0 ? 0 : 1);

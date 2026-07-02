@@ -1923,6 +1923,18 @@
                       title="複製建議 slug（不會覆蓋現有 slug 欄位）">Copy suggested slug</button>
               <span id="npd-slug-suggest-status" style="margin-left: 0.4rem; font-size: 0.82em;" aria-live="polite"></span>
             </div>
+            <%# Phase 20260702-admin-slug-collision-hint-slice-c1:
+                Display-only slug collision early-warning below the slug field.
+                Shows a non-blocking ⚠ ONLY when the current slug matches an
+                existing slug in the render-time snapshot of admin-loaded real
+                posts (validation-fixtures / templates excluded by the loader
+                glob). Global match across sites — mirrors validate-content.js
+                duplicate-slug. Empty / invalid / no-collision → hidden (no green
+                ✓, no UI noise). Snapshot is point-in-time; validate:content stays
+                the authority. Writes only its own textContent (no innerHTML);
+                never writes SLUG_EL; never gates export. -%>
+            <div id="npd-slug-collision-hint" aria-live="polite"
+                 style="display: none; margin-top: 0.2rem; font-size: 0.8em;"></div>
           </td>
         </tr>
         <tr>
@@ -3626,6 +3638,18 @@
       return { categories: cats, tags: tags };
     })();
   </script>
+  <%# Phase 20260702-admin-slug-collision-hint-slice-c1:
+      Inject an existing-slug snapshot for the display-only slug collision hint.
+      DATA SOURCE = admin loader `posts` (loader globs ONLY
+      content/{github,blogger}/posts/*.md — validation-fixtures / templates /
+      placeholders are excluded by construction). Read-only / serialized once on
+      render; no fetch / no refresh / no write path. Snapshot is point-in-time;
+      validate-content.js duplicate-slug remains ground truth. -%>
+  <script>
+    window.NPD_EXISTING_SLUGS = <%- JSON.stringify((Array.isArray(posts) ? posts : [])
+      .filter(function (p) { return p && typeof p.slug === 'string' && p.slug.trim() !== ''; })
+      .map(function (p) { return { slug: p.slug.trim(), site: typeof p.sourceSite === 'string' ? p.sourceSite : '', status: typeof p.status === 'string' ? p.status : '' }; })) %>;
+  </script>
   <script>
     (function () {
       var SITE_EL = document.getElementById('npd-site');
@@ -3691,6 +3715,45 @@
       var REGISTRY_SNAPSHOT = (window.NPD_REGISTRY && typeof window.NPD_REGISTRY === 'object')
         ? window.NPD_REGISTRY
         : { categories: [], tags: [] };
+      // Phase 20260702-admin-slug-collision-hint-slice-c1:
+      //   Display-only slug collision early-warning. EXISTING_SLUGS = injected
+      //   point-in-time snapshot of admin-loaded real posts (fixtures / templates
+      //   excluded by the loader glob). renderSlugCollisionHint() shows a
+      //   non-blocking ⚠ ONLY when the current slug matches an existing slug
+      //   (global match across sites — mirrors validate-content.js duplicate-slug).
+      //   Empty / invalid / no-collision → hidden (no green ✓, no UI noise).
+      //   Writes only its own textContent (no innerHTML); never writes SLUG_EL;
+      //   never gates export; validate:content stays the authority.
+      var SLUG_COLLISION_EL = document.getElementById('npd-slug-collision-hint');
+      var EXISTING_SLUGS = Array.isArray(window.NPD_EXISTING_SLUGS) ? window.NPD_EXISTING_SLUGS : [];
+      function renderSlugCollisionHint(input) {
+        if (!SLUG_COLLISION_EL) return;
+        var safeInput = input && typeof input === 'object' ? input : {};
+        var slug = String(safeInput.slug == null ? '' : safeInput.slug).replace(/^\s+|\s+$/g, '');
+        if (slug === '' || !SLUG_RE.test(slug)) {
+          SLUG_COLLISION_EL.style.display = 'none';
+          SLUG_COLLISION_EL.textContent = '';
+          return;
+        }
+        var hits = [];
+        for (var i = 0; i < EXISTING_SLUGS.length; i++) {
+          var e = EXISTING_SLUGS[i];
+          if (e && typeof e.slug === 'string' && e.slug === slug) hits.push(e);
+        }
+        if (hits.length === 0) {
+          SLUG_COLLISION_EL.style.display = 'none';
+          SLUG_COLLISION_EL.textContent = '';
+          return;
+        }
+        var where = hits.map(function (h) {
+          var site = (h && h.site) ? h.site : '?';
+          var st = (h && h.status) ? ('，status: ' + h.status) : '';
+          return site + st;
+        }).join('；');
+        SLUG_COLLISION_EL.style.display = '';
+        SLUG_COLLISION_EL.style.color = '#856404';
+        SLUG_COLLISION_EL.textContent = '⚠ slug「' + slug + '」已存在於載入當下的 content 快照（' + where + '）；存檔後會觸發 validate:content 的 duplicate-slug ERROR。此為快照提示，validate:content 仍為權威。';
+      }
       // Phase 20260627-admin-draft-markdown-output-usability-slice-a:
       //   Draft summary strip + per-field char counter elements. Mirror of
       //   admin-markdown-export.js buildExportSummary (smoke 76-86).
@@ -4427,6 +4490,11 @@
         //   Copy-only; never auto-fills SLUG_EL.value; never influences the
         //   markdown export path.
         renderSlugSuggestion(input);
+        // Phase 20260702-admin-slug-collision-hint-slice-c1:
+        //   Display-only slug collision early-warning (below the suggestion
+        //   strip). Reads the injected existing-slug snapshot; never writes
+        //   SLUG_EL / gates export / mutates the suggestion strip.
+        renderSlugCollisionHint(input);
       }
 
       function fallbackCopy() {
