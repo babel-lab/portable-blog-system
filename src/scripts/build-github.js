@@ -569,11 +569,16 @@ async function main() {
   const startedAt = new Date();
   const outputs = [];
 
-  // Phase Admin-1-b：每次 run 都清除 .cache/pages/admin/ 殘留；dev-mode 之後會 re-create
-  //   - 防止 prod build 因 stale .cache 而把 admin/index.html 帶進 dist/
-  //   - 即使 vite emptyOutDir 清 dist，.cache 不被清，故需 build-github.js 主動處理
-  const adminCacheDir = path.join(PAGES_DIR, 'admin');
-  await fs.rm(adminCacheDir, { recursive: true, force: true }).catch(() => {});
+  // Phase 20260703-c1-g1：每次 run 先整個清除 .cache/pages（generated output）再由後續寫入重建。
+  //   - Root cause（C1-G0）：vite.config.js 以 glob `**/*.html` 掃 .cache/pages 當 rollup input；
+  //     build-github 過去只增量寫入、不清舊檔，故 draft / quarantined / deleted post 的 stale
+  //     .cache/pages/posts/<slug>/ 會殘留，被 vite emptyOutDir rebuild 時複製進 dist/ 成 orphan URL。
+  //   - 即使 vite emptyOutDir 清 dist，.cache 不被清，故需 build-github.js 主動清 PAGES_DIR。
+  //   - PAGES_DIR 下全部內容皆由本 run 重新產生（posts / categories / tags / design-system /
+  //     admin(dev) / _assets / index / 404），故整個清除安全；一併涵蓋原 admin-only 清除
+  //     （Phase Admin-1-b）與 categories / tags 之同類 stale slug 目錄。DATA_DIR（.cache/data）
+  //     為 PAGES_DIR 之 sibling，不受影響。
+  await fs.rm(PAGES_DIR, { recursive: true, force: true }).catch(() => {});
 
   const settings = await loadSettings();
   // Phase 8-f-2-b：plumbing — settings 經 loadPosts 轉發至 processMarkdownEntry / normalizePostOutput

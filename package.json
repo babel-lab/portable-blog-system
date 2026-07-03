@@ -40,6 +40,7 @@
     "check:admin-markdown-export": "node src/scripts/check-admin-markdown-export.js",
     "check:github-pages-prepublish": "node src/scripts/check-github-pages-prepublish-readiness.js",
     "check:github-pages-prepublish-smoke": "node src/scripts/check-github-pages-prepublish-readiness-smoke.js",
+    "check:github-build-cache-hygiene": "node src/scripts/check-github-build-cache-hygiene.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
