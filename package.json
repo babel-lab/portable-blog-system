@@ -42,6 +42,7 @@
     "check:github-pages-prepublish-smoke": "node src/scripts/check-github-pages-prepublish-readiness-smoke.js",
     "check:github-build-cache-hygiene": "node src/scripts/check-github-build-cache-hygiene.js",
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
+    "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
