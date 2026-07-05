@@ -83,6 +83,7 @@ first deploy（C1 line，deploy commit `1170e7e`，live `https://babel-lab.githu
 - **1 個：** `admin-ui-draft-generator-first-test`
   - 需：status draft→ready（Dean 決定是否對外）、補 `tags`、（建議）補 `cover`、內容對外性確認。
   - 之後才進 `check:github-pages-prepublish` + build + online 驗收。
+  - **See also（2026-07-05 cross-link）**：`docs/20260705-admin-ui-draft-generator-first-test-readiness-note.md`（20260705-C 新增之 decision note only；已把此篇 medium candidate 之 readiness / blockers / Dean questions 集中登錄；該 note 未動 content / frontmatter，未 flip `status`/`draft`/`publishTargets`，未 build / preview / deploy；亦校正本節「`tags:` 目前為空」之描述——實測 `tags` 已填 `[github, vite, static-site]`，不再是 blocker。仍為 Dean-gated medium candidate）。
 
 ### blocked / 暫不 deploy 的候選
 - `github-pages-blog-planning`：C1 刻意 quarantine，online 404 by design。解除須 Dean explicit un-hold + prepublish 重跑。
