@@ -44,6 +44,7 @@
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:content-type-metadata": "node src/scripts/check-content-type-metadata.js",
+    "check:adsense-mode-metadata": "node src/scripts/check-adsense-mode-metadata.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
