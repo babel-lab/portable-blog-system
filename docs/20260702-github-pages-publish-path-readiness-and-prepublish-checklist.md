@@ -224,4 +224,43 @@ These checks are read-only. They do not build, deploy, publish, fetch, or pull. 
 
 ---
 
+## 11. contentType guard 現況與決策（docs-only decision note，2026-07-06）
+
+**本節為 docs-only decision note，不是本次實作 aggregate registration**。以下記錄 `check:content-type-metadata` 與 `check:github-pages-prepublish` aggregate 的當前關係，供未來評估切片對照。
+
+### 11.1 現況
+
+- `check:content-type-metadata` 已是**獨立 npm script**（`node src/scripts/check-content-type-metadata.js`），report-only / warning-only / 一律 exit 0；掃 `content/{github,blogger}/{posts,pages}/**/*.md`（排除 `*.fb.md` sidecar）。
+- 本 session（2026-07-06）production scan 實測結果：**scanned 17 / legacy(no `contentType`) 17 / valid 0 / warnings 0，exit 0**。
+- `check:npm-script-targets` live baseline 已包含 `check:content-type-metadata`，本 session 實測 **39/39 PASS**（涵蓋所有 `node src/scripts/*.js` 目標存在性）。
+
+### 11.2 決策
+
+**暫時不把 `check:content-type-metadata` 併入 `check:github-pages-prepublish` aggregate**。
+
+理由：
+
+- `check:github-pages-prepublish` live baseline 目前為 **16/16 PASS**（8 條 source-repo + 2 條 required-doc + 6 條 deploy-clone），語意為 git-state + 必要 doc 存在性守門。
+- `check:github-pages-prepublish-smoke` Case 1（happy-path）以 **hard-coded 字串比對** `total=16  pass=16  fail=0` 鎖 exit-code / output-contract；任何往 aggregate 加項都會直接讓 smoke Case 1 FAIL，除非同步 patch smoke 期望值。
+- 併入 aggregate 會**同時牽動 prepublish baseline 與 smoke baseline**，屬 code + smoke 雙位移；當前 production content 尚無 `contentType` 使用，實益 = 0。
+- 在正式內容尚未導入 `contentType` 前，獨立 npm script + `check:npm-script-targets` 存在性覆蓋已足夠。
+- `check:content-type-metadata` 為 report-only（exit 0），與 prepublish 的 fail-fast（任一 FAIL → exit 1）語意不同；併入會 dilute prepublish 的 fail-fast contract 或靜默吃掉 contentType warning，兩者皆非期望。
+
+### 11.3 未來切片觸發條件
+
+以下任一情況發生時，另開切片重新評估是否納入 aggregate：
+
+- 正式 production content 開始新增 `contentType` frontmatter（valid > 0 或 warning > 0），且需要在 pre-publish 時強制擋下不合法值。
+- 引入 campaign page / landing page 內容線，`contentType` 成為 build / render / SEO 決策依據。
+- `check:content-type-metadata` 語意由 report-only 升級為 fail-fast（例：對特定值域強制 gate）。
+
+未來若納入 aggregate，同一切片須：
+- refactor `check-content-type-metadata.js` 對外暴露 result records（現行為 `main() → exit 0`）
+- 同步 patch `check-github-pages-prepublish-readiness-smoke.js` Case 1 的 `total=16  pass=16  fail=0` 期望值
+- 於 CLAUDE.md §Validation baseline 同步 baseline 位移
+
+**本輪不做以上任何一項**。
+
+---
+
 （本文件結束）
