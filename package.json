@@ -48,6 +48,7 @@
     "check:campaign-purpose-metadata": "node src/scripts/check-campaign-purpose-metadata.js",
     "check:campaign-industry-metadata": "node src/scripts/check-campaign-industry-metadata.js",
     "check:custom-promo-metadata": "node src/scripts/check-custom-promo-metadata.js",
+    "check:metadata-guards": "npm run check:content-type-metadata && npm run check:adsense-mode-metadata && npm run check:campaign-purpose-metadata && npm run check:campaign-industry-metadata && npm run check:custom-promo-metadata",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
