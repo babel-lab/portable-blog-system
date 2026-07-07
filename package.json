@@ -47,6 +47,7 @@
     "check:adsense-mode-metadata": "node src/scripts/check-adsense-mode-metadata.js",
     "check:campaign-purpose-metadata": "node src/scripts/check-campaign-purpose-metadata.js",
     "check:campaign-industry-metadata": "node src/scripts/check-campaign-industry-metadata.js",
+    "check:custom-promo-metadata": "node src/scripts/check-custom-promo-metadata.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
