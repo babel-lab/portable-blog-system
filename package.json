@@ -50,6 +50,7 @@
     "check:custom-promo-metadata": "node src/scripts/check-custom-promo-metadata.js",
     "check:campaign-metadata-cross-field": "node src/scripts/check-campaign-metadata-cross-field.js",
     "check:custom-promo-cross-field": "node src/scripts/check-custom-promo-cross-field.js",
+    "check:adsense-cross-field": "node src/scripts/check-adsense-cross-field.js",
     "check:metadata-guards": "npm run check:content-type-metadata && npm run check:adsense-mode-metadata && npm run check:campaign-purpose-metadata && npm run check:campaign-industry-metadata && npm run check:custom-promo-metadata",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
