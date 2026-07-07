@@ -55,6 +55,7 @@
     "check:metadata-cross-fields": "npm run check:campaign-metadata-cross-field && npm run check:custom-promo-cross-field && npm run check:adsense-cross-field",
     "check:metadata-all": "npm run check:metadata-guards && npm run check:metadata-cross-fields",
     "check:release-readiness": "npm run check:github-pages-prepublish && npm run check:github-pages-prepublish-smoke && npm run check:metadata-all && npm run validate:content",
+    "check:release-readiness-contract": "node src/scripts/check-release-readiness-contract.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js"
   },
