@@ -20,6 +20,8 @@
 //   3. script 包含四個必要片段（prepublish / prepublish-smoke / metadata-all / validate:content）。
 //   4. script 不含任何危險 token（build / deploy / gh-pages / push / publish / dist /
 //      portable-blog-deploy）。
+//   5. script 包含五個 ordered fragments（contract → prepublish → prepublish-smoke →
+//      metadata-all → validate:content），且 indexOf 嚴格遞增。
 //
 // 注意：check:github-pages-prepublish{,-smoke} 名稱含 "prepublish"，其中的 "publish" 屬合法
 //       子字串，不得被誤判為危險的 "publish"。危險 "publish" 偵測以 negative lookbehind
@@ -37,6 +39,18 @@ const PKG = path.join(REPO_ROOT, 'package.json');
 const SCRIPT_NAME = 'check:release-readiness';
 
 const REQUIRED_FRAGMENTS = [
+  'npm run check:github-pages-prepublish',
+  'npm run check:github-pages-prepublish-smoke',
+  'npm run check:metadata-all',
+  'npm run validate:content',
+];
+
+// Ordered fragments：check:release-readiness 契約要求 contract guard 先跑
+// （避免其他子檢查在 contract 未通過前浪費時間），最後才跑重量級 validate:content。
+// 使用 indexOf 嚴格遞增判斷。若某 fragment missing，其 indexOf = -1 會使 order check fail；
+// 為避免與 REQUIRED_FRAGMENTS missing 檢查重複噪音，本檢查以單一 aggregate case 呈現。
+const ORDERED_FRAGMENTS = [
+  'npm run check:release-readiness-contract',
   'npm run check:github-pages-prepublish',
   'npm run check:github-pages-prepublish-smoke',
   'npm run check:metadata-all',
@@ -108,6 +122,28 @@ for (const token of FORBIDDEN_TOKENS) {
   record(`forbidden token absent: "${label}"`, !present, present ? `found "${label}"` : '');
 }
 
+// 5. ordered fragments：indexOf 嚴格遞增
+let orderedHit = 0;
+let lastIdx = -1;
+const orderProblems = [];
+for (const frag of ORDERED_FRAGMENTS) {
+  const idx = value.indexOf(frag);
+  if (idx > lastIdx) {
+    orderedHit += 1;
+    lastIdx = idx;
+  } else if (idx < 0) {
+    orderProblems.push(`"${frag}" missing`);
+  } else {
+    orderProblems.push(`"${frag}" out of order (idx ${idx} ≤ prev ${lastIdx})`);
+  }
+}
+const orderOk = orderProblems.length === 0;
+record(
+  `ordered fragments in expected sequence (${orderedHit}/${ORDERED_FRAGMENTS.length})`,
+  orderOk,
+  orderOk ? '' : orderProblems.join('; '),
+);
+
 const passed = cases.filter((c) => c.ok).length;
 const total = cases.length;
 
@@ -115,6 +151,7 @@ console.log('');
 console.log('release-readiness contract summary:');
 console.log(`  script "${SCRIPT_NAME}" present: ${scriptExists ? 'yes' : 'no'}`);
 console.log(`  required fragments: ${requiredHit}/${REQUIRED_FRAGMENTS.length}`);
+console.log(`  ordered fragments: ${orderedHit}/${ORDERED_FRAGMENTS.length}`);
 console.log(`  forbidden tokens found: ${forbiddenHit}/${FORBIDDEN_TOKENS.length} checked`);
 console.log('');
 console.log(`release-readiness contract guard: ${passed}/${total} ${passed === total ? 'PASS' : 'FAIL'}`);
