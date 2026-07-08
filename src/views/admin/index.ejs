@@ -180,6 +180,23 @@
   .settings-files { columns: 2 12rem; column-gap: 1.25rem; font-size: 0.85em; margin: 0; padding-left: 1.1rem; }
   .settings-files li { break-inside: avoid; }
   .settings-files code { background: #f3f4f6; padding: 0 3px; border-radius: 2px; }
+  /* Phase 20260708-admin-blogger-export-output-paths: per-post output access helper
+     - read-only path + clipboard helper only; ADMIN 不讀 dist-blogger、不開檔、不寫 repo、不 build/deploy
+     - flex-first（§9.4）；reuse .surface-card / .mono / .badge / .payload-copy-btn 視覺 token */
+  .be-notice { background: #fff4cc; border: 1px solid #f0d264; border-radius: 4px; padding: 0.55rem 0.75rem; margin: 0.5rem 0 0.75rem; font-size: 0.83em; color: #5a4900; line-height: 1.55; }
+  .be-notice strong { color: #856404; }
+  .be-global-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; font-size: 0.85em; }
+  .be-global-bar code { background: #f3f4f6; padding: 1px 5px; border-radius: 2px; }
+  .be-post-list { display: flex; flex-direction: column; gap: 0.6rem; }
+  .be-post-card { background: #fafbfc; border: 1px solid #e1e4e8; border-radius: 4px; padding: 0.6rem 0.75rem; }
+  .be-post-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.5rem; margin-bottom: 0.4rem; }
+  .be-post-title { font-weight: 600; font-size: 0.92em; color: #1f2d3d; }
+  .be-path-rows { display: flex; flex-direction: column; gap: 0.25rem; }
+  .be-path-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+  .be-path-label { flex: 0 0 8.5rem; color: #57606a; font-size: 0.8em; font-weight: 600; }
+  .be-path-row .mono { flex: 1 1 18rem; min-width: 12rem; }
+  .be-disabled-reason { font-size: 0.82em; color: #a06a00; font-style: italic; }
+  .be-copy-status { font-size: 0.78em; color: #555; margin-left: 0.4rem; }
   /* Phase 20260701-admin-slug-suggestion-helper-slice-a + 20260702 disabled-visual-slice:
      Copy suggested slug button visual states. Mirrors .payload-copy-btn:disabled
      (opacity 0.5 + not-allowed cursor); hover only lights up when enabled so
@@ -2917,13 +2934,142 @@
         <p class="surface-note">產出皆 git-ignored。重貼仍須手動 + theme CSS gate + 備份。</p>
       </div>
     </div>
-    <p style="margin: 0.5rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 未實作：</p>
+
+    <%# Phase 20260708-admin-blogger-export-output-paths：per-post output access helper
+        - 資料來源 = 既有 posts（publishTargets.blogger.enabled + slug + status）；不新增 fetch / loader
+        - 只提供 dist 路徑字串 + clipboard copy；ADMIN 不讀 dist-blogger、不開檔、不 build、不 deploy、不寫 repo
+        - 按鈕文案一律 "Copy …"，不用 "Open" / "一鍵打開"（避免誤導成真的開檔）
+        - 缺 slug → 該篇不組 dist 路徑，顯示明確 disabled reason -%>
+    <h3 style="margin: 0.75rem 0 0.35rem; font-size: 0.98em; color: #1f2d3d;">Per-post output access <span class="section-tag tag-readonly">read-only</span></h3>
+    <div class="be-notice">
+      <strong>ADMIN 不會產生 <code>dist-blogger</code>。</strong>
+      本區只提供路徑與 clipboard helper，<strong>不讀檔、不開檔、不 build、不寫 repo</strong>。使用方式：
+      <br>1. 先在 terminal 跑 <code>npm run build:blogger</code>（本頁下方按鈕可複製此指令）。
+      <br>2. 再依每篇列出的路徑，到 <code>dist-blogger/posts/&lt;slug&gt;/</code> 手動開檔複製貼到 Blogger 後台。
+    </div>
+    <div class="be-global-bar">
+      <button type="button" class="payload-copy-btn" data-blogger-copy data-copy-text="npm run build:blogger" data-copy-done="Copy build command">Copy build command</button>
+      <span class="mono">npm run build:blogger</span>
+      <span class="be-copy-status" data-be-global-status aria-live="polite"></span>
+    </div>
+    <%
+      var bloggerEnabledPosts = (Array.isArray(posts) ? posts : []).filter(function (p) {
+        return p && p.blogger && p.blogger.enabled === true;
+      });
+    %>
+    <% if (bloggerEnabledPosts.length === 0) { %>
+      <p class="empty">目前沒有 <code>publishTargets.blogger.enabled: true</code> 的文章。</p>
+    <% } else { %>
+      <p class="surface-note" style="margin: 0 0 0.5rem;">共 <%= bloggerEnabledPosts.length %> 篇 blogger-enabled 文章。路徑皆為 repo 相對路徑（build 後才會實際存在）。</p>
+      <div class="be-post-list">
+        <% bloggerEnabledPosts.forEach(function (p) { %>
+          <%
+            var beSlug = typeof p.slug === 'string' ? p.slug : '';
+            var beMode = (p.blogger && p.blogger.mode) ? p.blogger.mode : '(未設定 mode)';
+            var beStatus = p.status ? p.status : '(no status)';
+            var beFolder = 'dist-blogger/posts/' + beSlug + '/';
+            var bePaths = [
+              { label: 'output folder', path: beFolder, btn: 'Copy output folder' },
+              { label: 'post.html', path: beFolder + 'post.html', btn: 'Copy post.html path' },
+              { label: 'copy-helper.txt', path: beFolder + 'copy-helper.txt', btn: 'Copy copy-helper path' },
+              { label: 'publish-checklist.txt', path: beFolder + 'publish-checklist.txt', btn: 'Copy checklist path' },
+              { label: 'meta.json', path: beFolder + 'meta.json', btn: 'Copy meta path' }
+            ];
+          %>
+          <div class="be-post-card">
+            <div class="be-post-head">
+              <span class="be-post-title"><%= p.title || '(no title)' %></span>
+              <span class="badge b-tag">slug: <%= beSlug || '—' %></span>
+              <span class="badge b-info">mode: <%= beMode %></span>
+              <span class="badge <%= beStatus === 'published' ? 'b-published' : (beStatus === 'ready' ? 'b-ready' : (beStatus === 'draft' ? 'b-draft' : 'b-info')) %>">status: <%= beStatus %></span>
+            </div>
+            <% if (!beSlug) { %>
+              <p class="be-disabled-reason">⚠ 此篇缺 <code>slug</code>，無法組出 <code>dist-blogger</code> 路徑；請先於 frontmatter 補 <code>slug</code> 後再 build。</p>
+            <% } else { %>
+              <div class="be-path-rows">
+                <% bePaths.forEach(function (row) { %>
+                  <div class="be-path-row">
+                    <span class="be-path-label"><%= row.label %></span>
+                    <code class="mono"><%= row.path %></code>
+                    <button type="button" class="payload-copy-btn" data-blogger-copy data-copy-text="<%= row.path %>" data-copy-done="<%= row.btn %>"><%= row.btn %></button>
+                  </div>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+
+    <p style="margin: 0.75rem 0 0; font-weight: 600; font-size: 0.88em;">⏳ 未實作：</p>
     <ul class="planned-list">
-      <li>per-post copy-helper / publish-checklist 一鍵打開（目前需手動到 <code>dist-blogger/posts/&lt;slug&gt;/copy-helper.txt</code>）</li>
+      <li>per-post copy-helper / publish-checklist 真正開啟本機檔（本區僅提供路徑字串 + clipboard copy，不讀 <code>dist-blogger</code>、不開檔）</li>
       <li>Blogger 後台 published URL 一鍵回填 UI（須開 admin write 路徑；目前 dormant）</li>
       <li>per-post repost readiness flag（live-verified / pending repost / never reposted）</li>
       <li>per-post AdSense 是否實際渲染（已有 guard 但未集成至 ADMIN per-post detail）</li>
     </ul>
+
+    <%# Phase 20260708-admin-blogger-export-output-paths：clipboard helper（clipboard-only）
+        - navigator.clipboard.writeText 優先；不可用時 fallback off-DOM transient textarea + execCommand('copy')
+        - 無 fetch / XHR / form submit / fs write / middleware ping；複製字串不構成任何寫入或核准 -%>
+    <script>
+      (function () {
+        var btns = document.querySelectorAll('[data-blogger-copy]');
+        if (!btns.length) return;
+        var globalStatus = document.querySelector('[data-be-global-status]');
+
+        function fallbackCopy(text) {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', 'readonly');
+          ta.style.position = 'fixed';
+          ta.style.top = '-1000px';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          document.body.removeChild(ta);
+          return ok;
+        }
+
+        function flash(btn, msg, isErr) {
+          var doneLabel = btn.getAttribute('data-copy-done') || btn.textContent;
+          btn.textContent = msg;
+          if (globalStatus) {
+            globalStatus.textContent = isErr ? '複製失敗' : '已複製 (Copied)';
+            globalStatus.style.color = isErr ? '#a00' : '#080';
+          }
+          setTimeout(function () {
+            btn.textContent = doneLabel;
+            if (globalStatus && !isErr) globalStatus.textContent = '';
+          }, 1500);
+        }
+
+        function copyText(btn, text) {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(text).then(function () {
+              flash(btn, '已複製 ✓', false);
+            }).catch(function () {
+              var ok = fallbackCopy(text);
+              flash(btn, ok ? '已複製 ✓' : '複製失敗', !ok);
+            });
+          } else {
+            var ok = fallbackCopy(text);
+            flash(btn, ok ? '已複製 ✓' : '複製失敗', !ok);
+          }
+        }
+
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].addEventListener('click', function () {
+            var text = this.getAttribute('data-copy-text') || '';
+            if (!text) { flash(this, '無內容', true); return; }
+            copyText(this, text);
+          });
+        }
+      })();
+    </script>
   </section>
 
   <%# === GitHub Pages（read-only） === -%>
