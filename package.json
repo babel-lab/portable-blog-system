@@ -47,6 +47,7 @@
     "check:blogger-backfill:wp02-intake-contract": "node src/scripts/check-blogger-backfill-wp02-intake-contract.js",
     "check:blogger-backfill:one-post-worksheet-contract": "node src/scripts/check-blogger-backfill-one-post-worksheet-contract.js",
     "check:blogger-backfill:wp02-one-post-consistency-contract": "node src/scripts/check-blogger-backfill-wp02-one-post-consistency-contract.js",
+    "check:blogger-backfill:write-rehearsal-template-contract": "node src/scripts/check-blogger-backfill-write-rehearsal-template-contract.js",
     "check:content-type-metadata": "node src/scripts/check-content-type-metadata.js",
     "check:adsense-mode-metadata": "node src/scripts/check-adsense-mode-metadata.js",
     "check:campaign-purpose-metadata": "node src/scripts/check-campaign-purpose-metadata.js",
