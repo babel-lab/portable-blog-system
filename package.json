@@ -44,6 +44,7 @@
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-backfill:one-post": "node src/scripts/check-blogger-backfill-one-post.js",
+    "check:blogger-backfill:wp02-intake-contract": "node src/scripts/check-blogger-backfill-wp02-intake-contract.js",
     "check:content-type-metadata": "node src/scripts/check-content-type-metadata.js",
     "check:adsense-mode-metadata": "node src/scripts/check-adsense-mode-metadata.js",
     "check:campaign-purpose-metadata": "node src/scripts/check-campaign-purpose-metadata.js",
