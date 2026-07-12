@@ -49,13 +49,15 @@ const PKG = path.join(REPO_ROOT, 'package.json');
 
 const SCRIPT_NAME = 'check:metadata-all';
 
-// 四個必要子檢查片段；順序 = contract 先跑，再跑 metadata umbrella 與 cross-field，
-// 最後跑 download indexing cross-resolver invariant。
+// 五個必要子檢查片段；順序 = contract 先跑，再跑 metadata umbrella 與 cross-field，
+// 再跑 download indexing pure cross-resolver invariant，最後跑 download indexing
+// end-to-end generated-output contract（Phase 20260712 §十 umbrella integration）。
 const REQUIRED_FRAGMENTS = [
   'npm run check:metadata-all-contract',
   'npm run check:metadata-guards',
   'npm run check:metadata-cross-fields',
   'npm run check:download-indexing-independence',
+  'npm run check:download-indexing-generated-output',
 ];
 
 const ORDERED_FRAGMENTS = [
@@ -63,6 +65,7 @@ const ORDERED_FRAGMENTS = [
   'npm run check:metadata-guards',
   'npm run check:metadata-cross-fields',
   'npm run check:download-indexing-independence',
+  'npm run check:download-indexing-generated-output',
 ];
 
 // 危險 token：每項可為 plain 子字串或 { label, re }（regex）。
