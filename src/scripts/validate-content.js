@@ -2206,6 +2206,44 @@ export function validateContent({ posts, settings }) {
       });
     }
 
+    // Phase 20260712-byline-boolean-hardening ERROR：byline / byline.showAuthor 型別 hard validation
+    //   - per docs/20260712-shared-author-byline-contract.md §2.3 / §2.4：byline 為 optional；若出現則必須為
+    //     plain object，且若 showAuthor 出現則必須為 YAML boolean（true / false）。禁止 truthy/falsy coercion。
+    //   - 對任何 status 都檢查（結構性錯誤與 status 無關；mirror invalid-status 之處理）。
+    //   - byline 缺 → 合法（backward-compat；per §2.4；既有 17 篇 production 皆命中此分支 → 0 error）。
+    //   - byline.showAuthor 缺 → 合法（byline 可為未來擴充欄位保留 shell）。
+    //   - byline.showAuthor 為 null / undefined / string / number / array / object → ERROR。
+    //     - YAML `showAuthor:`（空值）parse 為 null；`hasOwnProperty` 為 true → typeof null === 'object' → 命中 error 分支。
+    const byline = post.byline;
+    if (byline !== undefined) {
+      if (byline === null || typeof byline !== 'object' || Array.isArray(byline)) {
+        issues.push({
+          severity: 'error',
+          type: 'byline-invalid-type',
+          sourcePath,
+          value: byline === null ? 'null' : Array.isArray(byline) ? 'array' : typeof byline,
+        });
+      } else if (
+        Object.prototype.hasOwnProperty.call(byline, 'showAuthor') &&
+        typeof byline.showAuthor !== 'boolean'
+      ) {
+        const v = byline.showAuthor;
+        issues.push({
+          severity: 'error',
+          type: 'byline-show-author-invalid-type',
+          sourcePath,
+          value:
+            v === null
+              ? 'null'
+              : Array.isArray(v)
+                ? 'array'
+                : typeof v === 'string'
+                  ? `string "${v}"`
+                  : typeof v,
+        });
+      }
+    }
+
     // Phase 5-g-3 ERROR + Phase 5-g-4 WARNING
     // 只對 ready / published 觸發；draft / archived 視為作者編輯中或已封存，不警
     if (typeof status === 'string' && READY_STATUS.has(status)) {

@@ -1,51 +1,45 @@
 #!/usr/bin/env node
 // Phase 20260712-shared-author-byline-contract：byline schema + renderer decision 契約 guard
-//   （report-only / warning-only / standalone；不動 validate-content.js / build / package
-//    以外之現有 scripts；不接進 validate:content / phase1-readiness / release-readiness umbrella）。
+//   （standalone；不接進 validate:content / phase1-readiness / release-readiness umbrella）。
 //
-// 背景 / 決策來源：
-//   - docs/20260712-shared-author-byline-contract.md（Blogger / GitHub Pages 共用同一份 `author`；
-//     `byline.showAuthor` 只控制視覺；omitted → 預設顯示；meta.json / JSON-LD 一律保留 author）
-//   - CLAUDE.md §Red lines（作者不因發布平台改變；不新增 `bloggerAuthor` / `githubAuthor` /
-//     `showOnBlogger` / `showOnGithub`；Blogger 主題不會額外顯示 Google 帳號作者）
+// 2026-07-12 boolean-hardening：新增 Layer 3 直接跑 validateContent()（validate-content.js 已於
+//   本 phase 加入 ERROR 規則 `byline-invalid-type` / `byline-show-author-invalid-type`）以證明
+//   非 boolean 之 byline.showAuthor 會被 validator hard-fail，而非僅在 renderer / metadata 層以
+//   warning 或 fallback 帶過。
 //
-// 為何獨立 script（而非改 validate-content.js）：
-//   - validate-content.js 是 build-coupled 中央 validator；改它會位移 documented baseline
-//     （0 error / 135 warning / 107 post）。standalone report-only = 零 baseline blast radius，
-//     mirrors check-content-type-metadata / check-adsense-mode-metadata / check-blogger-backfill
-//     既有 pattern。
-//   - 本 guard 不接 build / render / listing / sitemap / Blogger / GitHub Pages / Admin
-//     消費路徑；純 metadata 層 warning。
-//
-// 兩層契約：
+// 三層契約：
 //   Layer 1（renderer decision contract；in-memory cases A–E）：
-//     鎖 EJS 判斷式 `!(post.byline && post.byline.showAuthor === false)` 之語意。
-//     Case A（backward-compat）：byline 缺 → 顯示。
-//     Case B（新文章預設方向）：`byline.showAuthor: true` → 顯示。
-//     Case C（隱藏 opt-in）：`byline.showAuthor: false` → 隱藏。
-//     Case D（外部投稿）：byline.showAuthor: true + 非 Babel 作者 → 顯示原作者名。
-//     Case E（invalid type；string "false"）：**不**靜默轉 boolean，renderer 視為
-//       顯示（因為 `=== false` strict 比較不通過）；guard 另在 Layer 2 對其發 warning。
-//     這些 case 一旦失敗 = renderer 契約已被無意間改動 → exit 非 0（contract failure）。
+//     鎖 EJS 判斷式 `!(post.byline && post.byline.showAuthor === false)` 之語意（strict `=== false`）。
+//     Case A（backward-compat / byline omitted）：顯示。
+//     Case B（byline.showAuthor: true）：顯示。
+//     Case C（byline.showAuthor: false）：隱藏。
+//     Case D（外部投稿 + true）：顯示原作者名。
+//     Case E（string "false"）：renderer 不靜默 coerce → 仍顯示（但於 Layer 3 被 validator hard-fail）。
+//     任一 FAIL → exit 1。
 //
 //   Layer 2（frontmatter schema surface scan；warning-only）：
 //     掃 content/{github,blogger}/{posts,pages}/**/*.md，若 byline 出現：
 //       - byline 非 plain object → warning（byline-invalid-type）
 //       - byline.showAuthor 存在且非 boolean → warning（byline-showAuthor-invalid-type）
 //     缺 byline 或 byline.showAuthor 是 boolean → 靜默通過。
-//     所有 warning 只印出；exit code 由 Layer 1 決定；Layer 2 從不影響 exit。
+//     現有 production content 0 篇有 byline → 0 warning（此層作為未來新內容之報告器）。
 //
-// 掃描範圍（mirror check-content-type-metadata §3.B）：
-//   content/github/posts/**/*.md
-//   content/blogger/posts/**/*.md
-//   content/github/pages/**/*.md
-//   content/blogger/pages/**/*.md
-//   排除 *.fb.md sidecar。不掃 deploy clone、不掃 validation-fixtures、不掃 templates
-//   （templates 已於本 phase 落預設 byline，掃了不會 warning 但也不需要掃）。
+//   Layer 3（validator hard-fail proof；in-memory validateContent() invocation）：
+//     直接 import validateContent 並跑 synthetic minimal posts，驗證下列必須是 ERROR：
+//       - Case D（string "false"）→ byline-show-author-invalid-type
+//       - Case E（number 0）→ byline-show-author-invalid-type
+//       - Case F（null / YAML `showAuthor:`）→ byline-show-author-invalid-type
+//       - Case G（byline 為 string）→ byline-invalid-type
+//     以及必須 NOT 觸發下列（backward-compat）：
+//       - byline omitted
+//       - byline.showAuthor: true
+//       - byline.showAuthor: false
+//     任一 case 期望不符 → exit 1（validator 契約已破損）。
 //
 // 執行：node src/scripts/check-byline-contract.js
-//   - Layer 1 全 PASS + Layer 2 純 warning → exit 0。
-//   - Layer 1 有任一 FAIL → exit 1（renderer 契約破損；務必回頭修）。
+//   - Layer 1 全 PASS + Layer 2 純 warning + Layer 3 全 PASS → exit 0。
+//   - Layer 1 / Layer 3 任一 FAIL → exit 1。
+//   - Layer 2 從不影響 exit。
 //   - I/O 錯誤 → node 預設拋非 0。
 
 import path from 'node:path';
@@ -53,13 +47,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import fg from 'fast-glob';
 import matter from 'gray-matter';
+import { validateContent } from './validate-content.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
-// Renderer decision（mirror `!(post.byline && post.byline.showAuthor === false)`）。
-// 純函式，rendererShouldShowAuthor 內只做 `=== false` strict 比較，不做隱含 boolean coercion。
+// ---------- Layer 1 ----------
 function rendererShouldShowAuthor(post) {
   const author = post && post.author;
   if (typeof author !== 'string' || author.trim() === '') return false;
@@ -68,7 +62,6 @@ function rendererShouldShowAuthor(post) {
   return true;
 }
 
-// Layer 1 cases — 一 case fail 就代表 EJS 判斷式與意圖已脫勾。
 const RENDERER_CASES = [
   {
     id: 'A',
@@ -96,13 +89,28 @@ const RENDERER_CASES = [
   },
   {
     id: 'E',
-    label: 'invalid type (string "false") is NOT silently coerced; renderer still shows',
+    label: 'renderer does NOT silently coerce string "false"; still shows',
     post: { author: 'Babel', byline: { showAuthor: 'false' } },
     expected: true,
   },
 ];
 
-// Frontmatter schema surface scan.
+function runLayer1() {
+  console.log('[byline-contract] Layer 1 — renderer decision cases');
+  let passed = 0;
+  const failures = [];
+  for (const c of RENDERER_CASES) {
+    const actual = rendererShouldShowAuthor(c.post);
+    const ok = actual === c.expected;
+    console.log(`  [${ok ? 'PASS' : 'FAIL'}] Case ${c.id} — ${c.label} (expected=${c.expected}, actual=${actual})`);
+    if (ok) passed++;
+    else failures.push(c.id);
+  }
+  console.log(`  layer1: ${passed}/${RENDERER_CASES.length} PASS`);
+  return { passed, total: RENDERER_CASES.length, failures };
+}
+
+// ---------- Layer 2 ----------
 const DEFAULT_GLOBS = [
   'content/github/posts/**/*.md',
   'content/blogger/posts/**/*.md',
@@ -135,21 +143,6 @@ function inspectByline(data, sourcePath) {
     };
   }
   return { kind: 'valid' };
-}
-
-function runLayer1() {
-  console.log('[byline-contract] Layer 1 — renderer decision cases');
-  let passed = 0;
-  const failures = [];
-  for (const c of RENDERER_CASES) {
-    const actual = rendererShouldShowAuthor(c.post);
-    const ok = actual === c.expected;
-    console.log(`  [${ok ? 'PASS' : 'FAIL'}] Case ${c.id} — ${c.label} (expected=${c.expected}, actual=${actual})`);
-    if (ok) passed++;
-    else failures.push(c.id);
-  }
-  console.log(`  layer1: ${passed}/${RENDERER_CASES.length} PASS`);
-  return { passed, total: RENDERER_CASES.length, failures };
 }
 
 function runLayer2() {
@@ -196,13 +189,136 @@ function runLayer2() {
   console.log(`  scanned ${scanned} | legacy(no byline) ${legacy} | withByline ${withByline} | warnings ${warnings.length}`);
 }
 
+// ---------- Layer 3 ----------
+// Build a minimally valid ready post; validator gates most rules on ready/published, but the byline
+// rule fires for any status. We keep status:'draft' so the post won't trigger unrelated missing-*
+// warnings (draft is filtered from most rules; byline rule is status-agnostic). Adjust `byline` per
+// case to prove the target error type appears / disappears exactly as expected.
+function makeSyntheticPost(byline) {
+  const post = {
+    sourcePath: '(synthetic)',
+    site: 'github',
+    contentKind: 'tech-note',
+    primaryPlatform: 'github',
+    title: 'Byline validator smoke',
+    slug: 'byline-validator-smoke',
+    date: '2026-07-12',
+    author: 'Babel',
+    category: '',
+    tags: [],
+    status: 'draft',
+    draft: true,
+  };
+  if (byline !== undefined) post.byline = byline;
+  return post;
+}
+
+// Minimal settings shape sufficient for validateContent() to not blow up on registry lookups.
+const SYNTHETIC_SETTINGS = {
+  site: { language: 'zh-TW', author: "Babel's Lab", siteName: "Babel's Lab" },
+  categories: [],
+  tags: [],
+  ads: {},
+  commerceLinks: [],
+  downloadAssets: [],
+  downloadForms: [],
+  promotion: { facebook: { enabled: false } },
+};
+
+const VALIDATOR_CASES = [
+  {
+    id: 'A (validator)',
+    label: 'omitted byline → no byline error (backward-compat)',
+    byline: undefined,
+    expectTypes: [],
+  },
+  {
+    id: 'B (validator)',
+    label: 'byline.showAuthor: true → no byline error',
+    byline: { showAuthor: true },
+    expectTypes: [],
+  },
+  {
+    id: 'C (validator)',
+    label: 'byline.showAuthor: false → no byline error',
+    byline: { showAuthor: false },
+    expectTypes: [],
+  },
+  {
+    id: 'D (validator)',
+    label: 'byline.showAuthor: "false" (string) → ERROR byline-show-author-invalid-type',
+    byline: { showAuthor: 'false' },
+    expectTypes: ['byline-show-author-invalid-type'],
+  },
+  {
+    id: 'E (validator)',
+    label: 'byline.showAuthor: 0 (number) → ERROR byline-show-author-invalid-type',
+    byline: { showAuthor: 0 },
+    expectTypes: ['byline-show-author-invalid-type'],
+  },
+  {
+    id: 'F (validator)',
+    label: 'byline.showAuthor: null (YAML empty value) → ERROR byline-show-author-invalid-type',
+    byline: { showAuthor: null },
+    expectTypes: ['byline-show-author-invalid-type'],
+  },
+  {
+    id: 'G (validator)',
+    label: 'byline: "true" (byline itself a string) → ERROR byline-invalid-type',
+    byline: 'true',
+    expectTypes: ['byline-invalid-type'],
+  },
+];
+
+function runLayer3() {
+  console.log('');
+  console.log('[byline-contract] Layer 3 — validator hard-fail proof (in-memory validateContent invocation)');
+  let passed = 0;
+  const failures = [];
+  for (const c of VALIDATOR_CASES) {
+    const post = makeSyntheticPost(c.byline);
+    const result = validateContent({ posts: [post], settings: SYNTHETIC_SETTINGS });
+    const bylineErrors = result.issues.filter(
+      (i) =>
+        i.severity === 'error' &&
+        (i.type === 'byline-invalid-type' || i.type === 'byline-show-author-invalid-type'),
+    );
+    const actualTypes = bylineErrors.map((i) => i.type).sort();
+    const expectedTypes = [...c.expectTypes].sort();
+    const ok =
+      actualTypes.length === expectedTypes.length &&
+      actualTypes.every((t, idx) => t === expectedTypes[idx]);
+    const actualDesc = actualTypes.length === 0 ? '(none)' : actualTypes.join(', ');
+    const expectedDesc = expectedTypes.length === 0 ? '(none)' : expectedTypes.join(', ');
+    const detail = ok
+      ? ''
+      : ` — expected [${expectedDesc}], actual [${actualDesc}]${bylineErrors.length > 0 ? '; sample value=' + JSON.stringify(bylineErrors[0].value) : ''}`;
+    console.log(`  [${ok ? 'PASS' : 'FAIL'}] Case ${c.id} — ${c.label}${detail}`);
+    if (ok) passed++;
+    else failures.push(c.id);
+  }
+  console.log(`  layer3: ${passed}/${VALIDATOR_CASES.length} PASS`);
+  return { passed, total: VALIDATOR_CASES.length, failures };
+}
+
+// ---------- main ----------
 function main() {
   const layer1 = runLayer1();
   runLayer2();
+  const layer3 = runLayer3();
 
-  const overallOk = layer1.passed === layer1.total;
+  const overallOk = layer1.passed === layer1.total && layer3.passed === layer3.total;
+  const details = [
+    `layer1 ${layer1.passed}/${layer1.total}`,
+    `layer2 warning-only`,
+    `layer3 ${layer3.passed}/${layer3.total}`,
+  ];
+  const failedDetail =
+    (layer1.failures.length > 0 ? `; layer1 failed: ${layer1.failures.join(', ')}` : '') +
+    (layer3.failures.length > 0 ? `; layer3 failed: ${layer3.failures.join(', ')}` : '');
+
   console.log('');
-  console.log(`byline-contract guard: ${overallOk ? 'PASS' : 'FAIL'} (layer1 ${layer1.passed}/${layer1.total}${overallOk ? '' : `; failed cases: ${layer1.failures.join(', ')}`}; layer2 warning-only)`);
+  console.log(`byline-contract guard: ${overallOk ? 'PASS' : 'FAIL'} (${details.join('; ')}${failedDetail})`);
 
   if (!overallOk) process.exit(1);
   process.exit(0);

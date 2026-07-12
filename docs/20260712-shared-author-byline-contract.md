@@ -48,6 +48,69 @@ byline:
 - `showAuthor: false` **不**清空 `meta.json.author`、**不**清空 JSON-LD `author`、**不**清空 `<meta name="author">`。
 - Blogger 與 GitHub Pages 依同一份 `byline.showAuthor` 決定視覺渲染。
 
+#### 型別契約（hard validation；validate:content 會拒絕）
+
+`byline` 為 optional。若出現：
+
+- `byline` **必須**為 plain object；非 object（string / number / array / null）→ `byline-invalid-type` ERROR。
+- `byline.showAuthor` 為 optional；若出現則**必須**為 YAML boolean（`true` / `false`）。
+- **不**做 truthy / falsy coercion —— 字串 `"true"` / `"false"`、數值、`null`、YAML 空值皆為 invalid。
+
+合法：
+
+```yaml
+byline:
+  showAuthor: true
+```
+
+```yaml
+byline:
+  showAuthor: false
+```
+
+```yaml
+# byline omitted 也合法（backward-compat：視覺 byline 顯示）
+```
+
+不合法（`validate:content` exit 1，錯誤類型 `byline-show-author-invalid-type`）：
+
+```yaml
+byline:
+  showAuthor: "false"    # string
+```
+
+```yaml
+byline:
+  showAuthor: 0          # number
+```
+
+```yaml
+byline:
+  showAuthor: null       # explicit null
+```
+
+```yaml
+byline:
+  showAuthor:            # YAML empty value → parse 為 null
+```
+
+不合法（`validate:content` exit 1，錯誤類型 `byline-invalid-type`）：
+
+```yaml
+byline: "true"           # byline 本身非 object
+```
+
+```yaml
+byline:                  # byline 為 YAML empty 值 → null
+```
+
+錯誤訊息形如：
+
+```text
+[ERROR] byline-show-author-invalid-type  content/foo/bar.md: string "false"
+[ERROR] byline-invalid-type              content/foo/bar.md: string
+```
+
 ### 2.4 Backward-compatible default
 
 - `byline` 缺 → 視覺 byline 顯示（`showAuthor` 邏輯上等於 `true`）。
@@ -129,7 +192,8 @@ Landing / campaign / download 等頁面若共用同一 article renderer，行為
 | B（新文章預設） | `author: Babel` + `byline.showAuthor: true` | Babel | Babel | Babel | Babel |
 | C（隱藏視覺） | `author: Babel` + `byline.showAuthor: false` | hidden | hidden | Babel | Babel |
 | D（外部投稿） | `author: 投稿者` + `byline.showAuthor: true` | 投稿者 | 投稿者 | 投稿者 | 投稿者 |
-| E（invalid type） | `byline.showAuthor: "false"`（string） | 仍顯示 | 仍顯示 | 保留 | 保留 |
+| E（invalid type，validator hard-fail） | `byline.showAuthor: "false"`（string） | validate:content ERROR | validate:content ERROR | — | — |
+| F（invalid null，validator hard-fail） | `byline.showAuthor: null`（或 YAML 空值） | validate:content ERROR | validate:content ERROR | — | — |
 
 Case C 對 GitHub Pages 之 DOM 差異（`post-detail.ejs`）：
 
@@ -140,26 +204,40 @@ Case C 對 GitHub Pages 之 DOM 差異（`post-detail.ejs`）：
 
 Blogger `blogger-post-full.ejs` / `blogger-post-summary.ejs` 同 DOM 結構（` · ` 綁在條件塊起始）。
 
-Case E 的 renderer 行為：`byline.showAuthor: "false"` 為 string；`=== false` 不成立 → 視為顯示。
-`check:byline-contract` guard 於 Layer 2 對此發 `byline-showAuthor-invalid-type` warning
-（report-only；不阻擋 build）。
+Case E / F 的雙層防護：
+- **`validate:content`**（新 ERROR 規則 `byline-show-author-invalid-type`）hard-fail，exit 1；
+  非 boolean 值**不能進**任何 build / render 路徑。
+- **Renderer**（`=== false` strict）作為第二層防禦：即便 validator 被繞過，字串 `"false"` 也
+  **不會**被靜默轉成 `false` 而誤隱藏作者。
+- **`check:byline-contract`** Layer 2 對 production content 掃描報告；Layer 3 in-memory 跑
+  `validateContent()` 直接證明 Cases D/E/F/G 觸發 ERROR。
 
 ---
 
 ## 5. Guard: `check:byline-contract`
 
-- Standalone / report-only / warning-only；**不**接進 `validate:content` / `check:phase1-readiness`
-  / `check:release-readiness` umbrella（避免位移 documented baseline 0/135/107）。
-- 兩層契約：
-  - Layer 1 — renderer decision cases（A–E）in-memory，全 PASS 才 exit 0。
-  - Layer 2 — frontmatter schema surface scan，warning-only。
-- 掃描範圍：`content/{github,blogger}/{posts,pages}/**/*.md`（排除 `*.fb.md`）。
-- baseline @ landing：Layer 1 5/5 PASS；Layer 2 scanned 17 / legacy 17 / withByline 0 / warnings 0。
+- Standalone；**不**接進 `check:phase1-readiness` / `check:release-readiness` umbrella
+  （避免無關 baseline 位移）。**invalid byline 本身由 `validate:content` 之 ERROR 規則
+  hard-fail**；本 guard 是「三層契約 rehearsal」。
+- 三層契約：
+  - **Layer 1** — renderer decision cases（A–E）in-memory，鎖 EJS `=== false` 語意；
+    全 PASS 才 exit 0。
+  - **Layer 2** — frontmatter schema surface scan，warning-only 報告（掃 production
+    content；現況 0 production byline → 0 warning，作為未來新內容加入時之報告器）。
+  - **Layer 3** — validator hard-fail proof；import `validateContent()` 跑 synthetic
+    minimal posts 證明 non-boolean `byline.showAuthor` 與 non-object `byline` 皆升為
+    ERROR，且 boolean / omitted 通過。全 PASS 才 exit 0。
+- 掃描範圍（Layer 2）：`content/{github,blogger}/{posts,pages}/**/*.md`（排除 `*.fb.md`）。
+- baseline @ boolean-hardening landing：
+  - Layer 1 5/5 PASS
+  - Layer 2 scanned 17 / legacy 17 / withByline 0 / warnings 0
+  - Layer 3 7/7 PASS
 
 執行：
 
 ```bash
 npm run check:byline-contract
+npm run validate:content    # 亦會對真正 content 之非 boolean byline 直接 exit 1
 ```
 
 ---
@@ -183,5 +261,7 @@ npm run check:byline-contract
 - `src/views/pages/post-detail.ejs` line 34-39（GitHub Pages byline 判斷式）
 - `src/views/blogger/blogger-post-full.ejs` line 57-60（Blogger full byline 判斷式）
 - `src/views/blogger/blogger-post-summary.ejs` line 32-35（Blogger summary byline 判斷式）
-- `src/scripts/check-byline-contract.js`（兩層契約 guard 實作）
+- `src/scripts/check-byline-contract.js`（三層契約 guard 實作；Layer 3 直接 invoke validator）
+- `src/scripts/validate-content.js`（新 ERROR 規則 `byline-invalid-type` / `byline-show-author-invalid-type`，
+  於 `validateContent()` 主 loop 內；status-agnostic；boolean-hardening 落點於 2026-07-12）
 - `docs/20260703-c1-*` / `docs/20260702-phase1-manual-e2e-runbook.md`（Phase 1 relevant baseline）
