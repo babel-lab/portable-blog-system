@@ -10,19 +10,20 @@
 // 目的（防呆 / 防回歸）：
 //   check:phase1-readiness 是「Phase 1 穩定測試 checks-only umbrella」，只串接既有 read-only
 //   子檢查（validate:content → npm-script-targets → adsense-mode-metadata → blogger-backfill
-//   → github-pages-prepublish → github-pages-prepublish-smoke）。若未來有人誤把它改成含
-//   build / deploy / push / gh-pages / write 等危險操作，Phase 1 readiness 就從「安全檢查」變成
-//   「會實際發布 / 寫檔」，且平時 baseline 不會發現。本 guard 靜態斷言 package.json 中該 script
-//   維持 checks-only 契約與六個子檢查的順序。
+//   → download-indexing-independence → github-pages-prepublish → github-pages-prepublish-smoke）。
+//   若未來有人誤把它改成含 build / deploy / push / gh-pages / write 等危險操作，Phase 1 readiness
+//   就從「安全檢查」變成「會實際發布 / 寫檔」，且平時 baseline 不會發現。本 guard 靜態斷言
+//   package.json 中該 script 維持 checks-only 契約與七個子檢查的順序。
 //
 // 斷言：
 //   1. package.json 可解析。
 //   2. scripts["check:phase1-readiness"] 存在且為非空 string。
-//   3. script 包含六個必要片段（validate:content / npm-script-targets / adsense-mode-metadata
-//      / blogger-backfill / github-pages-prepublish / github-pages-prepublish-smoke）。
+//   3. script 包含七個必要片段（validate:content / npm-script-targets / adsense-mode-metadata
+//      / blogger-backfill / download-indexing-independence / github-pages-prepublish
+//      / github-pages-prepublish-smoke）。
 //   4. script 不含任何危險 token（build / deploy / gh-pages / publish / push / write /
 //      backfill:url / admin:write / safe-write / rm -rf / git push / git checkout / git reset）。
-//   5. script 包含六個 ordered fragments，且 indexOf 嚴格遞增。
+//   5. script 包含七個 ordered fragments，且 indexOf 嚴格遞增。
 //
 // 注意：
 //   - check:github-pages-prepublish{,-smoke} 名稱含 "prepublish"，其中的 "publish" 屬合法子字串，
@@ -42,24 +43,29 @@ const PKG = path.join(REPO_ROOT, 'package.json');
 
 const SCRIPT_NAME = 'check:phase1-readiness';
 
-// 六個 Phase 1 穩定測試 read-only 子檢查，順序固定。
+// 七個 Phase 1 穩定測試 read-only 子檢查，順序固定。
+// 註：download-indexing-independence 於本 phase 由 standalone / additive 升入 phase1-readiness
+// umbrella；位置介於 metadata / backfill 與 prepublish / smoke 之間，語意 = cross-resolver
+// invariant guard，per docs §七 順序原則（後續 prepublish / release / smoke 之前）。
 const REQUIRED_FRAGMENTS = [
   'npm run validate:content',
   'npm run check:npm-script-targets',
   'npm run check:adsense-mode-metadata',
   'npm run check:blogger-backfill',
+  'npm run check:download-indexing-independence',
   'npm run check:github-pages-prepublish',
   'npm run check:github-pages-prepublish-smoke',
 ];
 
-// Ordered fragments：與 REQUIRED_FRAGMENTS 相同的六項，以 indexOf 嚴格遞增判斷順序。
+// Ordered fragments：與 REQUIRED_FRAGMENTS 相同的七項，以 indexOf 嚴格遞增判斷順序。
 // 注意 "npm run check:github-pages-prepublish" 為 "...-smoke" 的前綴子字串；indexOf 會取第一個
-// 出現位置（第 5 項），而 "-smoke"（第 6 項）出現在其後，故嚴格遞增仍成立。
+// 出現位置（第 6 項），而 "-smoke"（第 7 項）出現在其後，故嚴格遞增仍成立。
 const ORDERED_FRAGMENTS = [
   'npm run validate:content',
   'npm run check:npm-script-targets',
   'npm run check:adsense-mode-metadata',
   'npm run check:blogger-backfill',
+  'npm run check:download-indexing-independence',
   'npm run check:github-pages-prepublish',
   'npm run check:github-pages-prepublish-smoke',
 ];
