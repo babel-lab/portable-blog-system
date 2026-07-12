@@ -123,7 +123,8 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 | `github-pages-blog-planning` quarantine 解除 | 🔴 hold（by design） | `docs/20260705-github-pages-blog-planning-quarantine-decision-note.md` |
 | Admin write path（Apply / middleware / admin-write-cli / `--apply` / `dryRun:false`） | 🔴 dormant | `memory/project_admin_write_path_status.md` |
 | FB sidecar 真實寫入 | ⏸ dormant | 待 Dean 勾選 8 項 preflight |
-| Preview-only helper（B1 navigator / B2 draft-aware preview build） | ⏸ preanalysis only | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6 / §13 |
+| Preview-only helper — B1 navigator | ✅ implemented（`cc6497b`，2026-07-12；`check:blogger-preview`；read-only；未進 phase1-readiness / release-readiness umbrella） | `docs/20260712-preview-only-helper-implementation.md`；`docs/20260710-blogger-preview-only-script-preanalysis.md` §6.1 |
+| Preview-only helper — B2 draft-aware preview build | ⏸ not implemented / Dean-gated（未建立 `dist-blogger-preview/` / 未動 `.gitignore` / 無 PREVIEW-ONLY marker） | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2 / §13；須另開 phase + explicit approval |
 | Commerce L2 / L3 / L4 新 candidates | 🔴 BLOCKED；user-provided YAML + explicit approval | `memory/project_commerce_status.md` |
 | Phase 2 功能（後台登入 / 視覺編輯器 / Blogger API / Drive API / View 數 / 讚 / 留言 / 全文搜尋 / DB） | 🔴 第一版永禁 | `CLAUDE.md` §29 |
 | Phase 1 final 之降級 / 重新封存 | 🔴 永禁 | `CLAUDE.md` §3a Core operating rules |
@@ -171,7 +172,8 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 | `github-pages-blog-planning` 解除 quarantine | Dean 明說 | `docs/20260705-github-pages-blog-planning-quarantine-decision-note.md` |
 | Admin write path 啟動（Apply / middleware / admin-write-cli / `--apply` / `dryRun:false`） | Dean 明說 | `memory/project_admin_write_path_status.md` |
 | FB sidecar 真實寫入 | Dean 完成 8 項 preflight 勾選 | dormant |
-| Preview-only helper 實作（B1 / B2） | 「啟動 preview helper 實作 phase；選 B1 或 B2」 | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6 / §11 |
+| Preview-only helper — B1 navigator | ✅ landed（`cc6497b`，2026-07-12；`docs/20260712-preview-only-helper-implementation.md`）；本行僅存於歷史比對，未來不需再次 approval | — |
+| Preview-only helper — B2 draft-aware preview build | 「啟動 B2 preview helper 實作 phase」（B1 已 landed，此項僅剩 B2） | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2 / §11 |
 | 動 `content/settings/ads.config.json` real IDs | Dean 明說；real IDs 僅存於該檔（`CLAUDE.md` §3a Red lines）| — |
 | CLAUDE.md / MEMORY.md / memory/** 大型改動 | 明訂 memory-sync phase | `memory/feedback_phase_discipline.md` |
 
@@ -190,7 +192,7 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 | #1 | idle freeze | 預設 | `CLAUDE.md` §3a Recommended next paths |
 | #2 | 候選 A — Phase 1 RC → next-phase 決策入口 preanalysis（docs-only） | Dean 想看清下一步分岔面 | 未來 slice：`docs/<YYYYMMDD>-blog-next-phase-route-selection-preanalysis.md` |
 | #3 | 候選 B — Blogger backfill write phase preflight 已 landed（`e477a75`）→ 未來實寫 | Dean 提供真值 + explicit approval | `docs/20260710-blogger-backfill-write-phase-preflight.md` |
-| #4 | 候選 D — Blogger preview-only script preanalysis 已 landed（`abc707c`）→ 未來 B1 / B2 實作 | Dean 明說手動繁瑣度 + 選 B1 / B2 | `docs/20260710-blogger-preview-only-script-preanalysis.md` |
+| #4 | 候選 D — Blogger preview-only helper：B1 navigator 已 landed（`cc6497b`，2026-07-12）；剩 B2 draft-aware preview build 待 Dean 明說 | Dean 明說啟動 B2 | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2；`docs/20260712-preview-only-helper-implementation.md` |
 | #5 | 候選 E — custom domain / AdSense trigger checklist 已 landed（`c0ee384`）→ 未來 Gate D / A | Dean 判斷 SEO 累積時機 + 明說啟動 | `docs/20260710-custom-domain-adsense-trigger-checklist.md` |
 | #6 | 候選 C — Blogger 實機發布頁 overflow 觀察 docs-only | **僅在** Blogger 實機發布頁再現水平捲軸時 | `docs/20260708-blogger-mobile-horizontal-scrollbar-audit.md` §7 Option A |
 
@@ -274,7 +276,8 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 - `docs/20260710-phase1-rc-next-readiness-analysis.md`（RC readiness re-verify + 三份 workflow docs 影響面 audit + 候選推薦順序）
 - `docs/20260710-blogger-backfill-write-phase-preflight.md`（Blogger backfill write phase 前置條件 / gates / dry-run / rollback）
 - `docs/20260710-custom-domain-adsense-trigger-checklist.md`（Custom domain Gate D + AdSense Gate A trigger conditions + 未來 sequence）
-- `docs/20260710-blogger-preview-only-script-preanalysis.md`（Preview-only helper B1 navigator / B2 draft-aware preview build preanalysis）
+- `docs/20260710-blogger-preview-only-script-preanalysis.md`（Preview-only helper B1 navigator / B2 draft-aware preview build preanalysis；B1 已於 2026-07-12 landing，見下）
+- `docs/20260712-preview-only-helper-implementation.md`（B1 navigator source slice landing ledger；2026-07-12；`cc6497b`；`check:blogger-preview` + `check:blogger-preview-smoke` 49/49）
 - `docs/20260708-phase1-stability-closeout-rc-note.md`（Phase 1 stability closeout RC note；handoff / next-readiness 之 RC sign-off 依據）
 - `docs/20260708-phase1-second-manual-e2e-result.md`（第二次人工 E2E；P1/P2 follow-up 分級來源）
 - `docs/20260708-phase1-third-manual-smoke-result.md`（第三次小型人工 smoke；P1-1 verified resolved）

@@ -90,7 +90,7 @@ Readiness checks 本輪跑（read-only）：
 
 ## 4. 使用本 checklist 的時機與界線
 
-- **使用時機**：Blogger draft-preview 階段（runbook §D-8 之後、§D-10 改回 draft 之前）。**每篇** blogger-enabled 文章 preview 時皆可用。
+- **使用時機**：Blogger draft-preview 階段（runbook §D-8 之後、§D-10 改回 draft 之前）。**每篇** blogger-enabled 文章 preview 時皆可用。**paste 前**建議先跑 §5.0 之 B1 preview navigator 一步確認 slug + dist artifacts；navigator = read-only（不 build / 不 modify / 不 deploy），不能取代本 checklist §5.1–§5.9 之人工檢查。
 - **不用於**：
   - 正式發布後之 Blogger 後台 QA（正式發布另有 `CLAUDE.md` §7 checklist + `dist-blogger/posts/<slug>/publish-checklist.txt`）
   - Admin `#new-post-draft` 之 markdown 匯出階段（Admin 輸出 raw markdown、非 Blogger HTML；`docs/20260710-blogger-admin-export-workflow-alignment.md` §3）
@@ -107,6 +107,20 @@ Readiness checks 本輪跑（read-only）：
 貼 HTML 到 Blogger draft、按 preview 之後，依序勾（先易後難；Fail 之項回頭修測試檔或依 runbook §E / §F 排除）：
 
 > 前置 recap（僅一句）：已依 runbook §D-1..§D-7 產生 `dist-blogger/posts/<slug>/post.html`、以 Blogger **HTML 模式**貼上。若不確定，回讀 runbook §D-7 + §E first bullet；若還在 Attempt 1（貼 raw MD），停止並回 runbook §D-4/§D-5 產 HTML。
+
+### 5.0 Paste 前 quick lookup（B1 preview navigator）
+
+在切到 Blogger 後台貼 HTML 之前，先跑一次 B1 preview navigator，確認目標 slug 與 `dist-blogger/posts/<slug>/` 四檔均存在（純唯讀；不 build / 不 modify / 不 deploy / 不呼叫 Blogger API）：
+
+- [ ] 已跑 `npm run check:blogger-preview -- --slug <slug>`；trailer 顯示 `PASS blogger preview navigator (read-only; warning-only; no writes performed).`
+- [ ] `advice` 為 `dist-blogger/posts/<slug>/ complete — open post.html and paste into Blogger HTML mode (see docs/20260708-blogger-draft-preview-runbook.md §D-7).`（若顯示 folder MISSING / 某檔 MISSING → 回 runbook §D-5 執行 `npm run build:blogger`）
+- [ ] 若 focus 顯示 `filter reason: draft:true` → 目標為 draft、不會進正式 `dist-blogger/`；走 runbook §D-4 workaround
+- [ ] 若 focus 顯示 `source path: (not found)` → slug 拼錯或 frontmatter `publishTargets.blogger.enabled` 未開；先用 `npm run check:blogger-preview`（不帶 `--slug`）之 list mode 對 slug
+- [ ] 若 focus 顯示 frontmatter parse error → 先修 frontmatter，**不**略過 error 硬走 paste
+
+界線 recap：navigator = **read-only navigator**、**非** renderer / builder / publish gate；exit 0 **不等於**「已發布」/「Blogger 後台已建立草稿」/「sidecar 真值完整」/「backfill 完成」。navigator 不能取代本 checklist §5.1–§5.9 之視覺 / metadata / 連結類人工檢查；亦不能取代 Blogger 後台之 Preview。詳細命令 / 狀態解讀見 runbook §C.5。
+
+B1 / B2 邊界：B1 navigator = ✅ implemented（`docs/20260712-preview-only-helper-implementation.md`；`cc6497b`，2026-07-12）；B2 draft-aware preview build = ⏸ not implemented / Dean-gated（`docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2；須另開 phase + explicit approval）。
 
 ### 5.1 內容完整性（Content parity）
 
@@ -242,6 +256,8 @@ Readiness checks 本輪跑（read-only）：
 
 ## See also
 
+- `docs/20260712-preview-only-helper-implementation.md`（B1 navigator source slice landing ledger；2026-07-12；§5.0 之對應實作）
+- `docs/20260710-blogger-preview-only-script-preanalysis.md`（B1 navigator §6.1 / B2 draft-aware preview build §6.2 preanalysis；B2 仍 preanalysis-only）
 - `docs/20260710-blogger-admin-export-workflow-alignment.md`（前一份 alignment audit；本 doc 為其 §3 workflow 之 paste-preview 階段細化 checklist）
 - `docs/20260710-phase1-rc-handoff-operating-readout.md`（Phase 1 RC handoff readout；本 doc 為 §6 候選外之細目補充；未動 §6 候選狀態）
 - `docs/20260708-blogger-draft-preview-runbook.md`（Blogger draft-preview 6 步可重複流程；本 checklist 對應 §D-8..§D-9 之細化；§F overflow debug 由本 checklist §5.5 / §5.8 引用）

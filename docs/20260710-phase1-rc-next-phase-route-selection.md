@@ -195,7 +195,9 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 
 ### Route D — Blogger preview helper implementation（B1 或 B2）
 
-- **Trigger condition**：Dean 明確判斷 Blogger 手動 preview 流程繁瑣度足以支撐引入 helper，且明說選 B1（navigator）或 B2（draft-aware preview build）。
+> **Status update（2026-07-12）**：**B1 navigator 已 landed**（source slice `cc6497b`；`check:blogger-preview` + `check:blogger-preview-smoke` 49/49）；details 見 `docs/20260712-preview-only-helper-implementation.md`。runbook §C.5 + sanity §5.0 已納入 B1。**B2 draft-aware preview build 仍未實作 / Dean-gated**（未建立 `dist-blogger-preview/` / 未動 `.gitignore` / 無 PREVIEW-ONLY marker）；本 Route D 之下一步僅剩 B2。以下欄位保留為完整 route spec；B1 相關欄位僅供歷史對照，未來 Dean 若啟動下一波 preview helper 實作，指涉 = B2。
+
+- **Trigger condition**：Dean 明確判斷 Blogger 手動 preview 流程繁瑣度足以支撐引入 helper，且明說選 B1（navigator）或 B2（draft-aware preview build）。**B1 已 landed 2026-07-12；未來 Route D 啟動之預期選項 = B2。**
 - **Allowed work**：
   - ✅ 依 `docs/20260710-blogger-preview-only-script-preanalysis.md` §6 / §11 acceptance criteria 實作選定之 B1 或 B2
   - ✅ 新增 `src/scripts/<slug>.js`（B1 為主）或極小改 `src/scripts/build-blogger.js`（B2 需嚴格 scope）
@@ -347,7 +349,7 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 | A | Idle freeze | 預設 | 極低 | 無 | 無（純 idle）|
 | B | Phase 2 next-work-scope planning | Dean 想深化 route 描述 / 加新 route | 極低 | Dean 想深化之目標 | 新增 `docs/<YYYYMMDD>-<topic>-preanalysis.md` |
 | C | Blogger backfill write phase | Dean 提供真值 + 明說啟動 | 中 | `publishedUrl` / `publishedAt`（+ optional `note`；不列 `bloggerPostId`）| 1 篇 sidecar write |
-| D | Blogger preview helper 實作 | Dean 明說 B1 / B2 | B1 低 / B2 中 | 選 B1 或 B2 | B1: 新 `src/scripts/preview-blogger-navigator.js` ／ B2: 先寫最小 spec doc |
+| D | Blogger preview helper 實作 | Dean 明說 B1 / B2；**B1 已 landed 2026-07-12（`cc6497b`），下一步僅剩 B2** | B1 低（已 landed） / B2 中 | 選 B1 或 B2 | B1（已 landed）: `src/scripts/check-blogger-preview.js` ／ B2: 先寫最小 spec doc |
 | E | Custom domain / AdSense launch | Dean 明說 Gate D 或 Gate A | Prep 極低 / Live 中-高 | Gate D: domain 字串 + DNS 權限 ／ Gate A: real pub id | Prep phase doc |
 | F | Live Blogger overflow 觀察 | 實機再現水平捲軸 | 極低 | Dean DevTools 提供 offender / scrollWidth / viewport | 新 observation doc |
 | G | Second GitHub Pages deploy | Dean 明列篇目 + 明說 push 授權 | 中-高 | 逐篇 file paths + push 授權 | 1 篇 pre-deploy gate + build + deploy |
@@ -382,8 +384,9 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 | Blogger backfill write phase 啟動 + 補真值 | Route C | `docs/20260710-blogger-backfill-write-phase-preflight.md` |
 | 動 `.publish.json` sidecar 之任何欄位 | Route C | 同上 |
 | 建立 6 篇 sidecar-absent 之新 sidecar | Route C | 同上 §5 / §8 |
-| Blogger preview helper 實作（B1 / B2） | Route D | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6 / §11 |
-| 動 `build:blogger` / `classify` / `dist-blogger/` 契約 | Route D | 同上（B2 gate）|
+| Blogger preview helper 實作 — B1 navigator | Route D | ✅ landed 2026-07-12（`cc6497b`；`docs/20260712-preview-only-helper-implementation.md`）；此列僅為歷史對照 |
+| Blogger preview helper 實作 — B2 draft-aware preview build | Route D | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2 / §11；B2 仍 Dean-gated |
+| 動 `build:blogger` / `classify` / `dist-blogger/` 契約 | Route D | 同上（B2 gate；B1 未動這三者）|
 | Custom domain（Gate D）啟動 + 買 domain / 設 DNS / 建 `CNAME` | Route E | `docs/20260710-custom-domain-adsense-trigger-checklist.md` §5 / §6 |
 | AdSense（Gate A）啟動 + 落地 real pub id / `ads.txt` | Route E | 同上 §8 / §10 / §11 |
 | Blogger 實機 overflow 觀察啟動 | Route F | `docs/20260708-blogger-mobile-horizontal-scrollbar-audit.md` §7 Option A |
@@ -467,6 +470,7 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 - `docs/20260710-blogger-backfill-write-phase-preflight.md`（Route C 之 preflight；本 doc §3 Route C 引用 §2 / §4 / §5 / §7 / §8 / §9 / §10）
 - `docs/20260710-custom-domain-adsense-trigger-checklist.md`（Route E 之 preflight；本 doc §3 Route E 引用 §5 / §6 / §8 / §10 / §11）
 - `docs/20260710-blogger-preview-only-script-preanalysis.md`（Route D 之 preflight；本 doc §3 Route D 引用 §6 / §11）
+- `docs/20260712-preview-only-helper-implementation.md`（Route D B1 navigator landing ledger；2026-07-12；`cc6497b`；`check:blogger-preview` + `check:blogger-preview-smoke` 49/49）
 - `docs/20260708-phase1-stability-closeout-rc-note.md`（Phase 1 stability closeout RC note；本 doc §2.1 引用 §F）
 - `docs/20260708-phase1-second-manual-e2e-result.md`（第二次人工 E2E；P1/P2 follow-up 分級來源）
 - `docs/20260708-phase1-third-manual-smoke-result.md`（第三次小型人工 smoke；P1-1 verified resolved）
