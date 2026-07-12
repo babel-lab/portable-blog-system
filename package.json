@@ -50,6 +50,7 @@
     "check:blogger-backfill:write-rehearsal-template-contract": "node src/scripts/check-blogger-backfill-write-rehearsal-template-contract.js",
     "check:download-indexing-independence": "node src/scripts/check-download-indexing-independence.js",
     "check:download-indexing-generated-output": "node src/scripts/check-download-indexing-generated-output.js",
+    "check:download-indexing-dist-smoke": "node src/scripts/check-download-indexing-dist-smoke.js",
     "check:content-type-metadata": "node src/scripts/check-content-type-metadata.js",
     "check:adsense-mode-metadata": "node src/scripts/check-adsense-mode-metadata.js",
     "check:campaign-purpose-metadata": "node src/scripts/check-campaign-purpose-metadata.js",
