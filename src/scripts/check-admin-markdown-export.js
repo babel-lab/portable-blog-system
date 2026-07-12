@@ -2662,11 +2662,18 @@ check('109 admin index.ejs #npd-summary-ready initial DOM matches runtime first-
 //   and are intentionally excluded — their values depend on input so a scan
 //   cannot lock them without re-implementing the helper.
 //
-//   Both surfaces single-quote the push argument (`lines.push('author: "Dean"')`),
+//   Both surfaces single-quote the push argument (`lines.push('author: "Babel"')`),
 //   so one literal substring matches both. The server file uses `lines.push`
 //   only inside buildPostMarkdown() (defaultBody() uses an array literal), so a
 //   whole-file substring check is unambiguous; the client side is scoped to the
 //   brace-counted buildMarkdown() block for precision.
+//
+//   2026-07-12：default author flipped `Dean` → `Babel` and the byline scaffold
+//   added (`byline:` / `  showAuthor: true`) per shared author byline contract
+//   (docs/20260712-shared-author-byline-contract.md). Existing content files are
+//   NOT rewritten; only the new-draft scaffold ships the new default. Renderers
+//   still gate visibility with `byline.showAuthor === false`; backward-compat
+//   default = show.
 //
 //   Pure source string scan; no DOM, no headless browser, no execution of
 //   either surface.
@@ -2711,7 +2718,9 @@ check('110 admin buildMarkdown() client mirror frontmatter scaffold matches serv
   //   category as title / slug / description. Its parity + empty-default
   //   (`titleEn: ""`) are locked behaviorally by cases 115–118 below.
   const SCAFFOLD = [
-    'author: "Dean"',
+    'author: "Babel"',
+    'byline:',
+    '  showAuthor: true',
     'status: "draft"',
     'draft: true',
     'canonical: "auto"',

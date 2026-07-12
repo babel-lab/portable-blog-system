@@ -29,7 +29,8 @@ const summaryDescription = display.description || post.description;
       <% if (post.date) { %>
       <time datetime="<%= post.date %>"><%= post.date %></time>
       <% } %>
-      <% if (post.author) { %>
+      <%# Shared author byline contract（2026-07-12）：post.byline?.showAuthor === false 才隱藏；omitted / true / 其他值一律顯示（backward-compatible default） -%>
+      <% if (post.author && !(post.byline && post.byline.showAuthor === false)) { %>
        · <span><%= post.author %></span>
       <% } %>
     </p>

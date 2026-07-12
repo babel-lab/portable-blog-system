@@ -135,7 +135,10 @@ slug: "${slugArg}"
 
 date: "${today}"
 updated: "${today}"
-author: "Dean"
+author: "Babel"
+
+byline:
+  showAuthor: true
 
 category: ""
 tags: []

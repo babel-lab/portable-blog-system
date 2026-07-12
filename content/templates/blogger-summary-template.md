@@ -15,7 +15,9 @@ titleEn: "GitHub Pages Free Hosting Limits and Blog Planning"
 slug: "github-pages-blog-planning"
 date: "2026-05-04"
 updated: "2026-05-04"
-author: "Dean"
+author: "Babel"
+byline:
+  showAuthor: true
 category: "tech-note"
 tags: ["github", "vite", "static-site"]
 description: "整理 GitHub Pages 免費空間限制與可搬家部落格規劃。"

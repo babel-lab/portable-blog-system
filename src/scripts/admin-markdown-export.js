@@ -714,7 +714,10 @@ export function buildPostMarkdown(input) {
   lines.push('');
   lines.push('date: ' + yamlEscapeScalar(dateForFm));
   lines.push('updated: ' + yamlEscapeScalar(dateForFm));
-  lines.push('author: "Dean"');
+  lines.push('author: "Babel"');
+  lines.push('');
+  lines.push('byline:');
+  lines.push('  showAuthor: true');
   lines.push('');
   lines.push(category !== '' ? 'category: ' + yamlEscapeScalar(category) : 'category: ""');
   lines.push(tagsBlock);

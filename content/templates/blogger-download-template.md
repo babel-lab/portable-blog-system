@@ -8,7 +8,9 @@ titleEn: ""
 slug: "{teaching-material-slug}"
 date: "2026-05-04"
 updated: "2026-05-04"
-author: "Dean"
+author: "Babel"
+byline:
+  showAuthor: true
 category: "download"
 tags: ["download"]
 description: "{教具下載文章摘要；說明素材內容、適用對象與使用方式；2-3 句話}"

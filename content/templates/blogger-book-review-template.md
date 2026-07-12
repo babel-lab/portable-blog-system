@@ -8,7 +8,9 @@ titleEn: ""
 slug: "{book-slug}"
 date: "{YYYY-MM-DD}"
 updated: "{YYYY-MM-DD}"
-author: "Dean"
+author: "Babel"
+byline:
+  showAuthor: true
 category: "book-review"
 tags: ["book"]
 description: "{書評摘要；2-3 句話}"
