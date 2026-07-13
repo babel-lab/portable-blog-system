@@ -30,11 +30,18 @@
 //       - Case E（number 0）→ byline-show-author-invalid-type
 //       - Case F（null / YAML `showAuthor:`）→ byline-show-author-invalid-type
 //       - Case G（byline 為 string）→ byline-invalid-type
+//       - Case H（byline: null；YAML empty `byline:` 值）→ byline-invalid-type
+//       - Case I（byline: []）→ byline-invalid-type
+//       - Case J（byline: 42；number）→ byline-invalid-type
 //     以及必須 NOT 觸發下列（backward-compat）：
 //       - byline omitted
 //       - byline.showAuthor: true
 //       - byline.showAuthor: false
 //     任一 case 期望不符 → exit 1（validator 契約已破損）。
+//     Cases H/I/J 分別覆蓋 validator 內三條獨立分支（`byline === null` /
+//     `Array.isArray(byline)` / `typeof byline !== 'object'`）—— 未來若不小心把
+//     `byline === null` 改成 `byline == null`（會誤攔 `undefined` → 破 Case A
+//     backward-compat）或漏掉某分支，均會在 Layer 3 hard-fail。
 //
 // 執行：node src/scripts/check-byline-contract.js
 //   - Layer 1 全 PASS + Layer 2 純 warning + Layer 3 全 PASS → exit 0。
@@ -266,6 +273,29 @@ const VALIDATOR_CASES = [
     id: 'G (validator)',
     label: 'byline: "true" (byline itself a string) → ERROR byline-invalid-type',
     byline: 'true',
+    expectTypes: ['byline-invalid-type'],
+  },
+  {
+    // Covers `byline === null` branch. YAML `byline:` empty value parses to null;
+    // guards against a `byline == null` regression that would silently accept `undefined`.
+    id: 'H (validator)',
+    label: 'byline: null (YAML empty `byline:` value) → ERROR byline-invalid-type',
+    byline: null,
+    expectTypes: ['byline-invalid-type'],
+  },
+  {
+    // Covers `Array.isArray(byline)` branch. typeof [] === 'object', so the
+    // array short-circuit must fire before the object-shape check.
+    id: 'I (validator)',
+    label: 'byline: [] (array) → ERROR byline-invalid-type',
+    byline: [],
+    expectTypes: ['byline-invalid-type'],
+  },
+  {
+    // Covers `typeof byline !== 'object'` branch for non-string primitives.
+    id: 'J (validator)',
+    label: 'byline: 42 (number) → ERROR byline-invalid-type',
+    byline: 42,
     expectTypes: ['byline-invalid-type'],
   },
 ];

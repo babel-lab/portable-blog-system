@@ -231,7 +231,8 @@ Case E / F 的雙層防護：
 - baseline @ boolean-hardening landing：
   - Layer 1 5/5 PASS
   - Layer 2 scanned 17 / legacy 17 / withByline 0 / warnings 0
-  - Layer 3 7/7 PASS
+  - Layer 3 10/10 PASS（Cases A–J；Cases H/I/J 分別鎖 `byline === null` /
+    `Array.isArray(byline)` / `typeof byline !== 'object'` 三條 validator 分支）
 
 執行：
 
