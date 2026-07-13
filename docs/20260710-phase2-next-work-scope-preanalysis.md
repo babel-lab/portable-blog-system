@@ -1,6 +1,7 @@
 # BLOG Phase 2 next-work-scope planning preanalysis（docs-only）
 
 - 建立日期：2026-07-10（Asia/Taipei）
+- 最後對齊：2026-07-13（Asia/Taipei）— docs-only state reconciliation slice；見下方 §0.5 Status update（2026-07-13）
 - 類型：docs-only **Phase 2 work-package planning preanalysis**（唯一 mutation = 本 doc 新增；**不**改 source / content / settings / views / scripts / package / lockfile / dist / gh-pages / `.cache` / `CLAUDE.md` / `MEMORY.md` / `memory/`）
 - 目的：於 Phase 1 RC 已穩定（見 `docs/20260710-phase1-rc-docs-index.md`）、且 `docs/20260710-phase1-rc-next-phase-route-selection.md`（A–G routes）已 landed 之後，把「Phase 2 / next-phase 之後真正可挑選之工作包」拆成**細顆粒 work packages**（WP-01 … WP-20），讓 Dean 於下一 session 可**明確選一個 WP** 進入（而非停在 route 層之高階分類）。**不**啟動任一 WP、**不**代 Dean 選 WP、**不**排 WP 之間 preferred order；只提供結構化 lookup。
 - 觸發：`docs/20260710-phase1-rc-next-phase-route-selection.md` §3 Route B（Phase 2 next-work-scope planning）+ 本 session Dean 明確指示執行 Route B。
@@ -37,16 +38,45 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 
 ---
 
+## 0.5 Status update（2026-07-13；docs-only state reconciliation）
+
+本 doc 於 2026-07-10 landing 時，WP-01 rehearsal template / WP-02 intake / WP-05 B1 navigator 皆為未來候選。2026-07-10 至 2026-07-12 期間，Dean 於獨立 phases 中各自 explicit approval 後，數個 WP 之準備工作 / helper 實作已 landed。為避免未來 session 誤把「已完成之準備工作」再度提為新的 entry candidate，本 §0.5 補一份**狀態對齊表**；`§1` / `§4` / `§5` / `§7` 之對應段落已同步更新，並保留原始欄位以便歷史對照。
+
+**本 §0.5 為 additive-only docs update；不改任何契約 / 不新增規則 / 不移除任何 red-line / 不宣告新 PASS / 不代 Dean 決策 / 不啟動任一 WP**。
+
+| WP | 原分類 | 目前實際狀態 | 依據（commit / doc / guard） |
+| --- | --- | --- | --- |
+| **WP-01** — Blogger backfill write-phase rehearsal（docs-only） | P2-Entry candidate | ✅ **LANDED** | `f1aec08` `docs/20260710-blogger-backfill-write-rehearsal-template.md` + 相關 `5c92d15` `docs/20260710-blogger-backfill-one-post-dry-run-worksheet.md` + `b0b0488` `src/scripts/check-blogger-backfill-one-post.js` + `260dd1b` `src/scripts/check-blogger-backfill-write-rehearsal-template-contract.js`；`package.json` 新增 `check:blogger-backfill:one-post` / `check:blogger-backfill:write-rehearsal-template-contract` |
+| **WP-02** — Blogger backfill write 1 篇 sidecar 之**準備工作** | P2-Entry candidate（1 篇 sidecar write） | ✅ **PREPARATION LANDED** | `631ba5c` `docs/20260710-blogger-backfill-wp02-intake-template.md` + `79dec13` `docs/20260710-blogger-backfill-seven-candidate-one-post-dry-run-report.md` + `e61730e` `docs/20260710-blogger-backfill-wp02-true-value-intake-packet.md` + guards `8fe2cac` / `97ea33b` / `ad32119`（`check:blogger-backfill:wp02-intake-contract` / `one-post-worksheet-contract` / `wp02-one-post-consistency-contract`） |
+| **WP-02** — Blogger backfill write 1 篇 sidecar 之**實寫入** | P2-Entry candidate | ⏸ **WAITING FOR DEAN INPUT** — Dean 尚未於任何 session 中提供 real `publishedUrl` / `publishedAt`；`check:blogger-backfill` 目前 candidates 7 / complete 0 / missing 7 / report-only；write phase 仍需 Dean explicit approval + real Blogger 後台真值 | 「不猜」policy 由 `docs/20260706-blogger-identity-and-backfill-strategy.md` 保護；write target canonical location = `.publish.json` sidecar per `docs/20260706-blogger-backfill-write-target-inventory.md`；不啟動 |
+| **WP-05** — Blogger preview helper B1 navigator（read-only） | P2-Entry candidate | ✅ **LANDED**（2026-07-12） | `cc6497b` `src/scripts/check-blogger-preview.js` + `cae3123` operationalize + `1ea5d58` `docs/20260712-blogger-preview-b1-one-post-operational-rehearsal.md` + `53cc20d` `docs/20260712-blogger-b1-live-manual-preview-test-we-media-myself2.md`；`package.json` 新增 `check:blogger-preview` + `check:blogger-preview-smoke`；`docs/20260712-preview-only-helper-implementation.md` |
+| **WP-06** — Blogger preview helper B2 draft-aware preview build | Deferred until Dean signal | ⏸ **NOT STARTED / DEAN-GATED** — `dist-blogger-preview/` 尚未建立 / `.gitignore` 尚未動 / 無 PREVIEW-ONLY marker | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2 / §13；未啟動 |
+
+**其他 out-of-scope 但已 landed 之 additive slice（非 WP-01..WP-20 原 catalog 之項目，僅資訊記錄；未來 route/WP recommendation 不再列為 entry candidate）**：
+
+| Slice | 狀態 | 依據 |
+| --- | --- | --- |
+| Download page indexing decoupling（Phase 1 `check:phase1-readiness` umbrella 新增 `check:download-indexing-independence`；download page 生成輸出 contract；temp-build smoke） | ✅ landed；已納 metadata / phase1-readiness umbrella | `7cbb278` / `2d1b462` / `9304e50` / `624d74b` / `88190cd`；`docs/20260712-download-page-indexing-independence-policy-lock.md` / `docs/20260712-download-indexing-guard-phase1-umbrella-integration.md` / `docs/20260712-download-indexing-guard-metadata-umbrella-integration.md` / `docs/20260712-download-page-generated-output-contract.md` / `docs/20260712-download-page-temp-build-smoke.md` |
+| Shared author byline contract（validator / renderer / test coverage 3 slices） | ✅ landed；已達合理停止點（Layer 1 5/5、Layer 2 production scanned 17 warnings 0、Layer 3 10/10）；**不**再擴充微型 assertion / **不**接入 readiness umbrella / **不**新增作者頁或作者系統 | `9cb38a1` / `796ee5a` / `0b87aae` / `f944ff7`；`docs/20260712-shared-author-byline-contract.md`；`package.json` `check:byline-contract` |
+
+**Recommendation post-2026-07-13**：本 §0.5 landing 之後，**Recommendation 仍 = remain idle freeze**（沿用 §9）；如 Dean 於未來 session 明確判斷推進，唯一仍屬「小切片 entry candidate」之未動 WP 為 **WP-11**（overflow observation；僅在觸發條件命中時）／ **WP-12**（Download next-phase preanalysis）／ **WP-14**（custom domain Gate D prep-1 docs-only）／ **WP-16**（AdSense Gate A prep-1 docs-only）／ **WP-07**（GA4 P2/P3 dimension 觀察）；已完成之 WP-01 / WP-05 不再列為 entry candidate。**WP-02 實寫入仍為主要 medium-scope 待啟動**，但 gate 為 Dean 提供 real Blogger 值 + explicit approval，非 idle-freeze 可自動推進之項目。
+
+---
+
 ## 1. 結論（先講結果）
 
 **A. 本 doc 拆出 20 個 Phase 2 work packages（WP-01 … WP-20）**。每個 WP 皆有固定欄位：goal / trigger condition / allowed work / forbidden work / required Dean approval / required input data / touches（code / content / sidecar / deploy / external）/ risk level / suggested first slice / required checks。此拆分為 route selection doc（`docs/20260710-phase1-rc-next-phase-route-selection.md`）§3 之**下一層深化**：route level = A–G；WP level = 每個 route 內可獨立啟動之最小切片。
 
-**B. 20 個 WP 分四類**：
+**B. 20 個 WP 分四類**（reconciled 2026-07-13；見 §0.5）：
 
-1. **P2-Entry candidates**（適合作 Phase 2 第一個安全小切片；docs-only 或極小 scope）：WP-01（Blogger backfill write phase preflight rehearsal，docs-only）/ WP-02（Blogger backfill write 1 篇 sidecar，小 scope）/ WP-05（Preview helper B1 navigator，read-only）/ WP-11（Blogger live overflow observation，docs-only；僅觸發時）/ WP-14（custom domain prep-1 docs-only）/ WP-16（AdSense prep-1 docs-only）。
-2. **Deferred until Dean signal**（需 Dean 提供外部資料 / 判斷時機）：WP-03（backfill remaining 篇目 rollout）/ WP-06（Preview helper B2 draft-aware build）/ WP-08（Second GitHub Pages deploy 1 篇）/ WP-15（Gate D DNS / CNAME 落地）/ WP-17（Gate A pub id 落地 / ads.txt）/ WP-18（Blogger AdSense Batch 2 P2 live repost）/ WP-19（Reverse UTM pm-26 deploy）/ WP-20（Admin richer fields / ready option）。
-3. **Blocked / dormant / red-line**（第一版永禁或明確 dormant；本 doc 不放路徑）：WP-04（Admin write path Apply / middleware / admin-write-cli）/ WP-09（FB sidecar 真實寫入）/ WP-10（Commerce L2 / L3 / L4 新 candidates）/ WP-13（`github-pages-blog-planning` quarantine 解除）。
-4. **Analytical only**（純觀察 / 情報收集；不進系統實作）：WP-07（GA4 P2 / P3 dimension 觀察）/ WP-12（Download Admin picker / renderer / Forms 串接 preanalysis）。
+0. **Completed since original doc（2026-07-10..07-12）**：
+   - WP-01（Blogger backfill write-phase rehearsal docs-only）= ✅ **LANDED**（`f1aec08` rehearsal template + `5c92d15` one-post worksheet + `b0b0488` one-post dry-run script + `260dd1b` rehearsal template contract guard）
+   - WP-02 **準備工作**（intake template / seven-candidate dry-run report / true-value intake packet / 3 支 WP-02 相關 contract guards）= ✅ **LANDED**（`631ba5c` / `79dec13` / `e61730e` / `8fe2cac` / `97ea33b` / `ad32119`）；**注意** WP-02 之實寫入仍屬第 1 類 waiting-for-Dean-input
+   - WP-05（Blogger preview helper B1 navigator, read-only）= ✅ **LANDED**（`cc6497b` navigator + `cae3123` operationalize + `1ea5d58` rehearsal doc + `53cc20d` manual preview doc）
+1. **P2-Entry candidates**（適合作 Phase 2 第一個安全小切片；docs-only 或極小 scope）：~~WP-01~~（✅ landed，移到第 0 類）／ WP-02 **實寫入**（Blogger backfill write 1 篇 sidecar；準備工作已完成、waiting for Dean to provide real `publishedUrl` / `publishedAt`）／ ~~WP-05~~（✅ landed，移到第 0 類）／ WP-11（Blogger live overflow observation，docs-only；僅觸發時）／ WP-14（custom domain prep-1 docs-only）／ WP-16（AdSense prep-1 docs-only）。
+2. **Deferred until Dean signal**（需 Dean 提供外部資料 / 判斷時機）：WP-03（backfill remaining 篇目 rollout）／ WP-06（Preview helper B2 draft-aware build）／ WP-08（Second GitHub Pages deploy 1 篇）／ WP-15（Gate D DNS / CNAME 落地）／ WP-17（Gate A pub id 落地 / ads.txt）／ WP-18（Blogger AdSense Batch 2 P2 live repost）／ WP-19（Reverse UTM pm-26 deploy）／ WP-20（Admin richer fields / ready option）。
+3. **Blocked / dormant / red-line**（第一版永禁或明確 dormant；本 doc 不放路徑）：WP-04（Admin write path Apply / middleware / admin-write-cli）／ WP-09（FB sidecar 真實寫入）／ WP-10（Commerce L2 / L3 / L4 新 candidates）／ WP-13（`github-pages-blog-planning` quarantine 解除）。
+4. **Analytical only**（純觀察 / 情報收集；不進系統實作）：WP-07（GA4 P2 / P3 dimension 觀察）／ WP-12（Download Admin picker / renderer / Forms 串接 preanalysis）。
 
 **C. Recommended P2-entry candidates**：本 doc **不排** WP-01 / 02 / 05 / 11 / 14 / 16 之間 preferred order，改依 Dean 目標分岔（見 §5）：
 
@@ -112,6 +142,8 @@ CLAUDE.md §3a                             ← 上位契約 / red lines
 
 ### WP-01 — Blogger backfill write-phase rehearsal（docs-only；含 dry-run runbook / rollback drill）
 
+> **Status update（2026-07-13）**：✅ **LANDED**。Rehearsal template = `docs/20260710-blogger-backfill-write-rehearsal-template.md`（commit `f1aec08`）；one-post dry-run worksheet = `docs/20260710-blogger-backfill-one-post-dry-run-worksheet.md`（`5c92d15`）；one-post dry-run helper script = `src/scripts/check-blogger-backfill-one-post.js`（`b0b0488`；registered as `check:blogger-backfill:one-post`）；rehearsal template contract guard = `src/scripts/check-blogger-backfill-write-rehearsal-template-contract.js`（`260dd1b`；registered as `check:blogger-backfill:write-rehearsal-template-contract`）。原本欄位保留為完整 WP spec；未來 Route B / Route C 啟動時**不再將 WP-01 列為新的 entry candidate**。若需再拉一份 rehearsal doc，屬 refresh phase、須 Dean explicit approval + 另開 phase。
+
 - **Goal**：於 `docs/20260710-blogger-backfill-write-phase-preflight.md` 既有 preflight 之上，追加一份 write-phase rehearsal doc：明列 sidecar write 之逐項步驟（先於 sandbox / 假路徑），並模擬 rollback；**不**寫任何真值。
 - **Trigger condition**：Dean 想先把 write-phase 流程 rehearsal 過再實寫；或 Dean 尚未取得真值但想穩定 write-phase 之 acceptance / rollback 細節。
 - **Allowed work**：新增 `docs/<YYYYMMDD>-blogger-backfill-write-phase-rehearsal.md`（docs-only；additive-only）。
@@ -124,6 +156,16 @@ CLAUDE.md §3a                             ← 上位契約 / red lines
 - **Required checks**：`git status --short` 只顯示新增 doc；`check:phase1-readiness` exit 0；`check:phase1-readiness-contract` 22/22。
 
 ### WP-02 — Blogger backfill write 1 篇 sidecar（真值寫入）
+
+> **Status update（2026-07-13）**：⚠️ **PREPARATION LANDED / WRITE STILL DEAN-GATED**。所有 write-phase 前置準備均已 landed：
+> - `docs/20260710-blogger-backfill-wp02-intake-template.md`（`631ba5c`；WP-02 intake template）
+> - `docs/20260710-blogger-backfill-seven-candidate-one-post-dry-run-report.md`（`79dec13`；七篇 backfill dry-run 報告）
+> - `docs/20260710-blogger-backfill-wp02-true-value-intake-packet.md`（`e61730e`；WP-02 true-value intake packet）
+> - guard `check:blogger-backfill:wp02-intake-contract`（`8fe2cac`）
+> - guard `check:blogger-backfill:one-post-worksheet-contract`（`97ea33b`）
+> - guard `check:blogger-backfill:wp02-one-post-consistency-contract`（`ad32119`）
+>
+> **實寫入尚未執行**：`.publish.json` sidecar 未動；`check:blogger-backfill` 仍 candidates 7 / complete 0 / missing 7（report-only）；`bloggerPostId` 屬系統欄位不列必填、per identity policy。啟動條件不變：Dean 於 approval 中明列篇目 + 提供 real `publishedUrl` / `publishedAt`（+ optional `note`）。Claude 不主動啟動、不猜任何 Blogger 值、不從既有 metadata 推導 Blogger internal ID。
 
 - **Goal**：對 1 篇候選（例如 `we-media-myself2`，只缺 `bloggerPostId`；或 P3 `blog-restart-steady-rhythm-notes` 已 live verified）寫入 sidecar `.publish.json` 真值。
 - **Trigger condition**：Dean 於 approval 中明列篇目 + 提供 real `publishedUrl` / `publishedAt`（+ optional `note`；`bloggerPostId` 不列必填、per identity policy）。
@@ -163,6 +205,8 @@ CLAUDE.md §3a                             ← 上位契約 / red lines
 - **Required checks**：**不 apply**。
 
 ### WP-05 — Blogger preview helper B1 navigator（read-only；隔離於 build）
+
+> **Status update（2026-07-13）**：✅ **LANDED**（2026-07-12）。B1 navigator source landed at `cc6497b`（`feat(blogger): add read-only preview navigator helper`；`src/scripts/check-blogger-preview.js` + smoke `src/scripts/check-blogger-preview-smoke.js`；registered as `check:blogger-preview` + `check:blogger-preview-smoke`；`check:blogger-preview` + smoke 49/49 PASS per landing ledger）。Operationalization landed at `cae3123`；operational rehearsal ledger `docs/20260712-blogger-preview-b1-one-post-operational-rehearsal.md`（`1ea5d58`）；live manual preview record `docs/20260712-blogger-b1-live-manual-preview-test-we-media-myself2.md`（`53cc20d`）。**B1 read-only、隔離於 build**：不動 `build:blogger` 契約 / 不改 `classify` / 不動 `dist-blogger/` / 不呼叫 Blogger API / 不進 phase1-readiness / release-readiness umbrella；未來 Route B / Route D 啟動時**不再將 WP-05 列為新的 entry candidate**。若日後 Dean 判斷需 B2 draft-aware preview build，指涉 = WP-06（仍 Dean-gated / not started）。原本欄位保留為完整 WP spec；歷史對照用。
 
 - **Goal**：新增 `src/scripts/preview-blogger-navigator.js`（read-only；輸出 preview HTML index；不動 build 契約）+ 新增 `npm run preview:blogger`；per `docs/20260710-blogger-preview-only-script-preanalysis.md` §6 / §11。
 - **Trigger condition**：Dean 明說「Blogger 手動 preview 流程繁瑣度足以支撐引入 helper；選 B1」。
@@ -375,20 +419,21 @@ CLAUDE.md §3a                             ← 上位契約 / red lines
 
 ## 5. Recommended Phase 2 entry candidates
 
-依 Dean 目標分岔（本 doc **不排** entry candidates 之間 preferred order；也**不代** Dean 選）：
+依 Dean 目標分岔（本 doc **不排** entry candidates 之間 preferred order；也**不代** Dean 選）。**2026-07-13 reconciliation**：WP-01 rehearsal template + WP-05 B1 navigator 均已 landed（見 §0.5），已從下表**移除**；WP-02 準備工作 landed、實寫入仍 Dean-gated（見 §0.5）。
 
 | Dean 目標 | 推薦 entry WP | 為什麼 |
 | --- | --- | --- |
-| 「先 rehearsal Blogger backfill write flow，不用真值」 | **WP-01** | docs-only；不需真值；rehearsal / rollback drill；可為 WP-02 鋪路 |
-| 「已取得 Blogger 後台真值 + 想寫 1 篇 sidecar」 | **WP-02** | 1 篇 sidecar write；write path 首觸；per preflight §7 acceptance |
-| 「Blogger 手動 preview 流程繁瑣度足以引入 helper（B1）」 | **WP-05** | 新 script（read-only）；不動 build；per preanalysis §11 acceptance |
+| 「已取得 Blogger 後台真值 + 想寫 1 篇 sidecar」 | **WP-02**（實寫入；準備工作已 landed，見 §0.5） | 1 篇 sidecar write；write path 首觸；per preflight §7 acceptance；Dean 提供 real `publishedUrl` / `publishedAt` 為 hard gate |
 | 「Blogger 實機發布頁再現水平捲軸」 | **WP-11** | docs-only 觀察；觸發條件命中才啟動 |
 | 「累積內容 / 觀察 SEO 到啟動 custom domain（Gate D）」 | **WP-14** | docs-only prep-1；不動 DNS / CNAME |
 | 「AdSense 資產先鋪（Gate A）」 | **WP-16** | docs-only prep-1；不落地 pub id |
 | 「Download 系統擴充方向 preanalysis」 | **WP-12** | docs-only preanalysis |
 | 「GA4 dimension 觀察」 | **WP-07** | docs-only 觀察；Dean 手動 GA4 後台 + masked evidence |
+| 「Blogger 手動 preview 流程繁瑣度需再進一步 helper 支援」 | **WP-06**（B2 draft-aware preview build） | B1 read-only helper 已 landed（見 §0.5）；若 B1 仍不足才討論 B2；B2 尚未實作 / Dean-gated |
+| 「先 rehearsal Blogger backfill write flow」 | ✅ 已 landed（WP-01；見 §0.5），**不再是新 entry** | — |
+| 「引入 Blogger preview navigator helper（read-only）」 | ✅ 已 landed（WP-05 B1；見 §0.5），**不再是新 entry** | — |
 
-**caveat**：本 §5 為 recommendation，**非**強制流程；Dean 可依當下判斷選擇 WP，Claude 於下一 session 明確 approval 時執行。
+**caveat**：本 §5 為 recommendation，**非**強制流程；Dean 可依當下判斷選擇 WP，Claude 於下一 session 明確 approval 時執行。**已 landed 之 WP-01 / WP-05 不得再被列為新 entry candidate**；若要新增 rehearsal / refresh / re-run，須 explicit approval + 另開 phase。
 
 ---
 
@@ -421,8 +466,9 @@ CLAUDE.md §3a                             ← 上位契約 / red lines
 | Blogger backfill write phase 啟動 + 補真值 | WP-02 / WP-03 | `docs/20260710-blogger-backfill-write-phase-preflight.md` |
 | 動 `.publish.json` sidecar 之任何欄位 | WP-02 / WP-03 | 同上 |
 | 建立 6 篇 sidecar-absent 之新 sidecar | WP-02 / WP-03 §5 / §8 | 同上 |
-| Blogger preview helper 實作（B1 / B2） | WP-05 / WP-06 | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6 / §11 |
-| 動 `build:blogger` / `classify` / `dist-blogger/` 契約 | WP-06 gate | 同上 |
+| Blogger preview helper B1 navigator 實作 | WP-05 | ✅ landed 2026-07-12（`cc6497b`；`docs/20260712-preview-only-helper-implementation.md`）；此列僅為歷史對照 |
+| Blogger preview helper B2 draft-aware preview build 實作 | WP-06 | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2 / §11；B2 仍未實作 / Dean-gated |
+| 動 `build:blogger` / `classify` / `dist-blogger/` 契約 | WP-06 gate | 同上（B2 gate；B1 未動這三者） |
 | Custom domain Gate D 啟動 + 買 domain / 設 DNS / 建 `CNAME` | WP-14 / WP-15 | `docs/20260710-custom-domain-adsense-trigger-checklist.md` §5 / §6 |
 | AdSense Gate A 啟動 + 落地 real pub id / `ads.txt` | WP-16 / WP-17 | 同上 §8 / §10 / §11 |
 | Blogger 實機 overflow 觀察啟動 | WP-11 | `docs/20260708-blogger-mobile-horizontal-scrollbar-audit.md` §7 Option A |
@@ -507,6 +553,10 @@ CLAUDE.md §3a                             ← 上位契約 / red lines
 
 ## 11. 變更安全性（docs-only）
 
+**2026-07-13 reconciliation slice**（同性質 docs-only additive update；唯一 mutation = 本檔之 §0.5 新增 + §1.B 分類補「Completed since original doc」+ WP-01 / WP-02 / WP-05 段落各加 Status update 註記 + §5 entry candidates 表移除已 landed 者 + §7 must-not-start 表對 B1 / B2 拆分）：**未**改 source / content / settings / views / scripts / package / lockfile / dist / gh-pages / `.cache` / `CLAUDE.md` / `MEMORY.md` / `memory/`；**未**新增契約 / 規則 / red-line；**未**移除任何既有 red-line；**未**宣告新 PASS；**未**代 Dean 決策；**未**啟動任一 WP；**未**動任何 sidecar / frontmatter；**未**猜任何 Blogger 值。原本 2026-07-10 landing 之欄位皆保留為完整 WP spec、僅在 WP-01 / WP-02 / WP-05 上加註 Status update 註記；歷史對照仍可讀。
+
+原本 2026-07-10 landing 之 §11 敘述保留於下（僅適用於原本 landing 時之狀態；不 override 本 §11 開頭之 reconciliation 補述）：
+
 本檔為 docs-only 新增，唯一 mutation = 本檔（+ 對應 commit + push origin/main）。**不含**任何程式 / frontmatter / settings / sidecar / build / deploy / dev-server 變更；未新增 guard / npm script / preview-only script / helper script；未改 `.gitignore`；未改 CSS；未改 `CLAUDE.md` / `MEMORY.md` / `memory/`；未觸碰 deploy clone 寫入；未 build / 未產 dist / 未 deploy / 未 push gh-pages；未發布 Blogger；未購買網域 / 未動 DNS / 未碰 AdSense / GA4 / Blogger / GSC 後台；未寫回任何 Phase 1 status 宣告至 `CLAUDE.md`；未猜 Blogger `bloggerPostId` / `publishedUrl` / `publishedAt` / `bloggerBlogId`；未從任何 metadata 推導 Blogger internal ID；未新增測試文章 / artifact；未建 `CNAME` / `ads.txt`（含 placeholder / fake）；未動 `content/settings/ads.config.json`；未升級任何 report-only guard 為 fail-fast。§0 boot baseline 為本 session read-only 驗證；§1 結論為對既有 result / RC docs 之盤點結論，未代替 Dean 宣告新 PASS；§2 Phase 1 RC 關係為既有 family 之外圍延伸描述，未 downgrade Phase 1 RC；§3 source docs 為本 session read-only 讀取盤點；§4 WP-01 … WP-20 為對既有 preflight / preanalysis docs 之細顆粒拆分整理，未新增契約；§5 recommended entry candidates 為建議、非強制流程；§6 blocked 列沿用 `CLAUDE.md` §3a Dormant summary + `memory/project_*_status.md` + 各 preflight docs；§7 Claude must not start autonomously 沿用 `CLAUDE.md` §3a Red lines + route selection §6；§8 non-goals 沿用 route selection §7 + `CLAUDE.md` §3a Red lines；§9 idle-freeze recommendation 沿用 `CLAUDE.md` §3a Recommended next paths；§10 next slice 為候選列表、非決策。
 
 ---
@@ -520,6 +570,14 @@ CLAUDE.md §3a                             ← 上位契約 / red lines
 - `docs/20260710-blogger-preview-sanity-analysis.md`（Blogger preview 40 項 sanity checklist）
 - `docs/20260710-phase1-rc-next-readiness-analysis.md`（RC readiness re-verify + 三份 workflow docs 影響面 audit）
 - `docs/20260710-blogger-backfill-write-phase-preflight.md`（WP-01 / WP-02 / WP-03 上位；本 doc §4 引用 §2 / §4 / §5 / §7 / §8 / §9 / §10）
+- `docs/20260710-blogger-backfill-write-rehearsal-template.md`（WP-01 rehearsal template；`f1aec08`；2026-07-13 §0.5 reconciliation 引用）
+- `docs/20260710-blogger-backfill-one-post-dry-run-worksheet.md`（WP-01 one-post worksheet；`5c92d15`；2026-07-13 §0.5 reconciliation 引用）
+- `docs/20260710-blogger-backfill-wp02-intake-template.md`（WP-02 intake template；`631ba5c`；2026-07-13 §0.5 reconciliation 引用）
+- `docs/20260710-blogger-backfill-seven-candidate-one-post-dry-run-report.md`（WP-02 seven-candidate dry-run 報告；`79dec13`；2026-07-13 §0.5 reconciliation 引用）
+- `docs/20260710-blogger-backfill-wp02-true-value-intake-packet.md`（WP-02 true-value intake packet；`e61730e`；2026-07-13 §0.5 reconciliation 引用）
+- `docs/20260712-preview-only-helper-implementation.md`（WP-05 B1 navigator implementation ledger；`cc6497b`；`check:blogger-preview` + `check:blogger-preview-smoke` 49/49；2026-07-13 §0.5 reconciliation 引用）
+- `docs/20260712-blogger-preview-b1-one-post-operational-rehearsal.md`（WP-05 B1 operational rehearsal；`1ea5d58`）
+- `docs/20260712-blogger-b1-live-manual-preview-test-we-media-myself2.md`（WP-05 B1 live manual preview test；`53cc20d`）
 - `docs/20260710-custom-domain-adsense-trigger-checklist.md`（WP-14 / WP-15 / WP-16 / WP-17 上位；本 doc §4 引用 §5 / §6 / §8 / §10 / §11）
 - `docs/20260710-blogger-preview-only-script-preanalysis.md`（WP-05 / WP-06 上位；本 doc §4 引用 §6 / §11）
 - `docs/20260709-blog-phase2-next-work-packet.md`（Phase 2 next-work packet；本 doc 為其 §C 候選 2 之更深一層落地）
