@@ -232,7 +232,10 @@ Case E / F 的雙層防護：
   - Layer 1 5/5 PASS
   - Layer 2 scanned 17 / legacy 17 / withByline 0 / warnings 0
   - Layer 3 10/10 PASS（Cases A–J；Cases H/I/J 分別鎖 `byline === null` /
-    `Array.isArray(byline)` / `typeof byline !== 'object'` 三條 validator 分支）
+    `Array.isArray(byline)` / `typeof byline !== 'object'` 三條 validator 分支；
+    Cases D/F/G/H/I 另鎖 error `value` 字串格式契約 —— 分別覆蓋
+    `string "…"` / `null`（showAuthor 分支）/ bare `typeof` / `null`（byline 分支）/ `array`
+    五種格式輸出，per §2.3 錯誤訊息範例）
 
 執行：
 

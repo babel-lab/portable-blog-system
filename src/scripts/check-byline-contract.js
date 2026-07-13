@@ -42,6 +42,10 @@
 //     `Array.isArray(byline)` / `typeof byline !== 'object'`）—— 未來若不小心把
 //     `byline === null` 改成 `byline == null`（會誤攔 `undefined` → 破 Case A
 //     backward-compat）或漏掉某分支，均會在 Layer 3 hard-fail。
+//     額外：宣告 `expectValue` 之案例（D/F/G/H/I）另鎖 error `value` 字串格式契約
+//     （per docs/20260712-shared-author-byline-contract.md §2.3 錯誤訊息範例）——
+//     `null` / `array` / `string "…"` / bare `typeof` 四種格式分支被 5 案例分別覆蓋；
+//     若 validator 丟掉 `null` / `array` 特例或把 string 的 quoted 包裝拿掉，Layer 3 hard-fail。
 //
 // 執行：node src/scripts/check-byline-contract.js
 //   - Layer 1 全 PASS + Layer 2 純 warning + Layer 3 全 PASS → exit 0。
@@ -256,6 +260,7 @@ const VALIDATOR_CASES = [
     label: 'byline.showAuthor: "false" (string) → ERROR byline-show-author-invalid-type',
     byline: { showAuthor: 'false' },
     expectTypes: ['byline-show-author-invalid-type'],
+    expectValue: 'string "false"',
   },
   {
     id: 'E (validator)',
@@ -268,12 +273,14 @@ const VALIDATOR_CASES = [
     label: 'byline.showAuthor: null (YAML empty value) → ERROR byline-show-author-invalid-type',
     byline: { showAuthor: null },
     expectTypes: ['byline-show-author-invalid-type'],
+    expectValue: 'null',
   },
   {
     id: 'G (validator)',
     label: 'byline: "true" (byline itself a string) → ERROR byline-invalid-type',
     byline: 'true',
     expectTypes: ['byline-invalid-type'],
+    expectValue: 'string',
   },
   {
     // Covers `byline === null` branch. YAML `byline:` empty value parses to null;
@@ -282,6 +289,7 @@ const VALIDATOR_CASES = [
     label: 'byline: null (YAML empty `byline:` value) → ERROR byline-invalid-type',
     byline: null,
     expectTypes: ['byline-invalid-type'],
+    expectValue: 'null',
   },
   {
     // Covers `Array.isArray(byline)` branch. typeof [] === 'object', so the
@@ -290,6 +298,7 @@ const VALIDATOR_CASES = [
     label: 'byline: [] (array) → ERROR byline-invalid-type',
     byline: [],
     expectTypes: ['byline-invalid-type'],
+    expectValue: 'array',
   },
   {
     // Covers `typeof byline !== 'object'` branch for non-string primitives.
@@ -315,14 +324,27 @@ function runLayer3() {
     );
     const actualTypes = bylineErrors.map((i) => i.type).sort();
     const expectedTypes = [...c.expectTypes].sort();
-    const ok =
+    let ok =
       actualTypes.length === expectedTypes.length &&
       actualTypes.every((t, idx) => t === expectedTypes[idx]);
     const actualDesc = actualTypes.length === 0 ? '(none)' : actualTypes.join(', ');
     const expectedDesc = expectedTypes.length === 0 ? '(none)' : expectedTypes.join(', ');
-    const detail = ok
+    let detail = ok
       ? ''
       : ` — expected [${expectedDesc}], actual [${actualDesc}]${bylineErrors.length > 0 ? '; sample value=' + JSON.stringify(bylineErrors[0].value) : ''}`;
+
+    // Error `value` format contract (docs/20260712-shared-author-byline-contract.md §2.3):
+    // only enforced when case declares `expectValue` AND type-match already succeeded.
+    if (ok && c.expectValue !== undefined) {
+      const targetType = c.expectTypes[0];
+      const targetError = bylineErrors.find((e) => e.type === targetType);
+      const actualValue = targetError ? targetError.value : undefined;
+      if (actualValue !== c.expectValue) {
+        ok = false;
+        detail = ` — value contract mismatch on ${targetType}: expected ${JSON.stringify(c.expectValue)}, actual ${JSON.stringify(actualValue)}`;
+      }
+    }
+
     console.log(`  [${ok ? 'PASS' : 'FAIL'}] Case ${c.id} — ${c.label}${detail}`);
     if (ok) passed++;
     else failures.push(c.id);
