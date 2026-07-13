@@ -195,6 +195,7 @@ Readiness checks 本輪已跑（read-only；exit 0）：
 | #4 | 候選 D — Blogger preview-only helper：B1 navigator 已 landed（`cc6497b`，2026-07-12）；剩 B2 draft-aware preview build 待 Dean 明說 | Dean 明說啟動 B2 | `docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2；`docs/20260712-preview-only-helper-implementation.md` |
 | #5 | 候選 E — custom domain / AdSense trigger checklist 已 landed（`c0ee384`）→ 未來 Gate D / A | Dean 判斷 SEO 累積時機 + 明說啟動 | `docs/20260710-custom-domain-adsense-trigger-checklist.md` |
 | #6 | 候選 C — Blogger 實機發布頁 overflow 觀察 docs-only | **僅在** Blogger 實機發布頁再現水平捲軸時 | `docs/20260708-blogger-mobile-horizontal-scrollbar-audit.md` §7 Option A |
+| #7 | 候選 F — WP-12 Download next-phase preanalysis（docs-only）已於 2026-07-13 landed；未來若啟動實作，見 follow-up A–I | Dean 明說啟動 §10 任一 follow-up | `docs/20260713-wp12-download-next-phase-preanalysis.md` |
 
 **啟動任一候選皆須 Dean explicit approval + 另開獨立 phase**；本 index 不代 Dean 決策。
 
