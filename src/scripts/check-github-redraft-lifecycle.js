@@ -97,9 +97,14 @@ check('redraft round-trip: 同 slug ready → draft → ready 之 include 為 tr
   assert.strictEqual(drafted.include, false, `退回草稿應 exclude（reason=${drafted.reason}）`);
 
   // 沿用相同 slug 重新上架 → 恢復相同輸出路徑
-  const live2 = classify({ ...base, status: 'ready', draft: false });
+  const republished = { ...base, status: 'ready', draft: false };
+  const live2 = classify(republished);
   assert.strictEqual(live2.include, true, `重新上架應 include（reason=${live2.reason}）`);
-  assert.strictEqual(live2 && base.slug, slug, 'slug 不變（同輸出路徑 posts/<slug>/index.html）');
+  // classify 為唯讀 predicate：不得 mutate 傳入文章物件之 identity（slug）。
+  // 這保證 redraft 生命週期反覆 classify 同一來源時 slug 不漂移 → 重新上架沿用同 slug、恢復同輸出路徑
+  // posts/<slug>/index.html。斷言取 classify() 呼叫「之後」的 republished.slug，故真正依賴 classify 的行為，
+  // 而非僅比較兩個 fixture 建構時已知相等的變數。
+  assert.strictEqual(republished.slug, slug, 'classify 不得 mutate slug（同輸出路徑 posts/<slug>/index.html）');
 });
 
 // ── 4. stale HTML 契約（source-level 靜態斷言）──────────────────────────────────
