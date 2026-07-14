@@ -20,7 +20,11 @@ const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 const VISIBLE_STATUS = new Set(['ready', 'published']);
 
-function classify(data) {
+// Phase 20260714-github-redraft-lifecycle：classify 為 build 的唯一「文章是否進正式輸出」判斷。
+//   additive export（行為不變；既有 loadPosts 之內部呼叫沿用同一函式）供 lifecycle contract
+//   guard（check-github-redraft-lifecycle.js）以真實函式驗證 redraft state matrix，避免另抄一份
+//   規格產生 drift。draft:true 或 status∉{ready,published} → 排除（保守：矛盾狀態亦排除，偏向隱藏）。
+export function classify(data) {
   if (data.draft === true) return { include: false, reason: 'draft:true' };
   const status = data.status ?? 'draft';
   if (!VISIBLE_STATUS.has(status)) return { include: false, reason: `status:${status}` };
