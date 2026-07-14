@@ -46,6 +46,7 @@
     "check:redraft-plan": "node src/scripts/check-redraft-plan.js",
     "check:admin-git-safety-preflight": "node src/scripts/check-admin-git-safety-preflight.js",
     "check:redraft-apply-engine": "node src/scripts/check-redraft-apply-engine.js",
+    "check:redraft-apply-cli": "node src/scripts/check-redraft-apply-cli.js",
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-preview": "node src/scripts/check-blogger-preview.js",
@@ -79,7 +80,8 @@
     "admin:write": "node src/scripts/admin-write-cli.js",
     "admin:lookup": "node src/scripts/admin-article-lookup.js",
     "admin:plan-redraft": "node src/scripts/redraft-plan.js",
-    "admin:check-git-safety": "node src/scripts/admin-git-safety-preflight.js"
+    "admin:check-git-safety": "node src/scripts/admin-git-safety-preflight.js",
+    "admin:redraft-apply": "node src/scripts/redraft-apply-cli.js"
   },
   "dependencies": {
     "@vitejs/plugin-basic-ssl": "latest",

@@ -242,7 +242,7 @@ apply（Dean 明確）：
 | **A. read-only article lookup** ✅ **IMPLEMENTED（2026-07-14；見 §17）** | CLI／resolver 讀取並顯示既有文章 slug／title／current status／current draft／source path／GitHub·Blogger publishing metadata；建立 slug→唯一 post resolver。**不寫檔**。 | ❌ | ❌ |
 | **B. dry-run patch generation** ✅ **IMPLEMENTED（2026-07-14；見 §18）** | 產生僅含 status+draft 之 old/new diff（boolean 支援、兩欄位成對、expectedOldValues、source/target SHA-256）；**不 apply**。 | ❌ | ❌ |
 | **C.1a. dormant atomic apply engine** ✅ **IMPLEMENTED（2026-07-14；fixture-only / dormant；見 §20）** | atomic two-field write 本體：plan schema recheck → repository safety preflight（§19）→ Phase A 重新唯一解析 → source SHA TOCTOU → lifecycle precondition → target 重算核 SHA → same-dir atomic replace（exclusive create + fsync + mode 保留）→ 必要 post-write validation callback → 失敗 rollback。**無 production CLI 入口 / 無 `--apply` / 無 npm apply script / 未被任何 production CLI / Admin UI import；只在 contract guard 之 OS temp fixtures 實際寫入。** | ✅（temp fixtures only；production .md 從未被測試寫入） | ❌ |
-| **C.1b. production CLI activation**（未實作） | 將 engine 接上 Dean-gated 正式 CLI（explicit confirmation + Dean approval）；仍 disabled-by-default。 | — | ❌ |
+| **C.1b. production CLI activation** ✅ **IMPLEMENTED（2026-07-14；disabled-by-default；見 §21）** | 將 engine 接上 Dean-gated 正式 CLI（`redraft-apply-cli.js`）：multi-auth gate（`--apply` + env gate 精確值 + `--confirm=<精確 phrase>` + `--slug` + `--op` + `--expected-source-sha`）→ Phase A 重新解析 → Phase B 重新產 plan → expected source SHA 比對 → engine（含 Phase C0 preflight + atomic write + pure single-file post-write validation callback）。**預設完全禁用；無 force bypass；本 session 未對 production 執行 apply。** | ✅（temp fixtures only；production .md 從未被測試寫入） | ❌ |
 | **C. local apply, no Git automation**（git-safety preflight 前置**已備**，§19；C.1a engine **已備 dormant**；正式 CLI 啟用〔C.1b〕仍未實作） | 全部 preflight（§10；git-safety 部分見 §19）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
 | **D. optional Git assistance** | 另行評估 commit／push 輔助；**仍不得與 deploy 綁定**。 | — | commit/push（Dean-gated） |
 | **E. deploy assistance** | 另一個 Dean-gated slice；build + 同步 dist→gh-pages 使 URL 生效 404。 | — | deploy（Dean-gated） |
@@ -275,7 +275,14 @@ GO for read-only article lookup (Phase A)                    ← DONE 2026-07-14
 GO for dry-run-only status/draft patch generation (Phase B)  ← DONE 2026-07-14 (§18)
 GO for read-only repository safety preflight (Phase C 前置)   ← DONE 2026-07-14 (§19)
 GO for dormant atomic apply engine (Phase C.1a; fixture-only) ← DONE 2026-07-14 (§20)
+GO for explicit-confirmation local apply CLI (Phase C.1b)    ← DONE 2026-07-14 (§21; disabled-by-default; fixture-only tests)
 ```
+
+> **2026-07-14 update（Phase C.1b）**：explicit-confirmation local apply CLI（`redraft-apply-cli.js`，§21）
+> 已落地為 **production-capable 但預設完全禁用** 的 Dean-gated CLI。**下一 slice = first production
+> one-post rehearsal = GO only for a separate Dean-approved one-post rehearsal using an explicitly
+> selected non-critical article**；本 session **未**對任何 production Markdown 執行 apply、**未** commit /
+> push production 文章狀態、**未** build / deploy。**通過所有安全門 ≠ 已授權寫入。**
 
 > **2026-07-14 update（Phase C.1a）**：atomic two-field write 本體（`redraft-apply-engine.js`）已落地為
 > **dormant / fixture-only** engine（§20）：整合 git-safety preflight + source SHA recheck + article
@@ -535,6 +542,83 @@ Phase C 的 **atomic two-field write 本體**已落地為 **dormant、fixture-on
 
 - 本 slice **只**交付 dormant engine + guard + docs；**未**接正式 CLI、**未**啟用 `--apply`、**未** commit / push 文章狀態、**未** build / deploy。
 - Phase C.1b（正式 CLI activation）須**另開 phase + Dean explicit approval**，且 disabled-by-default；**通過所有安全門 ≠ 已授權寫入**。commit / push / build / deploy 與本 write path 仍完全分離。
+
+---
+
+## 21. Phase C.1b 實作紀錄（explicit-confirmation local apply CLI；disabled-by-default；2026-07-14 landed）
+
+Phase C.1a 的 dormant engine 已接上一個 **production-capable 但預設完全禁用** 的 Dean-gated 正式 CLI。CLI 只負責**授權 + 協調**，engine 負責真正的 atomic write 安全契約（CLI **不**複製 engine 已有安全邏輯）。**本 session 未對任何 production Markdown 執行 apply、未 commit / push 文章狀態、未 build / deploy；所有實際 apply 測試僅在 OS temp isolated git fixtures。**
+
+### 21.1 檔案 / 進入點
+
+| 檔案 | 角色 |
+| --- | --- |
+| `src/scripts/redraft-apply-cli.js` | apply CLI（`runApply` / `runCli` / `makePostWriteValidator` / `formatResult` / 授權常數 `ENV_GATE_NAME`·`ENV_GATE_VALUE`·`CONFIRM_PHRASE`·`FORBIDDEN_FLAGS`）。 |
+| `src/scripts/check-redraft-apply-cli.js` | contract guard（31 斷言；OS temp isolated git repos；finally 清除）。 |
+| npm `admin:redraft-apply` | `node src/scripts/redraft-apply-cli.js`（Dean-gated 入口；**value 不內建** `--apply` / env 值 / confirm phrase）。 |
+| npm `check:redraft-apply-cli` | 跑 contract guard。 |
+
+### 21.2 預設行為（未授權）
+
+未同時具備全部授權時，一律**不**呼叫 engine、**零寫入**：
+
+- **無 `--apply`** → hard-fail `missing-apply-flag`，並提示先執行 `admin:plan-redraft` 產生並檢視 dry-run plan（§4.1）。
+- 提供 `--slug` + `--op` 但缺 `--apply` → 仍拒（不因提供 slug + action 就寫入）。
+
+### 21.3 多重明確授權（§4.2；全部吻合才呼叫 engine）
+
+```
+--apply
+--slug=<exact-slug>
+--op=redraft|republish
+--expected-source-sha=<64 lowercase hex>
+--confirm=DEAN-CONFIRMS-LOCAL-STATUS-WRITE
+環境變數 PORTABLE_BLOG_REDRAFT_APPLY=DEAN_APPROVED_LOCAL_WRITE_ONLY
+```
+
+- **環境變數 gate**：`PORTABLE_BLOG_REDRAFT_APPLY` 必須**精確等於** `DEAN_APPROVED_LOCAL_WRITE_ONLY`。預設不存在；**不**接受 `1` / `true` / 部分匹配 / 前後空白；**不**寫入 `.env`；**不**永久開啟；每次執行都需重新提供。
+- **confirmation phrase**：固定精確字串 `DEAN-CONFIRMS-LOCAL-STATUS-WRITE`；**不**接受 `--yes` / `-y` / 大小寫變體 / 部分匹配。
+- **expected source SHA 必填**：Dean 須提供先前 dry-run 顯示的 `sourceSha256`。CLI 重新產生 plan、比對重新產生的 `sourceSha256` == 使用者提供值；**不符 → hard-fail `stale-source`**，不詢問後繼續、不自動採用新 SHA、不覆蓋最新檔案。
+
+### 21.4 執行流程（§6）
+
+1. 解析 / 驗證全部 CLI arguments（含 forbidden / unknown 拒絕、SHA 格式）。2. 驗證 env gate 精確值。3. 驗證 confirmation phrase。4. Phase A 重新唯一解析文章。5. Phase B 重新產生 dry-run plan。6. 比對 expected source SHA（不符 → `stale-source`）。7. 顯示最終即將執行：slug / title / source path / current status·draft / proposed status·draft / source SHA / target SHA。8. 呼叫 Phase C.1a engine。9. engine 內部重跑 Phase C0 preflight。10. engine 完成 atomic write。11. post-write validation callback（pure single-file）。12. 成功回報 `local Markdown changed` + `commit/push/build/deploy: no` + Dean 下一步。
+
+### 21.5 允許的操作（唯二；§5）
+
+`redraft`：`ready|published, false → draft, true`；`republish`：`draft, true → ready, false`。**只**成對改動 `status` + `draft` 兩欄位。**不**接受任意 target status / 任意 frontmatter key / published 精確還原 / archived 轉換 / 永久刪除 / Blogger online 狀態；**不**新增 `previousStatus` / sidecar / history metadata。
+
+### 21.6 禁止參數（§9；無 force bypass）
+
+即使同時帶 `--apply`，仍明確拒絕（`forbidden-flag`）：`--commit` / `--push` / `--deploy` / `--build` / `--fetch` / `--pull` / `--reset` / `--checkout` / `--stash` / `--clean` / `--delete` / `--permanent-delete` / `--blogger` / `--force` / `--skip-validation` / `--skip-preflight` / `--ignore-sha`。unknown 參數亦拒。
+
+### 21.7 post-write validation（§7；pure single-file）
+
+CLI 傳給 engine 的 validation callback **只重讀單一目標檔、in-memory 驗證**（**不**跑 repo-wide `validate:content` / lifecycle guard——dirty-tree 下會因「預期的單一文章變更」而失敗；**不**繞過安全門、**不**偽造 clean tree、**不** commit / stash / 隱藏變更）：Markdown 可解析 / status·draft 型別與一致性 / `classify()` 符合 action（redraft→隱藏、republish→可見）/ slug 未改變 / target SHA 正確 / **body 與非白名單 metadata 未改變**（把已寫入兩行反代回 old 值、重組 SHA-256 == `sourceSha256`，證明恰 2 行變更）。repo-wide checks 列為 apply 完成後 Dean 手動下一步。
+
+### 21.8 成功後 Git 狀態（§8）
+
+實際 local apply 成功後，production repository 預期為 **working tree dirty、只有目標 Markdown 有 status/draft 兩行變更**——這是正確結果。CLI **不**自動 commit / push / stash / clean / reset / build / deploy，並明確提示 Dean 下一步（`git diff` → validate → lifecycle guard → Dean 自行決定 commit / push / build / deploy）。
+
+### 21.9 fixture-only 測試 / contract guard（31 斷言；isolated temp git repos）
+
+覆蓋 §10 契約 1–32：無 `--apply` / 無 env / env 值錯（含 `1`·`true`·部分匹配）/ 無 confirm / confirm 錯 / 無 expected SHA / SHA 格式錯 / SHA mismatch(stale) → 全 hard-fail 且零寫入；合法 redraft / republish apply 成功（status/draft flipped、target SHA 對）；wrong-branch / ahead / behind / dirty / index.lock（不變）/ duplicate slug / lifecycle precondition → 零寫入；post-write validation failure → engine rollback（bytes / mode 恢復）+ CLI validator 拒篡改檔；成功後只有目標 Markdown 改變、sidecar / 其他 Markdown 不變、HEAD 不變（不 commit）、origin/main 不變（不 push）、無 dist（不 build/deploy）；§9 forbidden flags 全拒；CLI 不 import admin-write-cli / whitelist / patcher / safe-write / child_process；既有 real-write whitelist 未含 status/draft；Phase A / Phase B CLI 仍拒 `--apply`；**production repo read-only smoke（只走未授權路徑；前後 HEAD / working tree / index.lock 不變）**；package.json 入口安全（value 無 `--apply` / env 值 / confirm phrase / engine.js、不被 readiness/build/deploy chain 呼叫）。temp fixtures finally 清除、無 residue。
+
+### 21.10 維持的紅線（contract guard 靜態 + fixture 斷言）
+
+- CLI 只 import Phase A resolver / Phase B planner / Phase C.1a engine；**未** import safe-write / admin-write-cli / admin-write-whitelist / admin-frontmatter-patcher / child_process；**無** spawn / exec / fetch / git mutation / commit / push / build / deploy / gh-pages 呼叫。
+- 既有 real-write whitelist（`admin-frontmatter-patcher.js` `ALLOWED_TOP_LEVEL_KEYS` / `admin-write-cli.js` `ALLOWED_FIELDS`）維持 `{description, searchDescription}`、未加 status/draft。
+- `admin:redraft-apply` npm value = `node src/scripts/redraft-apply-cli.js`（無 `--apply` / env 值 / confirm phrase / engine.js 直引用）；**不**被任何 readiness / release / phase1 / build / deploy chain 自動呼叫；預設執行（無授權）不造成 write。
+- **Browser Admin UI 仍未整合**：本 slice 未新增 Admin UI apply 按鈕、未新增 local server bridge、未新增 fetch/XHR write API、未把 env / confirm token 暴露至 browser。
+
+### 21.11 驗證快照（2026-07-14）
+
+`check:redraft-apply-cli` **31/0**；回歸維持：`check:redraft-apply-engine` **36/0**、`check:admin-git-safety-preflight` **32/0**、`check:redraft-plan` **23/0**、`check:admin-article-lookup` **26/0**、`check:github-redraft-lifecycle` **13/0**、`check-github-draft-metadata`（direct node）**11/0**、`check:npm-script-targets` **70/70**（68→70；+`check:redraft-apply-cli`·`admin:redraft-apply`）、`check:release-readiness-contract` **14/14**、`check:phase1-readiness-contract` **23/23**、`validate:content` **0/135/107**。production content tree / HEAD / `.git/index.lock` 於全部 fixture 測試前後不變；temp fixtures 全清、無 residue；**無** build / deploy / gh-pages 變動。
+
+### 21.12 與 first production one-post rehearsal 邊界
+
+- 本 slice **只**交付 CLI wiring + guard + docs；**未**對 production 執行 apply、**未** commit / push 文章狀態、**未** build / deploy、**未**整合 Admin UI。
+- 第一次真正 production apply **必須另開 Dean 明確授權的 rehearsal / one-post slice**，且明確選定一篇**非關鍵**文章；**通過所有安全門 ≠ 已授權寫入**。commit / push（Phase D）/ build·deploy（Phase E）仍完全分離、各須獨立 Dean-gated slice。
 
 ---
 
