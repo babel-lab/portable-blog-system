@@ -10,7 +10,7 @@
 //   對 published 現況與未來 redraft 皆恆綠，不再誤報。
 //
 // 範圍 / 邊界：
-//   - **只讀**：gray-matter 解析單一 GitHub draft + 讀 categories.json / tags.json registry。
+//   - **只讀**：gray-matter 解析單一 GitHub 文章 + 讀 categories.json / tags.json registry。
 //   - **不**寫任何檔、**不**跑 build / deploy / validate / dev server、**不**碰 gh-pages / deploy clone。
 //   - **不** import build-github.js / load-posts.js（loadPosts 會過濾掉 draft，取不到本檔；
 //     且其 module load 可能觸發 side effect）。此處直接 readFile + matter 解析目標檔。
@@ -39,7 +39,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..', '..');
 
-const DRAFT_PATH = path.join(
+// lifecycle-neutral 命名：目標文章已由 draft 上架為 published（commit 53b02e9），
+// 本 guard 驗的是 registry 綁定 + status⇔draft 一致性契約，與其當下 draft/published 狀態無關，
+// 故變數改用中性 POST_PATH（檔名 check-github-draft-metadata.js 保留以維持既有 direct-node
+// 指令範例 / docs / cross-reference 相容，不做會擴張 ripple 的檔案改名）。
+const POST_PATH = path.join(
   ROOT,
   'content',
   'github',
@@ -64,8 +68,8 @@ const VALID_CONTENT_KIND = new Set([
 const FORBIDDEN_TAGS = new Set(['admin-ui', 'design-token', 'blogger', 'download', 'markdown']);
 
 // ── 讀取（read-only）─────────────────────────────────────────────────────────────
-const draftRaw = readFileSync(DRAFT_PATH, 'utf-8');
-const { data: fm } = matter(draftRaw);
+const postRaw = readFileSync(POST_PATH, 'utf-8');
+const { data: fm } = matter(postRaw);
 const categories = JSON.parse(readFileSync(CATEGORIES_PATH, 'utf-8'));
 const tags = JSON.parse(readFileSync(TAGS_PATH, 'utf-8'));
 
