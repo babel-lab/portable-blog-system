@@ -240,7 +240,7 @@ apply（Dean 明確）：
 | Phase | 內容 | 寫檔 | git 自動化 |
 | --- | --- | --- | --- |
 | **A. read-only article lookup** ✅ **IMPLEMENTED（2026-07-14；見 §17）** | CLI／resolver 讀取並顯示既有文章 slug／title／current status／current draft／source path／GitHub·Blogger publishing metadata；建立 slug→唯一 post resolver。**不寫檔**。 | ❌ | ❌ |
-| **B. dry-run patch generation** | 產生僅含 status+draft（白名單）之 old/new diff（含 boolean 支援、兩欄位耦合、expectedOldValue）；**不 apply**。 | ❌ | ❌ |
+| **B. dry-run patch generation** ✅ **IMPLEMENTED（2026-07-14；見 §18）** | 產生僅含 status+draft 之 old/new diff（boolean 支援、兩欄位成對、expectedOldValues、source/target SHA-256）；**不 apply**。 | ❌ | ❌ |
 | **C. local apply, no Git automation** | 全部 preflight（§10）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
 | **D. optional Git assistance** | 另行評估 commit／push 輔助；**仍不得與 deploy 綁定**。 | — | commit/push（Dean-gated） |
 | **E. deploy assistance** | 另一個 Dean-gated slice；build + 同步 dist→gh-pages 使 URL 生效 404。 | — | deploy（Dean-gated） |
@@ -259,13 +259,16 @@ apply（Dean 明確）：
 
 **本 session（analysis/docs-only）= 完成；不啟用任何 write path。**
 
-> **2026-07-14 update**：Phase A（read-only article lookup）**已於後續 coding slice 落地**（見 §17）。
-> 下一建議 slice 改為 **Phase B（dry-run-only status/draft patch generation）**，仍 **NO-GO for `--apply`**。
+> **2026-07-14 update**：Phase A（read-only article lookup，§17）與 Phase B（dry-run-only status/draft
+> patch generation，§18）**均已落地**。下一建議 slice = **Phase C（local apply, no Git automation）**，
+> 但 **NO-GO 至 §10 之 git-safety preflight（branch / ahead-behind / index.lock）實作 + Dean explicit
+> approval**；`--apply` 仍未實作 / 仍被拒絕。
 
-下一 coding slice（原建議，已完成）：
+已完成 coding slices：
 
 ```
-GO for read-only article lookup (Phase A)   ← DONE 2026-07-14
+GO for read-only article lookup (Phase A)                 ← DONE 2026-07-14 (§17)
+GO for dry-run-only status/draft patch generation (Phase B) ← DONE 2026-07-14 (§18)
 ```
 
 理由：
@@ -340,6 +343,54 @@ resolver 只 import `readFile`（node:fs/promises）/ fast-glob / gray-matter；
 
 - 本功能**不修改** Blogger 線上貼文、**不**登入 Blogger、**不**碰 GA4 / AdSense / gh-pages / deploy。
 - **`--apply` 不存在**（明確拒絕）。write path（Phase B dry-run patch / Phase C apply / Phase D commit-push / Phase E deploy）**皆未實作、皆 NO-GO、各須另開 phase + Dean explicit approval**。
+
+---
+
+## 18. Phase B 實作紀錄（dry-run-only status/draft patch planner；2026-07-14 landed）
+
+Phase B 已落地為 **dry-run-only** lifecycle patch planner：產生 redraft / republish 之 status+draft 兩欄位變更計畫（human diff + JSON plan + source/target SHA-256），**絕不寫檔**。
+
+### 18.1 檔案 / 進入點
+
+| 檔案 | 角色 |
+| --- | --- |
+| `src/scripts/redraft-plan.js` | planner（`planRedraft` / `applyLifecyclePatch`〔byte-preserving 兩欄位記憶體 patch，含 boolean 支援〕/ `formatPlan` / `runCli`）。 |
+| `src/scripts/check-redraft-plan.js` | contract guard（23 斷言；OS temp fixtures；finally 清除）。 |
+| npm `admin:plan-redraft` | `node src/scripts/redraft-plan.js`（CLI 進入點）。 |
+| npm `check:redraft-plan` | 跑 contract guard。 |
+
+### 18.2 使用方式
+
+```bash
+npm run admin:plan-redraft -- --slug=<slug> --op=redraft|republish [--site=github|blogger] [--json]
+# 或
+node src/scripts/redraft-plan.js --slug=<slug> --op=redraft [--json]
+```
+
+- redraft：`status ∈ {ready, published} + draft:false` → `status:draft + draft:true`。
+- republish：`status:draft + draft:true` → `status:ready + draft:false`。
+- `--op` 必填且必須符合當前 lifecycle 狀態（不符 → `precondition-not-met`，exit 8）。
+
+### 18.3 輸出
+
+- **human diff**（deterministic）：status / draft old→new、byte-level 兩行 frontmatter diff（含行號）、source/target SHA-256、boundary 說明。
+- **JSON plan**（`--json`；deterministic 固定 schema/key 順序）：`op / slug / sourcePath / contentRoot / current / target / changes[] / expectedOldValues / sourceSha256 / targetSha256 / dryRun:true / apply:false / written:false / effectNote`。
+- **SHA-256**：`sourceSha256` = 原始檔 bytes 之 SHA-256；`targetSha256` = 記憶體中 patch 後內容之 SHA-256（供未來 Phase C apply 前後核對）。
+
+### 18.4 byte-preserving 兩欄位成對變更
+
+`applyLifecyclePatch` 只替換 frontmatter 中唯一 top-level `status:` 與 `draft:` 兩行之值，其餘一切 byte-for-byte 不變（inline array / nested block / 註解 / 引號風格 / CRLF 皆保留；contract guard 斷言「恰 2 行 differ」）。boolean `draft` 以 literal `true`/`false` 表示（不加引號）。fail-closed：缺 status/draft 行、重複、block scalar、非 boolean literal、raw↔parsed precondition mismatch、no-op。
+
+### 18.5 zero-write 保證 + 既有 write 路徑不變（紅線）
+
+- planner 只 import `readFile`（node:fs/promises）/ `node:crypto`（hash）/ Phase A resolver；**未** import safe-write / admin-write-cli / admin-frontmatter-patcher / admin-write-whitelist，**未**呼叫任何寫入 API。contract guard 以 import-line + call-site 靜態斷言，並斷言 planning 後檔案 byte-identical + mtime 不變。
+- **未修改**既有 dormant real-write whitelist：`admin-frontmatter-patcher.js` 之 `ALLOWED_TOP_LEVEL_KEYS` 與 `admin-write-cli.js` 之 `ALLOWED_FIELDS` 維持 `{description, searchDescription}`、**未**加入 `status`/`draft`（contract guard 靜態斷言此不變式）。Phase B 之 boolean/兩欄位 patch 走**獨立** planner，不經既有 write 路徑。
+
+### 18.6 明確拒絕的參數 / 邊界
+
+- `--apply` / `--write` / `--commit` / `--push` / `--deploy` / `--save` / `--output` **明確拒絕**（exit 2，非忽略）。
+- **無** apply / write / commit / push / build / deploy 路徑。Phase C（local apply）、D（commit/push）、E（deploy）**皆未實作、皆 NO-GO、各須另開 phase + Dean explicit approval**；Phase C 另受 §10 git-safety preflight（branch / ahead-behind / index.lock）未實作之阻擋。
+- 不修改 Blogger 線上貼文、不碰 GA4 / AdSense / gh-pages。
 
 ---
 
