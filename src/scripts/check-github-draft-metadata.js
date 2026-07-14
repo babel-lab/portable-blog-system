@@ -1,5 +1,13 @@
 #!/usr/bin/env node
-// Phase 20260701-a3-2：GitHub draft frontmatter contract regression smoke（direct-node）。
+// Phase 20260701-a3-2：GitHub 文章 frontmatter contract regression smoke（direct-node）。
+//
+// 2026-07-14 update：目標文章 github-pages-build-preview-workflow 已於 commit 53b02e9 正式上架
+//   （status:published / draft:false；b4b8ecc 僅改 SEO 文案），不再是 draft。原本 pin「status
+//   必為 draft」的斷言已過時，會對已上架文章產生 false failure。本 guard 之核心價值為 registry
+//   綁定契約（category/tags 綁 registry + site[] 含 github + 紅線 tag 禁用），與 draft/published
+//   狀態無關、仍獨立有效（未被 check:github-redraft-lifecycle 覆蓋）。故將 draft-值-pin 改為
+//   status/draft 一致性不變式（lifecycle-aware：可見狀態⇔draft:false、隱藏狀態⇔draft:true），
+//   對 published 現況與未來 redraft 皆恆綠，不再誤報。
 //
 // 範圍 / 邊界：
 //   - **只讀**：gray-matter 解析單一 GitHub draft + 讀 categories.json / tags.json registry。
@@ -15,7 +23,8 @@
 //     - category 必須綁 registry（categories.json），且該 category 之 site[] 含 'github'
 //     - tags 必須全部存在於 registry（tags.json），且各 tag 之 site[] 含 'github'
 //     - tags 不得使用紅線禁用 / 不存在之 tag（admin-ui / design-token / blogger / download / markdown）
-//     - status / draft contract 合法且互相一致（status: draft ⇔ draft: true）
+//     - status / draft contract 合法且互相一致（status⇔draft：可見狀態 ready/published⇔draft:false、
+//       隱藏狀態 draft/archived⇔draft:true；不再 pin 特定值，隨文章 lifecycle 狀態動態驗一致性）
 //     - site / primaryPlatform / contentKind / publishTargets.github.enabled 合法
 //
 //   任一斷言失敗即 process.exit(1)；尾端印 "<pass> / <fail>"。
@@ -152,9 +161,28 @@ check('no forbidden / non-existent tag is used', () => {
   }
 });
 
-check('draft contract is consistent (status: "draft" ⇔ draft: true)', () => {
-  assert.strictEqual(fm.status, 'draft', `status 應為 draft（實得 ${JSON.stringify(fm.status)}）`);
-  assert.strictEqual(fm.draft, true, `draft 應為 true（實得 ${JSON.stringify(fm.draft)}）`);
+check('status / draft contract is internally consistent (status⇔draft agree)', () => {
+  // lifecycle-aware：不 pin 特定值，改驗 status 與 draft 互相一致，隨文章 redraft lifecycle 恆綠。
+  const VISIBLE = new Set(['ready', 'published']);
+  const HIDDEN = new Set(['draft', 'archived']);
+  assert.ok(
+    typeof fm.status === 'string' && (VISIBLE.has(fm.status) || HIDDEN.has(fm.status)),
+    `status 應為合法列舉值 ready/published/draft/archived（實得 ${JSON.stringify(fm.status)}）`,
+  );
+  assert.strictEqual(typeof fm.draft, 'boolean', `draft 應為 boolean（實得 ${JSON.stringify(fm.draft)}）`);
+  if (VISIBLE.has(fm.status)) {
+    assert.strictEqual(
+      fm.draft,
+      false,
+      `status:${fm.status} 為可見狀態，draft 應為 false（實得 ${JSON.stringify(fm.draft)}）`,
+    );
+  } else {
+    assert.strictEqual(
+      fm.draft,
+      true,
+      `status:${fm.status} 為隱藏狀態，draft 應為 true（實得 ${JSON.stringify(fm.draft)}）`,
+    );
+  }
 });
 
 check('publishTargets.github.enabled === true', () => {
