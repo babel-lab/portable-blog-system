@@ -172,11 +172,11 @@ apply（Dean 明確）：
 
 | # | 檢查 | 現況 | 分級 |
 | --- | --- | --- | --- |
-| 1 | 在 git repository 內 | 隱含 | hard-fail |
-| 2 | 在 `main`（或明確允許 branch） | **缺** → 新增 | **hard-fail** |
-| 3 | working tree clean（或明確拒絕覆蓋使用者修改） | ✅ `enforceCleanGit` | hard-fail |
-| 4 | `main == origin/main`（ahead／behind 明確處理） | **缺** → 新增 | **hard-fail**（ahead/behind ≠ 0 → 拒或明示） |
-| 5 | `.git/index.lock` 不存在 | **缺** → 新增 | **hard-fail** |
+| 1 | 在 git repository 內 | ✅ **已補**（§19 not-git-repository + repo-root-mismatch） | hard-fail |
+| 2 | 在 `main`（或明確允許 branch） | ✅ **已補**（§19 wrong-branch / detached-head） | **hard-fail** |
+| 3 | working tree clean（或明確拒絕覆蓋使用者修改） | ✅ `enforceCleanGit`；§19 亦獨立涵蓋 | hard-fail |
+| 4 | `main == origin/main`（ahead／behind 明確處理） | ✅ **已補**（§19 ahead-of-origin / behind-origin / diverged） | **hard-fail**（ahead/behind ≠ 0 → 拒或明示） |
+| 5 | `.git/index.lock` 不存在 | ✅ **已補**（§19 index-lock-present；不刪除 / 不修改 lock） | **hard-fail** |
 | 6 | 目標 Markdown 唯一存在 | ✅（whitelist 單一 resolved path） | hard-fail |
 | 7 | 目標位於允許 content root | ✅ whitelist | hard-fail |
 | 8 | 不接受任意檔案路徑 | ✅ whitelist + traversal | hard-fail |
@@ -241,7 +241,7 @@ apply（Dean 明確）：
 | --- | --- | --- | --- |
 | **A. read-only article lookup** ✅ **IMPLEMENTED（2026-07-14；見 §17）** | CLI／resolver 讀取並顯示既有文章 slug／title／current status／current draft／source path／GitHub·Blogger publishing metadata；建立 slug→唯一 post resolver。**不寫檔**。 | ❌ | ❌ |
 | **B. dry-run patch generation** ✅ **IMPLEMENTED（2026-07-14；見 §18）** | 產生僅含 status+draft 之 old/new diff（boolean 支援、兩欄位成對、expectedOldValues、source/target SHA-256）；**不 apply**。 | ❌ | ❌ |
-| **C. local apply, no Git automation** | 全部 preflight（§10）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
+| **C. local apply, no Git automation**（git-safety preflight 前置**已備**，§19；apply 本體仍未實作） | 全部 preflight（§10；git-safety 部分見 §19）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
 | **D. optional Git assistance** | 另行評估 commit／push 輔助；**仍不得與 deploy 綁定**。 | — | commit/push（Dean-gated） |
 | **E. deploy assistance** | 另一個 Dean-gated slice；build + 同步 dist→gh-pages 使 URL 生效 404。 | — | deploy（Dean-gated） |
 
@@ -259,16 +259,19 @@ apply（Dean 明確）：
 
 **本 session（analysis/docs-only）= 完成；不啟用任何 write path。**
 
-> **2026-07-14 update**：Phase A（read-only article lookup，§17）與 Phase B（dry-run-only status/draft
-> patch generation，§18）**均已落地**。下一建議 slice = **Phase C（local apply, no Git automation）**，
-> 但 **NO-GO 至 §10 之 git-safety preflight（branch / ahead-behind / index.lock）實作 + Dean explicit
-> approval**；`--apply` 仍未實作 / 仍被拒絕。
+> **2026-07-14 update**：Phase A（read-only article lookup，§17）、Phase B（dry-run-only status/draft
+> patch generation，§18）與 **git-safety preflight（Phase C 前置；§19）均已落地**。§10 之三項缺口
+> （branch / ahead-behind / index.lock）現已有 **reusable、read-only** 的 checker + contract guard。
+> 下一建議 slice = **Phase C（local apply, no Git automation）**，仍 **NO-GO 至 Dean explicit
+> approval + Phase C atomic two-field write / expected source SHA recheck 實作**；`--apply` 仍未實作 /
+> 仍被拒絕。git-safety preflight **通過 ≠ 已授權寫入**。
 
 已完成 coding slices：
 
 ```
-GO for read-only article lookup (Phase A)                 ← DONE 2026-07-14 (§17)
-GO for dry-run-only status/draft patch generation (Phase B) ← DONE 2026-07-14 (§18)
+GO for read-only article lookup (Phase A)                    ← DONE 2026-07-14 (§17)
+GO for dry-run-only status/draft patch generation (Phase B)  ← DONE 2026-07-14 (§18)
+GO for read-only repository safety preflight (Phase C 前置)   ← DONE 2026-07-14 (§19)
 ```
 
 理由：
@@ -391,6 +394,77 @@ node src/scripts/redraft-plan.js --slug=<slug> --op=redraft [--json]
 - `--apply` / `--write` / `--commit` / `--push` / `--deploy` / `--save` / `--output` **明確拒絕**（exit 2，非忽略）。
 - **無** apply / write / commit / push / build / deploy 路徑。Phase C（local apply）、D（commit/push）、E（deploy）**皆未實作、皆 NO-GO、各須另開 phase + Dean explicit approval**；Phase C 另受 §10 git-safety preflight（branch / ahead-behind / index.lock）未實作之阻擋。
 - 不修改 Blogger 線上貼文、不碰 GA4 / AdSense / gh-pages。
+
+---
+
+## 19. git-safety preflight 實作紀錄（read-only repository safety checker；2026-07-14 landed）
+
+§10 之三項 git-safety 缺口（branch == main / `main == origin/main` ahead-behind / `.git/index.lock`）已落地為**純唯讀、可重用**的 repository safety preflight + contract guard。**零寫檔、零 git mutation、零 network fetch、零自動修復、零 lock deletion、零 apply、零 build/deploy。**此為未來 Phase C local apply 的前置安全門，**通過 ≠ 已授權寫入**。
+
+### 19.1 檔案 / 進入點
+
+| 檔案 | 角色 |
+| --- | --- |
+| `src/scripts/admin-git-safety-preflight.js` | reusable helper（`evaluatePreflight` / `runGit` / `parsePorcelainZ` / `samePath` / `formatReport` / `exitCodeFor`）+ CLI adapter（`runCli`）。 |
+| `src/scripts/check-admin-git-safety-preflight.js` | contract guard（32 斷言；OS temp isolated git repos；finally 清除）。 |
+| npm `admin:check-git-safety` | `node src/scripts/admin-git-safety-preflight.js`（CLI 進入點）。 |
+| npm `check:admin-git-safety-preflight` | 跑 contract guard。 |
+
+### 19.2 使用方式
+
+```bash
+npm run admin:check-git-safety           # human-readable
+npm run admin:check-git-safety -- --json # deterministic JSON
+```
+
+- 預設唯讀 safety check；`--json` 輸出固定 schema / key 順序。
+- **明確拒絕**（exit 2，非忽略）：`--apply` / `--write` / `--fix` / `--repair` / `--unlock` / `--delete-lock` / `--reset` / `--checkout` / `--stash` / `--clean` / `--fetch` / `--pull` / `--push` / `--commit` / `--deploy` 及任何未知參數。
+
+### 19.3 Safety gate 契約（全部 hard-fail；未過即 non-zero exit、eligible:false）
+
+| gate | 失敗分類 | exit |
+| --- | --- | --- |
+| projectRoot 合法（非空絕對路徑且存在） | `invalid-project-root` | 10 |
+| 位於 git worktree（`rev-parse --show-toplevel`） | `not-git-repository` | 11 |
+| repository top-level == 傳入 project root（不接受外部／上層 repo） | `repo-root-mismatch` | 12 |
+| branch == main（不自動 checkout） | `wrong-branch` / `detached-head` / `unresolvable-head` | 13 / 14 |
+| `refs/heads/main` 存在 | `missing-main-ref` | 15 |
+| `refs/remotes/origin/main` 存在（本機 remote-tracking ref；未 fetch） | `missing-origin-main-ref` | 16 |
+| ahead == 0 && behind == 0（`rev-list --left-right --count main...origin/main`） | `ahead-of-origin` / `behind-origin` / `diverged` | 17 / 18 / 19 |
+| working tree clean（staged / unstaged / untracked / deleted / renamed / conflicted 皆涵蓋；`.gitignore` 排除者依 git status 真實結果不視為 dirty） | `dirty-working-tree` | 20 |
+| `.git/index.lock` 不存在（`rev-parse --git-path index.lock` 定位；不刪除／不修改） | `index-lock-present` | 21 |
+| git 命令執行成功 | `git-command-failed` | 22 |
+| 危險 / 未知 CLI 參數 | `unsupported-argument` | 2 |
+
+eligible → exit 0。多重 failure 時取排序後第一項（deterministic priority）之 exit code。
+
+### 19.4 只用的 read-only git 命令（allowlist；defense-in-depth）
+
+`rev-parse --show-toplevel` / `branch --show-current` / `rev-parse --verify HEAD` / `rev-parse --verify refs/heads/main` / `rev-parse --verify refs/remotes/origin/main` / `rev-list --left-right --count main...origin/main` / `status --porcelain=v1 -z --untracked-files=all` / `rev-parse --git-path index.lock`。`runGit` 以子命令 allowlist（`rev-parse` / `branch` / `rev-list` / `status`）+ forbidden set 雙層拒絕任何 mutation / network 子命令（**絕不** fetch / pull / push / add / commit / reset / checkout / switch / restore / stash / clean / gc / rm / merge / rebase / update-index / update-ref / init / apply）。
+
+### 19.5 輸出（無 secrets / 無檔案內容 / 無 repo 外部絕對路徑）
+
+- **human**：repository root / branch / HEAD·main·origin/main short hash / ahead·behind / working tree clean·dirty / dirty entry count / index.lock present·absent / eligible / failure reasons / `network fetch performed: no` / `write performed: no` / 「通過 preflight ≠ 已授權寫入」note。
+- **JSON**（固定 key 順序）：`schemaVersion / mode:"read-only-preflight" / repositoryRoot / projectRoot / branch / head / mainHead / originMainHead / ahead / behind / workingTreeClean / dirtyEntryCount / dirtyPaths / indexLockPresent / eligible / failures / warnings / networkFetchPerformed:false / writePerformed:false`。
+- dirty paths 僅輸出 **repo-relative 路徑**（非檔案內容、非 repo 外部絕對路徑）；不輸出 credentials / token / git config / 環境變數 / 檔案內容。
+
+### 19.6 zero-write / zero-mutation 保證（紅線）
+
+- helper 只 import `spawnSync`（node:child_process）/ `existsSync`（node:fs）/ path / url；**未** import / 呼叫任何寫入 API（writeFile / rename / unlink / rm / safe-write / admin-write-cli / patcher）。
+- **不** fetch / pull / push；`networkFetchPerformed` / `writePerformed` 恆 `false`。
+- `.git/index.lock` 存在時**只回報**，**絕不**刪除 / rename / truncate / 讀取內容判斷 stale；訊息要求人工確認無 git process 後再處理。
+- **不**自動修復任何 failure（不 checkout main、不 pull / merge / reset、不 clean、不刪 lock）。
+- contract guard 以 source 靜態掃描斷言每個 `runGit` call site 皆用 allowlisted 子命令、無 fetch/pull/push；並以 production repo read-only smoke 斷言 smoke 前後 HEAD / working tree / index.lock **三者狀態不變**。
+
+### 19.7 測試 / contract guard（32 斷言；isolated temp git repos）
+
+覆蓋：porcelain-z parser（staged/unstaged/untracked/deleted/rename/empty）、samePath、runGit 拒絕 mutation 子命令、危險 flag 集合；PASS（main/0-0/clean/no-lock → eligible exit 0）；hard-fail 全套（wrong-branch / detached-head / missing-main-ref〔unborn repo〕/ missing-origin-main-ref / ahead 1-0 / behind 0-1〔commit-tree 同 tree 保 clean〕/ diverged 1-1 / staged / unstaged / untracked / deleted / conflicted〔merge conflict〕/ index.lock present〔且斷言 lock 不被刪除/修改〕/ repo-root-mismatch〔subdir〕/ non-git dir / invalid projectRoot）；determinism（human + JSON byte-identical + 固定 key 順序）；no-leak（僅 repo-relative path、無 secret 檔案內容）；source no-write git command contract；no fetch/pull/push；**production repo read-only smoke（HEAD / tree / index.lock 前後不變）**；回歸（Phase B planner 仍拒 `--apply`、既有 real-write whitelist 未加 status/draft）；CLI 全危險參數 exit 2。temp git fixture 可建 commits / refs 但隔離於 OS temp、finally 清除、**不**污染 production repository。
+
+### 19.8 與 Phase C 的整合邊界
+
+- 本 slice **只**匯出 reusable read-only preflight + 獨立 CLI + contract guard；**未**修改 `redraft-plan.js`（Phase B planner 仍可獨立 dry-run，未接入 git-safety）、**未**新增 `--apply`、**未**串接 plan → write CLI、**未**改 real-write whitelist、**未**實作 atomic two-field write / expected source SHA apply / commit / push。
+- 未來 Phase C actual apply **必須先呼叫此 preflight**（eligible:true 才前進），但 **actual local apply 仍未實作、仍需 Dean explicit approval**；atomic two-field filesystem write 與 expected source SHA recheck 仍是下一階段缺口。
+- 不修改 Blogger 線上貼文、不碰 GA4 / AdSense / gh-pages / deploy。
 
 ---
 
