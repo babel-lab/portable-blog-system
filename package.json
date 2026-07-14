@@ -45,6 +45,7 @@
     "check:admin-article-lookup": "node src/scripts/check-admin-article-lookup.js",
     "check:redraft-plan": "node src/scripts/check-redraft-plan.js",
     "check:admin-git-safety-preflight": "node src/scripts/check-admin-git-safety-preflight.js",
+    "check:redraft-apply-engine": "node src/scripts/check-redraft-apply-engine.js",
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-preview": "node src/scripts/check-blogger-preview.js",

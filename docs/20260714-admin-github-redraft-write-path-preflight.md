@@ -241,7 +241,9 @@ apply（Dean 明確）：
 | --- | --- | --- | --- |
 | **A. read-only article lookup** ✅ **IMPLEMENTED（2026-07-14；見 §17）** | CLI／resolver 讀取並顯示既有文章 slug／title／current status／current draft／source path／GitHub·Blogger publishing metadata；建立 slug→唯一 post resolver。**不寫檔**。 | ❌ | ❌ |
 | **B. dry-run patch generation** ✅ **IMPLEMENTED（2026-07-14；見 §18）** | 產生僅含 status+draft 之 old/new diff（boolean 支援、兩欄位成對、expectedOldValues、source/target SHA-256）；**不 apply**。 | ❌ | ❌ |
-| **C. local apply, no Git automation**（git-safety preflight 前置**已備**，§19；apply 本體仍未實作） | 全部 preflight（§10；git-safety 部分見 §19）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
+| **C.1a. dormant atomic apply engine** ✅ **IMPLEMENTED（2026-07-14；fixture-only / dormant；見 §20）** | atomic two-field write 本體：plan schema recheck → repository safety preflight（§19）→ Phase A 重新唯一解析 → source SHA TOCTOU → lifecycle precondition → target 重算核 SHA → same-dir atomic replace（exclusive create + fsync + mode 保留）→ 必要 post-write validation callback → 失敗 rollback。**無 production CLI 入口 / 無 `--apply` / 無 npm apply script / 未被任何 production CLI / Admin UI import；只在 contract guard 之 OS temp fixtures 實際寫入。** | ✅（temp fixtures only；production .md 從未被測試寫入） | ❌ |
+| **C.1b. production CLI activation**（未實作） | 將 engine 接上 Dean-gated 正式 CLI（explicit confirmation + Dean approval）；仍 disabled-by-default。 | — | ❌ |
+| **C. local apply, no Git automation**（git-safety preflight 前置**已備**，§19；C.1a engine **已備 dormant**；正式 CLI 啟用〔C.1b〕仍未實作） | 全部 preflight（§10；git-safety 部分見 §19）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
 | **D. optional Git assistance** | 另行評估 commit／push 輔助；**仍不得與 deploy 綁定**。 | — | commit/push（Dean-gated） |
 | **E. deploy assistance** | 另一個 Dean-gated slice；build + 同步 dist→gh-pages 使 URL 生效 404。 | — | deploy（Dean-gated） |
 
@@ -272,7 +274,16 @@ apply（Dean 明確）：
 GO for read-only article lookup (Phase A)                    ← DONE 2026-07-14 (§17)
 GO for dry-run-only status/draft patch generation (Phase B)  ← DONE 2026-07-14 (§18)
 GO for read-only repository safety preflight (Phase C 前置)   ← DONE 2026-07-14 (§19)
+GO for dormant atomic apply engine (Phase C.1a; fixture-only) ← DONE 2026-07-14 (§20)
 ```
+
+> **2026-07-14 update（Phase C.1a）**：atomic two-field write 本體（`redraft-apply-engine.js`）已落地為
+> **dormant / fixture-only** engine（§20）：整合 git-safety preflight + source SHA recheck + article
+> re-resolution + target 重算 + atomic replace（fsync / mode 保留）+ 必要 post-write validation callback
+> + rollback。**無 production CLI 入口、無 `--apply`、無 apply npm script、未被任何 production CLI / Admin
+> UI import；production content 從未被測試寫入。** 下一 slice = **Phase C.1b（production CLI activation）**：
+> **GO only for a separate explicit-confirmation production CLI wiring slice; still disabled by default**，
+> 仍須 Dean explicit approval。**通過所有安全門 ≠ 已授權寫入。**
 
 理由：
 
@@ -465,6 +476,65 @@ eligible → exit 0。多重 failure 時取排序後第一項（deterministic pr
 - 本 slice **只**匯出 reusable read-only preflight + 獨立 CLI + contract guard；**未**修改 `redraft-plan.js`（Phase B planner 仍可獨立 dry-run，未接入 git-safety）、**未**新增 `--apply`、**未**串接 plan → write CLI、**未**改 real-write whitelist、**未**實作 atomic two-field write / expected source SHA apply / commit / push。
 - 未來 Phase C actual apply **必須先呼叫此 preflight**（eligible:true 才前進），但 **actual local apply 仍未實作、仍需 Dean explicit approval**；atomic two-field filesystem write 與 expected source SHA recheck 仍是下一階段缺口。
 - 不修改 Blogger 線上貼文、不碰 GA4 / AdSense / gh-pages / deploy。
+
+---
+
+## 20. Phase C.1a 實作紀錄（dormant atomic apply engine；fixture-only；2026-07-14 landed）
+
+Phase C 的 **atomic two-field write 本體**已落地為 **dormant、fixture-only** engine：具備 filesystem write 能力，但**未接任何 production 入口**、**只在 contract guard 之 OS temp isolated git fixtures 實際寫入**、**production content 從未被測試寫入**。**通過所有安全門 ≠ 已授權寫入**；正式 CLI 啟用（Phase C.1b）須另開 phase + Dean explicit approval。
+
+### 20.1 檔案 / 進入點
+
+| 檔案 | 角色 |
+| --- | --- |
+| `src/scripts/redraft-apply-engine.js` | dormant engine（`applyLifecycleAtomic({ projectRoot, plan, validateAfterWrite })`）。**無 CLI apply 進入點**；`isMainModule` 只印 dormant 提示、不 apply。 |
+| `src/scripts/check-redraft-apply-engine.js` | contract guard（36 斷言；OS temp isolated git repos；finally 清除）。 |
+| npm `check:redraft-apply-engine` | 跑 contract guard。**未**新增任何 `admin:apply-redraft` / `--apply` / production apply CLI。 |
+
+### 20.2 Engine API 與安全門順序（寫入前全部 hard-fail-able）
+
+`applyLifecycleAtomic({ projectRoot, plan, validateAfterWrite })` 依序：
+
+1. **參數 + validation callback 必要性**：`validateAfterWrite` 缺失／非 function → `validation-callback-required`，**寫入前 hard-fail**（沒有 post-write validation 不得寫入）。
+2. **§5.1 plan schema**：`dryRun:true` / `apply:false` / `written:false` / `op ∈ {redraft, republish}` / `changes` 精確為 `{status, draft}` 兩筆 / `current` 符 op 前置 / `target` 精確等於 op 固定轉換（拒任意 target status）/ status⇔draft 成對一致 / `sourceSha256`·`targetSha256` 皆 64-hex 且相異 / `sourcePath` 落在 allowlisted content root 且 site 對齊。不接受自行拼裝的不完整 plan。
+3. **§5.2 repository safety**：engine **自行**重跑 `evaluatePreflight`（§19）；要求 `eligible && branch===main && ahead===0 && behind===0 && workingTreeClean && !indexLockPresent`。任一不符 → `repository-not-eligible`。**不** fetch / pull / push / checkout / reset / stash / clean / delete-lock / 自動修復。
+4. **§5.3 article re-resolution**：以 `plan.slug` / `plan.contentRoot` 重新呼叫 Phase A resolver；驗證唯一命中、`sourcePath`·`slug`·`site` 皆等於 plan、落在 allowlist。**不信任呼叫端任意檔案路徑**（目標絕對路徑由重新解析結果組裝）。
+5. **§5.4 source SHA / TOCTOU**：重讀當下 bytes 計算 SHA-256；`!== plan.sourceSha256` → `stale-source`。**不**自動重產 plan、**不**覆蓋最新檔案。
+6. **§5.5 lifecycle precondition**：當下 `status`／`draft` 必須等於 `plan.current` 且符 op 轉換；狀態已改變 / 矛盾 / archived / no-op → hard-fail。
+7. **§5.6 target recomputation**：以 Phase B `applyLifecyclePatch` 重算 candidate；`recomputedTargetSha256 !== plan.targetSha256` → `target-sha-mismatch`；防禦性斷言 candidate 與原檔**恰 2 行 differ**（status + draft），body / slug / 其他 frontmatter / EOL / 引號風格 / key order 皆由 Phase B 契約保留。
+8. **§6 atomic write**：**僅**在上述全通過後執行 same-directory atomic replace。
+
+### 20.3 Atomic-write / Windows / file-mode 行為
+
+- **same-directory** temp（`.<base>.redraft-apply.tmp-<pid>-<seq>-<attempt>`），**exclusive create（`wx`）** 避免與既有 temp 衝突／覆蓋；寫入精確 candidate bytes → `fsync`（file flush）→ `chmod` 精確還原原始 mode → `fs.rename` over 目標。
+- **Windows**：`fs.rename` 於同目錄以 `MoveFileEx(REPLACE_EXISTING)` 語意替換既有檔（與既有 `safe-write.js` 同一 Node 契約）；**不**假設 POSIX rename 語意即成立。
+- **file mode**：寫入前 `stat` 取 `mode & 0o777`，寫入後對 temp `chmod` 同值再 rename → 原始 mode / permissions 保留（contract guard 斷言）。
+- 成功或失敗（含 rollback）後**皆不留 temp residue**（`finally` 清 temp handle / unlink）。
+- **不動 sidecar**（`.publish.json` / `.fb.md`）、**不動任何其他檔**。
+
+### 20.4 Post-write validation + rollback
+
+- 寫入後重讀並核 `targetSha256`；再呼叫必要的 `validateAfterWrite({ projectRoot, sourcePath, plan })`（可 async）。engine **不**由此 commit / push / build / deploy。
+- **validation success** → 回報成功（bytes 保留、target SHA 正確、無 temp residue）。
+- **validation failure**（或 post-write 讀取／SHA 核對失敗）→ 以**原始 source bytes** 執行 atomic rollback → 重新驗證 source SHA 恢復 → 原始 mode 恢復 → 無 temp residue → 回報 `apply failed + rollback succeeded`、無半套 lifecycle state。
+- **rollback 本身失敗** → high-severity hard failure：`needsManualInspection:true`、**絕不**宣稱成功、明示需人工檢查。（此極端路徑僅於 isolated fixture 概念覆蓋；實測 rollback 失敗跨平台不穩定，列為已知限制。）
+
+### 20.5 維持的 dormant / 未啟用狀態（紅線；contract guard 靜態斷言）
+
+- engine **無** production CLI 入口、**未**新增 `admin:apply-redraft` npm script、**未**被任何 production CLI / Admin UI / existing write CLI import；`node redraft-apply-engine.js` 只印 dormant 提示、exit 0、不 apply。
+- **未**修改既有 real-write whitelist：`admin-frontmatter-patcher.js` `ALLOWED_TOP_LEVEL_KEYS` 與 `admin-write-cli.js` `ALLOWED_FIELDS` 維持 `{description, searchDescription}`、未加 `status`/`draft`。
+- Phase A（`admin-article-lookup`）/ Phase B（`redraft-plan`）CLI 仍拒 `--apply`（exit 2）。
+- engine 只 import Phase A resolver / Phase B patch / Phase C0 preflight；**不** import safe-write / admin-write-cli / whitelist / patcher / child_process；source 靜態掃描斷言無 `spawnSync` / `exec` / `fetch` / git mutation / deploy 呼叫。
+- `package.json` 無任何 `--apply` / apply-redraft 入口；engine `.js` 僅由其 guard script 引用。
+
+### 20.6 驗證快照（2026-07-14）
+
+`check:redraft-apply-engine` **36/0**；回歸維持：`check:redraft-plan` **23/0**、`check:admin-git-safety-preflight` **32/0**、`check:admin-article-lookup` **26/0**、`check:github-redraft-lifecycle` **13/0**、`check-github-draft-metadata`（direct node）**11/0**、`validate:content` **0/135/107**、`check:npm-script-targets` **68/68**、`check:release-readiness-contract` **14/14**、`check:phase1-readiness-contract` **23/23**。production content tree / HEAD / `.git/index.lock` 於全部 fixture 測試前後不變；temp fixtures 全清、無 residue；**無** build / deploy / gh-pages 變動。
+
+### 20.7 與 Phase C.1b 邊界
+
+- 本 slice **只**交付 dormant engine + guard + docs；**未**接正式 CLI、**未**啟用 `--apply`、**未** commit / push 文章狀態、**未** build / deploy。
+- Phase C.1b（正式 CLI activation）須**另開 phase + Dean explicit approval**，且 disabled-by-default；**通過所有安全門 ≠ 已授權寫入**。commit / push / build / deploy 與本 write path 仍完全分離。
 
 ---
 
