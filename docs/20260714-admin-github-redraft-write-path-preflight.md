@@ -239,7 +239,7 @@ apply（Dean 明確）：
 
 | Phase | 內容 | 寫檔 | git 自動化 |
 | --- | --- | --- | --- |
-| **A. read-only article lookup** | Admin／CLI 讀取並顯示既有文章 slug／title／current status／current draft／source path／GitHub·Blogger publishing metadata；建立 slug/ID→唯一 post resolver。**不寫檔**。 | ❌ | ❌ |
+| **A. read-only article lookup** ✅ **IMPLEMENTED（2026-07-14；見 §17）** | CLI／resolver 讀取並顯示既有文章 slug／title／current status／current draft／source path／GitHub·Blogger publishing metadata；建立 slug→唯一 post resolver。**不寫檔**。 | ❌ | ❌ |
 | **B. dry-run patch generation** | 產生僅含 status+draft（白名單）之 old/new diff（含 boolean 支援、兩欄位耦合、expectedOldValue）；**不 apply**。 | ❌ | ❌ |
 | **C. local apply, no Git automation** | 全部 preflight（§10）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
 | **D. optional Git assistance** | 另行評估 commit／push 輔助；**仍不得與 deploy 綁定**。 | — | commit/push（Dean-gated） |
@@ -259,10 +259,13 @@ apply（Dean 明確）：
 
 **本 session（analysis/docs-only）= 完成；不啟用任何 write path。**
 
-下一 coding slice：
+> **2026-07-14 update**：Phase A（read-only article lookup）**已於後續 coding slice 落地**（見 §17）。
+> 下一建議 slice 改為 **Phase B（dry-run-only status/draft patch generation）**，仍 **NO-GO for `--apply`**。
+
+下一 coding slice（原建議，已完成）：
 
 ```
-GO for read-only article lookup (Phase A)
+GO for read-only article lookup (Phase A)   ← DONE 2026-07-14
 ```
 
 理由：
@@ -275,6 +278,68 @@ GO for read-only article lookup (Phase A)
 若 Dean 傾向直接進 dry-run，替代建議 = **GO for dry-run-only patch generation（Phase B）**，但須明確接受其包含 patcher boolean 支援之程式變更，且仍 **NO-GO for `--apply`**。
 
 **NO-GO 條件（未解不得進 apply/Phase C）**：§10 之 branch / ahead-behind / index.lock 三項 git-safety preflight 未實作前，不得啟用任何 `--apply` 寫回 status/draft。
+
+---
+
+## 17. Phase A 實作紀錄（read-only article lookup；2026-07-14 landed）
+
+Phase A 已落地為**純唯讀** slug→唯一文章 resolver + CLI + contract guard。**零寫檔、零 apply、零 build、零 deploy、零 Git 自動化**。
+
+### 17.1 檔案 / 進入點
+
+| 檔案 | 角色 |
+| --- | --- |
+| `src/scripts/admin-article-lookup.js` | 純 resolver（`resolveArticleBySlug` / `formatArticleLookup` / `validateSlug` / `ALLOWED_CONTENT_ROOTS`）+ CLI adapter（`runCli`）。 |
+| `src/scripts/check-admin-article-lookup.js` | contract guard（26 斷言；OS temp fixtures；finally 清除）。 |
+| npm `admin:lookup` | `node src/scripts/admin-article-lookup.js`（CLI 進入點）。 |
+| npm `check:admin-article-lookup` | 跑 contract guard。 |
+
+### 17.2 使用方式 / 支援輸入
+
+```bash
+npm run admin:lookup -- --slug=<slug> [--site=github|blogger] [--json]
+# 或
+node src/scripts/admin-article-lookup.js --slug=<slug> [--site=github|blogger] [--json]
+```
+
+- `--slug=<slug>`：**唯一必填**；只接受精確 slug（不做模糊 / 全文搜尋）。
+- `--site=github|blogger`：選填；當 slug 於兩 content root 重複時，依 content-root 資料夾精確消歧。
+- `--json`：選填；輸出 deterministic JSON（固定 schema / key 順序）。
+- `--apply`（及 `--commit` / `--push` / `--deploy` / `--write`）：**明確拒絕**（exit 2），非忽略。
+
+### 17.3 允許的 content roots（allowlist）
+
+只掃 `content/github/posts` 與 `content/blogger/posts` 之直屬 `*.md`（排除 `.fb.md` sidecar）。**不掃** `content/settings` / `content/*/pages` / `dist*` / `validation-fixtures` / 任意 repo 外部路徑。slug 格式驗證拒絕 `..` traversal、`/`、`\`、URL-encoded、絕對路徑。
+
+### 17.4 唯一解析
+
+`0 筆 → hard-fail(not-found, exit 4)`；`1 筆 → 成功(exit 0)`；`≥2 筆 → hard-fail(not-unique, exit 5)`。**不默默取第一筆**；`--site` 可消歧。
+
+### 17.5 顯示欄位（唯讀；安全子集）
+
+title / id / slug / repo-relative source path / contentRoot / site / contentKind / primaryPlatform / category / date / updated / status / draft / status⇔draft 一致性 / publishTargets 摘要（enabled+mode）/ 是否有 publish sidecar / Blogger·GitHub publishing metadata 摘要（blogger status·publishedUrl·publishedAt·hasPostId、github enabled·publishedUrl）。
+
+### 17.6 明確**不**輸出
+
+article body、secrets / token / credentials、大量原始 frontmatter、repo 外部 absolute path。（contract guard 以 secret marker + body 字串斷言 human 與 json 兩模式皆不外洩。）
+
+### 17.7 分級
+
+- **hard-fail（非 0 exit）**：非法 slug（3）/ traversal（3）/ 找不到（4）/ slug 命中多篇（5）/ frontmatter 無法解析（6；cache-independent 偵測）/ status·draft 型別不合法（7）/ 不支援的 write·apply 參數（2）/ invalid projectRoot（1）。
+- **warning-only（不影響 exit code、不自動修復）**：status⇔draft 矛盾（顯示 ⚠ 標示但仍 exit 0）、publishing metadata 缺漏。
+
+### 17.8 zero-write 保證
+
+resolver 只 import `readFile`（node:fs/promises）/ fast-glob / gray-matter；**未** import / 呼叫任何寫入 API（writeFile / appendFile / mkdir / rename / copyFile / unlink / rm / safe-write / admin-write-cli / patchFrontmatter）。contract guard §13a 以 import-line + call-site 靜態斷言此契約；§12 斷言 lookup 後檔案 byte-identical；§13b 斷言 mtime 不變。
+
+### 17.9 Browser UI / CLI 邊界
+
+本 slice **未**新增任何 Admin UI「讀取文章」按鈕、**未**新增 local server bridge、**未**新增 repository write API。Admin UI 維持 dev-only、read-only、無 fetch/fs。Phase A 以 **CLI / resolver foundation** 為交付；未來若接入 Admin UI 須另開 phase。
+
+### 17.10 與 Blogger / 未來 Phase 邊界
+
+- 本功能**不修改** Blogger 線上貼文、**不**登入 Blogger、**不**碰 GA4 / AdSense / gh-pages / deploy。
+- **`--apply` 不存在**（明確拒絕）。write path（Phase B dry-run patch / Phase C apply / Phase D commit-push / Phase E deploy）**皆未實作、皆 NO-GO、各須另開 phase + Dean explicit approval**。
 
 ---
 

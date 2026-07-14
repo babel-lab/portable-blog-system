@@ -42,6 +42,7 @@
     "check:github-pages-prepublish-smoke": "node src/scripts/check-github-pages-prepublish-readiness-smoke.js",
     "check:github-build-cache-hygiene": "node src/scripts/check-github-build-cache-hygiene.js",
     "check:github-redraft-lifecycle": "node src/scripts/check-github-redraft-lifecycle.js",
+    "check:admin-article-lookup": "node src/scripts/check-admin-article-lookup.js",
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-preview": "node src/scripts/check-blogger-preview.js",
@@ -72,7 +73,8 @@
     "check:phase1-readiness": "npm run validate:content && npm run check:npm-script-targets && npm run check:adsense-mode-metadata && npm run check:blogger-backfill && npm run check:download-indexing-independence && npm run check:github-pages-prepublish && npm run check:github-pages-prepublish-smoke",
     "check:phase1-readiness-contract": "node src/scripts/check-phase1-readiness-contract.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
-    "admin:write": "node src/scripts/admin-write-cli.js"
+    "admin:write": "node src/scripts/admin-write-cli.js",
+    "admin:lookup": "node src/scripts/admin-article-lookup.js"
   },
   "dependencies": {
     "@vitejs/plugin-basic-ssl": "latest",
