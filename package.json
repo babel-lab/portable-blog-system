@@ -47,6 +47,7 @@
     "check:admin-git-safety-preflight": "node src/scripts/check-admin-git-safety-preflight.js",
     "check:redraft-apply-engine": "node src/scripts/check-redraft-apply-engine.js",
     "check:redraft-apply-cli": "node src/scripts/check-redraft-apply-cli.js",
+    "check:redraft-all": "npm run check:github-redraft-lifecycle && npm run check:admin-article-lookup && npm run check:redraft-plan && npm run check:admin-git-safety-preflight && npm run check:redraft-apply-engine && npm run check:redraft-apply-cli",
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-preview": "node src/scripts/check-blogger-preview.js",
