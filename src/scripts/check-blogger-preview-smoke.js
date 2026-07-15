@@ -18,6 +18,11 @@
 //         fingerprint 逐檔比對，全部不變。
 //     (d) Determinism proof：兩次 --json 輸出，normalize 掉 mtime / size / generatedAtNote 後
 //         之 JSON 應 byte-identical。
+//     (f) Stale-mtime（per docs/20260710-blogger-preview-only-script-preanalysis.md §9.4 G-V1
+//         + §11.1）：以 pure `evaluateStaleness` 之合成輸入做正向（source 新於輸出 → stale）
+//         與負向（source 舊於輸出 → not stale）斷言，另含邊界（mtime 相等）與 fail-closed
+//         （無法比較 → stale:null，不謊報 fresh）。純函式單元測試 → 無需寫入 dist-blogger，
+//         smoke 之 read-only 契約不受影響。
 //     (e) Cleanup：smoke 結束後 git status --short 之新增／變動不含 dist-blogger 或臨時檔
 //         （只允許 src/scripts/*.js / package.json / docs 之預期新增，由外部 workflow 檢；
 //         本 smoke 只斷言 dist-blogger / content / sidecar 未受 child process 影響）。
@@ -28,6 +33,8 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fg from 'fast-glob';
+// Importing the navigator must not run it (guarded by isMainModule there).
+import { evaluateStaleness } from './check-blogger-preview.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,6 +73,7 @@ const LIST_MARKERS = [
   'mode: list',
   'dist-blogger root:',
   'candidates:',
+  'stale outputs:',
   'build command:       npm run build:blogger',
   'PASS blogger preview navigator (read-only; warning-only; no writes performed).',
 ];
@@ -75,6 +83,8 @@ const FOCUS_KNOWN_MARKERS = [
   'mode: focus',
   'slug:                we-media-myself2',
   'source path:         content/blogger/posts/20260515-we-media-myself2.md',
+  '    source mtime: ',
+  '    stale:        ',
   '---- advice ----',
   'PASS blogger preview navigator (read-only; warning-only; no writes performed).',
 ];
@@ -157,7 +167,8 @@ function normalizeJson(text) {
     if (node && typeof node === 'object') {
       const out = {};
       for (const [k, v] of Object.entries(node)) {
-        if (k === 'mtimeIso' || k === 'size' || k === 'generatedAtNote') continue;
+        if (k === 'mtimeIso' || k === 'mtimeMs' || k === 'size'
+          || k === 'sourceMtimeIso' || k === 'generatedAtNote') continue;
         out[k] = strip(v);
       }
       return out;
@@ -251,7 +262,112 @@ async function main() {
       equal ? '' : 'normalized outputs differ');
   }
 
-  // 9. Dist-blogger folder untouched: sanity — mtime of dist-blogger root should not have
+  // 9. Stale-mtime contract (preanalysis §9.4 G-V1 / §11.1) — pure-function unit tests over
+  //    synthetic mtimes; no filesystem writes, no dependency on the repo's current build state.
+  {
+    const SRC = 1_000_000;
+    const older = (name) => ({ name, exists: true, mtimeMs: SRC - 1_000 });
+    const newer = (name) => ({ name, exists: true, mtimeMs: SRC + 1_000 });
+
+    // 9a. Positive: every output predates the source → stale.
+    {
+      const r = evaluateStaleness({
+        sourceMtimeMs: SRC,
+        files: [older('post.html'), older('meta.json')],
+      });
+      record('stale-mtime positive: outputs older than source → stale true',
+        r.stale === true, `stale=${r.stale}`);
+      record('stale-mtime positive: staleFiles lists every stale output',
+        r.staleFiles.join(',') === 'post.html,meta.json', `staleFiles=${r.staleFiles.join(',')}`);
+      record('stale-mtime positive: per-file stale flags set',
+        r.files.every((f) => f.stale === true),
+        `flags=${r.files.map((f) => f.stale).join(',')}`);
+    }
+
+    // 9b. Negative: every output postdates the source → NOT stale (must not cry wolf).
+    {
+      const r = evaluateStaleness({
+        sourceMtimeMs: SRC,
+        files: [newer('post.html'), newer('meta.json')],
+      });
+      record('stale-mtime negative: outputs newer than source → stale false',
+        r.stale === false, `stale=${r.stale}`);
+      record('stale-mtime negative: staleFiles empty',
+        r.staleFiles.length === 0, `staleFiles=${r.staleFiles.join(',')}`);
+    }
+
+    // 9c. Mixed: a single stale output taints the whole slug, and only it is named.
+    {
+      const r = evaluateStaleness({
+        sourceMtimeMs: SRC,
+        files: [newer('post.html'), older('meta.json')],
+      });
+      record('stale-mtime mixed: one stale output → slug stale true', r.stale === true,
+        `stale=${r.stale}`);
+      record('stale-mtime mixed: only the stale output is named',
+        r.staleFiles.join(',') === 'meta.json', `staleFiles=${r.staleFiles.join(',')}`);
+    }
+
+    // 9d. Boundary: mtime equal to source is NOT stale (staleness is strictly older).
+    {
+      const r = evaluateStaleness({
+        sourceMtimeMs: SRC,
+        files: [{ name: 'post.html', exists: true, mtimeMs: SRC }],
+      });
+      record('stale-mtime boundary: equal mtime → not stale', r.stale === false,
+        `stale=${r.stale}`);
+    }
+
+    // 9e. Fail-closed: when the comparison cannot be made, report null — never a fresh verdict.
+    {
+      const noSource = evaluateStaleness({
+        sourceMtimeMs: null,
+        files: [older('post.html')],
+      });
+      record('stale-mtime fail-closed: missing source mtime → stale null (not false)',
+        noSource.stale === null && noSource.comparable === false,
+        `stale=${noSource.stale} comparable=${noSource.comparable}`);
+
+      const absentOutputs = evaluateStaleness({
+        sourceMtimeMs: SRC,
+        files: [{ name: 'post.html', exists: false, mtimeMs: null }],
+      });
+      record('stale-mtime fail-closed: absent outputs → stale null (dist-absent, not stale)',
+        absentOutputs.stale === null && absentOutputs.comparable === false,
+        `stale=${absentOutputs.stale} comparable=${absentOutputs.comparable}`);
+
+      const empty = evaluateStaleness();
+      record('stale-mtime fail-closed: no input → stale null, no crash',
+        empty.stale === null && empty.files.length === 0, `stale=${empty.stale}`);
+    }
+  }
+
+  // 10. Stale-mtime is actually wired into the navigator's real output (schema presence).
+  {
+    const rList = await runHelper(['--json']);
+    const rFocus = await runHelper(['--slug', 'we-media-myself2', '--json']);
+    let listObj = null;
+    let focusObj = null;
+    try { listObj = JSON.parse(rList.stdout); } catch { /* recorded below */ }
+    try { focusObj = JSON.parse(rFocus.stdout); } catch { /* recorded below */ }
+
+    record('list --json exposes staleCount',
+      listObj !== null && typeof listObj.staleCount === 'number',
+      `staleCount=${listObj ? listObj.staleCount : '(unparseable)'}`);
+    record('focus --json exposes stale verdict key',
+      focusObj !== null && 'stale' in (focusObj.outputs ?? {}),
+      `stale=${focusObj ? String(focusObj.outputs?.stale) : '(unparseable)'}`);
+    record('focus --json exposes staleFiles array',
+      focusObj !== null && Array.isArray(focusObj.outputs?.staleFiles));
+    record('focus --json exposes sourceMtimeIso',
+      focusObj !== null && 'sourceMtimeIso' in (focusObj.outputs ?? {}));
+    record('focus --json per-file entries carry a stale flag',
+      focusObj !== null && (focusObj.outputs?.files ?? []).every((f) => 'stale' in f));
+    record('stale-mtime wiring keeps navigator exit 0 (warning-only)',
+      rList.code === 0 && rFocus.code === 0, `list=${rList.code} focus=${rFocus.code}`);
+  }
+
+  // 11. Dist-blogger folder untouched: sanity — mtime of dist-blogger root should not have
   //    been advanced by the child (we can't strictly assert this cross-platform, but we
   //    do assert the folder still exists after all runs iff it existed before).
   {

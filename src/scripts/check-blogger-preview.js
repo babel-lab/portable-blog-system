@@ -19,6 +19,11 @@
 //   若尚未 build，提示 `npm run build:blogger`；若指定 slug 為 draft 或未列入 candidate，
 //   給出對應診斷指引。console output 亦包含 preview sanity checklist doc pointer。
 //
+//   另偵測 stale 輸出（per preanalysis §9.4 G-V1 / §11.1）：若 source `.md` 之 mtime 新於
+//   已存在之 dist 輸出檔，代表該輸出為上一次 build 之產物、不反映目前 source，貼上 Blogger
+//   會貼到過期 HTML。此時 advice 要求先 re-run `npm run build:blogger`。staleness 為
+//   warning-only 診斷（仍 exit 0），不改任何檔、不觸發 build。
+//
 // 使用：
 //   npm run check:blogger-preview                    列出所有 blogger-enabled candidates
 //   npm run check:blogger-preview -- --slug <slug>   聚焦單一 slug
@@ -164,19 +169,70 @@ async function statOne(abs) {
     return {
       exists: true,
       size: st.size,
+      mtimeMs: st.mtimeMs,
       mtimeIso: st.mtime.toISOString(),
     };
   } catch (err) {
     if (err && err.code === 'ENOENT') {
-      return { exists: false, size: null, mtimeIso: null };
+      return { exists: false, size: null, mtimeMs: null, mtimeIso: null };
     }
     throw err;
   }
 }
 
-async function probeDist(slug) {
+/**
+ * Pure staleness evaluator (no IO) — exported for contract smoke.
+ *
+ * A dist output file is stale when it exists and its mtime is strictly older than the
+ * source Markdown's mtime: the source changed after the last `npm run build:blogger`,
+ * so the output no longer reflects the source.
+ *
+ * Returns `stale: null` (not `false`) whenever the comparison cannot be made — no source
+ * mtime, or no existing output file. Absent output is "not yet built", which the dist /
+ * missing-file advice branches already cover; it is not a staleness verdict.
+ */
+export function evaluateStaleness({ sourceMtimeMs, files } = {}) {
+  const input = Array.isArray(files) ? files : [];
+  const comparableSource = typeof sourceMtimeMs === 'number' && Number.isFinite(sourceMtimeMs);
+
+  const evaluated = [];
+  const staleFiles = [];
+  let comparedCount = 0;
+
+  for (const f of input) {
+    const comparableFile = comparableSource
+      && f.exists === true
+      && typeof f.mtimeMs === 'number'
+      && Number.isFinite(f.mtimeMs);
+
+    if (!comparableFile) {
+      evaluated.push({ ...f, stale: null });
+      continue;
+    }
+    comparedCount += 1;
+    const stale = f.mtimeMs < sourceMtimeMs;
+    if (stale) staleFiles.push(f.name);
+    evaluated.push({ ...f, stale });
+  }
+
+  return {
+    comparable: comparedCount > 0,
+    stale: comparedCount > 0 ? staleFiles.length > 0 : null,
+    staleFiles,
+    files: evaluated,
+  };
+}
+
+async function probeDist(slug, sourceRel) {
   if (!slug) {
-    return { slugDir: null, dirExists: false, files: [] };
+    return {
+      slugDir: null,
+      dirExists: false,
+      files: [],
+      sourceMtimeIso: null,
+      stale: null,
+      staleFiles: [],
+    };
   }
   const slugDir = path.join(POSTS_DIST, slug);
   let dirExists = false;
@@ -197,7 +253,19 @@ async function probeDist(slug) {
       ...st,
     });
   }
-  return { slugDir: toRel(slugDir), dirExists, files };
+
+  const sourceStat = sourceRel ? await statOne(path.join(PROJECT_ROOT, sourceRel)) : null;
+  const sourceMtimeMs = sourceStat && sourceStat.exists ? sourceStat.mtimeMs : null;
+  const staleness = evaluateStaleness({ sourceMtimeMs, files });
+
+  return {
+    slugDir: toRel(slugDir),
+    dirExists,
+    files: staleness.files,
+    sourceMtimeIso: sourceStat && sourceStat.exists ? sourceStat.mtimeIso : null,
+    stale: staleness.stale,
+    staleFiles: staleness.staleFiles,
+  };
 }
 
 async function distBloggerRootExists() {
@@ -263,20 +331,24 @@ async function main() {
     const parseFail = parseFailures.find((e) => e.parseError && toRel(e.sourcePath).includes(args.slug));
 
     let entry = null;
-    let outputs = { slugDir: null, dirExists: false, files: [] };
+    let outputs = {
+      slugDir: null, dirExists: false, files: [], sourceMtimeIso: null, stale: null, staleFiles: [],
+    };
     let advice = null;
 
     if (focus) {
       entry = focus;
-      outputs = await probeDist(focus.slug);
+      outputs = await probeDist(focus.slug, focus.sourcePath);
       if (!outputs.dirExists) {
         advice = `dist-blogger/posts/${focus.slug}/ absent — run \`${BUILD_COMMAND}\` to produce Blogger output files.`;
       } else {
         const missing = outputs.files.filter((f) => !f.exists).map((f) => f.name);
         if (missing.length > 0) {
           advice = `dist-blogger/posts/${focus.slug}/ exists but missing ${missing.join(', ')} — re-run \`${BUILD_COMMAND}\`.`;
+        } else if (outputs.stale === true) {
+          advice = `dist-blogger/posts/${focus.slug}/ is STALE — ${focus.sourcePath} was modified after the last build, so ${outputs.staleFiles.join(', ')} no longer reflect the source. Re-run \`${BUILD_COMMAND}\` before pasting into Blogger (see ${RUNBOOK_DOC} §D-5).`;
         } else {
-          advice = `dist-blogger/posts/${focus.slug}/ complete — open post.html and paste into Blogger HTML mode (see ${RUNBOOK_DOC} §D-7).`;
+          advice = `dist-blogger/posts/${focus.slug}/ complete and newer than source — open post.html and paste into Blogger HTML mode (see ${RUNBOOK_DOC} §D-7).`;
         }
       }
     } else if (filtered) {
@@ -308,13 +380,14 @@ async function main() {
   // Listing mode.
   const enriched = [];
   for (const c of candidates) {
-    const outputs = await probeDist(c.slug);
+    const outputs = await probeDist(c.slug, c.sourcePath);
     enriched.push({ ...c, outputs });
   }
 
   const listReport = {
     ...report,
     mode: 'list',
+    staleCount: enriched.filter((e) => e.outputs.stale === true).length,
     entries: enriched,
     filteredOut,
     missingSlug,
@@ -345,7 +418,8 @@ function printPointers(out, pointers) {
 
 function fileLine(f) {
   if (!f.exists) return `    ${f.name}: MISSING`;
-  return `    ${f.name}: exists  size=${f.size}  mtime=${f.mtimeIso}`;
+  const staleTag = f.stale === true ? '  STALE (older than source)' : '';
+  return `    ${f.name}: exists  size=${f.size}  mtime=${f.mtimeIso}${staleTag}`;
 }
 
 function printList(report) {
@@ -353,6 +427,7 @@ function printList(report) {
   printHeader(out, report.mode);
   out.write(`dist-blogger root:   ${report.distBloggerRoot}${report.distBloggerRootExists ? '' : '  (absent)'}\n`);
   out.write(`candidates:          ${report.candidateCount}\n`);
+  out.write(`stale outputs:       ${report.staleCount}\n`);
   out.write(`filtered-out:        ${report.filteredOutCount}\n`);
   out.write(`missing-slug:        ${report.missingSlugCount}\n`);
   out.write(`parse-failures:      ${report.parseFailureCount}\n`);
@@ -370,6 +445,9 @@ function printList(report) {
       } else {
         out.write(`    dist folder: ${e.outputs.slugDir}\n`);
         for (const f of e.outputs.files) out.write(`${fileLine(f)}\n`);
+        if (e.outputs.stale === true) {
+          out.write(`    STALE: source newer than ${e.outputs.staleFiles.join(', ')} → re-run \`${report.buildCommand}\`\n`);
+        }
       }
     }
     out.write('\n');
@@ -430,6 +508,8 @@ function printFocus(report) {
       out.write('  (folder absent)\n');
     } else {
       for (const f of report.outputs.files) out.write(`${fileLine(f)}\n`);
+      out.write(`    source mtime: ${report.outputs.sourceMtimeIso ?? '(unknown)'}\n`);
+      out.write(`    stale:        ${report.outputs.stale === null ? 'n/a' : report.outputs.stale}\n`);
     }
     out.write('\n');
   }
@@ -442,13 +522,23 @@ function printFocus(report) {
   out.write('PASS blogger preview navigator (read-only; warning-only; no writes performed).\n');
 }
 
-main()
-  .then((code) => {
-    process.exit(typeof code === 'number' ? code : 0);
-  })
-  .catch((err) => {
-    process.stderr.write(
-      `[check-blogger-preview] UNEXPECTED ERROR: ${err.stack || err.message || err}\n`,
-    );
-    process.exit(1);
-  });
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  const argvUrl = new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href;
+  return import.meta.url === argvUrl;
+}
+
+// CLI only when invoked directly; importing this module (e.g. from the contract smoke to
+// unit-test evaluateStaleness) must not run the navigator.
+if (isMainModule()) {
+  main()
+    .then((code) => {
+      process.exit(typeof code === 'number' ? code : 0);
+    })
+    .catch((err) => {
+      process.stderr.write(
+        `[check-blogger-preview] UNEXPECTED ERROR: ${err.stack || err.message || err}\n`,
+      );
+      process.exit(1);
+    });
+}
