@@ -3,7 +3,13 @@
 //
 // 用途：
 //   作者於 Blogger 後台手動發布文章後，使用本工具回填 publishedUrl 至對應之 .publish.json sidecar。
-//   不接 Blogger API；不發布；不預測 URL；不建立 sidecar。
+//   不接 Blogger API；不發布；不預測 URL；不預測 publishedAt；不建立 sidecar。
+//
+// publishedAt 真值契約（fail-closed）：
+//   --url 與 --published-at 皆為 Blogger 平台真值，只能由作者自後台複製提供。
+//   --published-at 缺省 → 寫入前 hard-fail（exit 1），**不**回填當下時間、**不**推導 publishYear/publishMonth。
+//   依據：docs/publish-json-schema.md §5.4（不得預測、不得回填當下時間）、docs/publish-workflow.md §13、
+//        CLAUDE.md §3a Red lines（不得 guess publishedAt）、docs/20260706-blogger-identity-and-backfill-strategy.md。
 //
 // 設計依據：
 //   - docs/publish-workflow.md §13 publishedUrl backfill SOP（Phase 9-b 落地）
@@ -33,11 +39,11 @@ Designed for use AFTER manually publishing on Blogger backstage.
 
 Required:
   --url <url>              Blogger published URL (http:// or https://)
+  --published-at <iso>     ISO 8601 publish timestamp, copied from Blogger backstage
   --id <id>                Post identifier (frontmatter id); OR
   --slug <slug>            Post slug (frontmatter slug)
 
 Optional:
-  --published-at <iso>     ISO 8601 publish timestamp; default: now
   --blogger-post-id <id>   Blogger internal post ID (numeric string)
   --dry-run                Print plan; do not write
   --force                  Overwrite existing publishedUrl
@@ -49,15 +55,16 @@ Behavior:
   - If .publish.json does not exist, exits with error (--create-sidecar is NOT supported in this batch)
   - Atomic write: writes to .tmp then renames
   - Does NOT predict Blogger URLs; --url must be provided by author
+  - Does NOT predict publishedAt; --published-at must be provided by author (never defaults to now)
 
 Examples:
-  npm run backfill:url -- --id "20260504-my-post" --url "https://yourblog.blogspot.com/2026/05/my-slug.html"
-  npm run backfill:url -- --slug "my-slug" --url "https://yourblog.blogspot.com/2026/05/my-slug.html" --dry-run
+  npm run backfill:url -- --id "20260504-my-post" --url "https://yourblog.blogspot.com/2026/05/my-slug.html" --published-at "2026-05-12T08:30:00+08:00"
+  npm run backfill:url -- --slug "my-slug" --url "https://yourblog.blogspot.com/2026/05/my-slug.html" --published-at "2026-05-12T08:30:00+08:00" --dry-run
 `;
 
 // ─── flag parsing ───────────────────────────────────────────
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
     url: null,
@@ -122,6 +129,19 @@ function isParseableDate(s) {
   if (s.trim() === '') return false;
   const d = new Date(s);
   return !Number.isNaN(d.getTime());
+}
+
+// publishedAt 為 Blogger 平台之真值，只能由作者自後台複製提供。
+// docs/publish-json-schema.md §5.4：publishedAt 缺少 / 無效時不得預測、不得回填當下時間。
+// 回 { ok: true, publishedAt } 或 { ok: false, error: 'missing' | 'unparseable' }。
+export function resolvePublishedAt(rawPublishedAt) {
+  if (typeof rawPublishedAt !== 'string' || rawPublishedAt.trim() === '') {
+    return { ok: false, error: 'missing' };
+  }
+  if (!isParseableDate(rawPublishedAt)) {
+    return { ok: false, error: 'unparseable' };
+  }
+  return { ok: true, publishedAt: rawPublishedAt };
 }
 
 function isNumericString(s) {
@@ -219,13 +239,26 @@ async function main() {
     );
   }
 
-  const publishedAt = opts.publishedAt ?? new Date().toISOString();
-  if (!isParseableDate(publishedAt)) {
+  const resolvedAt = resolvePublishedAt(opts.publishedAt);
+  if (!resolvedAt.ok) {
+    if (resolvedAt.error === 'missing') {
+      process.stderr.write(
+        '[backfill-published-url] ERROR: --published-at is required (Blogger 後台之實際發布時間)\n',
+      );
+      process.stderr.write(
+        '  publishedAt 為 Blogger 平台真值，必須自後台複製；本工具不得回填當下時間。\n',
+      );
+      process.stderr.write(
+        '  See docs/publish-json-schema.md §5.4 / docs/publish-workflow.md §13.\n',
+      );
+      return 1;
+    }
     process.stderr.write(
-      `[backfill-published-url] ERROR: --published-at is not parseable as a date (got: ${publishedAt})\n`,
+      `[backfill-published-url] ERROR: --published-at is not parseable as a date (got: ${opts.publishedAt})\n`,
     );
     return 1;
   }
+  const publishedAt = resolvedAt.publishedAt;
 
   if (opts.bloggerPostId != null && !isNumericString(opts.bloggerPostId)) {
     process.stderr.write(

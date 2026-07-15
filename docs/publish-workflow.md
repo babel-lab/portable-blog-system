@@ -336,17 +336,17 @@ FB hashtags fallback chain（5 段；per Phase 8-g-19 後）：
 四種常用呼叫範例：
 
 ```bash
-# 1. 以 id 識別 post（基本用法）
-npm run backfill:url -- --id "<post-id>" --url "<blogger-url>"
+# 1. 以 id 識別 post（基本用法；--url 與 --published-at 皆為必填真值）
+npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --published-at "<iso>"
 
 # 2. 以 slug 識別 post
-npm run backfill:url -- --slug "<slug>" --url "<blogger-url>"
+npm run backfill:url -- --slug "<slug>" --url "<blogger-url>" --published-at "<iso>"
 
 # 3. dry-run（只印 plan；不寫入）
-npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --dry-run
+npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --published-at "<iso>" --dry-run
 
-# 4. 完整選填（含 bloggerPostId + 自訂 publishedAt）
-npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --blogger-post-id "<id>" --published-at "<iso>"
+# 4. 完整選填（加上 bloggerPostId）
+npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --published-at "<iso>" --blogger-post-id "<id>"
 ```
 
 本工具行為（per `src/scripts/backfill-published-url.js`）：
@@ -355,6 +355,7 @@ npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --blogger-post-id
 2. **不建立 `.publish.json`**（屬本批未支援之 `--create-sidecar` flag）
 3. **不寫 `.md` frontmatter legacy 欄位**（若 legacy 已存在 `blogger.publishedUrl` → stderr warning，不自動清除）
 4. **不預測 Blogger URL**（`--url` 必須由作者於 Blogger 後台複製貼上；`/yyyy/mm/` pattern 由 Blogger 平台依實際發布時間產生）
+4b. **不預測 `publishedAt`**（`--published-at` 為必填；缺省 → 寫入前 exit 1，**不**回填當下時間、**不**由當下時間推導 `publishYear` / `publishMonth`；per `docs/publish-json-schema.md` §5.4 + CLAUDE.md §3a Red lines。契約由 `npm run check:backfill-published-url` 保護）
 5. **不呼叫 Blogger API**（屬第一版禁區；per CLAUDE.md §29 / §4 技術限制）
 6. **若 `.publish.json` 不存在會失敗並提示作者先建立 sidecar**（exit 1；提示複製 `content/templates/_sample.publish.json`；`--create-sidecar` 屬未來批次）
 7. **若既有 `publishedUrl` 已存在，預設拒絕覆寫；需要 `--force`**（exit 1 unless `--force`；保護作者意外覆蓋）

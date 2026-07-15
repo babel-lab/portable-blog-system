@@ -50,6 +50,7 @@
     "check:redraft-all": "npm run check:redraft-all-contract && npm run check:github-redraft-lifecycle && npm run check:admin-article-lookup && npm run check:redraft-plan && npm run check:admin-git-safety-preflight && npm run check:redraft-apply-engine && npm run check:redraft-apply-cli",
     "check:redraft-all-contract": "node src/scripts/check-redraft-all-contract.js",
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
+    "check:backfill-published-url": "node src/scripts/check-backfill-published-url.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-preview": "node src/scripts/check-blogger-preview.js",
     "check:blogger-preview-smoke": "node src/scripts/check-blogger-preview-smoke.js",
