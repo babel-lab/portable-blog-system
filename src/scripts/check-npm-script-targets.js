@@ -11,10 +11,18 @@
 //   「Cannot find module」，且平時 baseline 不會發現。本 guard 靜態斷言：package.json 每個
 //   script 內出現的 .js 目標檔（node 呼叫的 local 路徑）都存在於 repo。
 //
+//   umbrella script（如 check:metadata-all / check:release-readiness / check:phase1-readiness /
+//   check:redraft-all）另以 `npm run <name>` 串接既有 script。該參照具相同失效模式：rename 或
+//   typo 後 npm 只在實際執行時報「Missing script」，靜態 baseline 不會發現。既有 umbrella
+//   contract guard 只硬編碼守自己那一支的子檢查名單，repo 內其餘 `npm run` 參照無任何覆蓋，
+//   因此本 guard 一併靜態解析 `npm run` 參照並斷言其可解析到 scripts 內既有 key。
+//
 // 斷言：
 //   1. 逐一掃 package.json `scripts` 每個 value，抽出其中所有 local `.js` 目標（node 呼叫）。
 //   2. 每個目標檔於 repo root 下 existsSync 為 true。
 //   3. 至少掃到 1 個目標（sanity；避免 regex 全 miss 卻假綠）。
+//   4. 逐一抽出每個 value 內所有 `npm run <name>` 參照，斷言 <name> 存在於 scripts。
+//   5. 至少掃到 1 個 `npm run` 參照（sanity；避免 regex 全 miss 卻假綠）。
 
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -50,6 +58,19 @@ function extractJsTargets(value) {
   return targets;
 }
 
+// 抽出一個 script value 內所有 `npm run <name>` 參照：
+//   - 允許 npm 與 run 之間、run 與 name 之間有多個空白
+//   - script name 允許 npm 慣用字元集（英數 + : _ . -）
+function extractNpmRunTargets(value) {
+  const targets = [];
+  const pattern = /\bnpm\s+run\s+([A-Za-z0-9][A-Za-z0-9:_.-]*)/g;
+  let match;
+  while ((match = pattern.exec(value)) !== null) {
+    targets.push(match[1]);
+  }
+  return targets;
+}
+
 let targetCount = 0;
 for (const [name, value] of Object.entries(scripts)) {
   const targets = extractJsTargets(value);
@@ -62,6 +83,19 @@ for (const [name, value] of Object.entries(scripts)) {
 
 record('at least one script .js target scanned', targetCount > 0,
   targetCount > 0 ? `${targetCount} targets` : 'no .js targets found in package.json scripts');
+
+let npmRunCount = 0;
+for (const [name, value] of Object.entries(scripts)) {
+  for (const ref of extractNpmRunTargets(value)) {
+    npmRunCount += 1;
+    const resolves = Object.prototype.hasOwnProperty.call(scripts, ref);
+    record(`${name} → npm run ${ref}`, resolves,
+      resolves ? '' : `missing script "${ref}" in package.json scripts`);
+  }
+}
+
+record('at least one npm run reference scanned', npmRunCount > 0,
+  npmRunCount > 0 ? `${npmRunCount} references` : 'no npm run references found in package.json scripts');
 
 const passed = cases.filter((c) => c.ok).length;
 const total = cases.length;
