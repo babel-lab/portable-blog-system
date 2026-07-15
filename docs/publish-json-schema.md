@@ -223,9 +223,22 @@ https://{blogspot-domain}/{yyyy}/{mm}/{permalink}.html
 - 若 `publishedAt` 存在且為合法 ISO 8601 字串，`publishYear` 為其 4 位年份字串、`publishMonth` 為其 2 位月份字串
 - 若 `publishedAt` 缺少（空字串）、無效或無法解析，`publishYear` 與 `publishMonth` 必須**留空字串**，不得預測、不得回填當下時間
 
+年月取自 `publishedAt` 之 ISO-8601 **原始日期部分**（字串開頭之 `YYYY-MM`），**不得先換算為 UTC**，亦不得依執行機器之 local timezone 推導。`publishedAt` 所帶之 offset 即代表 Blogger 發布當下之當地時間，該 offset 之年月才是 Blogger URL `/yyyy/mm/` 之月份（§5.3.1），亦為 §9.5 一致性檢查之對象。
+
+例：
+
+```
+publishedAt = "2026-08-01T00:30:00+08:00"
+→ publishYear = "2026" / publishMonth = "08"
+```
+
+該值換算為 UTC 會變成 `2026-07-31T16:30:00Z`；若據此推導會得出錯誤之 `"07"`，與 Blogger 實際 URL `/2026/08/` 矛盾。同理 `2026-12-31T23:30:00-05:00` 之正確年月為 `2026` / `12`，而非 UTC 換算後之 `2027` / `01`。推導結果不得因執行機器 timezone 而改變。
+
 不得由 `.md` frontmatter `date` 欄位推導 `publishYear` / `publishMonth`。`date` 為作者撰寫日期，與 Blogger 實際發布月份無關。
 
 不得由 `permalink` 反向推算月份。
+
+不得以「當下時間」或任何猜測值補入。無效之時間戳（含看似 ISO 但實際不存在之曆法日期，例 `2026-02-30T10:00:00+08:00`）必須 fail-closed 留空字串；不得因字串前七碼看似 `YYYY-MM` 就繞過完整日期驗證。
 
 ### 5.5 `history` 結構
 

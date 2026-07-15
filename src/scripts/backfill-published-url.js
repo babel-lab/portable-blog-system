@@ -149,12 +149,34 @@ function isNumericString(s) {
   return /^\d+$/.test(s);
 }
 
-function deriveYearMonth(isoStr) {
-  const d = new Date(isoStr);
-  if (Number.isNaN(d.getTime())) return { year: '', month: '' };
-  const y = String(d.getUTCFullYear());
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return { year: y, month: m };
+// 嚴格 ISO-8601：日期（YYYY-MM-DD）+ 可選之時間與 offset（Z 或 ±HH:MM）。
+// 全字串比對 → 任何前綴／尾隨垃圾字元皆不匹配。
+const ISO_8601_RE =
+  /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
+// publishYear / publishMonth 取自 publishedAt 字串本身之 YYYY-MM，**不**先換算 UTC。
+// 依據 docs/publish-json-schema.md §5.4（年月為 publishedAt「其」年月）與 §5.3.1
+// （Blogger URL 之 yyyy/mm 由平台依當地發布月份產生）+ §9.5（URL yyyy/mm 須與年月一致）。
+// 換算 UTC 會使含 offset 之時間戳在月份邊界推導出錯誤月份，例如
+// 2026-08-01T00:30:00+08:00 會被誤推成 2026/07，與 Blogger 之 /2026/08/ 矛盾。
+// 無法解析時回 { year: '', month: '' }（fail-closed；per §5.4 不得預測、不得回填當下時間）。
+export function deriveYearMonth(isoStr) {
+  const EMPTY = { year: '', month: '' };
+  if (typeof isoStr !== 'string') return EMPTY;
+  const m = ISO_8601_RE.exec(isoStr.trim());
+  if (!m) return EMPTY;
+  const [, year, month, day] = m;
+  // 曆法存在性驗證：以 Date.UTC 建構後 round-trip 比對，攔截 2026-02-30 這類看似 ISO
+  // 但實際不存在之日期。此處僅用於「日期是否存在」，不參與年月推導 → 與執行機器時區無關。
+  const probe = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (
+    probe.getUTCFullYear() !== Number(year) ||
+    probe.getUTCMonth() !== Number(month) - 1 ||
+    probe.getUTCDate() !== Number(day)
+  ) {
+    return EMPTY;
+  }
+  return { year, month };
 }
 
 function toRel(p) {
