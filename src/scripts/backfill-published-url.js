@@ -56,6 +56,8 @@ Behavior:
   - If .publish.json does not exist, exits with error (--create-sidecar is NOT supported in this batch)
   - Atomic write: writes to .tmp then renames
   - Does NOT predict Blogger URLs; --url must be provided by author
+  - Rejects --url with surrounding whitespace before any write; the accepted value is
+    written verbatim, so it must match the Blogger URL exactly
   - Does NOT predict publishedAt; --published-at must be provided by author (never defaults to now)
   - Rejects non-strict-ISO --published-at (e.g. "2026-05-15 10:00", or a value with
     surrounding whitespace) before any write; the accepted value is written verbatim,
@@ -118,9 +120,16 @@ export function parseArgs(argv) {
 
 // ─── validators ─────────────────────────────────────────────
 
-function isHttpUrl(s) {
+// publishedUrl 為 Blogger 平台之真值，CLI 逐字寫入 sidecar（見 main 之 newBlogger.publishedUrl）。
+// 驗證與寫入必須是同一個字串：先前以 s.trim() 比對 http(s) 前綴，卻回寫未 trim 之原值，使
+// " https://…" / "https://…\t" 這類自後台複製時常見之形狀通過驗證，以 exit 0 寫出帶空白之
+// blogger.publishedUrl —— 該值不再與 Blogger 上之真實 URL 逐字相同（docs/publish-json-schema.md
+// §5.3）。此處於任何寫入前 fail-closed。不 trim 後放行：URL 為作者複製之真值，工具不改寫、
+// 不正規化（與 resolvePublishedAt 同一契約）。
+export function isHttpUrl(s) {
   if (typeof s !== 'string') return false;
-  return /^https?:\/\//.test(s.trim());
+  if (s !== s.trim()) return false;
+  return /^https?:\/\//.test(s);
 }
 
 function hasBloggerYyyyMmPattern(url) {
@@ -274,7 +283,14 @@ async function main() {
   }
   if (!isHttpUrl(opts.url)) {
     process.stderr.write(
-      `[backfill-published-url] ERROR: --url must start with http:// or https:// (got: ${opts.url})\n`,
+      `[backfill-published-url] ERROR: --url must start with http:// or https:// (got: ${JSON.stringify(opts.url)})\n`,
+    );
+    process.stderr.write(
+      '  The value is written verbatim, so surrounding whitespace is rejected too; re-copy the URL\n' +
+        '  from the Blogger backstage without padding.\n',
+    );
+    process.stderr.write(
+      '  See docs/publish-json-schema.md §5.3 / docs/publish-workflow.md §13.\n',
     );
     return 1;
   }

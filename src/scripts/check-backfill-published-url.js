@@ -31,7 +31,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseArgs, resolvePublishedAt, deriveYearMonth } from './backfill-published-url.js';
+import { parseArgs, resolvePublishedAt, deriveYearMonth, isHttpUrl } from './backfill-published-url.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -451,6 +451,154 @@ for (const [label, input] of [
     assert.ok(!/DRY-RUN plan/.test(r.stdout), 'stdout 不得輸出 plan');
   });
 }
+
+// ── 8e. publishedUrl：前後帶空白 → 寫入前 fail-closed ────────────────────────────────
+// 與 publishedAt 同型缺口：isHttpUrl 先前以 s.trim() 比對 http(s) 前綴，main 卻以
+// `publishedUrl: opts.url` 逐字寫入未 trim 之原值 → " https://…" / "https://…\t" 會以
+// exit 0 寫出帶空白之 publishedUrl，該值不再與 Blogger 上之真實 URL 逐字相同（§5.3）。
+// 取自既有 sidecar 之現值（與正向測試同源；未新增任何推測之 Blogger 真值）。
+const PADDED_URL = FIXTURE_URL;
+const PADDED_URL_CASES = [
+  ['前導空格', ` ${PADDED_URL}`],
+  ['尾隨空格', `${PADDED_URL} `],
+  ['前導 tab', `\t${PADDED_URL}`],
+  ['尾隨換行', `${PADDED_URL}\n`],
+  ['前後皆空白', `  ${PADDED_URL}  `],
+  ['尾隨 CR（CRLF 貼上殘留）', `${PADDED_URL}\r`],
+];
+for (const [label, input] of PADDED_URL_CASES) {
+  check(`isHttpUrl: fail-closed — ${label}`, () => {
+    assert.strictEqual(isHttpUrl(input), false, `padded URL 不得通過驗證：${JSON.stringify(input)}`);
+  });
+}
+
+// 正向 regression：既有合法 URL 行為不變（無空白之 http/https 仍通過）。
+check('isHttpUrl: 無空白之 https URL 仍通過（regression）', () => {
+  assert.strictEqual(isHttpUrl(PADDED_URL), true);
+});
+check('isHttpUrl: 無空白之 http URL 仍通過（regression）', () => {
+  assert.strictEqual(isHttpUrl('http://example.com/2026/05/x.html'), true);
+});
+check('isHttpUrl: 非 http(s) scheme 仍被拒（regression）', () => {
+  assert.strictEqual(isHttpUrl('ftp://x/y'), false);
+});
+check('isHttpUrl: 非字串 → false（regression）', () => {
+  assert.strictEqual(isHttpUrl(12345), false);
+  assert.strictEqual(isHttpUrl(null), false);
+  assert.strictEqual(isHttpUrl(undefined), false);
+});
+
+// 不變式：凡通過 isHttpUrl 之值，其本身即無前後空白。此值會被逐字寫入 sidecar，
+// 故「通過驗證」與「可安全寫入」必須是同一件事（mirror publishedAt 之不變式）。
+check('invariant: 凡接受之 publishedUrl，其值本身即無前後空白', () => {
+  const PROBE = [
+    PADDED_URL,
+    ' ' + PADDED_URL,
+    PADDED_URL + '\t',
+    '\n' + PADDED_URL,
+    'http://example.com/2026/05/x.html ',
+    'ftp://x/y',
+  ];
+  for (const input of PROBE) {
+    if (!isHttpUrl(input)) continue;
+    assert.strictEqual(
+      input,
+      input.trim(),
+      `接受了帶前後空白之 publishedUrl（會逐字寫入 sidecar）：${JSON.stringify(input)}`,
+    );
+  }
+});
+
+// CLI 端到端：padded --url → 寫入前 exit 1。用 FIXTURE_SLUG（真實文章）+ --dry-run + --force
+// 證明「即便文章存在且帶 --force，padded URL 仍走不到 plan」；runCli 之 bytes/mtime 比對確保零寫入。
+// spawnSync shell:false → argv 逐字傳遞，不受 host shell quoting 影響。
+for (const [label, input] of PADDED_URL_CASES) {
+  check(`cli: ${label} 之 --url → exit 1（非 exit 0 寫入帶空白之值）`, () => {
+    const r = runCli([
+      '--slug', FIXTURE_SLUG, '--url', input, '--dry-run', '--force',
+      '--published-at', '2026-05-15T10:00:00+08:00',
+    ]);
+    assert.strictEqual(r.status, 1, `expected exit 1, got ${r.status}\n${r.stdout}`);
+    assert.ok(/must start with http/.test(r.stderr), `stderr: ${r.stderr}`);
+    assert.ok(!/DRY-RUN plan/.test(r.stdout), 'stdout 不得輸出 plan');
+    assert.ok(!/\bOK\b/.test(r.stdout), 'stdout 不得回報 OK');
+  });
+}
+check('cli: padded --url 之錯誤訊息說明空白遭拒（deterministic）', () => {
+  const r = runCli([
+    '--slug', FIXTURE_SLUG, '--url', ` ${PADDED_URL}`, '--dry-run', '--force',
+    '--published-at', '2026-05-15T10:00:00+08:00',
+  ]);
+  assert.ok(/surrounding whitespace is rejected/.test(r.stderr), `stderr 須說明空白遭拒：${r.stderr}`);
+});
+check('cli: padded --url 絕不出現於 resolved payload', () => {
+  const r = runCli([
+    '--slug', FIXTURE_SLUG, '--url', `\t${PADDED_URL}`, '--dry-run', '--force',
+    '--published-at', '2026-05-15T10:00:00+08:00',
+  ]);
+  assert.ok(
+    !/"blogger\.publishedUrl"/.test(r.stdout),
+    `padded URL 不得進入 payload：${r.stdout}`,
+  );
+});
+check('cli: padded --url 不得被 trim 後放行（stdout 不得帶 trim 後之 URL）', () => {
+  const r = runCli([
+    '--slug', FIXTURE_SLUG, '--url', `${PADDED_URL}\n`, '--dry-run', '--force',
+    '--published-at', '2026-05-15T10:00:00+08:00',
+  ]);
+  assert.strictEqual(r.status, 1, `expected exit 1, got ${r.status}`);
+  assert.ok(!r.stdout.includes(PADDED_URL), `不得回傳正規化後之 URL：${r.stdout}`);
+});
+check('cli: URL 檢查早於 post 查找（寫入路徑不可達）', () => {
+  const r = runCli([
+    '--slug', NONEXISTENT_SLUG, '--url', ` ${PADDED_URL}`, '--dry-run',
+    '--published-at', '2026-05-15T10:00:00+08:00',
+  ]);
+  assert.strictEqual(r.status, 1, `expected exit 1, got ${r.status}`);
+  assert.ok(/must start with http/.test(r.stderr), `stderr: ${r.stderr}`);
+  assert.ok(!/no post found/.test(r.stderr), 'URL 檢查須早於 post 查找');
+});
+// 正向 regression：乾淨 URL 之 plan 逐字等於作者提供值（未被工具改寫）。
+check('cli: 乾淨 --url 之 plan publishedUrl 逐字等於作者提供值', () => {
+  const r = runCli([
+    '--slug', FIXTURE_SLUG, '--url', FIXTURE_URL, '--dry-run', '--force',
+    '--published-at', '2026-05-15T10:00:00+08:00',
+  ]);
+  assert.strictEqual(r.status, 0, `expected exit 0, got ${r.status}\n${r.stderr}`);
+  const json = JSON.parse(r.stdout.slice(r.stdout.indexOf('{'), r.stdout.lastIndexOf('}') + 1));
+  assert.strictEqual(json.changes['blogger.publishedUrl'], FIXTURE_URL);
+});
+
+check('static: USAGE 說明 --url 之前後空白遭拒', () => {
+  assert.ok(
+    /--url with surrounding whitespace/i.test(SRC),
+    'USAGE 須說明 --url 之前後空白會被拒絕',
+  );
+});
+check('static: URL 檢查早於 findPosts（負向測試零寫入之前提）', () => {
+  const urlIdx = SRC.indexOf('if (!isHttpUrl(opts.url))');
+  const findIdx = SRC.indexOf('await findPosts(');
+  assert.ok(urlIdx > 0 && findIdx > 0, '找不到 isHttpUrl 檢查或 findPosts');
+  assert.ok(urlIdx < findIdx, 'URL fail-closed 必須早於 post 查找與寫入');
+});
+check('static: isHttpUrl 不得以 trim 後之值比對前綴', () => {
+  const block = SRC.slice(SRC.indexOf('export function isHttpUrl'));
+  const body = block.slice(0, block.indexOf('\n}\n') + 1);
+  assert.ok(
+    !/test\(\s*s\.trim\(\)\s*\)/.test(body),
+    'isHttpUrl 不得以 s.trim() 比對（驗證與寫入須為同一字串）',
+  );
+});
+check('static: publishedUrl 逐字取自 opts.url（未被工具正規化）', () => {
+  assert.ok(
+    /publishedUrl:\s*opts\.url\b/.test(SRC),
+    'publishedUrl 須逐字取自作者提供值',
+  );
+  assert.ok(
+    !/publishedUrl:\s*opts\.url\.trim\(\)/.test(SRC),
+    'CLI 不得於寫入前 trim 作者提供之 URL（真值不由工具改寫）',
+  );
+});
 
 check('static: USAGE 說明 --published-at 須為 strict ISO 8601', () => {
   const required = SRC.slice(SRC.indexOf('Required:'), SRC.indexOf('Optional:'));
