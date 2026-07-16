@@ -160,6 +160,46 @@ for (const [label, input] of NOT_STRICT_ISO_CASES) {
   });
 }
 
+// ── 3c. pure resolver：前後空白 → not-strict-iso（fail-closed）─────────────────────────
+// deriveYearMonth 以 trim 後之字串比對，resolvePublishedAt 卻回傳原值、CLI 逐字寫入 sidecar。
+// 若不在此攔截，`\t2026-05-15` 會以 exit 0 寫出含空白之 blogger.publishedAt —— 年月正確，
+// 但寫入之值本身不符 docs/publish-json-schema.md §5.4 之嚴格 ISO-8601。
+const PADDED_CASES = [
+  ['前導空格', ' 2026-05-15T10:00:00+08:00'],
+  ['尾隨空格', '2026-05-15T10:00:00+08:00 '],
+  ['前導 tab', '\t2026-05-15'],
+  ['尾隨換行', '2026-05-15\n'],
+  ['前後皆空白', '  2026-05-15T10:00:00Z  '],
+  ['date-only 前後空格', ' 2026-05-15 '],
+];
+for (const [label, input] of PADDED_CASES) {
+  check(`resolvePublishedAt: fail-closed — ${label}`, () => {
+    assert.deepStrictEqual(resolvePublishedAt(input), { ok: false, error: 'not-strict-iso' });
+  });
+}
+
+// 不變式：凡接受之值，其本身即為嚴格 ISO（== 已 trim）。回傳值會被逐字寫入 sidecar，
+// 故「通過驗證」與「可安全寫入」必須是同一件事。
+check('invariant: 凡接受之 publishedAt，其值本身即嚴格 ISO（無前後空白）', () => {
+  const PROBE = [
+    '2026-05-15',
+    '2026-05-15T10:00:00+08:00',
+    ' 2026-05-15',
+    '2026-05-15\t',
+    '\n2026-05-15T10:00:00Z',
+    '2028-02-29T12:00:00+08:00',
+  ];
+  for (const input of PROBE) {
+    const r = resolvePublishedAt(input);
+    if (!r.ok) continue;
+    assert.strictEqual(
+      r.publishedAt,
+      r.publishedAt.trim(),
+      `接受了帶前後空白之 publishedAt（會逐字寫入 sidecar）：${JSON.stringify(input)}`,
+    );
+  }
+});
+
 // 不變式（本切片之核心契約）：凡 resolvePublishedAt 接受之值，deriveYearMonth 必推得非空年月。
 // 覆蓋正向 + 各類負向，確保兩個 validator 不再各自為政。
 check('invariant: 凡接受之 publishedAt，deriveYearMonth 必非空', () => {
@@ -393,6 +433,25 @@ check('cli: 嚴格 ISO 檢查早於 post 查找（寫入路徑不可達）', () 
   assert.ok(/must be strict ISO 8601/.test(r.stderr), `stderr: ${r.stderr}`);
   assert.ok(!/no post found/.test(r.stderr), 'ISO 檢查須早於 post 查找');
 });
+// ── 8d. CLI 負向：前後帶空白之 --published-at → 寫入前 exit 1 ───────────────────────
+// 與 8c 同組合（真實文章 + --dry-run + --force）。此類值年月推得出來，故 8c 之空 publishYear
+// 斷言攔不到；缺口在於「寫入之 publishedAt 本身帶空白」。runCli 之 bytes/mtime 比對確保零寫入。
+for (const [label, input] of [
+  ['前導 tab', '\t2026-05-15'],
+  ['尾隨換行', '2026-05-15\n'],
+  ['前後空格', ' 2026-05-15T10:00:00+08:00 '],
+]) {
+  check(`cli: ${label} 之 --published-at → exit 1（非 exit 0 寫入帶空白之值）`, () => {
+    const r = runCli([
+      '--slug', FIXTURE_SLUG, '--url', FIXTURE_URL, '--dry-run', '--force',
+      '--published-at', input,
+    ]);
+    assert.strictEqual(r.status, 1, `expected exit 1, got ${r.status}\n${r.stdout}`);
+    assert.ok(/must be strict ISO 8601/.test(r.stderr), `stderr: ${r.stderr}`);
+    assert.ok(!/DRY-RUN plan/.test(r.stdout), 'stdout 不得輸出 plan');
+  });
+}
+
 check('static: USAGE 說明 --published-at 須為 strict ISO 8601', () => {
   const required = SRC.slice(SRC.indexOf('Required:'), SRC.indexOf('Optional:'));
   assert.ok(

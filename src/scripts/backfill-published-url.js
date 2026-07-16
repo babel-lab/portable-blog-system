@@ -57,8 +57,9 @@ Behavior:
   - Atomic write: writes to .tmp then renames
   - Does NOT predict Blogger URLs; --url must be provided by author
   - Does NOT predict publishedAt; --published-at must be provided by author (never defaults to now)
-  - Rejects non-strict-ISO --published-at (e.g. "2026-05-15 10:00") before any write,
-    since such values cannot yield publishYear/publishMonth
+  - Rejects non-strict-ISO --published-at (e.g. "2026-05-15 10:00", or a value with
+    surrounding whitespace) before any write; the accepted value is written verbatim,
+    so it must itself be strict ISO
 
 Examples:
   npm run backfill:url -- --id "20260504-my-post" --url "https://yourblog.blogspot.com/2026/05/my-slug.html" --published-at "2026-05-12T08:30:00+08:00"
@@ -138,7 +139,13 @@ function isParseableDate(s) {
 // docs/publish-json-schema.md §5.4：publishedAt 缺少 / 無效時不得預測、不得回填當下時間。
 // 回 { ok: true, publishedAt } 或 { ok: false, error: 'missing' | 'unparseable' | 'not-strict-iso' }。
 //
-// 三段式 fail-closed。第三段（not-strict-iso）攔截「Date 可解析、但 deriveYearMonth 無法推導年月」
+// 第二段（padded）：deriveYearMonth 以 trim 後之字串比對，但本函式回傳作者原值且 CLI 逐字寫入
+// sidecar。兩者落差使 `\t2026-05-15` / `2026-05-15\n` 這類前後帶空白之值推得非空年月而被接受，
+// 寫出之 blogger.publishedAt 卻含空白、本身不符 §5.4 之嚴格 ISO-8601。此處於任何寫入前拒絕，
+// 使「凡接受之值本身即嚴格 ISO」與既有「凡接受之值必推得年月」兩不變式同時成立。
+// 不 trim 後放行：publishedAt 為作者自後台複製之真值，工具不改寫、不正規化（§5.4）。
+//
+// 四段式 fail-closed。末段（not-strict-iso）攔截「Date 可解析、但 deriveYearMonth 無法推導年月」
 // 之落差值，例如 `2026-05-15 10:00`（空格取代 T）或 `May 15, 2026` —— V8 legacy parser 接受，
 // 但 §5.4 之嚴格 ISO-8601 推導會回空字串。若不在此攔截，CLI 會以 exit 0 寫入
 // status:"published" + publishYear:"" + publishMonth:""，靜默產生與 publishedUrl 之 /yyyy/mm/
@@ -146,6 +153,9 @@ function isParseableDate(s) {
 export function resolvePublishedAt(rawPublishedAt) {
   if (typeof rawPublishedAt !== 'string' || rawPublishedAt.trim() === '') {
     return { ok: false, error: 'missing' };
+  }
+  if (rawPublishedAt !== rawPublishedAt.trim()) {
+    return { ok: false, error: 'not-strict-iso' };
   }
   if (!isParseableDate(rawPublishedAt)) {
     return { ok: false, error: 'unparseable' };
@@ -296,7 +306,8 @@ async function main() {
         '  Expected YYYY-MM-DD or YYYY-MM-DDThh:mm[:ss][Z|±hh:mm] — note the "T" separator.\n',
       );
       process.stderr.write(
-        '  Non-ISO forms cannot yield publishYear/publishMonth and would write an inconsistent sidecar.\n',
+        '  The value is written verbatim, so surrounding whitespace is rejected too; other non-ISO\n' +
+          '  forms cannot yield publishYear/publishMonth and would write an inconsistent sidecar.\n',
       );
       process.stderr.write(
         '  See docs/publish-json-schema.md §5.4 / docs/publish-workflow.md §13.\n',
