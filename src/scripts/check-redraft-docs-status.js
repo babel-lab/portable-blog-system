@@ -199,9 +199,13 @@ const LIFECYCLE_REL = 'docs/20260714-github-redraft-lifecycle-contract.md';
 const LIFECYCLE = path.join(REPO_ROOT, LIFECYCLE_REL);
 const LIFECYCLE_CONTRACT = 'lifecycle contract deployed-state / operator path contract';
 
-// 現況區切點（標題文字定位，不依賴行號）。§0–§6 為 2026-07-14 當時語境，刻意保留、不掃 stale。
+// 現況區切點（標題文字定位，不依賴行號）。§0–§5 為 2026-07-14 當時語境，刻意保留、不掃 stale。
 const LIFECYCLE_CURRENT_START = '## Current status';
 const LIFECYCLE_HISTORICAL_START = '## 0. 目的與範圍';
+// §6「建議下一步」雖位於 §0 之後，卻是**持續維護**的 active 區（落地項會被劃掉並標「已完成」），
+// operator 會把它當現行待辦讀。故 active 區 = Current status + §6，stale-negation 只掃這兩段，
+// §0–§5 的當時語境不掃，避免歷史敘述造成 false failure。
+const LIFECYCLE_SECTION6_START = '## 6. 建議下一步';
 
 // 現況區必要契約文字。
 const REQUIRED_IN_LIFECYCLE_CURRENT = [
@@ -221,7 +225,17 @@ const REQUIRED_IN_LIFECYCLE_CURRENT = [
   { label: 'first production apply target', text: 'what-is-design-token' },
   { label: 'first target deploy completed', text: '0eaf9c6' },
   { label: 'deploy is single-grant, not permanent', text: '不構成**永久或自動 deploy 授權' },
-  { label: 're-publish CLI path not landed', text: 'Re-publish' },
+  // re-publish：executable source（redraft-plan.js OPS / redraft-apply-cli.js VALID_OPS /
+  // redraft-apply-engine.js TRANSITIONS）已支援 `--op=republish`，與 redraft 共用同一組安全門。
+  // 舊 anchor 只搜 'Re-publish' 且 label 宣稱 "CLI path not landed"，把與 source 相反的事實
+  // 焊進 contract，且鬆到任何提及都算過。改為釘住三段式分類：實作存在 / 從未授權 / 從未執行。
+  { label: 're-publish classified as implemented but never authorized or executed', text: 'implemented but never authorized or executed' },
+  { label: 're-publish implementation exists as a CLI op', text: '--op=republish' },
+  { label: 're-publish shares redraft CLI and safety gates', text: '與 redraft 共用同一支 CLI 與同一組安全門' },
+  { label: 're-publish production authorization never granted', text: '從未獲得 Dean production 授權' },
+  { label: 're-publish production execution never performed', text: '從未在 production 執行' },
+  { label: 'no completed production republish rehearsal/apply/deploy record', text: '沒有任何已完成的 production republish rehearsal／apply／deploy 紀錄' },
+  { label: 'first redraft authorization not reusable for republish', text: '首次 redraft 的授權不可沿用至 republish' },
   { label: 'admin UI still dormant', text: 'Admin UI 仍 dormant' },
   { label: 'phase D not started', text: 'Phase D' },
 ];
@@ -230,6 +244,17 @@ const REQUIRED_IN_LIFECYCLE_CURRENT = [
 const LIFECYCLE_PROHIBITED_TEXTS = [
   { label: 'stale manual-frontmatter-only operator path', text: '退回草稿與重新上架目前仍需 Dean 手動編輯 Markdown frontmatter' },
   { label: 'stale "live URL still serves old page" claim', text: 'live URL 仍供應舊頁' },
+];
+
+// active 區（Current status + §6）禁止之 stale negations。
+// 這三句與 executable source 相反：`republish` 已是 CLI 的合法 op（VALID_OPS / OPS / TRANSITIONS）。
+// 宣稱「未落地 / 不得描述為已實作」會讓 operator 以為必須另開 phase 實作，才能把已 redraft 的文章
+// 復原，並使 CLI 的真實寫入面（draft → ready）在狀態文件中被低估。未授權 ≠ 未實作，兩者不可互相推導。
+// 只掃 active 區：§0–§5 歷史語境不受此限。
+const LIFECYCLE_ACTIVE_PROHIBITED_TEXTS = [
+  { label: 'stale "re-publish CLI path has not landed" claim', text: '尚未正式落地' },
+  { label: 'stale "must not describe re-publish as implemented" instruction', text: '不得描述為已實作' },
+  { label: 'stale "dedicated re-publish CLI slice" framing', text: '專用 re-publish' },
 ];
 
 // ---- preflight 現況區：已知 stale negations 不得復發 ----
@@ -567,6 +592,7 @@ try {
 
 const idxLifecycleCurrent = lifecycle.indexOf(LIFECYCLE_CURRENT_START);
 const idxLifecycleHistorical = lifecycle.indexOf(LIFECYCLE_HISTORICAL_START);
+const idxLifecycleSection6 = lifecycle.indexOf(LIFECYCLE_SECTION6_START);
 const lifecycleSectionsOk =
   idxLifecycleCurrent >= 0 && idxLifecycleHistorical > idxLifecycleCurrent;
 record(
@@ -579,6 +605,20 @@ record(
 if (!lifecycleSectionsOk) summarize(1);
 
 const lifecycleCurrent = lifecycle.slice(idxLifecycleCurrent, idxLifecycleHistorical);
+
+// §6 為 active 待辦區，須可定位；否則 active-region stale 掃描會靜默縮水成只掃 Current status。
+const lifecycleSection6Ok = idxLifecycleSection6 > idxLifecycleHistorical;
+record(
+  'lifecycle active §6 section resolvable (建議下一步)',
+  lifecycleSection6Ok,
+  lifecycleSection6Ok
+    ? ''
+    : `${LIFECYCLE_REL} (${LIFECYCLE_CONTRACT}): missing heading "${LIFECYCLE_SECTION6_START}" after "${LIFECYCLE_HISTORICAL_START}" — §6 是持續維護的 active 待辦區，須納入 stale-negation 掃描範圍`,
+);
+if (!lifecycleSection6Ok) summarize(1);
+
+// active 區 = Current status + §6（§0–§5 之當時語境刻意排除，不掃 stale）。
+const lifecycleActive = lifecycleCurrent + lifecycle.slice(idxLifecycleSection6);
 
 for (const req of REQUIRED_IN_LIFECYCLE_CURRENT) {
   const ok = lifecycleCurrent.includes(req.text);
@@ -599,6 +639,17 @@ for (const prohibited of LIFECYCLE_PROHIBITED_TEXTS) {
     ok
       ? ''
       : `${LIFECYCLE_REL} (${LIFECYCLE_CONTRACT}): 禁止 "${prohibited.text}" —— 手動編輯 frontmatter 會繞過 git-safety preflight / source SHA TOCTOU / atomic engine；且首個 redraft target 之 deploy 已於 0eaf9c6 完成`,
+  );
+}
+
+for (const prohibited of LIFECYCLE_ACTIVE_PROHIBITED_TEXTS) {
+  const ok = !lifecycleActive.includes(prohibited.text);
+  record(
+    `no stale negation in lifecycle active regions: ${prohibited.label}`,
+    ok,
+    ok
+      ? ''
+      : `${LIFECYCLE_REL} Current status + §6 (${LIFECYCLE_CONTRACT}): 禁止 "${prohibited.text}" —— executable source 已支援 --op=republish（redraft-plan.js OPS / redraft-apply-cli.js VALID_OPS / redraft-apply-engine.js TRANSITIONS），與 redraft 共用同一組安全門；re-publish 之正確分類為 implemented but never authorized or executed，不得寫成未落地／未實作（§0–§5 歷史區不在此掃描範圍）`,
   );
 }
 
@@ -632,5 +683,8 @@ console.log(`  preflight prohibited stale negations: ${PREFLIGHT_PROHIBITED_IN_C
 console.log(`  preflight §17+ CLI/engine wiring texts: ${REQUIRED_IN_PREFLIGHT_IMPL.length} checked`);
 console.log(`  lifecycle current-status contract texts: ${REQUIRED_IN_LIFECYCLE_CURRENT.length} checked`);
 console.log(`  lifecycle prohibited stale negations: ${LIFECYCLE_PROHIBITED_TEXTS.length} checked`);
+console.log(
+  `  lifecycle active-region (Current status + §6) prohibited stale negations: ${LIFECYCLE_ACTIVE_PROHIBITED_TEXTS.length} checked`,
+);
 
 summarize(passed === total ? 0 : 1);
