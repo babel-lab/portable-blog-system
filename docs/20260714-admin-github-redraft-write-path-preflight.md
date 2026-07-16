@@ -23,6 +23,13 @@
 - Phase C **不包含** commit／push（Phase D）與 build／deploy（Phase E）。**Blogger publish** 與 **GitHub Pages deploy** 為分離且各自 Dean-gated 的後續階段，**不因 Phase C 落地而自動開放**。
 - Phase C 已實作 **≠** redraft workflow 全部結束，**≠** Dean 已授權對下一篇 production 文章執行 redraft。
 
+**Phase D（commit／push）邊界：單次已執行 ≠ 通用工具已落地**
+
+- **已完成（單次；operator 以普通 Git 指令人工執行）**：`what-is-design-token` 的 lifecycle 變更已 commit 為 `8a062b7`，並已 push 至 `origin/main`（`git merge-base --is-ancestor 8a062b7 origin/main` 成立）。
+- **不因此成立**：通用 Phase D commit／push CLI／engine／npm script／contract guard **在 repository 中均不存在**（無任何 npm script 執行 git commit／push；`redraft-apply-cli.js` / `redraft-apply-engine.js` 不 import `child_process`、不 spawn git）。§14 之 **D. optional Git assistance 仍尚未開放**，須另開 phase + Dean explicit approval。
+- **也不因此成立**：automatic commit、automatic push、force push、remote publication、Blogger publish、GitHub Pages deploy，或對下一篇 production 文章執行 redraft 的授權。
+- **未來仍需**：新的 plan → fresh preflight → reviewed diff → operator decision → normal non-force commit → explicit push decision。
+
 ---
 
 ## 1. Executive summary

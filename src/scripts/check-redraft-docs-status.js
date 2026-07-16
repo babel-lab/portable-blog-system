@@ -72,6 +72,40 @@ const REQUIRED_IN_CURRENT_STATUS = [
   { label: 'github pages deploy separation', text: 'GitHub Pages deploy' },
 ];
 
+// §0 現況區必須把「8a062b7 這一次 commit/push 已完成」與「通用 Phase D 工具仍不存在」分開講清楚。
+// 兩個方向的 drift 都要擋：把已完成的單次執行寫回 pending，或把單次人工執行誇大成通用 automation。
+const REQUIRED_PHASE_D_BOUNDARY = [
+  { label: 'phase D single-execution commit hash', text: '8a062b7' },
+  { label: 'phase D single-execution target post', text: 'what-is-design-token' },
+  { label: 'phase D single-execution was pushed', text: 'push 至 `origin/main`' },
+  { label: 'phase D single execution was manual operator git', text: 'operator 以普通 Git 指令人工執行' },
+  { label: 'phase D general tooling absent', text: '通用 Phase D commit／push CLI' },
+  { label: 'phase D general assistance still not open', text: '尚未開放' },
+  { label: 'phase D grants no automatic commit', text: 'automatic commit' },
+  { label: 'phase D grants no automatic push', text: 'automatic push' },
+  { label: 'future production work needs operator decision', text: 'operator decision' },
+];
+
+// stale 掃描（只掃 §0）：不得把已完成的單次 commit/push 描述為待執行。
+const PHASE_D_STALE_SUBJECTS = ['8a062b7', 'what-is-design-token', 'commit／push', 'commit/push'];
+const PHASE_D_STALE_NEGATIONS = [
+  'still pending',
+  'not yet committed',
+  'not yet pushed',
+  'awaiting push',
+  '尚未 commit',
+  '尚未 push',
+  '尚未推送',
+  '待 push',
+  '尚待 push',
+];
+
+// 反向 drift 掃描（掃現況區）：不得宣稱通用 Phase D automation 已落地。
+// 逐行 AND：同一行同時命中 "Phase D" 與落地宣稱詞。否定敘述（"尚未開放" / "not implemented"）
+// 不含這些子字串，因此文件仍能誠實描述 Phase D 邊界。
+const PHASE_D_OVERCLAIM_SUBJECTS = ['Phase D'];
+const PHASE_D_OVERCLAIM_NEGATIONS = ['fully implemented', 'is implemented', '已實作', '已自動化'];
+
 // §1–§16 必須帶清楚的歷史 / superseded 標示。
 const REQUIRED_HISTORICAL_MARKERS = [
   { label: 'historical snapshot marker', text: 'Historical snapshot' },
@@ -229,6 +263,63 @@ for (const req of REQUIRED_IN_CURRENT_STATUS) {
   );
 }
 
+// 3b. §0 現況區必須區分「單次 commit/push 已完成」與「通用 Phase D 工具未落地」
+for (const req of REQUIRED_PHASE_D_BOUNDARY) {
+  const ok = currentStatusSection.includes(req.text);
+  record(
+    `current status states ${req.label}`,
+    ok,
+    ok
+      ? ''
+      : `${DOC_REL} §0: missing required Phase D boundary text "${req.text}" — 8a062b7 的 commit/push 由 operator 人工完成且已在 origin/main，但通用 Phase D CLI/engine/npm script/guard 皆不存在；§0 須同時寫明兩者`,
+  );
+}
+
+// 3c. §0 不得把已完成的單次 commit/push 寫回 pending
+{
+  const offenders = [];
+  for (const rawLine of currentStatusSection.split('\n')) {
+    const line = rawLine.toLowerCase();
+    const subject = PHASE_D_STALE_SUBJECTS.find((s) => line.includes(s.toLowerCase()));
+    if (!subject) continue;
+    const negation = PHASE_D_STALE_NEGATIONS.find((n) => line.includes(n.toLowerCase()));
+    if (!negation) continue;
+    offenders.push(`"${subject}" + "${negation}": ${rawLine.trim().slice(0, 90)}`);
+  }
+  const ok = offenders.length === 0;
+  record(
+    'no stale "first redraft commit/push still pending" claim in §0 current status',
+    ok,
+    ok
+      ? ''
+      : `${DOC_REL} §0: what-is-design-token 的 lifecycle 變更已 commit 為 8a062b7 且已 push 至 origin/main（merge-base --is-ancestor 成立），現況區不得描述為待執行 — ${offenders.join(' | ')}`,
+  );
+}
+
+// 3d. 現況區不得宣稱通用 Phase D automation 已落地
+for (const region of [
+  { label: '§0 current status', text: currentStatusSection },
+  { label: '§17+ implementation records', text: implRecordsSection },
+]) {
+  const offenders = [];
+  for (const rawLine of region.text.split('\n')) {
+    const line = rawLine.toLowerCase();
+    const subject = PHASE_D_OVERCLAIM_SUBJECTS.find((s) => line.includes(s.toLowerCase()));
+    if (!subject) continue;
+    const negation = PHASE_D_OVERCLAIM_NEGATIONS.find((n) => line.includes(n.toLowerCase()));
+    if (!negation) continue;
+    offenders.push(`"${subject}" + "${negation}": ${rawLine.trim().slice(0, 90)}`);
+  }
+  const ok = offenders.length === 0;
+  record(
+    `no overclaimed "general phase D automation implemented" in ${region.label}`,
+    ok,
+    ok
+      ? ''
+      : `${DOC_REL} ${region.label}: repository 無任何 Phase D commit/push CLI/engine/npm script/guard；一次人工 commit/push（8a062b7）不構成通用 automation — ${offenders.join(' | ')}`,
+  );
+}
+
 // 4. 現況區不得宣稱 Phase C / local apply 未實作
 for (const region of currentRegions) {
   const offenders = [];
@@ -375,7 +466,9 @@ console.log('redraft docs status summary:');
 console.log(`  guard target: ${DOC_REL}`);
 console.log(`  guard target: ${REHEARSAL_REL} (${REHEARSAL_CONTRACT})`);
 console.log(`  current-status contract texts: ${REQUIRED_IN_CURRENT_STATUS.length} checked`);
-console.log(`  stale-claim scans: ${currentRegions.length + 1} region(s)`);
+console.log(`  phase D boundary contract texts: ${REQUIRED_PHASE_D_BOUNDARY.length} checked`);
+console.log(`  stale-claim scans: ${currentRegions.length + 2} region(s)`);
+console.log(`  phase D overclaim scans: ${currentRegions.length} region(s)`);
 console.log(`  overclaim scans: ${FORBIDDEN_OVERCLAIMS.length + REHEARSAL_FORBIDDEN_OVERCLAIMS.length}`);
 console.log(`  referenced npm entries: ${REFERENCED_SCRIPTS.length}`);
 console.log(`  rehearsal current-status contract texts: ${REQUIRED_IN_REHEARSAL_CURRENT.length} checked`);
