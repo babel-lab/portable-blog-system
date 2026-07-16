@@ -557,11 +557,11 @@ Phase C 的 **atomic two-field write 本體**已落地為 **dormant、fixture-on
 
 ### 20.5 維持的 dormant / 未啟用狀態（紅線；contract guard 靜態斷言）
 
-- engine **無** production CLI 入口、**未**新增 `admin:apply-redraft` npm script、**未**被任何 production CLI / Admin UI / existing write CLI import；`node redraft-apply-engine.js` 只印 dormant 提示、exit 0、不 apply。
+- **（狀態更新；§21 為準）** 本 slice 交付當時 engine 無 production CLI 入口。**現況**：`redraft-apply-cli.js` 已 `import { applyLifecycleAtomic } from './redraft-apply-engine.js'`，`package.json` 提供 `admin:redraft-apply`。該 CLI **預設 disabled**，只有通過明確 environment gate、confirmation phrase 與 `--expected-source-sha` 檢查後才可 apply，且**不** commit／push／build／deploy。`node redraft-apply-engine.js` 直接執行仍只印 dormant 提示、exit 0、不 apply。engine 仍**未**被 Admin UI / existing write CLI import；**未**新增 `admin:apply-redraft` npm script。
 - **未**修改既有 real-write whitelist：`admin-frontmatter-patcher.js` `ALLOWED_TOP_LEVEL_KEYS` 與 `admin-write-cli.js` `ALLOWED_FIELDS` 維持 `{description, searchDescription}`、未加 `status`/`draft`。
 - Phase A（`admin-article-lookup`）/ Phase B（`redraft-plan`）CLI 仍拒 `--apply`（exit 2）。
 - engine 只 import Phase A resolver / Phase B patch / Phase C0 preflight；**不** import safe-write / admin-write-cli / whitelist / patcher / child_process；source 靜態掃描斷言無 `spawnSync` / `exec` / `fetch` / git mutation / deploy 呼叫。
-- `package.json` 無任何 `--apply` / apply-redraft 入口；engine `.js` 僅由其 guard script 引用。
+- **（狀態更新；§21 為準）** 本 slice 交付當時 `package.json` 無 apply 入口、engine `.js` 僅由其 guard script 引用。**現況**：apply 入口 = `npm run admin:redraft-apply`（`node src/scripts/redraft-apply-cli.js`），engine `.js` 由該 CLI 與其 guard script 引用。此為 Dean-gated、預設 disabled 之 production CLI，**非**一般用途或自動化操作工具。
 
 ### 20.6 驗證快照（2026-07-14）
 
@@ -569,8 +569,8 @@ Phase C 的 **atomic two-field write 本體**已落地為 **dormant、fixture-on
 
 ### 20.7 與 Phase C.1b 邊界
 
-- 本 slice **只**交付 dormant engine + guard + docs；**未**接正式 CLI、**未**啟用 `--apply`、**未** commit / push 文章狀態、**未** build / deploy。
-- Phase C.1b（正式 CLI activation）須**另開 phase + Dean explicit approval**，且 disabled-by-default；**通過所有安全門 ≠ 已授權寫入**。commit / push / build / deploy 與本 write path 仍完全分離。
+- 本 slice（C.1a）**只**交付 dormant engine + guard + docs；**未**接正式 CLI、**未**啟用 `--apply`、**未** commit / push 文章狀態、**未** build / deploy。
+- **（狀態更新；§21 為準）** Phase C.1b（正式 CLI activation）**已於後續 phase 經 Dean explicit approval 落地**：`npm run admin:redraft-apply`，disabled-by-default。**通過所有安全門 ≠ 已授權寫入**；每次 apply 仍須 Dean 明確授權。commit / push（Phase D）/ build / deploy（Phase E）與本 write path 仍完全分離、各須獨立 Dean-gated slice。
 
 ---
 

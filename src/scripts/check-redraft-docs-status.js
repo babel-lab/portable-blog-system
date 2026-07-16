@@ -3,7 +3,10 @@
 //
 // 範圍 / 邊界：
 //   - 純讀 docs/20260714-admin-github-redraft-write-path-preflight.md、
-//     docs/20260714-admin-github-redraft-first-production-rehearsal.md 與 package.json 文字；
+//     docs/20260714-admin-github-redraft-first-production-rehearsal.md、
+//     docs/20260714-github-redraft-lifecycle-contract.md 與 package.json 文字；
+//     **不**讀 CLAUDE.md（本 guard 專守 redraft docs；CLAUDE.md 之 current-state 由 boot
+//     verification 以 Git 實測，不由本 guard 靜態斷言）；
 //     **不**執行 redraft plan / apply / engine / CLI；**不** build / deploy / dev server /
 //     fetch / pull；**不**寫任何檔；**不**讀取 deploy clone；**不**碰 gh-pages；**不**呼叫
 //     Blogger / Google / GA4 / AdSense API；**不**觸發任何 admin write path。
@@ -182,6 +185,65 @@ const REHEARSAL_STALE_NEGATIONS = [
 const REHEARSAL_FORBIDDEN_OVERCLAIMS = [
   ...FORBIDDEN_OVERCLAIMS,
   'safe to reuse this packet',
+];
+
+// ---- lifecycle contract（deployed-state / operator path contract）----
+//
+// 為何納入：本檔是 preflight 指名之**上位契約**（見 preflight §0 / See also），operator 會從它讀
+// 現行 redraft 路徑。它原本於 §5 寫「退回草稿與重新上架目前仍需 Dean 手動編輯 Markdown
+// frontmatter」——該敘述在 C.1b CLI + C.2 production apply 落地後已過時，且方向危險：手動編輯
+// frontmatter 會繞過 git-safety preflight、source SHA TOCTOU 檢查與 atomic engine 的
+// byte-preserving 斷言。反向 drift 同樣要擋：apply 已落地不代表 deploy 永久開放。
+
+const LIFECYCLE_REL = 'docs/20260714-github-redraft-lifecycle-contract.md';
+const LIFECYCLE = path.join(REPO_ROOT, LIFECYCLE_REL);
+const LIFECYCLE_CONTRACT = 'lifecycle contract deployed-state / operator path contract';
+
+// 現況區切點（標題文字定位，不依賴行號）。§0–§6 為 2026-07-14 當時語境，刻意保留、不掃 stale。
+const LIFECYCLE_CURRENT_START = '## Current status';
+const LIFECYCLE_HISTORICAL_START = '## 0. 目的與範圍';
+
+// 現況區必要契約文字。
+const REQUIRED_IN_LIFECYCLE_CURRENT = [
+  { label: 'historical snapshot marker for §0–§6', text: 'Historical snapshot' },
+  { label: 'production CLI write path exists', text: 'npm run admin:redraft-apply' },
+  { label: 'manual frontmatter edit no longer standard path', text: '手動編輯 Markdown frontmatter 已不再是標準 production redraft 流程' },
+  { label: 'CLI disabled by default', text: '預設 disabled' },
+  { label: 'gate 1 read-only lookup', text: 'read-only lookup' },
+  { label: 'gate 2 dry-run plan', text: 'dry-run plan' },
+  { label: 'gate 3 git-safety preflight', text: 'git-safety preflight' },
+  { label: 'gate 4 expected source sha', text: '--expected-source-sha' },
+  { label: 'gate 5 environment authorization gate', text: 'environment authorization gate' },
+  { label: 'gate 6 confirmation phrase', text: 'confirmation phrase' },
+  { label: 'gate 7 atomic engine', text: 'atomic lifecycle mutation engine' },
+  { label: 'apply and deploy are separately authorized', text: 'apply 與 deploy 為分離授權' },
+  { label: 'first production apply completed', text: '8a062b7' },
+  { label: 'first production apply target', text: 'what-is-design-token' },
+  { label: 'first target deploy completed', text: '0eaf9c6' },
+  { label: 'deploy is single-grant, not permanent', text: '不構成**永久或自動 deploy 授權' },
+  { label: 're-publish CLI path not landed', text: 'Re-publish' },
+  { label: 'admin UI still dormant', text: 'Admin UI 仍 dormant' },
+  { label: 'phase D not started', text: 'Phase D' },
+];
+
+// 全文禁止之已知 stale negations（一旦復發，operator 會被導回繞過安全門的手動路徑）。
+const LIFECYCLE_PROHIBITED_TEXTS = [
+  { label: 'stale manual-frontmatter-only operator path', text: '退回草稿與重新上架目前仍需 Dean 手動編輯 Markdown frontmatter' },
+  { label: 'stale "live URL still serves old page" claim', text: 'live URL 仍供應舊頁' },
+];
+
+// ---- preflight 現況區：已知 stale negations 不得復發 ----
+// §1–§16 為刻意保留之當時語境（帶 historical banner），不在此掃描範圍；只掃 §0 + §17+。
+const PREFLIGHT_PROHIBITED_IN_CURRENT = [
+  { label: 'stale "engine not imported by any production CLI"', text: '未被任何 production CLI' },
+  { label: 'stale "no --apply / apply-redraft entry in package.json"', text: '無任何 `--apply` / apply-redraft 入口' },
+];
+
+// preflight 現況區必須寫出 CLI ↔ engine 的真實接線與其邊界。
+const REQUIRED_IN_PREFLIGHT_IMPL = [
+  { label: 'CLI imports atomic engine', text: 'applyLifecycleAtomic' },
+  { label: 'apply npm entry exists', text: 'admin:redraft-apply' },
+  { label: 'CLI does not commit/push/build/deploy', text: 'commit／push／build／deploy' },
 ];
 
 const cases = [];
@@ -459,12 +521,105 @@ for (const claim of REHEARSAL_FORBIDDEN_OVERCLAIMS) {
   );
 }
 
+// 8. preflight 現況區：已知 stale negations 不得復發 + 必須寫出真實 CLI↔engine 接線
+for (const prohibited of PREFLIGHT_PROHIBITED_IN_CURRENT) {
+  const offenders = currentRegions
+    .filter((region) => region.text.includes(prohibited.text))
+    .map((region) => region.label);
+  const ok = offenders.length === 0;
+  record(
+    `no stale negation in preflight current regions: ${prohibited.label}`,
+    ok,
+    ok
+      ? ''
+      : `${DOC_REL} ${offenders.join(' + ')}: redraft-apply-cli.js 已 import applyLifecycleAtomic 且 package.json 有 admin:redraft-apply；現況區不得再出現 "${prohibited.text}"（§1–§16 歷史區不在此掃描範圍）`,
+  );
+}
+
+for (const req of REQUIRED_IN_PREFLIGHT_IMPL) {
+  const ok = implRecordsSection.includes(req.text);
+  record(
+    `preflight §17+ states ${req.label}`,
+    ok,
+    ok
+      ? ''
+      : `${DOC_REL} §17+: missing required text "${req.text}" — 現況區須寫明 production CLI 與 atomic engine 的真實接線及其 no-commit/push/build/deploy 邊界`,
+  );
+}
+
+// 9. lifecycle contract（上位契約）必須描述現行 operator path，且不得復發已知 stale negations
+const lifecycleExists = existsSync(LIFECYCLE);
+record(
+  `guard target exists: ${LIFECYCLE_REL}`,
+  lifecycleExists,
+  lifecycleExists ? '' : `missing ${LIFECYCLE_REL} (${LIFECYCLE_CONTRACT})`,
+);
+if (!lifecycleExists) summarize(1);
+
+let lifecycle;
+try {
+  lifecycle = readFileSync(LIFECYCLE, 'utf-8');
+  record(`guard target readable: ${LIFECYCLE_REL}`, true);
+} catch (err) {
+  record(`guard target readable: ${LIFECYCLE_REL}`, false, `${LIFECYCLE_REL}: ${err.message}`);
+  summarize(1);
+}
+
+const idxLifecycleCurrent = lifecycle.indexOf(LIFECYCLE_CURRENT_START);
+const idxLifecycleHistorical = lifecycle.indexOf(LIFECYCLE_HISTORICAL_START);
+const lifecycleSectionsOk =
+  idxLifecycleCurrent >= 0 && idxLifecycleHistorical > idxLifecycleCurrent;
+record(
+  'lifecycle sections resolvable (Current status → §0 historical context)',
+  lifecycleSectionsOk,
+  lifecycleSectionsOk
+    ? ''
+    : `${LIFECYCLE_REL} (${LIFECYCLE_CONTRACT}): missing/misordered heading — required in order: "${LIFECYCLE_CURRENT_START}", "${LIFECYCLE_HISTORICAL_START}"`,
+);
+if (!lifecycleSectionsOk) summarize(1);
+
+const lifecycleCurrent = lifecycle.slice(idxLifecycleCurrent, idxLifecycleHistorical);
+
+for (const req of REQUIRED_IN_LIFECYCLE_CURRENT) {
+  const ok = lifecycleCurrent.includes(req.text);
+  record(
+    `lifecycle current status states ${req.label}`,
+    ok,
+    ok
+      ? ''
+      : `${LIFECYCLE_REL} Current status (${LIFECYCLE_CONTRACT}): missing required text "${req.text}" — 本檔是 preflight 指名之上位契約，operator 由此讀現行 redraft 路徑；現況區須同時寫明 CLI 路徑、七道安全門、已完成範圍與未開放邊界`,
+  );
+}
+
+for (const prohibited of LIFECYCLE_PROHIBITED_TEXTS) {
+  const ok = !lifecycle.includes(prohibited.text);
+  record(
+    `no stale negation in lifecycle contract: ${prohibited.label}`,
+    ok,
+    ok
+      ? ''
+      : `${LIFECYCLE_REL} (${LIFECYCLE_CONTRACT}): 禁止 "${prohibited.text}" —— 手動編輯 frontmatter 會繞過 git-safety preflight / source SHA TOCTOU / atomic engine；且首個 redraft target 之 deploy 已於 0eaf9c6 完成`,
+  );
+}
+
+for (const claim of FORBIDDEN_OVERCLAIMS) {
+  const ok = !lifecycle.toLowerCase().includes(claim);
+  record(
+    `no overclaim in lifecycle contract: "${claim}"`,
+    ok,
+    ok
+      ? ''
+      : `${LIFECYCLE_REL} (${LIFECYCLE_CONTRACT}): apply CLI 已落地、首個 target 已 deploy，皆不代表未來 build／deploy／Blogger publish 已開放；禁止 "${claim}"`,
+  );
+}
+
 const passed = cases.filter((c) => c.ok).length;
 const total = cases.length;
 console.log('');
 console.log('redraft docs status summary:');
 console.log(`  guard target: ${DOC_REL}`);
 console.log(`  guard target: ${REHEARSAL_REL} (${REHEARSAL_CONTRACT})`);
+console.log(`  guard target: ${LIFECYCLE_REL} (${LIFECYCLE_CONTRACT})`);
 console.log(`  current-status contract texts: ${REQUIRED_IN_CURRENT_STATUS.length} checked`);
 console.log(`  phase D boundary contract texts: ${REQUIRED_PHASE_D_BOUNDARY.length} checked`);
 console.log(`  stale-claim scans: ${currentRegions.length + 2} region(s)`);
@@ -473,5 +628,9 @@ console.log(`  overclaim scans: ${FORBIDDEN_OVERCLAIMS.length + REHEARSAL_FORBID
 console.log(`  referenced npm entries: ${REFERENCED_SCRIPTS.length}`);
 console.log(`  rehearsal current-status contract texts: ${REQUIRED_IN_REHEARSAL_CURRENT.length} checked`);
 console.log(`  rehearsal historical markers: ${REQUIRED_IN_REHEARSAL_HISTORICAL.length} checked`);
+console.log(`  preflight prohibited stale negations: ${PREFLIGHT_PROHIBITED_IN_CURRENT.length} scanned in ${currentRegions.length} region(s)`);
+console.log(`  preflight §17+ CLI/engine wiring texts: ${REQUIRED_IN_PREFLIGHT_IMPL.length} checked`);
+console.log(`  lifecycle current-status contract texts: ${REQUIRED_IN_LIFECYCLE_CURRENT.length} checked`);
+console.log(`  lifecycle prohibited stale negations: ${LIFECYCLE_PROHIBITED_TEXTS.length} checked`);
 
 summarize(passed === total ? 0 : 1);
