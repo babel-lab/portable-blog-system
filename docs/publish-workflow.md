@@ -356,6 +356,7 @@ npm run backfill:url -- --id "<post-id>" --url "<blogger-url>" --published-at "<
 3. **不寫 `.md` frontmatter legacy 欄位**（若 legacy 已存在 `blogger.publishedUrl` → stderr warning，不自動清除）
 4. **不預測 Blogger URL**（`--url` 必須由作者於 Blogger 後台複製貼上；`/yyyy/mm/` pattern 由 Blogger 平台依實際發布時間產生）
 4b. **不預測 `publishedAt`**（`--published-at` 為必填；缺省 → 寫入前 exit 1，**不**回填當下時間、**不**由當下時間推導 `publishYear` / `publishMonth`；per `docs/publish-json-schema.md` §5.4 + CLAUDE.md §3a Red lines。契約由 `npm run check:backfill-published-url` 保護）
+4b-2. **`--published-at` 必須為嚴格 ISO 8601**（`YYYY-MM-DD` 或 `YYYY-MM-DDThh:mm[:ss][Z|±hh:mm]`）。JS `new Date()` 之 legacy parser 會接受 `2026-05-15 10:00`（空格取代 `T`）、`May 15, 2026`、`2026/05/15` 等形式，但 4c 之嚴格推導無法自其取得年月 → 若放行，將寫出 `status: "published"` 但 `publishYear` / `publishMonth` 為空字串之 sidecar，與 `publishedUrl` 之 `/yyyy/mm/` 不一致（§9.5）。故此類值於**寫入前** exit 1，並於 stderr 指引正確格式。不變式：凡 `resolvePublishedAt` 接受之值，`deriveYearMonth` 必推得非空年月。契約由 `npm run check:backfill-published-url` 保護
 4c. **`publishYear` / `publishMonth` 取自 `--published-at` 之 ISO-8601 原始日期部分**（字串開頭之 `YYYY-MM`），**不先換算 UTC**、不依執行機器 local timezone 推導；例 `2026-08-01T00:30:00+08:00` → `2026` / `08`（換算 UTC 會誤得 `07`，與 Blogger URL `/2026/08/` 矛盾）。無效時間戳（含 `2026-02-30T10:00:00+08:00` 這類不存在之曆法日期）→ fail-closed 留空字串。per `docs/publish-json-schema.md` §5.4 + §5.3.1 + §9.5
 5. **不呼叫 Blogger API**（屬第一版禁區；per CLAUDE.md §29 / §4 技術限制）
 6. **若 `.publish.json` 不存在會失敗並提示作者先建立 sidecar**（exit 1；提示複製 `content/templates/_sample.publish.json`；`--create-sidecar` 屬未來批次）

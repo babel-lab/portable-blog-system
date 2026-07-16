@@ -39,7 +39,8 @@ Designed for use AFTER manually publishing on Blogger backstage.
 
 Required:
   --url <url>              Blogger published URL (http:// or https://)
-  --published-at <iso>     ISO 8601 publish timestamp, copied from Blogger backstage
+  --published-at <iso>     Strict ISO 8601 publish timestamp, copied from Blogger backstage
+                           (YYYY-MM-DD or YYYY-MM-DDThh:mm[:ss][Z|±hh:mm])
   --id <id>                Post identifier (frontmatter id); OR
   --slug <slug>            Post slug (frontmatter slug)
 
@@ -56,6 +57,8 @@ Behavior:
   - Atomic write: writes to .tmp then renames
   - Does NOT predict Blogger URLs; --url must be provided by author
   - Does NOT predict publishedAt; --published-at must be provided by author (never defaults to now)
+  - Rejects non-strict-ISO --published-at (e.g. "2026-05-15 10:00") before any write,
+    since such values cannot yield publishYear/publishMonth
 
 Examples:
   npm run backfill:url -- --id "20260504-my-post" --url "https://yourblog.blogspot.com/2026/05/my-slug.html" --published-at "2026-05-12T08:30:00+08:00"
@@ -133,13 +136,23 @@ function isParseableDate(s) {
 
 // publishedAt 為 Blogger 平台之真值，只能由作者自後台複製提供。
 // docs/publish-json-schema.md §5.4：publishedAt 缺少 / 無效時不得預測、不得回填當下時間。
-// 回 { ok: true, publishedAt } 或 { ok: false, error: 'missing' | 'unparseable' }。
+// 回 { ok: true, publishedAt } 或 { ok: false, error: 'missing' | 'unparseable' | 'not-strict-iso' }。
+//
+// 三段式 fail-closed。第三段（not-strict-iso）攔截「Date 可解析、但 deriveYearMonth 無法推導年月」
+// 之落差值，例如 `2026-05-15 10:00`（空格取代 T）或 `May 15, 2026` —— V8 legacy parser 接受，
+// 但 §5.4 之嚴格 ISO-8601 推導會回空字串。若不在此攔截，CLI 會以 exit 0 寫入
+// status:"published" + publishYear:"" + publishMonth:""，靜默產生與 publishedUrl 之 /yyyy/mm/
+// 不一致之 sidecar（§9.5）。此處收斂為「凡接受之值，deriveYearMonth 必非空」之不變式。
 export function resolvePublishedAt(rawPublishedAt) {
   if (typeof rawPublishedAt !== 'string' || rawPublishedAt.trim() === '') {
     return { ok: false, error: 'missing' };
   }
   if (!isParseableDate(rawPublishedAt)) {
     return { ok: false, error: 'unparseable' };
+  }
+  const { year, month } = deriveYearMonth(rawPublishedAt);
+  if (year === '' || month === '') {
+    return { ok: false, error: 'not-strict-iso' };
   }
   return { ok: true, publishedAt: rawPublishedAt };
 }
@@ -269,6 +282,21 @@ async function main() {
       );
       process.stderr.write(
         '  publishedAt 為 Blogger 平台真值，必須自後台複製；本工具不得回填當下時間。\n',
+      );
+      process.stderr.write(
+        '  See docs/publish-json-schema.md §5.4 / docs/publish-workflow.md §13.\n',
+      );
+      return 1;
+    }
+    if (resolvedAt.error === 'not-strict-iso') {
+      process.stderr.write(
+        `[backfill-published-url] ERROR: --published-at must be strict ISO 8601 (got: ${opts.publishedAt})\n`,
+      );
+      process.stderr.write(
+        '  Expected YYYY-MM-DD or YYYY-MM-DDThh:mm[:ss][Z|±hh:mm] — note the "T" separator.\n',
+      );
+      process.stderr.write(
+        '  Non-ISO forms cannot yield publishYear/publishMonth and would write an inconsistent sidecar.\n',
       );
       process.stderr.write(
         '  See docs/publish-json-schema.md §5.4 / docs/publish-workflow.md §13.\n',
