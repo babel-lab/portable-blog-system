@@ -8,8 +8,9 @@
 //     / GA4 / AdSense API；**不**觸發任何 admin write path（apply / engine / CLI）。
 //
 // 目的（防呆 / 防回歸）：
-//   check:redraft-all 是 admin redraft write-path 的聚合檢查閘門，只串接六支既有 read-only
-//   contract guard（lifecycle → lookup → plan → git-safety preflight → apply engine → apply CLI）。
+//   check:redraft-all 是 admin redraft write-path 的聚合檢查閘門，只串接七支既有 read-only
+//   contract guard（lifecycle → lookup → plan → git-safety preflight → apply engine → apply CLI
+//   → docs status）。
 //   它本身必須是 checks-only：跑它**不得**寫任何 production Markdown、不得 commit / push /
 //   build / deploy。若未來有人：
 //     (a) 靜默刪掉其中一支子 guard → write-path 覆蓋面縮水而 baseline 不會發現；
@@ -21,16 +22,17 @@
 // 斷言：
 //   1. package.json 可解析。
 //   2. scripts["check:redraft-all"] 存在且為非空 string。
-//   3. script 包含六個必要片段（lifecycle / lookup / plan / git-safety / apply-engine / apply-cli）。
+//   3. script 包含七個必要片段（lifecycle / lookup / plan / git-safety / apply-engine / apply-cli
+//      / docs-status）。
 //   4. script 不含任何危險 token（write path 觸發 / build / deploy / push / gh-pages / dist）。
-//   5. script 包含七個 ordered fragments（contract → lifecycle → lookup → plan → git-safety →
-//      apply-engine → apply-cli），且 indexOf 嚴格遞增。git-safety preflight 必須先於兩支
-//      apply guard，與 write-path preflight 契約一致。
-//   6. 六支子 guard 皆存在於 scripts 且為直接 `node src/scripts/*.js` 目標（保持扁平；
+//   5. script 包含八個 ordered fragments（contract → lifecycle → lookup → plan → git-safety →
+//      apply-engine → apply-cli → docs-status），且 indexOf 嚴格遞增。git-safety preflight 必須
+//      先於兩支 apply guard，與 write-path preflight 契約一致。
+//   6. 七支子 guard 皆存在於 scripts 且為直接 `node src/scripts/*.js` 目標（保持扁平；
 //      禁止子層再套 umbrella，避免遞迴與覆蓋面被間接稀釋）。
 //
 // 注意：
-//   - 六支子 guard 名稱含 "redraft-apply-engine" / "redraft-apply-cli"，其中的 "apply" 屬合法
+//   - 七支子 guard 名稱含 "redraft-apply-engine" / "redraft-apply-cli"，其中的 "apply" 屬合法
 //     子字串，不得被誤判為危險 token。危險偵測針對的是「真正會寫入的入口」：CLI flag `--apply`、
 //     env gate、confirmation phrase、npm 入口 `admin:redraft-apply` / `admin:write`。
 //   - "publish" 以 negative lookbehind (?<!pre) 排除合法 "prepublish"；"republish" 會被攔下，
@@ -47,7 +49,8 @@ const PKG = path.join(REPO_ROOT, 'package.json');
 
 const SCRIPT_NAME = 'check:redraft-all';
 
-// 六支子 guard（package.json script 名稱）。順序即契約順序。
+// 七支子 guard（package.json script 名稱）。順序即契約順序。
+// docs-status 排最後：write-path 的程式面 guard 全綠後，才驗 operator 文件現況敘述未漂移。
 const SUB_GUARDS = [
   'check:github-redraft-lifecycle',
   'check:admin-article-lookup',
@@ -55,6 +58,7 @@ const SUB_GUARDS = [
   'check:admin-git-safety-preflight',
   'check:redraft-apply-engine',
   'check:redraft-apply-cli',
+  'check:redraft-docs-status',
 ];
 
 const REQUIRED_FRAGMENTS = SUB_GUARDS.map((name) => `npm run ${name}`);
@@ -127,7 +131,7 @@ record(`scripts["${SCRIPT_NAME}"] exists and is a non-empty string`, scriptExist
 // script 不存在時，後續片段 / token / 順序檢查無意義 → 直接收尾
 if (!scriptExists) summarize(1);
 
-// 3. 六個必要片段皆存在
+// 3. 七個必要片段皆存在
 let requiredHit = 0;
 for (const frag of REQUIRED_FRAGMENTS) {
   const ok = value.includes(frag);
@@ -167,7 +171,7 @@ record(
   orderOk ? '' : orderProblems.join('; '),
 );
 
-// 6. 六支子 guard 皆為直接 node script 目標（扁平；非巢狀 umbrella）
+// 6. 七支子 guard 皆為直接 node script 目標（扁平；非巢狀 umbrella）
 const DIRECT_NODE_TARGET = /^node src\/scripts\/[\w.-]+\.js$/;
 let flatHit = 0;
 for (const name of SUB_GUARDS) {
