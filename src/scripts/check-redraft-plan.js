@@ -313,6 +313,27 @@ async function main() {
       assert.strictEqual((await runCli({ argv: ['--slug=draft-post', '--op=redraft'], projectRoot: tmpRoot })).exit, 8); // precondition
     });
 
+    await check('(boundary message) states Phase C local apply is implemented; keeps dry-run / later-phase boundary', async () => {
+      const r = await planRedraft({ slug: 'ready-post', op: 'redraft', projectRoot: tmpRoot });
+      const human = formatPlan(r, { json: false });
+      // 舊 stale 文案不得復活（Phase C local apply 已實作）。
+      assert.ok(!human.includes('apply (Phase C) is NOT implemented'), 'stale "apply (Phase C) is NOT implemented" must not appear');
+      assert.ok(!/apply[^\n]*\bNOT implemented\b/i.test(human), 'must not claim apply is unimplemented');
+      // 新文案必須指向已實作的 apply CLI，且保留 gate。
+      assert.ok(human.includes('admin:redraft-apply'), 'must point operator at the implemented apply CLI');
+      assert.ok(human.includes('preflight'), 'must keep the preflight requirement');
+      // 本指令自身邊界不得鬆動。
+      assert.ok(human.includes('dry-run only'), 'must keep dry-run-only boundary');
+      assert.ok(human.includes('NO file written'), 'must keep the no-write statement');
+      assert.ok(human.includes('`--apply` 在此仍一律拒絕'), 'must keep --apply rejection for this CLI');
+      // 後續 phase 邊界必須仍在，且不得宣稱已完成 / 可發布 / 可部署。
+      assert.ok(human.includes('Blogger publish') && human.includes('GitHub Pages deploy'), 'must keep later-phase boundary');
+      assert.ok(!/safe to publish|ready to deploy|fully complete/i.test(human), 'must not over-claim publish/deploy readiness');
+      // 訊息不得暗示本次已寫入。
+      assert.strictEqual(r.plan.written, false);
+      assert.strictEqual(r.plan.apply, false);
+    });
+
     await check('(no leak) plan output contains no body text and no secret marker', async () => {
       const r = await planRedraft({ slug: 'ready-post', op: 'redraft', projectRoot: tmpRoot });
       const human = formatPlan(r, { json: false });

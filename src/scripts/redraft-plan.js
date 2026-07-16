@@ -5,8 +5,9 @@
 //   docs/20260714-admin-github-redraft-write-path-preflight.md §14 之 **Phase B**（dry-run patch
 //   generation）。Phase A（admin-article-lookup.js）已提供 slug→唯一文章唯讀解析；本檔在其之上
 //   產生「若要 redraft / republish，status 與 boolean draft 兩欄位該如何改」的 **dry-run 計畫**：
-//   deterministic human diff + JSON plan + source/target SHA-256。**絕不寫檔**，apply（Phase C）/
-//   commit-push（Phase D）/ deploy（Phase E）皆未實作、皆 Dean-gated。
+//   deterministic human diff + JSON plan + source/target SHA-256。**本檔絕不寫檔**；apply（Phase C）
+//   已實作於獨立 CLI（redraft-apply-cli.js，preflight + confirm gate），commit-push（Phase D）/
+//   deploy（Phase E）仍未實作；三者皆 Dean-gated，皆不由本檔執行。
 //
 // 生命週期轉換（preflight §5）：
 //   redraft   ：status ∈ {ready, published} + draft:false  →  status:draft + draft:true
@@ -320,7 +321,8 @@ export function formatPlan(result, { json = false } = {}) {
   lines.push('  ── boundary ──');
   lines.push('  dry-run only — NO file written; NO mtime / sidecar / build / deploy change.');
   lines.push(`  ${p.effectNote}`);
-  lines.push('  apply (Phase C) is NOT implemented; --apply is rejected.');
+  lines.push('  apply (Phase C, 本機 status 寫入) 已實作於獨立 CLI：`npm run admin:redraft-apply`；須先通過 preflight 並由操作者明確決定 + confirm gate。本指令維持 dry-run only，`--apply` 在此仍一律拒絕。');
+  lines.push('  後續 phase（commit-push / Blogger publish / GitHub Pages deploy）不由本指令執行，仍各自受控。');
   return lines.join('\n');
 }
 
