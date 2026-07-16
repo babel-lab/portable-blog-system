@@ -7,6 +7,24 @@
 
 ---
 
+## 0. Current Phase C status（現況；優先於 §1–§16 之當時分析）
+
+> **Historical snapshot**：§1–§16 為 2026-07-14 撰寫當下之唯讀前置分析與 go／no-go 紀錄，**刻意保留當時語境**、不改寫。其中對 Phase C／`--apply` 之當時判讀**已被 §17–§21 之實作紀錄 superseded**，不得再當作現行狀態依據。現行狀態以本節 + §17–§21 為準。
+
+**已實作（landed）**
+
+- **Phase C local status apply 已實作。** 直接證據：`7d057f5`（C.1a atomic 寫入引擎）→ `436e0bc`（C.1b 本地 apply CLI）→ `f827dce`（C.2 pre-apply rehearsal 封包）→ `8a062b7`（首次 production redraft apply／commit）→ `81eee7a`（operator-facing 訊息修正）。
+- 正式本地 apply 入口 = `npm run admin:redraft-apply`（§21）。已具備：atomic local source update、pre-apply verification、explicit apply gate、exact confirmation phrase。
+
+**仍然維持的安全限制（未因 Phase C 落地而放寬）**
+
+- `npm run admin:plan-redraft` **仍為 dry-run only**，**仍拒絕 `--apply`**（§18.6）。
+- apply **不自動發生**：須 operator 明確決定；preflight（§10／§19）仍為必經；bypass／force flags 仍被拒絕（§21.6）。
+- Phase C **不包含** commit／push（Phase D）與 build／deploy（Phase E）。**Blogger publish** 與 **GitHub Pages deploy** 為分離且各自 Dean-gated 的後續階段，**不因 Phase C 落地而自動開放**。
+- Phase C 已實作 **≠** redraft workflow 全部結束，**≠** Dean 已授權對下一篇 production 文章執行 redraft。
+
+---
+
 ## 1. Executive summary
 
 Dean 需求：GitHub 文章能安全地「退回草稿（暫時下架）→ 未來沿用相同 slug／URL 重新上架」，且**明確 ≠ 永久刪除**。
@@ -243,9 +261,9 @@ apply（Dean 明確）：
 | **B. dry-run patch generation** ✅ **IMPLEMENTED（2026-07-14；見 §18）** | 產生僅含 status+draft 之 old/new diff（boolean 支援、兩欄位成對、expectedOldValues、source/target SHA-256）；**不 apply**。 | ❌ | ❌ |
 | **C.1a. dormant atomic apply engine** ✅ **IMPLEMENTED（2026-07-14；fixture-only / dormant；見 §20）** | atomic two-field write 本體：plan schema recheck → repository safety preflight（§19）→ Phase A 重新唯一解析 → source SHA TOCTOU → lifecycle precondition → target 重算核 SHA → same-dir atomic replace（exclusive create + fsync + mode 保留）→ 必要 post-write validation callback → 失敗 rollback。**無 production CLI 入口 / 無 `--apply` / 無 npm apply script / 未被任何 production CLI / Admin UI import；只在 contract guard 之 OS temp fixtures 實際寫入。** | ✅（temp fixtures only；production .md 從未被測試寫入） | ❌ |
 | **C.1b. production CLI activation** ✅ **IMPLEMENTED（2026-07-14；disabled-by-default；見 §21）** | 將 engine 接上 Dean-gated 正式 CLI（`redraft-apply-cli.js`）：multi-auth gate（`--apply` + env gate 精確值 + `--confirm=<精確 phrase>` + `--slug` + `--op` + `--expected-source-sha`）→ Phase A 重新解析 → Phase B 重新產 plan → expected source SHA 比對 → engine（含 Phase C0 preflight + atomic write + pure single-file post-write validation callback）。**預設完全禁用；無 force bypass；本 session 未對 production 執行 apply。** | ✅（temp fixtures only；production .md 從未被測試寫入） | ❌ |
-| **C. local apply, no Git automation**（git-safety preflight 前置**已備**，§19；C.1a engine **已備 dormant**；正式 CLI 啟用〔C.1b〕仍未實作） | 全部 preflight（§10；git-safety 部分見 §19）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
-| **D. optional Git assistance** | 另行評估 commit／push 輔助；**仍不得與 deploy 綁定**。 | — | commit/push（Dean-gated） |
-| **E. deploy assistance** | 另一個 Dean-gated slice；build + 同步 dist→gh-pages 使 URL 生效 404。 | — | deploy（Dean-gated） |
+| **C. local apply, no Git automation**（彙總列）✅ **IMPLEMENTED**（C0 preflight §19 + C.1a engine §20 + C.1b CLI §21 皆已落地；入口 `npm run admin:redraft-apply`） | 全部 preflight（§10；git-safety 部分見 §19）通過 + Dean 明確確認後：原子寫入 Markdown → `validate:content` → `check:github-redraft-lifecycle`。**不 commit / 不 push / 不 deploy**。 | ✅（.md only） | ❌ |
+| **D. optional Git assistance** | 另行評估 commit／push 輔助；**仍不得與 deploy 綁定**。**尚未開放**；須另開 phase + Dean explicit approval。 | — | commit/push（Dean-gated） |
+| **E. deploy assistance** | 另一個 Dean-gated slice；build + 同步 dist→gh-pages 使 URL 生效 404。**尚未開放**；須另開 phase + Dean explicit approval。 | — | deploy（Dean-gated） |
 
 **對現有架構的調整建議**：Phase A 之 read-only lookup 部分 Admin 已有（顯示既有文章），可只補「CLI 唯讀查詢 + slug 唯一 resolver」小切片；Phase B 需先在 patcher 加 boolean 支援（現況 `new-value-must-be-string`）。順序維持 A→B→C→D→E 不變（write 前置 read-only、apply 前置 dry-run，皆與既有 dormant CLI 的兩段式一致）。
 
@@ -261,7 +279,7 @@ apply（Dean 明確）：
 
 **本 session（analysis/docs-only）= 完成；不啟用任何 write path。**
 
-> **2026-07-14 update**：Phase A（read-only article lookup，§17）、Phase B（dry-run-only status/draft
+> **2026-07-14 update**（**historical；已 superseded —— 本段記錄當時判讀，現行狀態見 §0**）：Phase A（read-only article lookup，§17）、Phase B（dry-run-only status/draft
 > patch generation，§18）與 **git-safety preflight（Phase C 前置；§19）均已落地**。§10 之三項缺口
 > （branch / ahead-behind / index.lock）現已有 **reusable、read-only** 的 checker + contract guard。
 > 下一建議 slice = **Phase C（local apply, no Git automation）**，仍 **NO-GO 至 Dean explicit
@@ -301,7 +319,9 @@ GO for explicit-confirmation local apply CLI (Phase C.1b)    ← DONE 2026-07-14
 
 若 Dean 傾向直接進 dry-run，替代建議 = **GO for dry-run-only patch generation（Phase B）**，但須明確接受其包含 patcher boolean 支援之程式變更，且仍 **NO-GO for `--apply`**。
 
-**NO-GO 條件（未解不得進 apply/Phase C）**：§10 之 branch / ahead-behind / index.lock 三項 git-safety preflight 未實作前，不得啟用任何 `--apply` 寫回 status/draft。
+**NO-GO 條件（當時；已解除）**：§10 之 branch / ahead-behind / index.lock 三項 git-safety preflight 未落地前，不得啟用任何 `--apply` 寫回 status/draft。
+
+> **狀態更新（superseded）**：上述 NO-GO 條件已由 §19 之 read-only repository safety preflight 解除，其後 §20／§21 落地 apply engine 與 Dean-gated CLI。**現行狀態見 §0**：apply 已可經 `npm run admin:redraft-apply` 執行，但仍須 preflight 通過 + operator 明確授權；commit／push（Phase D）與 deploy（Phase E）仍分離、仍須另開 phase。
 
 ---
 
@@ -363,7 +383,8 @@ resolver 只 import `readFile`（node:fs/promises）/ fast-glob / gray-matter；
 ### 17.10 與 Blogger / 未來 Phase 邊界
 
 - 本功能**不修改** Blogger 線上貼文、**不**登入 Blogger、**不**碰 GA4 / AdSense / gh-pages / deploy。
-- **`--apply` 不存在**（明確拒絕）。write path（Phase B dry-run patch / Phase C apply / Phase D commit-push / Phase E deploy）**皆未實作、皆 NO-GO、各須另開 phase + Dean explicit approval**。
+- **本 lookup CLI 無 `--apply`**（明確拒絕）；lookup 永遠唯讀。
+- 現行 write path 邊界（見 §0）：Phase B dry-run patch（§18）與 Phase C local apply（§19–§21）**已落地**，apply 入口 = `npm run admin:redraft-apply`，仍須 preflight + operator 明確授權。Phase D（commit／push）與 Phase E（deploy）**尚未開放，各須另開 phase + Dean explicit approval**。
 
 ---
 
@@ -410,7 +431,8 @@ node src/scripts/redraft-plan.js --slug=<slug> --op=redraft [--json]
 ### 18.6 明確拒絕的參數 / 邊界
 
 - `--apply` / `--write` / `--commit` / `--push` / `--deploy` / `--save` / `--output` **明確拒絕**（exit 2，非忽略）。
-- **無** apply / write / commit / push / build / deploy 路徑。Phase C（local apply）、D（commit/push）、E（deploy）**皆未實作、皆 NO-GO、各須另開 phase + Dean explicit approval**；Phase C 另受 §10 git-safety preflight（branch / ahead-behind / index.lock）未實作之阻擋。
+- **本 planner 無** apply / write / commit / push / build / deploy 路徑；`admin:plan-redraft` **維持 dry-run only**，此邊界不因 Phase C 落地而改變。
+- 現行 write path 邊界（見 §0）：Phase C local apply **已落地**，但**不在本 planner 內**——實際寫入須改走 `npm run admin:redraft-apply`（§21），且須 preflight（§19）通過 + operator 明確授權 + exact confirmation phrase。Phase D（commit/push）、E（deploy）**尚未開放，各須另開 phase + Dean explicit approval**。
 - 不修改 Blogger 線上貼文、不碰 GA4 / AdSense / gh-pages。
 
 ---
@@ -481,7 +503,7 @@ eligible → exit 0。多重 failure 時取排序後第一項（deterministic pr
 ### 19.8 與 Phase C 的整合邊界
 
 - 本 slice **只**匯出 reusable read-only preflight + 獨立 CLI + contract guard；**未**修改 `redraft-plan.js`（Phase B planner 仍可獨立 dry-run，未接入 git-safety）、**未**新增 `--apply`、**未**串接 plan → write CLI、**未**改 real-write whitelist、**未**實作 atomic two-field write / expected source SHA apply / commit / push。
-- 未來 Phase C actual apply **必須先呼叫此 preflight**（eligible:true 才前進），但 **actual local apply 仍未實作、仍需 Dean explicit approval**；atomic two-field filesystem write 與 expected source SHA recheck 仍是下一階段缺口。
+- Phase C actual apply **必須先呼叫此 preflight**（eligible:true 才前進）。該 apply 其後已落地（atomic two-field filesystem write §20 + expected source SHA recheck §21），入口 = `npm run admin:redraft-apply`；**preflight 通過 ≠ 已授權寫入**，仍須 operator 明確決定 + exact confirmation phrase。
 - 不修改 Blogger 線上貼文、不碰 GA4 / AdSense / gh-pages / deploy。
 
 ---
