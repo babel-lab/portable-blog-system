@@ -2,7 +2,8 @@
 // Phase 20260716：redraft write-path docs status contract guard（docs-level 靜態斷言）。
 //
 // 範圍 / 邊界：
-//   - 純讀 docs/20260714-admin-github-redraft-write-path-preflight.md 與 package.json 文字；
+//   - 純讀 docs/20260714-admin-github-redraft-write-path-preflight.md、
+//     docs/20260714-admin-github-redraft-first-production-rehearsal.md 與 package.json 文字；
 //     **不**執行 redraft plan / apply / engine / CLI；**不** build / deploy / dev server /
 //     fetch / pull；**不**寫任何檔；**不**讀取 deploy clone；**不**碰 gh-pages；**不**呼叫
 //     Blogger / Google / GA4 / AdSense API；**不**觸發任何 admin write path。
@@ -27,6 +28,11 @@
 //   5. 全文不得出現過度宣稱（fully complete / safe to publish / ready to deploy /
 //      all phases implemented）。
 //   6. 文件引用的 npm 入口（admin:redraft-apply / admin:plan-redraft）必須真的存在於 package.json。
+//   7. rehearsal packet（first-production-rehearsal）必須帶 historical / completed 標示：
+//      該封包原為「執行前準備 + 未來 apply 命令範本 + approval checklist」，Phase C.2 已由
+//      8a062b7 對 what-is-design-token 執行完畢。若封包看起來仍是 pending apply 指令，
+//      operator 可能對同一篇文章重跑 production apply、或重用已 stale 的 expected source SHA。
+//      其 §1–§24 為 2026-07-14 當時語境，**刻意保留**、不掃 stale；只掃 §0 現況區。
 //
 // 注意：
 //   - 所有斷言以標題文字切區、以子字串 / 逐行比對，**不依賴行號**、不依賴日期以外的環境狀態。
@@ -86,6 +92,63 @@ const FORBIDDEN_OVERCLAIMS = [
 
 // 文件引用之 npm 入口必須實際存在。
 const REFERENCED_SCRIPTS = ['admin:redraft-apply', 'admin:plan-redraft'];
+
+// ---- rehearsal packet（historical / completed status contract）----
+
+const REHEARSAL_REL = 'docs/20260714-admin-github-redraft-first-production-rehearsal.md';
+const REHEARSAL = path.join(REPO_ROOT, REHEARSAL_REL);
+const REHEARSAL_CONTRACT = 'rehearsal historical/completed status contract';
+
+// 現況區切點（標題文字定位，不依賴行號）。
+const REHEARSAL_CURRENT_START = '## 0. Current status';
+const REHEARSAL_HISTORICAL_START = '## 1. Executive summary';
+
+// §0 現況區必要契約文字。
+const REQUIRED_IN_REHEARSAL_CURRENT = [
+  { label: 'historical/completed marker', text: 'Historical / completed rehearsal packet' },
+  { label: 'historical snapshot marker for §1–§24', text: 'Historical snapshot' },
+  { label: 'completion commit', text: '8a062b7' },
+  { label: 'completion target post', text: 'what-is-design-token' },
+  { label: 'do-not-rerun warning', text: 'Do not rerun this packet as a pending production apply' },
+  { label: 'new plan/preflight required for future lifecycle change', text: '必須建立新的 plan／preflight' },
+  { label: 'republish not authorized', text: 'republish' },
+  { label: 'blogger write not authorized', text: 'Blogger write' },
+  { label: 'github pages deploy not authorized', text: 'GitHub Pages deploy' },
+];
+
+// §1–§24 歷史區必須帶 superseded / completed 註記，讓當時的「下一步」不被讀成現行待辦。
+const REQUIRED_IN_REHEARSAL_HISTORICAL = [
+  { label: 'historical plan completion note', text: 'Historical plan — completed by' },
+  { label: 'superseded completion status note', text: 'Superseded completion status' },
+];
+
+// stale 掃描（只掃 §0）：同一行同時命中主題詞與「尚待執行」詞才判定。
+// 歷史區的 "NOT EXECUTED" / 「下一 slice」是 2026-07-14 當時的合法紀錄，不在掃描範圍。
+const REHEARSAL_STALE_SUBJECTS = [
+  'what-is-design-token',
+  'production redraft apply',
+  'production apply',
+  'Phase C.2',
+];
+const REHEARSAL_STALE_NEGATIONS = [
+  'next slice',
+  '下一 slice',
+  '下一個 slice',
+  'not yet applied',
+  'not yet implemented',
+  'awaiting execution',
+  'still pending',
+  'NOT EXECUTED',
+  '尚待執行',
+  '待執行',
+  '尚未執行',
+];
+
+// rehearsal 封包專屬過度宣稱（全文禁止）。
+const REHEARSAL_FORBIDDEN_OVERCLAIMS = [
+  ...FORBIDDEN_OVERCLAIMS,
+  'safe to reuse this packet',
+];
 
 const cases = [];
 function record(name, ok, detail = '') {
@@ -217,14 +280,105 @@ for (const name of REFERENCED_SCRIPTS) {
   );
 }
 
+// 7. rehearsal packet 必須標示為 historical / completed
+const rehearsalExists = existsSync(REHEARSAL);
+record(
+  `guard target exists: ${REHEARSAL_REL}`,
+  rehearsalExists,
+  rehearsalExists ? '' : `missing ${REHEARSAL_REL} (${REHEARSAL_CONTRACT})`,
+);
+if (!rehearsalExists) summarize(1);
+
+let rehearsal;
+try {
+  rehearsal = readFileSync(REHEARSAL, 'utf-8');
+  record(`guard target readable: ${REHEARSAL_REL}`, true);
+} catch (err) {
+  record(`guard target readable: ${REHEARSAL_REL}`, false, `${REHEARSAL_REL}: ${err.message}`);
+  summarize(1);
+}
+
+const idxRehearsalCurrent = rehearsal.indexOf(REHEARSAL_CURRENT_START);
+const idxRehearsalHistorical = rehearsal.indexOf(REHEARSAL_HISTORICAL_START);
+const rehearsalSectionsOk =
+  idxRehearsalCurrent >= 0 && idxRehearsalHistorical > idxRehearsalCurrent;
+record(
+  'rehearsal sections resolvable (§0 current status → §1 historical plan)',
+  rehearsalSectionsOk,
+  rehearsalSectionsOk
+    ? ''
+    : `${REHEARSAL_REL} (${REHEARSAL_CONTRACT}): missing/misordered heading — required in order: "${REHEARSAL_CURRENT_START}", "${REHEARSAL_HISTORICAL_START}"`,
+);
+if (!rehearsalSectionsOk) summarize(1);
+
+const rehearsalCurrent = rehearsal.slice(idxRehearsalCurrent, idxRehearsalHistorical);
+const rehearsalHistorical = rehearsal.slice(idxRehearsalHistorical);
+
+for (const req of REQUIRED_IN_REHEARSAL_CURRENT) {
+  const ok = rehearsalCurrent.includes(req.text);
+  record(
+    `rehearsal current status states ${req.label}`,
+    ok,
+    ok
+      ? ''
+      : `${REHEARSAL_REL} §0 (${REHEARSAL_CONTRACT}): missing required text "${req.text}" — Phase C.2 已由 8a062b7 對 what-is-design-token 執行完畢，現況區須明示完成狀態與未授權範圍`,
+  );
+}
+
+for (const req of REQUIRED_IN_REHEARSAL_HISTORICAL) {
+  const ok = rehearsalHistorical.includes(req.text);
+  record(
+    `rehearsal historical region carries ${req.label}`,
+    ok,
+    ok
+      ? ''
+      : `${REHEARSAL_REL} §1+ (${REHEARSAL_CONTRACT}): missing required text "${req.text}" — 當時的 apply 範本／checklist／「下一步」須標注已由 8a062b7 完成，否則會被當成待執行 runbook`,
+  );
+}
+
+{
+  const offenders = [];
+  for (const rawLine of rehearsalCurrent.split('\n')) {
+    // ASCII 詞需大小寫不敏感（"Next slice" / "NOT EXECUTED" 等皆須命中）；中文不受影響。
+    const line = rawLine.toLowerCase();
+    const subject = REHEARSAL_STALE_SUBJECTS.find((s) => line.includes(s.toLowerCase()));
+    if (!subject) continue;
+    const negation = REHEARSAL_STALE_NEGATIONS.find((n) => line.includes(n.toLowerCase()));
+    if (!negation) continue;
+    offenders.push(`"${subject}" + "${negation}": ${rawLine.trim().slice(0, 90)}`);
+  }
+  const ok = offenders.length === 0;
+  record(
+    'no stale "production apply still pending" claim in rehearsal §0 current status',
+    ok,
+    ok
+      ? ''
+      : `${REHEARSAL_REL} §0 (${REHEARSAL_CONTRACT}): what-is-design-token 的 production redraft apply 已完成（8a062b7），現況區不得把它描述為待執行 — ${offenders.join(' | ')}`,
+  );
+}
+
+for (const claim of REHEARSAL_FORBIDDEN_OVERCLAIMS) {
+  const ok = !rehearsal.toLowerCase().includes(claim);
+  record(
+    `no overclaim in rehearsal packet: "${claim}"`,
+    ok,
+    ok
+      ? ''
+      : `${REHEARSAL_REL} (${REHEARSAL_CONTRACT}): apply 已完成不代表 republish / Blogger write / GitHub Pages deploy 已授權，也不代表本封包可重用；禁止 "${claim}"`,
+  );
+}
+
 const passed = cases.filter((c) => c.ok).length;
 const total = cases.length;
 console.log('');
 console.log('redraft docs status summary:');
 console.log(`  guard target: ${DOC_REL}`);
+console.log(`  guard target: ${REHEARSAL_REL} (${REHEARSAL_CONTRACT})`);
 console.log(`  current-status contract texts: ${REQUIRED_IN_CURRENT_STATUS.length} checked`);
-console.log(`  stale-claim scans: ${currentRegions.length} region(s)`);
-console.log(`  overclaim scans: ${FORBIDDEN_OVERCLAIMS.length}`);
+console.log(`  stale-claim scans: ${currentRegions.length + 1} region(s)`);
+console.log(`  overclaim scans: ${FORBIDDEN_OVERCLAIMS.length + REHEARSAL_FORBIDDEN_OVERCLAIMS.length}`);
 console.log(`  referenced npm entries: ${REFERENCED_SCRIPTS.length}`);
+console.log(`  rehearsal current-status contract texts: ${REQUIRED_IN_REHEARSAL_CURRENT.length} checked`);
+console.log(`  rehearsal historical markers: ${REQUIRED_IN_REHEARSAL_HISTORICAL.length} checked`);
 
 summarize(passed === total ? 0 : 1);
