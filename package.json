@@ -77,7 +77,7 @@
     "check:metadata-all-contract": "node src/scripts/check-metadata-all-contract.js",
     "check:release-readiness": "npm run check:release-readiness-contract && npm run check:github-pages-prepublish && npm run check:github-pages-prepublish-smoke && npm run check:metadata-all && npm run validate:content",
     "check:release-readiness-contract": "node src/scripts/check-release-readiness-contract.js",
-    "check:phase1-readiness": "npm run validate:content && npm run check:npm-script-targets && npm run check:adsense-mode-metadata && npm run check:blogger-backfill && npm run check:download-indexing-independence && npm run check:github-pages-prepublish && npm run check:github-pages-prepublish-smoke",
+    "check:phase1-readiness": "npm run check:phase1-readiness-contract && npm run validate:content && npm run check:npm-script-targets && npm run check:adsense-mode-metadata && npm run check:blogger-backfill && npm run check:download-indexing-independence && npm run check:github-pages-prepublish && npm run check:github-pages-prepublish-smoke",
     "check:phase1-readiness-contract": "node src/scripts/check-phase1-readiness-contract.js",
     "safe-write:test": "node src/scripts/safe-write-test.js",
     "admin:write": "node src/scripts/admin-write-cli.js",
