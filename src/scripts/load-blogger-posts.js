@@ -10,7 +10,10 @@
 
 import { loadPosts } from './load-posts.js';
 
-const VALID_BLOGGER_MODES = new Set(['full', 'summary', 'redirect-card']);
+// Phase 20260717-B2-a：additive export（行為不變；本檔內部沿用同一 Set）。
+//   供 blogger-preview-plan.js 之 draft-aware preview planner 以真實列舉判定 bloggerMode，
+//   避免另抄一份規格產生 drift（沿用 load-posts.js 之 classify additive export 慣例）。
+export const VALID_BLOGGER_MODES = new Set(['full', 'summary', 'redirect-card']);
 
 export async function loadBloggerPosts({ settings = {} } = {}) {
   // Phase 8-f-2-b：plumbing — settings 由 caller 經 loadBloggerPosts 轉發至內部之 loadPosts

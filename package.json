@@ -57,6 +57,8 @@
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-preview": "node src/scripts/check-blogger-preview.js",
     "check:blogger-preview-smoke": "node src/scripts/check-blogger-preview-smoke.js",
+    "check:blogger-preview-plan": "node src/scripts/check-blogger-preview-plan.js",
+    "blogger:plan-preview": "node src/scripts/blogger-preview-plan.js",
     "check:blogger-backfill:one-post": "node src/scripts/check-blogger-backfill-one-post.js",
     "check:blogger-backfill:wp02-intake-contract": "node src/scripts/check-blogger-backfill-wp02-intake-contract.js",
     "check:blogger-backfill:one-post-worksheet-contract": "node src/scripts/check-blogger-backfill-one-post-worksheet-contract.js",
