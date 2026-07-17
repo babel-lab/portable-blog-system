@@ -52,6 +52,7 @@
     "check:redraft-all-contract": "node src/scripts/check-redraft-all-contract.js",
     "check:npm-script-targets": "node src/scripts/check-npm-script-targets.js",
     "check:docs-npm-run-refs": "node src/scripts/check-docs-npm-run-refs.js",
+    "check:docs-node-script-refs": "node src/scripts/check-docs-node-script-refs.js",
     "check:backfill-published-url": "node src/scripts/check-backfill-published-url.js",
     "check:blogger-backfill": "node src/scripts/check-blogger-backfill.js",
     "check:blogger-preview": "node src/scripts/check-blogger-preview.js",
