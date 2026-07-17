@@ -120,7 +120,7 @@ Readiness checks 本輪跑（read-only）：
 
 界線 recap：navigator = **read-only navigator**、**非** renderer / builder / publish gate；exit 0 **不等於**「已發布」/「Blogger 後台已建立草稿」/「sidecar 真值完整」/「backfill 完成」。navigator 不能取代本 checklist §5.1–§5.9 之視覺 / metadata / 連結類人工檢查；亦不能取代 Blogger 後台之 Preview。詳細命令 / 狀態解讀見 runbook §C.5。
 
-B1 / B2 邊界：B1 navigator = ✅ implemented（`docs/20260712-preview-only-helper-implementation.md`；`cc6497b`，2026-07-12）；B2 draft-aware preview build = ⏸ not implemented / Dean-gated（`docs/20260710-blogger-preview-only-script-preanalysis.md` §6.2；須另開 phase + explicit approval）。
+B1 / B2 邊界：B1 navigator = ✅ implemented（`docs/20260712-preview-only-helper-implementation.md`；`cc6497b`，2026-07-12）；B2 draft-aware preview build = ✅ implemented（Phase A planner `22f1789` + Phase C builder `2f70290`，2026-07-17）。要看 draft 外觀時可直接跑 `npm run build:blogger-preview -- --slug=<slug>` → `dist-blogger-preview/posts/<slug>/`（local-only；gitignored；三載體皆帶 `PREVIEW-ONLY` / `NOT FOR DEPLOY`；不寫入 Blogger），**不必**先暫改 `status: ready` + `draft: false`；操作入口與限制見 runbook §C.6。B2 落地**未**放寬既有邊界：B1 navigator 仍只讀正式 `dist-blogger/`、B1 `--dry-run` 仍是相容性 no-op、runbook §D 十步流程保留為 fallback（需驗證正式 `dist-blogger/` ready-only 輸出時仍適用）；B2 **不**自動操作 Blogger 後台 Preview、**不**呼叫 Blogger API、**不**發布 —— 貼上後台後之 Preview，與本 checklist §5.1–§5.9 之人工檢查，皆不可略過。
 
 ### 5.1 內容完整性（Content parity）
 
