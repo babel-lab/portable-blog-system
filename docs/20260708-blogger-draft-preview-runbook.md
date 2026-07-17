@@ -134,7 +134,7 @@ npm run check:blogger-preview -- --dry-run
 ```
 
 - `--help`：印 usage + behavior + See also。exit 0。
-- `--dry-run`：navigator 本無寫入副作用；`--dry-run` 為 CLI shape parity 之 no-op，行為與 list mode 相同，僅於 stderr 印 `[check-blogger-preview] note: --dry-run is a no-op (navigator is read-only)`。**不**模擬 build、**不**模擬 publish、**不**建立 sandbox `dist-blogger-preview/`。若未來有 B2 draft-aware preview build 實作，`--dry-run` 之語意才會實質擴展；本階段保留旗標形狀。
+- `--dry-run`：navigator 本無寫入副作用；`--dry-run` 為 CLI shape parity 之 no-op，行為與 list mode 相同，僅於 stderr 印 `[check-blogger-preview] note: --dry-run is a no-op (navigator is read-only)`。**不**模擬 build、**不**模擬 publish、**不**建立 sandbox `dist-blogger-preview/`。B2 draft-aware preview build 已實作（見 §C.6），但它**不**改變 B1 `--dry-run` 旗標本身之語意：`--dry-run` 目前仍是相容性 no-op（保留旗標形狀），navigator 亦**未**支援 `dist-blogger-preview/`，仍只認正式 `dist-blogger/`。draft 預覽請改用 §C.6 之 `build:blogger-preview`。
 
 ### C.5-5. 常見狀態與下一步
 
