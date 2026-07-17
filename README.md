@@ -29,7 +29,8 @@ npm run dev
 |  | `npm run preview` | 預覽 `dist/` |
 | build:* | `npm run build:data` | 讀 Markdown + settings → 渲染 EJS → 寫 `.cache/pages/`、`.cache/data/posts.json`、`site.json`、`build-manifest.json` |
 |  | `npm run build:github` | 同 `build:data` 的 alias |
-|  | `npm run build:blogger` | 產 Blogger 匯出 dist：每篇 4 檔（post.html / copy-helper.txt 13 區塊 / meta.json / publish-checklist.txt）+ Blogger home + category index |
+|  | `npm run build:blogger` | 產 Blogger 匯出 dist：每篇 4 檔（post.html / copy-helper.txt 13 區塊 / meta.json / publish-checklist.txt）+ Blogger home + category index。**ready-only**（draft 不進正式 dist）|
+|  | `npm run build:blogger-preview -- --slug=<slug>` | **本機 preview only**：draft-aware 單篇預覽產出至 `dist-blogger-preview/posts/<slug>/`（post.html / copy-helper.txt / meta.json，皆帶 `PREVIEW-ONLY / NOT FOR DEPLOY`）。不改 frontmatter、不動正式 `dist-blogger/`、不 deploy、零網路 |
 |  | `npm run build:blogger-theme` | 產 Blogger 主題 CSS 4 檔（tokens / components / article / full-style）|
 |  | `npm run build:promotion` | 產 FB 粉絲頁推廣文案 txt（`dist-promotion/facebook/{blogger,github}/{slug}.txt`）|
 |  | `npm run build:sitemap` | 產 `dist/sitemap.xml`（filter noindex）+ `robots.txt`；postbuild 自動串接 |

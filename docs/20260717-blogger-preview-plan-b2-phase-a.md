@@ -210,9 +210,15 @@ npm run blogger:plan-preview -- --slug=<slug>
 
 ## 8. 仍需 Dean 明確授權之後續步驟（本 slice **不**啟動）
 
-1. **B2 Phase C — renderer 抽出 + preview 產出**：把 `build-blogger.js` 之 renderer 抽成可重用 entrypoint、產出 `dist-blogger-preview/posts/<slug>/`、`.gitignore` 加 `dist-blogger-preview/*`、輸出頂部標 `PREVIEW-ONLY / NOT FOR DEPLOY`、新增 `build:blogger-preview`。**須驗證 `build:blogger` byte-identical modulo `builtAt`**。
-2. **Runbook / sanity checklist 更新**：`docs/20260708-blogger-draft-preview-runbook.md` §D 之 10 步於本 slice **仍完全正確、未變動**（本 slice 未改任何流程），故刻意未動；待 Phase C 產檔能力落地後再依 §11.2 更新 §D / §5.0。
+> **狀態更新（2026-07-17）**：下方第 1、2 項已於 **B2 Phase C** 落地（Dean-gated；獨立 slice）。
+> 落地紀錄：`docs/20260717-blogger-preview-artifact-builder-b2-phase-c.md`。
+> 本 §8 原文保留作歷史對照，**不**代表當前待辦。
+
+1. ~~**B2 Phase C — renderer 抽出 + preview 產出**~~ → ✅ **已落地**：共用 renderer `src/scripts/blogger-render.js`（正式 build 與 preview 共用同一實作）；`src/scripts/build-blogger-preview.js` 產出 `dist-blogger-preview/posts/<slug>/`；`.gitignore` 已加 `dist-blogger-preview/`；三載體標記 `PREVIEW-ONLY / NOT FOR DEPLOY`；`npm run build:blogger-preview -- --slug=<slug>` 已註冊。**`build:blogger` byte-identical modulo `builtAt` 已驗證**（pre/post 快照 37/37 檔、0 real differences）。guard `check:build-blogger-preview` 61/0。
+   - 附帶：本檔 §3 所述之工程約束（`build-blogger.js` 913 行 / 零 export / import 即執行 `main()`）**已於 Phase C 解除** —— renderer 已無 top-level side effect（不 import `node:fs`）。
+2. ~~**Runbook / sanity checklist 更新**~~ → ✅ **已落地**：runbook 新增 **§C.6「B2 alternative」**（`build:blogger-preview` 不需暫改 frontmatter），§D 原 10 步**保留未刪**（仍為 fallback）。
 3. 其餘一律維持 deferred：F5 / Blogger backfill intake（7 篇 true values）/ production backfill / production redraft / production republish / Route G deploy / Blogger AdSense Batch 2 live repost / reverse UTM pm-26。
+4. **人工 Blogger Preview**（B2 實際收益驗收）：須 Dean 明確授權；Claude 不代登入 Blogger、不代貼、不代發布。
 
 ---
 

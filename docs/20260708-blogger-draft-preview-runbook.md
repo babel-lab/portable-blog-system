@@ -151,9 +151,42 @@ npm run check:blogger-preview -- --dry-run
 
 ---
 
+## C.6 B2 draft-aware preview build（alternative；**不需**暫改 frontmatter）
+
+自 Phase 20260717-B2-c 起，draft 可**直接**產出預覽 HTML，**不必**走 §D-4 的「暫改 `status: ready` + `draft: false`」再於 §D-10 改回：
+
+```bash
+npm run build:blogger-preview -- --slug=<slug>
+```
+
+產出（**皆帶 `PREVIEW-ONLY / NOT FOR DEPLOY` 標記**）：
+
+```
+dist-blogger-preview/posts/<slug>/post.html          # Blogger 可貼 HTML（檔首為 preview marker 註解）
+dist-blogger-preview/posts/<slug>/copy-helper.txt    # 檔首為 preview 橫幅
+dist-blogger-preview/posts/<slug>/meta.json          # 含 preview: { previewOnly: true, notForDeploy: true, ... }
+```
+
+要點：
+
+- **不改 frontmatter**、**不動正式 `dist-blogger/`**、不 deploy、不需 Blogger 登入、零網路。
+- 與正式 `build:blogger` **共用同一 renderer 與同一 EJS 模板** → 外觀等同正式輸出（差異僅 preview marker）。
+- 刻意**不產** `publish-checklist.txt`（preview 產物不供正式發布流程使用）。
+- 強制指定單一 slug；`--apply` / `--deploy` / `--publish` / `--output` 一律 hard-fail。
+- `dist-blogger-preview/` 已 gitignored；貼 Blogger 前請**移除檔首 marker 註解**（或直接複製 `<div class="lab-blogger-article">` 起之本體）。
+- 只要「產出計畫」而不要產檔：`npm run blogger:plan-preview -- --slug=<slug>`（dry-run only）。
+
+接續步驟同 §D-7 起（貼 Blogger → 存 draft → preview → 依 sanity checklist 驗），但**可略過** §D-4 與 §D-10（無 frontmatter 需要改回），§D-11 之清理對象改為 `dist-blogger-preview/`。
+
+> §D 原 10 步流程**保留不刪**：仍為 fallback，且在需要驗證「正式 `dist-blogger/` 真實輸出」時仍應使用。
+> 詳細契約 / 安全邊界 / parity 證明見 `docs/20260717-blogger-preview-artifact-builder-b2-phase-c.md`。
+
+---
+
 ## D. 操作流程
 
 > ⚠️ 全程界線：只到 Blogger **draft / preview**；不發布、不 deploy、不 commit 測試文章。
+> 💡 自 2026-07-17 起，若只是要看 draft 外觀，可改用 §C.6 之 `build:blogger-preview`（不需 §D-4 / §D-10 的暫改 frontmatter）。
 
 1. **在 Admin new post draft 填寫文章。**
    `npm run dev` → 開 `/admin/#new-post-draft`（dev-mode-only、noindex、不進 prod build）。填 title / slug / category（registry-bound）/ tags（registry）/ description / searchDescription 等。

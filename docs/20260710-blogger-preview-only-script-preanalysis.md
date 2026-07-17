@@ -171,6 +171,12 @@ Step 6  改回 draft / 清理 dist-blogger/ / git status --short 回到 clean
 
 ### 6.2 Variant B2 — draft-aware preview build（原 `20260708` inventory §7 Option B）
 
+> **狀態更新（2026-07-17）：B2 ✅ 已實作落地。**
+> - Phase A（draft-aware target planner，dry-run only）：`src/scripts/blogger-preview-plan.js`；`npm run blogger:plan-preview`；guard `check:blogger-preview-plan` 44/0。
+> - Phase C（可重用 renderer + preview artifact builder）：`src/scripts/blogger-render.js` + `src/scripts/build-blogger-preview.js`；`npm run build:blogger-preview -- --slug=<slug>`；guard `check:build-blogger-preview` 61/0；正式 `build:blogger` 輸出經 pre/post 快照證明 **byte-identical modulo builtAt**（37/37 檔、0 real differences）。
+> - 落地紀錄與完整契約：`docs/20260717-blogger-preview-artifact-builder-b2-phase-c.md`。
+> - 下方 §6.2 原文為**當時之設計提案**，保留作歷史對照；實際落地形態以上述 landing doc 為準（差異：`--dry-run` 未採為 default —— 見 §11.2 註記）。
+
 **行為**：
 
 - 建立獨立 `dist-blogger-preview/` 目錄；`.gitignore` 加入該目錄。
@@ -328,17 +334,25 @@ Step 6  改回 draft / 清理 dist-blogger/ / git status --short 回到 clean
 
 ### 11.2 If Dean approves B2（draft-aware preview build）
 
-- [ ] B1 已 landed（**建議** 先 B1 / 再 B2）或 Dean 明示跳過 B1。
-- [ ] Helper `src/scripts/build-blogger-preview.js` 落地；讀 slug（可含 draft）、產 `dist-blogger-preview/posts/<slug>/`。
-- [ ] `.gitignore` 加 `dist-blogger-preview/*`；driver / build manifest 加 PREVIEW-ONLY 標記。
-- [ ] `package.json` scripts 新增 `build:blogger-preview`；`check:npm-script-targets` PASS。
-- [ ] Output HTML top comment / meta.json 明確標 `PREVIEW-ONLY / NOT FOR DEPLOY`。
-- [ ] Helper CLI 需 slug（不 accept 空 = 避免無腦全部產出）；`--dry-run` 為 default。
-- [ ] `build:blogger`（正式）之行為 byte-identical（`load-posts.js` `classify` 不動；正式 `dist-blogger/` 內容不動）。
-- [ ] `check:phase1-readiness` / `-contract` / `check:release-readiness` / `-contract` / `validate:content` 全 exit 0 / 契約 PASS。
-- [ ] Smoke 覆蓋：happy-path / draft slug / ready slug / missing slug / gitignore 對齊；smoke n/n PASS。
-- [ ] Runbook §D 更新（新增「B2 alternative」段落，不刪 §D 原 10 步）；preview sanity checklist §5 更新。
-- [ ] Commit subject 建議：`feat(blogger): add preview-only build helper`。
+> **驗收結果（2026-07-17；Phase A `22f1789` + Phase C）：全數滿足，另有 2 項刻意偏離，逐條列於下方。**
+
+- [x] B1 已 landed（`check:blogger-preview` / `check:blogger-preview-smoke`，2026-07-12 `cc6497b`）→ 順序符合「先 B1 再 B2」建議。
+- [x] Helper `src/scripts/build-blogger-preview.js` 落地；讀 slug（可含 draft）、產 `dist-blogger-preview/posts/<slug>/`。
+- [x] `.gitignore` 加 `dist-blogger-preview/`；HTML / copy-helper / meta.json 三載體皆加 PREVIEW-ONLY 標記。
+- [x] `package.json` scripts 新增 `build:blogger-preview`；`check:npm-script-targets` 113 → **115/115 PASS**。
+- [x] Output HTML top comment / meta.json 明確標 `PREVIEW-ONLY / NOT FOR DEPLOY`。
+- [x] Helper CLI 需 slug（不 accept 空）。**⚠️ 偏離 1：`--dry-run` 未採為 default** —— 見下方註記。
+- [x] `build:blogger`（正式）行為 byte-identical：pre/post 快照 37/37 檔、**0 real differences**（唯一正規化 = 各 run 自身之 `buildAt` 精確字面值）。`classify` **未動**。
+- [x] `validate:content` 0 / 135 / 107（不變）；`check:redraft-all` 99/99；`check:phase1-readiness` 於 commit 後回 16/16（commit 前之 `source: working tree clean` 假陽性見 landing doc §10）。
+- [x] Guard 覆蓋 happy-path / draft slug / ready slug / missing slug / gitignore 對齊 + 另加 non-Blogger reject / duplicate slug / 壞 frontmatter / 禁止參數 / output root 安全閘 / atomic / determinism / 注入 / no-network / no-credential：`check:build-blogger-preview` **61/0 PASS**。
+- [x] Runbook 新增 **§C.6「B2 alternative」**段落，§D 原 10 步**未刪**。
+- [x] Commit subject：`feat(blogger): add draft-aware preview artifact builder`（描述實際內容；未硬套範例）。
+
+**⚠️ 偏離 1 — `--dry-run` 未採為 default（§9.2 G-S4）**
+本節原設計「B2 之 default 應為 dry-run（避免無意間產出）」。實際落地未採用，理由：(a) Phase A 已把「純計畫、不產檔」完整實作為**獨立指令** `npm run blogger:plan-preview`，B2 若再預設 dry-run 則兩支指令語意重疊且 `build:blogger-preview` 預設不 build 反直覺；(b) G-S4 所防的「無意間產出」已由更強的三道閘取代 —— **強制單一 slug**（無全站模式）+ **輸出根不可覆寫**（`--output` hard-fail、CLI 恆用 canonical root）+ **輸出根 gitignored**。`--dry-run` 傳入本工具時為 **hard-fail 並明確導向 planner**（非靜默忽略）。
+
+**⚠️ 偏離 2 — 同 phase 內新增了 guard（§9.2 G-S5）**
+本節原列「不新增 preview helper 之外的 script」。實際新增了 `check:build-blogger-preview`（61 assertions）。理由：Phase C 之上位授權明確要求 focused contract guard 與正式 build parity 證明，且 §9.4 G-V1 本身即要求 smoke/guard 覆蓋；兩者取後者。新 guard **未**併入 `check:phase1-readiness` / `check:release-readiness` / `check:metadata-all` 任何 umbrella（G-V3 / G-V4 維持；guard E5 直接斷言）。
 
 ### 11.3 Cross-cutting acceptance（B1 或 B2 皆須滿足）
 

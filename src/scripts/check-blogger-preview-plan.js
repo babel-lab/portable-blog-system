@@ -25,7 +25,7 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs/promises';
-import { statSync, readFileSync, existsSync } from 'node:fs';
+import { statSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -414,9 +414,18 @@ async function main() {
     });
 
     // ── 12. production content 未被碰觸（真實 repo root；唯讀）────────────────
-    await check('production 契約：真實 repo 之 dist-blogger-preview/ 未被本 guard 建立', async () => {
-      assert.ok(!existsSync(path.join(REPO_ROOT, PREVIEW_DIST_REL)),
-        '本切片不得建立 dist-blogger-preview/（write path 屬後續 phase）');
+    await check('production 契約：planner 不建立 / 不改動真實 repo 之 dist-blogger-preview/', async () => {
+      // Phase 20260717-B2-c 起，dist-blogger-preview/ 會因 `npm run build:blogger-preview`
+      // 而**合法存在**（gitignored 之本機 preview 產物）。故此處斷言的是 planner 自身之
+      // **zero-write 不變式** —— 跑 planner 前後該路徑之存在性與內容清單完全不變 ——
+      // 而非斷言它不存在（後者自 Phase C 起已非正確契約）。
+      const previewRoot = path.join(REPO_ROOT, PREVIEW_DIST_REL);
+      const snapshot = () =>
+        (existsSync(previewRoot) ? readdirSync(previewRoot).sort().join(',') : '<absent>');
+      const before = snapshot();
+      await planBloggerPreview({ slug: 'native-draft', projectRoot: tmpRoot });
+      assert.strictEqual(snapshot(), before, 'planner 不得建立 / 改動 dist-blogger-preview/');
+      assert.ok(!existsSync(path.join(tmpRoot, 'dist-blogger')), 'planner 不得建立正式 dist');
     });
   } finally {
     await fs.rm(tmpRoot, { recursive: true, force: true });

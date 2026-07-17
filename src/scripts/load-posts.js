@@ -39,17 +39,25 @@ function toRelative(absPath) {
 //   - 解析 frontmatter（含 8-b-3 contentKind 相容讀取）
 //   - 並行讀取 .publish.json 與 .fb.md sidecar（8-b-4 / 8-b-5）
 //   - sourceCollection 標記來源（'posts' | 'pages'），加在 entry 與 filtered 兩種輸出
-async function processMarkdownEntry(absPath, sourceCollection, settings) {
+//
+// Phase 20260717-B2-c：additive export + additive option `includeFiltered`（**預設 false**）。
+//   動機：draft-aware Blogger preview builder（build-blogger-preview.js）需要與正式 build **完全相同**
+//   的 entry 組裝結果（frontmatter + sidecars + normalized），否則就得另抄一份組裝邏輯 → 必然漂移。
+//   契約：`includeFiltered` 只影響「被 classify 排除者是否仍組裝 entry」，**不影響 `included` 之值**
+//   —— 被排除者恆回 `included: false`。既有唯一 caller（loadPosts）不傳此參數 → 走與改動前
+//   **完全相同**的分支與輸出 → 正式 build 之 dist/ 與 dist-blogger/ 不受影響（CLAUDE.md §23：
+//   draft 不得進正式 dist；本改動不放寬 classify、不改變任何過濾規則）。
+export async function processMarkdownEntry(absPath, sourceCollection, settings, options = {}) {
+  const { includeFiltered = false } = options;
   const raw = await fs.readFile(absPath, 'utf-8');
   const { data, content } = matter(raw);
 
   const sourcePath = toRelative(absPath);
   const verdict = classify(data);
 
-  if (!verdict.include) {
-    return {
-      included: false,
-      filtered: {
+  const filtered = verdict.include
+    ? null
+    : {
         sourcePath,
         sourceCollection,
         id: data.id ?? null,
@@ -57,8 +65,11 @@ async function processMarkdownEntry(absPath, sourceCollection, settings) {
         status: data.status ?? null,
         draft: data.draft ?? null,
         reason: verdict.reason,
-      },
-    };
+      };
+
+  // 預設路徑（includeFiltered=false）：與改動前逐字等價 —— 被排除者不組裝 entry、直接回報。
+  if (filtered && !includeFiltered) {
+    return { included: false, filtered };
   }
 
   // Phase 8-b-3：type → contentKind 相容讀取
@@ -119,6 +130,11 @@ async function processMarkdownEntry(absPath, sourceCollection, settings) {
   //   - 本批僅資料通道；normalize-post-output 目前仍未使用 settings.series（屬 8-f-3 範圍）
   //   - 若 caller 未傳 settings（向後相容），processMarkdownEntry 收到 undefined；normalizePostOutput 之 settings 預設為 {}
   entry.normalized = normalizePostOutput(entry, settings ?? {}, { deriveGithubUrl: false });
+
+  // Phase 20260717-B2-c：includeFiltered=true 且被 classify 排除 → `included` 仍如實回報 false
+  //   （呼叫端不會誤把 draft 當可發布），但附上已組裝之 entry 供 draft-aware preview 使用。
+  //   正式 build 不傳 includeFiltered → 永遠走不到此分支。
+  if (filtered) return { included: false, filtered, entry, verdict };
 
   return { included: true, entry };
 }

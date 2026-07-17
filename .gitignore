@@ -2,6 +2,7 @@ node_modules/
 dist/*
 dist-blogger/*
 !dist-blogger/.gitkeep
+dist-blogger-preview/
 dist-promotion/*
 !dist-promotion/.gitkeep
 dist-reports/*
