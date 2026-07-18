@@ -67,6 +67,8 @@
     "check:blogger-backfill-sidecar-bootstrap": "node src/scripts/check-blogger-backfill-sidecar-bootstrap.js",
     "plan:blogger-backfill-sidecars": "node src/scripts/plan-blogger-backfill-sidecars.js",
     "bootstrap:blogger-backfill-sidecars": "node src/scripts/bootstrap-blogger-backfill-sidecars.js",
+    "prepare:blogger-backfill-truth-manifest": "node src/scripts/prepare-blogger-backfill-truth-manifest.js",
+    "check:blogger-backfill-truth-manifest": "node src/scripts/check-blogger-backfill-truth-manifest.js",
     "check:blogger-backfill:wp02-intake-contract": "node src/scripts/check-blogger-backfill-wp02-intake-contract.js",
     "check:blogger-backfill:one-post-worksheet-contract": "node src/scripts/check-blogger-backfill-one-post-worksheet-contract.js",
     "check:blogger-backfill:wp02-one-post-consistency-contract": "node src/scripts/check-blogger-backfill-wp02-one-post-consistency-contract.js",
