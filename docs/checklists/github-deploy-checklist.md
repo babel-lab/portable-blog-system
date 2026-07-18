@@ -64,11 +64,31 @@ GitHub Pages 部署操作勾選清單。配套詳細說明見 `docs/github-deplo
 
 - [ ] §4.1 已決定採用 §5.2.A 手動 copy / 5.2.B git worktree / 5.2.C git subtree 之一
 - [ ] §4.2 第二 clone / worktree 目錄已建立並 checkout gh-pages（首次採 `--orphan`）
-- [ ] §4.3 dist 內容已 copy / sync 至 gh-pages 目錄
-- [ ] §4.4 `.nojekyll` 空檔已建立（避免 Jekyll 預設處理）
-- [ ] §4.5 `git add .` / `git commit` / `git push origin gh-pages` 已執行
+- [ ] §4.3 pre-cleanup 狀態確認：
+  - [ ] §4.3.a deploy branch = gh-pages
+  - [ ] §4.3.b working tree clean（`git status --short --branch` 無 uncommitted changes）
+  - [ ] §4.3.c `.git/index.lock` absent
+  - [ ] §4.3.d `CNAME` presence / absence 已記錄
+  - [ ] §4.3.e 若 §4.3.d 為 PRESENT，`CNAME` exact content 已 `cat CNAME` 記錄；若 ABSENT，記為目前合法狀態（cutover 前）
+- [ ] §4.4 dist 內容已 copy / sync 至 gh-pages 目錄（cleanup 之保留檔清單 = `.git` / `.nojekyll` / `CNAME`；使用 `find -maxdepth 1` preserve pattern，見 runbook §5.4）
+- [ ] §4.5 `.nojekyll` 空檔已建立（避免 Jekyll 預設處理）
+- [ ] §4.6 post-copy / pre-commit `CNAME` 狀態驗證：
+  - [ ] §4.6.a `CNAME` state 與 §4.3.d 一致（PRESENT → PRESENT / ABSENT → ABSENT）
+  - [ ] §4.6.b 若 §4.3.d 為 PRESENT：`CNAME` 仍存在於 deploy branch root
+  - [ ] §4.6.c 若 §4.3.d 為 PRESENT：`cat CNAME` 內容與 §4.3.e 記錄一致（byte-identical）
+  - [ ] §4.6.d 無 duplicate 或 nested `CNAME`（`find . -type f -name CNAME` 至多返一筆、且路徑恰為 `./CNAME`）
+  - [ ] §4.6.e `git status` / `git diff --cached --stat` 只含預期 dist snapshot 變更；無 accidental domain-file 刪除
+  - [ ] §4.6.f `git diff --cached --check` PASS
+- [ ] §4.7 pre-push blocking：任一 §4.6 項失敗（含 `CNAME` 刪除 / 內容變更 / duplicate / nested）→ 中止 commit / 中止 push；不得自行重建未知 domain value；回到人工檢查
+- [ ] §4.8 rollback 分類已理解且**本次不執行**：
+  - [ ] §4.8.a Git content rollback（`git revert <deploy-commit>` 於 deploy repo；不改 DNS、不改 Pages settings）
+  - [ ] §4.8.b GitHub Pages custom-domain setting rollback（Settings → Pages → Custom domain 清空；Dean 手動）
+  - [ ] §4.8.c DNS rollback（Cloudflare DNS 端刪 apex A / AAAA / `www` CNAME；Dean 手動）
+- [ ] §4.9 `git add .` / `git commit` / `git push origin gh-pages` 已執行（§4.6 全 PASS + §4.7 未觸發後才進行）
 
-對應 runbook §5。
+對應 runbook §5（§5.4 preserve-CNAME wipe pattern）。
+
+⚠️ **CNAME preserve invariant**：一旦 GitHub Pages custom domain 完成 cutover（見 `docs/20260718-custom-domain-cloudflare-github-pages-preflight.md` §7.2 Stage 2），deploy root 之 `CNAME` 為受保護檔；本節之 §4.3 / §4.6 / §4.7 於每次部署皆須勾選。custom domain 尚未啟用時，§4.3.d / §4.6.a 為 ABSENT → ABSENT，仍須逐項確認、**不**授權預先建立 production `CNAME`。
 
 ---
 

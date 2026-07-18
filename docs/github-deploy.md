@@ -178,18 +178,73 @@ git push -u origin gh-pages
 
 ⚠️ **`.nojekyll` 是必要的**：GitHub Pages 預設用 Jekyll 處理；若 dist 含 `_` 開頭資料夾或 file，會被忽略。空檔 `.nojekyll` 告訴 GitHub Pages 跳過 Jekyll。
 
+📝 **首次 orphan 期無 `CNAME` 可 preserve**：本節之 `git rm -rf .` 屬首次 orphan 起始清理，deploy root 尚無 `CNAME` 檔（GitHub Pages custom domain 尚未啟用；`CNAME` ABSENT 為目前合法狀態）。一旦 custom domain 完成 cutover（見 `docs/20260718-custom-domain-cloudflare-github-pages-preflight.md` §7.2 之 Stage 2），deploy root 之 `CNAME` 為受保護檔；**後續 §5.4 之增量 deploy 之 wipe 必須 preserve `CNAME`**（同 `.nojekyll` 之保留方式）。
+
 ### 5.4 後續部署（增量更新）
 
 ```bash
 # 在 portable-blog-deploy 目錄
 cd ../portable-blog-deploy
-rm -rf ./*                   # 清舊內容；保留 .git
+
+# 5.4.1 pre-cleanup：確認 deploy branch / working tree / index.lock 狀態
+git branch --show-current                # 預期：gh-pages
+git status --short --branch              # 預期：clean；no uncommitted changes
+test -e .git/index.lock \
+  && echo "index.lock PRESENT（abort；不進 wipe）" \
+  || echo "index.lock ABSENT"
+
+# 5.4.2 pre-cleanup：記錄 CNAME 現況（cutover 前 ABSENT / cutover 後 PRESENT 單行）
+if [ -f CNAME ]; then
+  echo "CNAME PRESENT; recorded content:"
+  cat CNAME                              # 記下 exact bytes / single-domain value
+else
+  echo "CNAME ABSENT（cutover 前為合法狀態）"
+fi
+
+# 5.4.3 destructive cleanup：只清 generated site output；preserve .git / .nojekyll / CNAME
+#   使用 -maxdepth 1 只掃 top-level entries，避免遞迴進入 .git/ 誤刪內部檔案
+find . -mindepth 1 -maxdepth 1 \
+  ! -name '.git' ! -name '.nojekyll' ! -name 'CNAME' \
+  -exec rm -rf {} +
+
+# 5.4.4 copy 新 build 產物 + 補 .nojekyll
 cp -r ../portable-blog-system/dist/* .
-touch .nojekyll              # 必要
+touch .nojekyll                          # 必要
+
+# 5.4.5 post-copy：CNAME 狀態驗證
+#   - 若 5.4.2 為 PRESENT：仍存在 / 內容未改 / 位於 deploy root / 無 duplicate / 無 nested
+#   - 若 5.4.2 為 ABSENT：仍 ABSENT；本流程不預先建立 production CNAME
+if [ -f CNAME ]; then
+  echo "post-copy CNAME content:"
+  cat CNAME                              # 比對 5.4.2 recorded content：必須一致
+fi
+find . -type f -name CNAME               # 預期：至多 1 筆、且 path 恰為 ./CNAME（無 duplicate / 無 nested）
+
+# 5.4.6 pre-commit：僅接受預期 dist snapshot 變更
+git status --short
+git diff --cached --stat
+git diff --cached --check
+
+# 5.4.7 commit + pre-push：若 5.4.5 任一驗證失敗 → 中止 commit / 中止 push；不得自行重建
 git add .
 git commit -m "deploy: <commit-hash> snapshot"
 git push origin gh-pages
 ```
+
+⚠️ **CNAME preserve invariant**（cutover 之後永久生效；本 docs-only slice 未觸發 cutover）：
+
+- Destructive cleanup 只能刪除 generated site output；**不得**把 `CNAME` 視為一般 stale artifact
+- Copy 新 build 產物之後：`CNAME` 仍須位於 deploy branch root、內容未變、無 duplicate、無 nested 副本
+- 任一驗證失敗（`CNAME` 消失 / 內容被覆寫 / 位置變動 / 出現重複 or nested 副本 / `git diff` 顯示 `CNAME` 被刪除）：**中止 commit / 中止 push**；不得自行重建未知的 domain value；回到人工檢查
+- Custom domain 尚未啟用、deploy root 尚無 `CNAME` 時：`CNAME` ABSENT 為目前合法狀態；本 runbook **不**授權預先建立 production `CNAME`（含 placeholder / fake value）
+
+**Rollback 分類**（清楚區分、不自動連動）：
+
+- **Git content rollback**：`git revert <deploy-commit>` 於 deploy repo；只回退本次 dist snapshot；**不**改 DNS、**不**改 Pages settings、**不**移除 `CNAME`（若 revert 之 commit 已含 preserve-CNAME 之狀態，則 revert 後 `CNAME` 依然保留）
+- **GitHub Pages custom-domain setting rollback**：於 repo Settings → Pages → Custom domain 手動清空（Dean 手動；Claude 不執行）
+- **DNS rollback**：於 Cloudflare DNS 端手動刪 apex A / AAAA / `www` CNAME（Dean 手動；Claude 不執行）
+
+**本 docs-only slice 不執行**上述任何 rollback；亦不執行 build / deploy / DNS 變更 / Pages 設定變更 / `CNAME` 建立。
 
 ---
 
