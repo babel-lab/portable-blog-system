@@ -60,6 +60,20 @@
 //  45  production Markdown bytes / mtime unchanged
 //  46  deploy repository unchanged (best-effort; skipped if path unavailable)
 //  47  productionWritePerformed === false in every code path
+//
+// 20260719 race-safe finalization audit — additional coverage in this file:
+//  48  no-replace final commit primitive is `fs.link` (source-level static)
+//  49  no `fs.rename` in the mutating write path (source-level static)
+//  50  no fs.access-then-rename gap in the write primitive (source-level static)
+//  51  `beforeFinalCommit` hook fires AFTER temp write and BEFORE final commit
+//  52  target appearing AT the exact race point (after temp write, before final commit)
+//      → link fails; target bytes unchanged; target mtime unchanged; tmp cleaned up
+//  53  two-writer race at the exact commit point → exactly one wins; loser observes
+//      EEXIST; loser's tmp cleaned up; winner's bytes remain intact
+//  54  externally-replaced target is NOT deleted during rollback (inode ownership
+//      check refuses unlink and surfaces the ownership failure)
+//  55  no .rehearse.tmp artifact remains after either success, race rejection,
+//      or rollback
 
 import assert from 'node:assert';
 import {
@@ -371,6 +385,36 @@ async function main() {
     });
     await check('src: rehearsal-only wording present', () => {
       assert.ok(/rehearsal-only|OS-temp rehearsal|no production apply/i.test(CLI_SRC));
+    });
+
+    // ── 20260719 race-safe finalization audit static bans ────────────────
+    await check('src: final commit uses fs.link (no-replace primitive)', () => {
+      // The per-file commit primitive must be fs.link, whose destination-exists
+      // semantics are EEXIST on both POSIX and Windows. Absence would mean the
+      // no-replace guarantee is not enforced by a single filesystem primitive.
+      assert.ok(/\bfs\.link\s*\(/.test(CLI_SRC));
+    });
+    await check('src: no fs.rename in write path', () => {
+      // fs.rename has replace semantics on both POSIX (rename(2)) and Windows
+      // (MoveFileExW with MOVEFILE_REPLACE_EXISTING). Presence in the mutating
+      // write path would reintroduce a check-then-commit race.
+      assert.ok(!/\bfs\.rename\s*\(/.test(CLI_SRC));
+    });
+    await check('src: no fs.access-then-rename gap (no F_OK check as the commit gate)', () => {
+      // The old primitive used `fs.access(target, F_OK)` immediately before
+      // `fs.rename`. The new primitive relies on `fs.link` alone; F_OK against
+      // the target should not appear anywhere in the mutating primitive. It is
+      // fine for the preflight loop (all-record) to use fs.access.
+      const primitiveRegion = CLI_SRC.split('writeExclusivelyOrThrow')[1] || '';
+      // The primitive body ends before the next top-level function or comment
+      // block; use a coarse boundary.
+      const cutoff = primitiveRegion.indexOf('\n// ──');
+      const region = cutoff > 0 ? primitiveRegion.slice(0, cutoff) : primitiveRegion.slice(0, 3000);
+      assert.ok(!/fs\.access\s*\(\s*targetAbs/.test(region));
+      assert.ok(!/fs\.rename/.test(region));
+    });
+    await check('src: beforeFinalCommit hook name is present in engine source', () => {
+      assert.ok(/beforeFinalCommit/.test(CLI_SRC));
     });
 
     // ── parseArgs smoke ─────────────────────────────────────────────────
@@ -1138,6 +1182,241 @@ async function main() {
       await check('race-hook: first target was rolled back', () => {
         const t0 = path.join(repoRoot, 'content/blogger/posts/20260301-first.publish.json');
         assert.ok(!existsSync(t0));
+      });
+    }
+
+    // ── beforeFinalCommit: exact race point (after temp, before final commit) ─
+    // The old check-then-rename primitive could be raced between fs.access(F_OK)
+    // and fs.rename. The new fs.link primitive rejects the race atomically with
+    // EEXIST. This block reproduces the exact race window via the beforeFinalCommit
+    // hook (which fires AFTER the temp is fully written but BEFORE fs.link runs).
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'race-final-commit-'));
+      writeMarker(repoRoot);
+      seedTwoMissingCandidates(repoRoot);
+      const manifestPath = writeManifest(repoRoot, validManifestForTwoMissing());
+      const fp = await computeExpectedFingerprint(repoRoot, manifestPath);
+
+      let hookFired = false;
+      let tempExistedAtHookTime = false;
+      const targetRel = 'content/blogger/posts/20260301-first.publish.json';
+      const targetAbs = path.join(repoRoot, targetRel);
+      const externalBytes = 'EXTERNAL-CONCURRENT-WRITER\n';
+      let capturedMtimeMs = null;
+
+      const result = await rehearseTruthApply({
+        manifestPath,
+        repoRoot,
+        expectedFingerprint: fp,
+        failureInjection: {
+          beforeFinalCommit: async (i, ctx) => {
+            if (i === 0) {
+              hookFired = true;
+              // Assert the temp file is present at hook time — this proves the
+              // hook fires AFTER the temp write.
+              const tempAbs = ctx.absTarget + '.rehearse.tmp';
+              tempExistedAtHookTime = existsSync(tempAbs);
+              // Simulate a concurrent external writer creating the target with
+              // different bytes at the exact race point.
+              writeFileSync(ctx.absTarget, externalBytes, 'utf-8');
+              capturedMtimeMs = statSync(ctx.absTarget).mtimeMs;
+            }
+          },
+        },
+      });
+
+      await check('race-final-commit: beforeFinalCommit fired at index 0', () => {
+        assert.strictEqual(hookFired, true);
+      });
+      await check('race-final-commit: temp file existed at hook time (hook is post-temp)', () => {
+        assert.strictEqual(tempExistedAtHookTime, true);
+      });
+      await check('race-final-commit: fs.link failed and rehearsal did NOT overwrite target', () => {
+        assert.strictEqual(result.ok, false);
+        assert.strictEqual(result.transaction.status, 'rolled-back');
+        const bytesNow = readFileSync(targetAbs, 'utf-8');
+        assert.strictEqual(bytesNow, externalBytes, 'target bytes must be untouched');
+      });
+      await check('race-final-commit: target mtime unchanged', () => {
+        const mtimeNow = statSync(targetAbs).mtimeMs;
+        assert.strictEqual(mtimeNow, capturedMtimeMs);
+      });
+      await check('race-final-commit: temp for raced target was cleaned up', () => {
+        const tempAbs = targetAbs + '.rehearse.tmp';
+        assert.ok(!existsSync(tempAbs));
+      });
+      await check('race-final-commit: raced target NOT added to transaction ownership', () => {
+        // createdBeforeFailure should not include the raced (never-committed) target.
+        assert.ok(!result.transaction.createdBeforeFailure.includes(targetRel));
+      });
+      await check('race-final-commit: second target was not written at all', () => {
+        const t1 = path.join(repoRoot, 'content/blogger/posts/20260302-second.publish.json');
+        assert.ok(!existsSync(t1));
+      });
+      await check('race-final-commit: transaction rolledBackCount === 0 (nothing to roll back)', () => {
+        assert.strictEqual(result.summary.rolledBackCount, 0);
+        assert.strictEqual(result.summary.createdCount, 0);
+      });
+      // Clean up the "external" target manually since we injected it.
+      try { rmSync(targetAbs, { force: true }); } catch (_) {}
+    }
+
+    // ── Two-writer race at the exact commit point ────────────────────────
+    // Deterministic two-writer test: writer A begins a rehearsal; at the exact
+    // final-commit point of its first record, writer B (simulated) completes an
+    // independent write into the same target. Writer A's fs.link must fail; the
+    // target must contain writer B's bytes intact; writer A's tmp must be gone.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'two-writer-'));
+      writeMarker(repoRoot);
+      seedTwoMissingCandidates(repoRoot);
+      const manifestA = writeManifest(repoRoot, validManifestForTwoMissing(), 'manifest-A.json');
+      const fpA = await computeExpectedFingerprint(repoRoot, manifestA);
+
+      const targetRel = 'content/blogger/posts/20260301-first.publish.json';
+      const targetAbs = path.join(repoRoot, targetRel);
+      const winnerBytes = JSON.stringify(
+        buildSidecarBody({
+          publishedUrl: 'https://example.blogspot.com/2026/03/first-winner-B.html',
+          publishedAt: '2026-03-01',
+        }),
+        null, 2,
+      ) + '\n';
+
+      const resultA = await rehearseTruthApply({
+        manifestPath: manifestA,
+        repoRoot,
+        expectedFingerprint: fpA,
+        failureInjection: {
+          beforeFinalCommit: async (i, ctx) => {
+            if (i === 0) {
+              // Writer B commits winner payload right before A's fs.link.
+              writeFileSync(ctx.absTarget, winnerBytes, 'utf-8');
+            }
+          },
+        },
+      });
+
+      await check('two-writer: writer A observed EEXIST-style link failure', () => {
+        assert.strictEqual(resultA.ok, false);
+        assert.strictEqual(resultA.transaction.status, 'rolled-back');
+        // Errors mention write-failed (not target-appeared, since fs.link is
+        // now the sole gate).
+        assert.ok(resultA.errors.some((e) => /write-failed at index 0/.test(e)));
+      });
+      await check('two-writer: winner (B) bytes remain intact', () => {
+        const bytesNow = readFileSync(targetAbs, 'utf-8');
+        assert.strictEqual(bytesNow, winnerBytes);
+      });
+      await check('two-writer: loser (A) tmp is cleaned up', () => {
+        assert.ok(!existsSync(targetAbs + '.rehearse.tmp'));
+      });
+      await check('two-writer: loser (A) rolledBackCount === 0 (nothing committed)', () => {
+        assert.strictEqual(resultA.summary.createdCount, 0);
+        assert.strictEqual(resultA.summary.rolledBackCount, 0);
+      });
+      await check('two-writer: loser (A) createdBeforeFailure does not include raced target', () => {
+        assert.ok(!resultA.transaction.createdBeforeFailure.includes(targetRel));
+      });
+      try { rmSync(targetAbs, { force: true }); } catch (_) {}
+    }
+
+    // ── Rollback ownership check: externally-replaced target is preserved ────
+    // If a target committed by the transaction is subsequently replaced by an
+    // external actor (different inode) before rollback, the ownership check
+    // must refuse to unlink it and surface the ownership failure.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'rollback-ownership-'));
+      writeMarker(repoRoot);
+      seedTwoMissingCandidates(repoRoot);
+      const manifestPath = writeManifest(repoRoot, validManifestForTwoMissing());
+      const fp = await computeExpectedFingerprint(repoRoot, manifestPath);
+
+      const target0Rel = 'content/blogger/posts/20260301-first.publish.json';
+      const target0Abs = path.join(repoRoot, target0Rel);
+      const externalReplacement = 'EXTERNAL-REPLACED-DO-NOT-DELETE\n';
+
+      // Use failAfterWriteIndex=0 with a beforeFinalCommit hook on i=1 that
+      // externally replaces target 0 right before we would have written target 1.
+      // This gives us: target 0 committed by us; then externally replaced (new
+      // inode); then transaction fails; then rollback tries to unlink target 0
+      // and must refuse because inode changed.
+      const result = await rehearseTruthApply({
+        manifestPath,
+        repoRoot,
+        expectedFingerprint: fp,
+        failureInjection: {
+          beforeFinalCommit: async (i, ctx) => {
+            if (i === 1) {
+              // Delete target 0 (breaks the hardlink), then create a NEW file at
+              // target 0 with different bytes — this yields a new inode. This
+              // simulates an external actor replacing the file after we
+              // committed but before rollback.
+              try { rmSync(target0Abs, { force: true }); } catch (_) {}
+              writeFileSync(target0Abs, externalReplacement, 'utf-8');
+              // Force the transaction to fail so rollback runs.
+              throw new Error('injected-for-ownership-test');
+            }
+          },
+        },
+      });
+
+      await check('rollback-ownership: transaction rolled back', () => {
+        assert.strictEqual(result.ok, false);
+        assert.strictEqual(result.transaction.status, 'rolled-back');
+      });
+      await check('rollback-ownership: target 0 was originally committed', () => {
+        assert.strictEqual(result.summary.createdCount, 1);
+        // createdBeforeFailure lists the committed target.
+        assert.ok(result.transaction.createdBeforeFailure.includes(target0Rel));
+      });
+      await check('rollback-ownership: externally-replaced target NOT deleted', () => {
+        assert.ok(existsSync(target0Abs), 'externally-replaced target must survive rollback');
+        assert.strictEqual(readFileSync(target0Abs, 'utf-8'), externalReplacement);
+      });
+      await check('rollback-ownership: ownership-verification-failed surfaced', () => {
+        assert.strictEqual(result.summary.rollbackFailureCount, 1);
+        const rf = result.transaction.rollbackFailures[0];
+        assert.strictEqual(rf.target, target0Rel);
+        assert.ok(/ownership-verification-failed/.test(rf.error));
+      });
+      await check('rollback-ownership: remainingCreatedTargets reflects surviving target', () => {
+        assert.strictEqual(result.summary.remainingCreatedCount, 1);
+        assert.ok(result.transaction.remainingCreatedTargets.includes(target0Rel));
+      });
+      try { rmSync(target0Abs, { force: true }); } catch (_) {}
+    }
+
+    // ── No .rehearse.tmp artifact after race rejection ───────────────────
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'no-temp-after-race-'));
+      writeMarker(repoRoot);
+      seedTwoMissingCandidates(repoRoot);
+      const manifestPath = writeManifest(repoRoot, validManifestForTwoMissing());
+      const fp = await computeExpectedFingerprint(repoRoot, manifestPath);
+
+      const result = await rehearseTruthApply({
+        manifestPath,
+        repoRoot,
+        expectedFingerprint: fp,
+        failureInjection: {
+          beforeFinalCommit: async (i, ctx) => {
+            if (i === 0) {
+              writeFileSync(ctx.absTarget, 'RACE-INJECTED\n', 'utf-8');
+            }
+          },
+        },
+      });
+      await check('no-temp-after-race: rehearsal FAIL', () => {
+        assert.strictEqual(result.ok, false);
+      });
+      await check('no-temp-after-race: no .rehearse.tmp files remain in posts dir', () => {
+        const postsDir = path.join(repoRoot, 'content/blogger/posts');
+        const names = readdirSync(postsDir);
+        for (const n of names) {
+          assert.ok(!n.endsWith('.rehearse.tmp'), `stale temp remained: ${n}`);
+          assert.ok(!n.endsWith('.tmp'), `stale tmp remained: ${n}`);
+        }
       });
     }
 

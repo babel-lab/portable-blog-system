@@ -49,11 +49,28 @@
 //   - Fingerprint match is required before ANY write is attempted. Mismatch → refuse.
 //   - Every planned record is preflight-checked (schema shape via planner + engine cross-check)
 //     before the first write. Any preflight failure → zero writes.
-//   - Per-file write primitive: exclusive `.tmp` create (`flag: 'wx'`), verify target still
-//     absent, rename tmp → target. On failure: tmp is unlinked; no partial file left on target.
+//   - Per-file write primitive (no-replace commit):
+//       1. Write full bytes to `<target>.rehearse.tmp` with `flag: 'wx'` (exclusive create).
+//       2. Commit via `fs.link(tmp, target)` — a single filesystem primitive whose contract on
+//          both POSIX (`link(2)`) and Windows (`CreateHardLinkW`) is: fail atomically with
+//          EEXIST / ERROR_ALREADY_EXISTS if `target` already exists; otherwise create a new
+//          hardlink at `target`. There is NO check-then-commit gap; no reader ever sees partial
+//          bytes at `target` because the tmp is fully written before the link is created.
+//       3. Best-effort unlink of the tmp path after a successful link. If tmp cleanup fails, the
+//          target is still correctly committed; the transaction does NOT roll back a successful
+//          commit for a tmp-cleanup leak.
+//       4. On link failure: unlink the tmp and throw. `target` bytes and mtime are unchanged.
+//     Filesystem requirement: temp and target on the same filesystem (they are — same directory),
+//     and the filesystem supports hardlinks (NTFS + all common POSIX FSes: ext4, APFS, ZFS, XFS,
+//     Btrfs, HFS+). On unsupported filesystems (FAT/exFAT) the link surfaces as an error; this
+//     engine hard-fails and never falls back to any replace-capable primitive.
 //   - Multi-record transaction rollback: on any failure after the first write, every already-
-//     created target is unlinked. Pre-existing files are NEVER touched. Rollback failures are
-//     surfaced in the report; they do not cause silent partial state.
+//     created target is unlinked in reverse creation order. Before each unlink, the target's
+//     current inode is compared against the inode captured at commit time; a mismatch (indicating
+//     the target has been externally replaced) refuses the unlink and surfaces the ownership
+//     failure in the report. Pre-existing files are NEVER touched. Rollback failures are surfaced
+//     in the report; they do not cause silent partial state. Multi-record rollback remains
+//     best-effort compensating (not a filesystem transaction, not crash-safe).
 //   - Rehearsal writes and rollback happen ONLY under a validated OS-temp `--repo-root`. Even in
 //     success, the engine never writes anywhere else — no dist-*, no gh-pages, no deploy clone,
 //     no source-repo tree, no `/etc`, no `~/`.
@@ -367,32 +384,77 @@ export async function verifyRehearsalMarker({ repoRoot }) {
   return { ok: true };
 }
 
-// ── per-file exclusive create ───────────────────────────────────────────────
+// ── per-file no-replace commit ──────────────────────────────────────────────
 
-// Exclusive-create write followed by rename. The tmp file uses a rehearsal-specific
-// suffix so it can never be confused with a writer's tmp. Belt-and-suspenders: even
-// though the plan phase already confirmed the target is absent, verify one more time
-// immediately before rename so a between-preflight-and-write appearance is caught
-// rather than silently overwritten. On any failure, tmp is unlinked; the target file
-// is never partially overwritten because rename is preceded by an absence check.
-async function writeExclusivelyOrThrow({ targetAbs, bodyBytes }) {
+// Per-file commit primitive with race-safe no-replace semantics.
+//
+// Sequence:
+//   1. Write full bytes to `<target>.rehearse.tmp` using `flag: 'wx'` (exclusive
+//      create). The tmp suffix is rehearsal-specific so it can never be confused
+//      with a production writer's tmp artifact.
+//   2. Optional `beforeFinalCommit` test hook (programmatic-only; wired only by the
+//      focused guard). Fires AFTER the temp is fully written and BEFORE the final
+//      commit — the exact filesystem race point. If the hook throws, tmp is cleaned
+//      up and the caller's transaction rolls back.
+//   3. `fs.link(tmp, target)` is the SINGLE no-replace commit primitive:
+//        - POSIX `link(2)`: fails atomically with EEXIST if `target` already exists.
+//        - Windows `CreateHardLinkW`: fails with ERROR_ALREADY_EXISTS if `target`
+//          already exists.
+//      There is NO check-then-commit gap. If the target appears between preflight
+//      and this call — either from another writer or from the `beforeFinalCommit`
+//      hook — the link fails; `target` bytes and mtime are unchanged; the tmp is
+//      cleaned up; the caller sees a write failure and rolls back.
+//   4. Capture the target's inode (`stat.ino`) after a successful link so the
+//      multi-record rollback layer can verify ownership before unlinking.
+//   5. Best-effort unlink of the tmp path. If tmp cleanup fails after a successful
+//      commit, the target is still correctly committed; do NOT roll back a
+//      successful commit for a tmp-cleanup leak.
+//
+// This function does NOT read back the committed bytes; the outer loop performs
+// the read-back verification so verification failure can be treated as a rollback
+// trigger without duplicating the read.
+async function writeExclusivelyOrThrow({
+  targetAbs,
+  bodyBytes,
+  failureInjection = null,
+  hookIndex = -1,
+  hookCtx = null,
+}) {
   const tmp = targetAbs + TMP_SUFFIX;
   await fs.writeFile(tmp, bodyBytes, { encoding: 'utf-8', flag: 'wx' });
-  try {
-    let stillAbsent = false;
+
+  if (failureInjection && typeof failureInjection.beforeFinalCommit === 'function') {
     try {
-      await fs.access(targetAbs, fs.constants.F_OK);
+      await failureInjection.beforeFinalCommit(hookIndex, hookCtx);
     } catch (err) {
-      if (err && err.code === 'ENOENT') stillAbsent = true;
+      await fs.unlink(tmp).catch(() => {});
+      throw err;
     }
-    if (!stillAbsent) {
-      throw new Error(`target appeared before rename (create-only): ${targetAbs}`);
+  }
+
+  let committedIno = null;
+  try {
+    // Single no-replace commit primitive. EEXIST is the destination-exists surface;
+    // any other error (EPERM/EACCES on non-hardlink FS, EIO, ...) is likewise fatal
+    // and does NOT fall back to a replace-capable operation.
+    await fs.link(tmp, targetAbs);
+    try {
+      const st = await fs.stat(targetAbs);
+      committedIno = st.ino;
+    } catch (_) {
+      // Non-fatal — commit succeeded; we simply cannot ownership-verify on rollback.
+      committedIno = null;
     }
-    await fs.rename(tmp, targetAbs);
   } catch (err) {
     await fs.unlink(tmp).catch(() => {});
     throw err;
   }
+
+  // Target is committed. Best-effort unlink of temp; a leak here does not
+  // invalidate the commit.
+  await fs.unlink(tmp).catch(() => {});
+
+  return { committedIno };
 }
 
 // ── main rehearsal API ──────────────────────────────────────────────────────
@@ -403,14 +465,18 @@ async function writeExclusivelyOrThrow({ targetAbs, bodyBytes }) {
 //
 // `failureInjection` is a rehearsal-only test facility:
 //   {
-//     beforeWriteHook?: async (i, ctx) => void
-//     failBeforeWriteIndex?: number
-//     failAfterWriteIndex?: number
+//     beforeWriteHook?:            async (i, ctx) => void  // BEFORE per-record write starts
+//     beforeFinalCommit?:          async (i, ctx) => void  // AFTER temp write, BEFORE fs.link
+//     failBeforeWriteIndex?:       number
+//     failAfterWriteIndex?:        number
 //     failDuringVerificationIndex?: number
-//     failDuringRollbackIndex?: number
+//     failDuringRollbackIndex?:    number
 //   }
 // Neither the CLI nor any env var can populate these; they exist so the focused
 // guard can exercise the transaction contract without needing a real crash source.
+// `beforeFinalCommit` is the hook that reproduces the exact race: it fires between
+// the successful temp write and the final `fs.link` commit, which is the only
+// filesystem window that could have raced under the old check-then-rename primitive.
 export async function rehearseTruthApply({
   manifestPath,
   repoRoot,
@@ -585,8 +651,9 @@ export async function rehearseTruthApply({
   result.summary.preflightPassed = true;
 
   // Enter transaction. createdTargets tracks ONLY targets we created; rollback is
-  // constrained to this list.
-  const createdTargets = [];
+  // constrained to this list. Each entry records the absolute path plus the inode
+  // captured at commit time so rollback can verify ownership before unlink.
+  const createdTargets = []; // { absPath: string, ino: number|null }
   const perRecord = [];
   result.transaction.status = 'in-progress';
 
@@ -621,14 +688,26 @@ export async function rehearseTruthApply({
 
     const absTarget = path.resolve(repoRoot, e.targetPath);
     const bodyBytes = serializeSidecarBody(e.payload);
+    let committedIno = null;
     try {
-      await writeExclusivelyOrThrow({ targetAbs: absTarget, bodyBytes });
+      const commit = await writeExclusivelyOrThrow({
+        targetAbs: absTarget,
+        bodyBytes,
+        failureInjection,
+        hookIndex: i,
+        hookCtx: {
+          entry: e,
+          absTarget,
+          repoRoot,
+        },
+      });
+      committedIno = commit.committedIno;
     } catch (err) {
       failed = true;
       failureCause = `write-failed at index ${i}: ${err.message}`;
       break;
     }
-    createdTargets.push(absTarget);
+    createdTargets.push({ absPath: absTarget, ino: committedIno });
     perRecord.push({
       recordIndex: e.recordIndex,
       sourcePath: e.sourcePath,
@@ -669,26 +748,67 @@ export async function rehearseTruthApply({
     errors.push(`transaction-failed: ${failureCause}`);
     result.transaction.status = 'rolled-back';
     result.transaction.createdBeforeFailure = createdTargets.map((t) =>
-      toRelFromRoot(t, repoRoot),
+      toRelFromRoot(t.absPath, repoRoot),
     );
 
     // Roll back in reverse creation order. Never touch anything outside createdTargets.
+    // Before each unlink, stat the target and compare its inode against the inode
+    // captured at commit time. A mismatch means the target has been externally
+    // replaced since we committed; refuse to unlink and surface the ownership
+    // failure. This is a best-effort ownership check, not a filesystem transaction.
     for (let i = createdTargets.length - 1; i >= 0; i -= 1) {
       const t = createdTargets[i];
+      const rel = toRelFromRoot(t.absPath, repoRoot);
       if (failureInjection && failureInjection.failDuringRollbackIndex === i) {
         result.transaction.rollbackFailures.push({
-          target: toRelFromRoot(t, repoRoot),
+          target: rel,
           error: `injected: failDuringRollbackIndex=${i}`,
         });
         continue;
       }
+      // Ownership verification: only when we captured an inode at commit time.
+      if (t.ino != null) {
+        let currentIno = null;
+        let currentExists = true;
+        try {
+          const st = await fs.stat(t.absPath);
+          currentIno = st.ino;
+        } catch (err) {
+          if (err && err.code === 'ENOENT') {
+            currentExists = false;
+          } else {
+            result.transaction.rollbackFailures.push({
+              target: rel,
+              error: `ownership-stat-failed: ${err.message}`,
+            });
+            continue;
+          }
+        }
+        if (currentExists && currentIno !== t.ino) {
+          result.transaction.rollbackFailures.push({
+            target: rel,
+            error:
+              `ownership-verification-failed: target inode changed since commit ` +
+              `(committed inode=${t.ino}, current inode=${currentIno}); ` +
+              `refusing to unlink externally-replaced target`,
+          });
+          continue;
+        }
+        if (!currentExists) {
+          // Already gone (someone else unlinked it). Treat as rolled back but do not
+          // attempt another unlink.
+          result.transaction.rolledBackTargets.push(rel);
+          result.summary.rolledBackCount += 1;
+          continue;
+        }
+      }
       try {
-        await fs.unlink(t);
-        result.transaction.rolledBackTargets.push(toRelFromRoot(t, repoRoot));
+        await fs.unlink(t.absPath);
+        result.transaction.rolledBackTargets.push(rel);
         result.summary.rolledBackCount += 1;
       } catch (err) {
         result.transaction.rollbackFailures.push({
-          target: toRelFromRoot(t, repoRoot),
+          target: rel,
           error: err.message,
         });
       }
@@ -698,8 +818,8 @@ export async function rehearseTruthApply({
     // What remains on disk after rollback attempt?
     for (const t of createdTargets) {
       try {
-        await fs.access(t, fs.constants.F_OK);
-        result.transaction.remainingCreatedTargets.push(toRelFromRoot(t, repoRoot));
+        await fs.access(t.absPath, fs.constants.F_OK);
+        result.transaction.remainingCreatedTargets.push(toRelFromRoot(t.absPath, repoRoot));
       } catch (_) {
         /* gone — expected */
       }
