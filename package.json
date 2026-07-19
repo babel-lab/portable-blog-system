@@ -73,6 +73,8 @@
     "check:blogger-backfill-truth-manifest-validator": "node src/scripts/check-blogger-backfill-truth-manifest-validator.js",
     "plan:blogger-backfill-truth-apply": "node src/scripts/plan-blogger-backfill-truth-apply.js",
     "check:blogger-backfill-truth-apply-plan": "node src/scripts/check-blogger-backfill-truth-apply-plan.js",
+    "rehearse:blogger-backfill-truth-apply": "node src/scripts/rehearse-blogger-backfill-truth-apply.js",
+    "check:blogger-backfill-truth-apply-rehearsal": "node src/scripts/check-blogger-backfill-truth-apply-rehearsal.js",
     "check:blogger-backfill:wp02-intake-contract": "node src/scripts/check-blogger-backfill-wp02-intake-contract.js",
     "check:blogger-backfill:one-post-worksheet-contract": "node src/scripts/check-blogger-backfill-one-post-worksheet-contract.js",
     "check:blogger-backfill:wp02-one-post-consistency-contract": "node src/scripts/check-blogger-backfill-wp02-one-post-consistency-contract.js",
