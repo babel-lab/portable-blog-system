@@ -75,6 +75,8 @@
     "check:blogger-backfill-truth-apply-plan": "node src/scripts/check-blogger-backfill-truth-apply-plan.js",
     "rehearse:blogger-backfill-truth-apply": "node src/scripts/rehearse-blogger-backfill-truth-apply.js",
     "check:blogger-backfill-truth-apply-rehearsal": "node src/scripts/check-blogger-backfill-truth-apply-rehearsal.js",
+    "apply:blogger-backfill-truth": "node src/scripts/apply-blogger-backfill-truth.js",
+    "check:blogger-backfill-production-apply-capability": "node src/scripts/check-blogger-backfill-production-apply-capability.js",
     "check:blogger-backfill:wp02-intake-contract": "node src/scripts/check-blogger-backfill-wp02-intake-contract.js",
     "check:blogger-backfill:one-post-worksheet-contract": "node src/scripts/check-blogger-backfill-one-post-worksheet-contract.js",
     "check:blogger-backfill:wp02-one-post-consistency-contract": "node src/scripts/check-blogger-backfill-wp02-one-post-consistency-contract.js",
