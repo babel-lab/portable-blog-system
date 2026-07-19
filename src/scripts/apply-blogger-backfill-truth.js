@@ -383,7 +383,21 @@ export function fingerprintEntry(entry, manifestSchemaVersion) {
 // ── authorization loader ────────────────────────────────────────────────────
 
 // Strict validator. Every check is fail-closed. No coercion, no trimming, no fallback.
-export async function loadAuthorization(authPath) {
+//
+// Options:
+//   requireApproved (default true)
+//     When true (production apply), authorization.approval.explicitlyAuthorized
+//     MUST be strict boolean `true`; any other value → ok: false.
+//     When false (read-only preflight), authorization.approval.explicitlyAuthorized
+//     may be strict boolean `true` OR strict boolean `false`; any non-boolean
+//     value still hard-fails. This lets a read-only preflight tool classify
+//     an unapproved-but-shape-valid draft as `authorizationDocumentValid: true`
+//     while surfacing `explicitlyAuthorized: false` separately. The apply engine
+//     itself invariantly calls with the default (requireApproved: true).
+//
+// The type check (`typeof … === 'boolean'`) is always applied, regardless of
+// requireApproved. Truthy non-boolean values (1, "true", "yes", …) always fail.
+export async function loadAuthorization(authPath, { requireApproved = true } = {}) {
   if (typeof authPath !== 'string' || authPath === '') {
     return { ok: false, error: 'authorization path missing' };
   }
@@ -548,7 +562,16 @@ export async function loadAuthorization(authPath) {
       error: `authorization.approval has unknown field(s): ${unknownApp.join(', ')}`,
     };
   }
-  if (parsed.approval.explicitlyAuthorized !== true) {
+  // Always enforce boolean type. Truthy non-boolean (1, "true", "yes", null, …)
+  // always fails regardless of requireApproved.
+  if (typeof parsed.approval.explicitlyAuthorized !== 'boolean') {
+    return {
+      ok: false,
+      error:
+        'authorization.approval.explicitlyAuthorized must be a boolean',
+    };
+  }
+  if (requireApproved && parsed.approval.explicitlyAuthorized !== true) {
     return {
       ok: false,
       error:
