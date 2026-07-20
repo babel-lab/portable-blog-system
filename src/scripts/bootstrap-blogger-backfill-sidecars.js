@@ -87,7 +87,57 @@ export const MANIFEST_SCHEMA_VERSION = 1;
 // 接受之 record 欄位。任何 key 不在此白名單即 fail closed。
 const ALLOWED_RECORD_TOP_KEYS = new Set(['sourcePath', 'blogger']);
 const ALLOWED_RECORD_BLOGGER_KEYS = new Set(['publishedUrl', 'publishedAt']);
-const ALLOWED_MANIFEST_TOP_KEYS = new Set(['schemaVersion', 'records', 'notes']);
+// `coverage` 為 additive、optional 之 coverage-mode 宣告（Phase 20260720）。省略即等同
+// full coverage（legacy 預設；byte-identical）。writer 本身 create-only、逐 record 運作，
+// **不**依 coverage 做任何 coverage 完整性判定（那是 intake validator 的職責）；此處僅做
+// envelope 結構驗證，避免上游 selected-coverage manifest 於共用 loadManifest 被誤判為
+// unknown top-level field。
+const ALLOWED_MANIFEST_TOP_KEYS = new Set(['schemaVersion', 'records', 'notes', 'coverage']);
+
+// coverage envelope。`mode` 為必填 enum；`selectedSourcePaths` 只在 mode==='selected' 允許
+// 且必填（element-level canonical / dedup / MISSING_SIDECAR 語意檢查延後到 intake validator）。
+export const ALLOWED_COVERAGE_MODES = new Set(['full', 'selected']);
+const ALLOWED_COVERAGE_KEYS = new Set(['mode', 'selectedSourcePaths']);
+
+// 結構驗證 coverage envelope（不做語意檢查）。回 null 表 OK；回字串表 error message。
+function validateCoverageEnvelope(cov) {
+  if (!isPlainObject(cov)) {
+    return 'manifest.coverage must be an object';
+  }
+  const unknown = Object.keys(cov).filter((k) => !ALLOWED_COVERAGE_KEYS.has(k));
+  if (unknown.length > 0) {
+    return `manifest.coverage has unknown field(s): ${unknown.join(', ')}`;
+  }
+  if (typeof cov.mode !== 'string' || !ALLOWED_COVERAGE_MODES.has(cov.mode)) {
+    return `manifest.coverage.mode must be "full" or "selected" (got: ${JSON.stringify(cov.mode)})`;
+  }
+  if (cov.mode === 'selected') {
+    if (!Array.isArray(cov.selectedSourcePaths)) {
+      return 'manifest.coverage.selectedSourcePaths must be an array when coverage.mode is "selected"';
+    }
+  } else if (Object.prototype.hasOwnProperty.call(cov, 'selectedSourcePaths')) {
+    return 'manifest.coverage.selectedSourcePaths is only allowed when coverage.mode is "selected"';
+  }
+  return null;
+}
+
+// Resolve the effective coverage mode of a structurally-valid manifest. Absent
+// coverage ≡ full (legacy default; never silently downgrades to selected). Returns
+// { mode, selectedSourcePaths } where selectedSourcePaths is null for full mode and
+// the declared array for selected mode. Shared by the intake validator + apply-plan
+// so coverage-mode determination has a single source of truth.
+export function resolveCoverageMode(manifest) {
+  const cov = manifest && manifest.coverage;
+  if (cov && cov.mode === 'selected') {
+    return {
+      mode: 'selected',
+      selectedSourcePaths: Array.isArray(cov.selectedSourcePaths)
+        ? cov.selectedSourcePaths
+        : [],
+    };
+  }
+  return { mode: 'full', selectedSourcePaths: null };
+}
 
 // 禁止之 flag：出現即 hard-fail（防覆寫 / 合併 / bypass）。
 const FORBIDDEN_FLAGS = new Set([
@@ -297,6 +347,10 @@ export async function loadManifest(inputPath) {
   }
   if (!Array.isArray(parsed.records)) {
     return { ok: false, error: 'manifest.records must be an array' };
+  }
+  if (parsed.coverage !== undefined) {
+    const covErr = validateCoverageEnvelope(parsed.coverage);
+    if (covErr) return { ok: false, error: covErr };
   }
   return { ok: true, manifest: parsed };
 }

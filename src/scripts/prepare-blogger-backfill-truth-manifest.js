@@ -85,6 +85,9 @@ export const EXCLUDED_SIDECAR_STATUSES = new Set([
 // Manifest schema version — must match bootstrap writer (`MANIFEST_SCHEMA_VERSION`).
 export const MANIFEST_SCHEMA_VERSION = 1;
 
+// Allowed sourcePath prefix (mirrors bootstrap writer ALLOWED_SOURCE_PREFIX).
+const ALLOWED_SOURCE_PREFIX = 'content/blogger/posts/';
+
 // Truth fields that Dean must populate before writer dry-run accepts the manifest.
 export const REQUIRED_TRUTH_FIELDS = ['blogger.publishedUrl', 'blogger.publishedAt'];
 
@@ -103,7 +106,7 @@ const FORBIDDEN_FLAGS = new Set([
   '--fix',
 ]);
 
-const USAGE = `Usage: prepare-blogger-backfill-truth-manifest [--json | --manifest-only] [--help]
+const USAGE = `Usage: prepare-blogger-backfill-truth-manifest [--json | --manifest-only] [--source-path <path> ...] [--help]
 
 Generate a deterministic, human-fillable truth-manifest TEMPLATE for the Blogger
 backfill candidates currently classified as MISSING_SIDECAR by
@@ -127,8 +130,31 @@ Modes:
                      \`bootstrap:blogger-backfill-sidecars --input <file>\` to
                      verify readiness.
 
+Coverage modes:
+  (no --source-path)     FULL coverage (default). The template covers EVERY current
+                         MISSING_SIDECAR candidate and carries no \`coverage\` field.
+                         The downstream intake validator requires the operator-filled
+                         manifest to still cover every candidate exactly (a manifest
+                         that "just happens to have fewer records" fails).
+  --source-path <path>   SELECTED coverage (repeatable). Explicitly names the subset
+                         of current MISSING_SIDECAR candidates to backfill this time.
+                         The emitted manifest carries
+                         \`coverage: { mode: "selected", selectedSourcePaths: [...] }\`
+                         and records only the selected paths. Unselected candidates
+                         remain MISSING_SIDECAR and keep appearing in
+                         plan:blogger-backfill-sidecars. Selected coverage does NOT
+                         publish anything, does NOT create a sidecar, and does NOT
+                         change any article's lifecycle — it only scopes which
+                         already-published posts a later authorized apply may write.
+                         Each --source-path must be a canonical repo-relative path
+                         under content/blogger/posts/ that is CURRENTLY a
+                         MISSING_SIDECAR candidate. Duplicate, empty, unknown, or
+                         non-candidate selection hard-fails with no output.
+
 Options:
   --help / -h            Print this usage.
+  --source-path <path>   (Repeatable.) Select one MISSING_SIDECAR candidate for
+                         explicit selected coverage. Omit entirely for full coverage.
   --repo-root <abs>      (Guard use only.) Absolute path to an alternate repo root
                          used for isolated fixture testing. Defaults to the current
                          repo root.
@@ -136,7 +162,8 @@ Options:
 Fail-closed:
   This generator refuses mutation-like flags: --apply, --write, --output, --out,
   --force, --overwrite, --replace, --merge, --yes, -y, --fix. Any occurrence
-  produces exit 1 with no output.
+  produces exit 1 with no output. There is deliberately NO --all / --force / --yes
+  selection bypass: selected coverage must be spelled out one --source-path at a time.
 
 Never fabricates Blogger truth:
   publishedUrl, publishedAt, bloggerPostId, and bloggerBlogId are all real
@@ -157,6 +184,8 @@ export function parseArgs(argv) {
     json: false,
     manifestOnly: false,
     repoRoot: null,
+    sourcePaths: [],
+    selectionRequested: false,
     forbidden: [],
     unknown: [],
   };
@@ -172,6 +201,16 @@ export function parseArgs(argv) {
     }
     if (a === '--manifest-only') {
       opts.manifestOnly = true;
+      continue;
+    }
+    if (a === '--source-path') {
+      opts.selectionRequested = true;
+      opts.sourcePaths.push(args[++i] ?? null);
+      continue;
+    }
+    if (a.startsWith('--source-path=')) {
+      opts.selectionRequested = true;
+      opts.sourcePaths.push(a.slice('--source-path='.length));
       continue;
     }
     if (a === '--repo-root') {
@@ -215,15 +254,58 @@ export function buildTemplateRecord(sourcePath) {
   };
 }
 
+// Shape-validate a single `--source-path` selection value. Mirrors the record
+// sourcePath contract enforced downstream by the writer / intake validator.
+// Returns null when OK, else an error string.
+export function validateSelectedPathShape(s) {
+  if (typeof s !== 'string' || s === '') {
+    return '--source-path must be a non-empty string';
+  }
+  if (s !== s.trim()) {
+    return `--source-path has surrounding whitespace: ${JSON.stringify(s)}`;
+  }
+  if (path.isAbsolute(s) || s.includes('\\')) {
+    return `--source-path must be repo-relative POSIX-style: ${JSON.stringify(s)}`;
+  }
+  if (s.split('/').includes('..')) {
+    return `--source-path must not contain "..": ${JSON.stringify(s)}`;
+  }
+  if (!s.startsWith(ALLOWED_SOURCE_PREFIX)) {
+    return `--source-path must be within ${ALLOWED_SOURCE_PREFIX}: ${JSON.stringify(s)}`;
+  }
+  if (!s.endsWith('.md') || s.endsWith('.fb.md')) {
+    return `--source-path must be a Blogger post Markdown (.md, not .fb.md): ${JSON.stringify(s)}`;
+  }
+  return null;
+}
+
 // Given a planner result, produce:
-//   - manifest: { schemaVersion: 1, records: [...] }   (writer-compatible)
+//   - manifest: { schemaVersion: 1, [coverage,] records: [...] }   (writer-compatible)
 //   - excluded: [ { sourcePath, sidecarStatus, reason } ]   (documented reason)
+//   - selection: { mode, selectedSourcePaths, unselected, errors }
 //   - summary counts
 // All lists are sorted deterministically (by sourcePath ascending).
-export function deriveTemplate(plan) {
+//
+// options.selectedSourcePaths (Phase 20260720):
+//   - null / omitted → FULL coverage. Manifest carries NO `coverage` field and
+//     records cover every current MISSING_SIDECAR candidate. Byte-identical to the
+//     legacy full-coverage template.
+//   - a (possibly empty) array → SELECTED coverage. The operator explicitly names
+//     the subset of current MISSING_SIDECAR candidates to backfill this time. The
+//     manifest carries `coverage: { mode: "selected", selectedSourcePaths: [...] }`
+//     and records ONLY the selected paths. Invalid shape, duplicate, empty, or a
+//     path that is not a current MISSING_SIDECAR candidate populates
+//     `selection.errors` (the CLI hard-fails; nothing is emitted).
+export function deriveTemplate(plan, options = {}) {
+  const requested = Array.isArray(options.selectedSourcePaths)
+    ? options.selectedSourcePaths
+    : null;
+
+  const bySourcePath = (a, b) =>
+    a.sourcePath < b.sourcePath ? -1 : a.sourcePath > b.sourcePath ? 1 : 0;
+
   const includedCandidates = [];
   const excludedCandidates = [];
-
   for (const c of plan.candidates) {
     if (INCLUDED_SIDECAR_STATUSES.has(c.sidecarStatus)) {
       includedCandidates.push(c);
@@ -231,20 +313,67 @@ export function deriveTemplate(plan) {
       excludedCandidates.push(c);
     }
   }
+  includedCandidates.sort(bySourcePath);
+  excludedCandidates.sort(bySourcePath);
 
-  includedCandidates.sort((a, b) =>
-    a.sourcePath < b.sourcePath ? -1 : a.sourcePath > b.sourcePath ? 1 : 0,
-  );
-  excludedCandidates.sort((a, b) =>
-    a.sourcePath < b.sourcePath ? -1 : a.sourcePath > b.sourcePath ? 1 : 0,
-  );
+  const missingSet = new Set(includedCandidates.map((c) => c.sourcePath));
 
-  const records = includedCandidates.map((c) => buildTemplateRecord(c.sourcePath));
+  // ── selection resolution ──────────────────────────────────────────────────
+  const selectionErrors = [];
+  let mode = 'full';
+  let selectedSorted = null;
+  let recordCandidates = includedCandidates; // full-mode default: everything missing
+  let unselected = [];
 
-  const manifest = {
-    schemaVersion: MANIFEST_SCHEMA_VERSION,
-    records,
-  };
+  if (requested != null) {
+    mode = 'selected';
+    if (requested.length === 0) {
+      selectionErrors.push('selected coverage requires at least one --source-path');
+    }
+    const seen = new Set();
+    const dupes = new Set();
+    for (const p of requested) {
+      const shapeErr = validateSelectedPathShape(p);
+      if (shapeErr) selectionErrors.push(shapeErr);
+      if (seen.has(p)) dupes.add(p);
+      seen.add(p);
+    }
+    for (const p of [...dupes].sort()) {
+      selectionErrors.push(`duplicate --source-path: ${p}`);
+    }
+    const uniqueRequested = [...new Set(requested.filter((p) => typeof p === 'string'))];
+    const notMissing = uniqueRequested.filter((p) => !missingSet.has(p)).sort();
+    for (const p of notMissing) {
+      selectionErrors.push(
+        `--source-path is not a current MISSING_SIDECAR candidate ` +
+          `(unknown / already has sidecar / not a candidate): ${p}`,
+      );
+    }
+    selectedSorted = [...uniqueRequested].sort();
+    const selectedSet = new Set(selectedSorted);
+    recordCandidates = includedCandidates.filter((c) => selectedSet.has(c.sourcePath));
+    unselected = includedCandidates
+      .filter((c) => !selectedSet.has(c.sourcePath))
+      .map((c) => c.sourcePath)
+      .sort();
+  }
+
+  const records = recordCandidates.map((c) => buildTemplateRecord(c.sourcePath));
+
+  const manifest =
+    mode === 'selected'
+      ? {
+          schemaVersion: MANIFEST_SCHEMA_VERSION,
+          coverage: {
+            mode: 'selected',
+            selectedSourcePaths: selectedSorted,
+          },
+          records,
+        }
+      : {
+          schemaVersion: MANIFEST_SCHEMA_VERSION,
+          records,
+        };
 
   const excluded = excludedCandidates.map((c) => ({
     sourcePath: c.sourcePath,
@@ -265,7 +394,9 @@ export function deriveTemplate(plan) {
     markdownScanned: plan.scanned,
     candidateCount: plan.candidateCount,
     missingSidecarCount: plan.summary.sidecarStatus.MISSING_SIDECAR,
+    coverageMode: mode,
     templateRecordCount: records.length,
+    unselectedMissingCount: mode === 'selected' ? unselected.length : 0,
     excludedExistingSidecarCount: excludedCandidates.filter(
       (c) => c.sidecarStatus === 'PRESENT_COMPLETE' || c.sidecarStatus === 'PRESENT_INCOMPLETE',
     ).length,
@@ -275,7 +406,17 @@ export function deriveTemplate(plan) {
     excludedInvalidSourceCount: invalidSourceCount,
   };
 
-  return { manifest, excluded, summary };
+  return {
+    manifest,
+    excluded,
+    summary,
+    selection: {
+      mode,
+      selectedSourcePaths: selectedSorted,
+      unselected,
+      errors: selectionErrors,
+    },
+  };
 }
 
 // ── formatting ──────────────────────────────────────────────────────────────
@@ -287,7 +428,11 @@ export function formatHumanReadable({ plan, template }) {
   lines.push(`Markdown scanned:                    ${template.summary.markdownScanned}`);
   lines.push(`Candidate count:                     ${template.summary.candidateCount}`);
   lines.push(`Missing-sidecar count:               ${template.summary.missingSidecarCount}`);
+  lines.push(`Coverage mode:                       ${template.summary.coverageMode}`);
   lines.push(`Template record count:               ${template.summary.templateRecordCount}`);
+  if (template.summary.coverageMode === 'selected') {
+    lines.push(`Unselected missing candidates:       ${template.summary.unselectedMissingCount}`);
+  }
   lines.push(`Excluded (existing sidecar):         ${template.summary.excludedExistingSidecarCount}`);
   lines.push(`Excluded (invalid sidecar):          ${template.summary.excludedInvalidSidecarCount}`);
   lines.push(`Excluded (invalid source):           ${template.summary.excludedInvalidSourceCount}`);
@@ -334,6 +479,16 @@ export function formatHumanReadable({ plan, template }) {
         lines.push(`      - ${r}`);
       }
     }
+    lines.push('');
+  }
+
+  if (template.selection && template.selection.mode === 'selected' &&
+      template.selection.unselected.length > 0) {
+    lines.push('---- unselected MISSING_SIDECAR candidates (deferred; still shown by the planner) ----');
+    for (const p of template.selection.unselected) {
+      lines.push(`  - ${p}`);
+    }
+    lines.push('  (these remain missing-sidecar candidates and are NOT touched by this selected manifest)');
     lines.push('');
   }
 
@@ -412,7 +567,22 @@ async function main() {
   }
 
   const plan = await planMissingSidecars({ repoRoot });
-  const template = deriveTemplate(plan);
+  const template = deriveTemplate(plan, {
+    selectedSourcePaths: opts.selectionRequested ? opts.sourcePaths : null,
+  });
+
+  // Selected coverage is opt-in and must be fully valid before any output is
+  // emitted. A malformed / duplicate / empty / non-candidate selection hard-fails
+  // with no manifest on stdout, so a broken selection can never be piped downstream.
+  if (template.selection.errors.length > 0) {
+    process.stderr.write(
+      '[prepare-blogger-backfill-truth-manifest] ERROR: invalid --source-path selection:\n',
+    );
+    for (const e of template.selection.errors) {
+      process.stderr.write(`  - ${e}\n`);
+    }
+    return 1;
+  }
 
   if (opts.manifestOnly) {
     process.stdout.write(formatManifestOnly({ template }));

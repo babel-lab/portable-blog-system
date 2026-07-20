@@ -2,6 +2,10 @@
 
 Session：`260718 / add truth-manifest template generator`
 
+> **Update（2026-07-20）**：generator 現支援 explicit selected coverage（可重複 `--source-path`）；
+> 無 `--source-path` 時 full-coverage 預設行為與輸出**不變**。current runbook 見
+> `docs/20260720-blogger-backfill-selected-coverage.md`。
+
 - Date：2026-07-18（Asia/Taipei）
 - Type：source implementation + targeted guard + minimal docs
 - 上游 policy：

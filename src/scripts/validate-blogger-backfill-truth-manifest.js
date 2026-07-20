@@ -61,6 +61,7 @@ import { fileURLToPath } from 'node:url';
 import {
   loadManifest,
   planBootstrap,
+  resolveCoverageMode,
   MANIFEST_SCHEMA_VERSION,
   ALLOWED_SOURCE_PREFIX,
 } from './bootstrap-blogger-backfill-sidecars.js';
@@ -213,8 +214,55 @@ function extractUrlYearMonth(url) {
   return { year: m[1], month: m[2] };
 }
 
+// Shape-validate a single declared `coverage.selectedSourcePaths` entry. Mirrors
+// the record sourcePath contract enforced by the bootstrap writer's shape layer,
+// but applies to the explicit selection declaration itself. Returns null when OK.
+function validateSelectedPathShape(s) {
+  if (typeof s !== 'string' || s === '') {
+    return 'selectedSourcePaths entry must be a non-empty string';
+  }
+  if (s !== s.trim()) {
+    return `selectedSourcePaths entry has surrounding whitespace: ${JSON.stringify(s)}`;
+  }
+  if (path.isAbsolute(s) || s.includes('\\')) {
+    return `selectedSourcePaths entry must be repo-relative POSIX-style: ${JSON.stringify(s)}`;
+  }
+  if (s.split('/').includes('..')) {
+    return `selectedSourcePaths entry must not contain "..": ${JSON.stringify(s)}`;
+  }
+  if (!s.startsWith(ALLOWED_SOURCE_PREFIX)) {
+    return `selectedSourcePaths entry must be within ${ALLOWED_SOURCE_PREFIX}: ${JSON.stringify(s)}`;
+  }
+  if (!s.endsWith('.md') || s.endsWith('.fb.md')) {
+    return `selectedSourcePaths entry must be a Blogger post Markdown (.md, not .fb.md): ${JSON.stringify(s)}`;
+  }
+  return null;
+}
+
 // Coverage cross-check: manifest sourcePath set vs current MISSING_SIDECAR
-// candidate set. Symmetric-difference splits into missing / unknown.
+// candidate set. Two modes (Phase 20260720):
+//
+//   full (default; coverage absent or coverage.mode === 'full'):
+//     manifest sourcePath set must be EXACTLY the current MISSING_SIDECAR set.
+//     Any omission → missing_candidate; any extra → unknown_candidate. This is the
+//     unchanged legacy behavior. A manifest that "just happens to have fewer
+//     records" is NEVER silently treated as a subset — it fails as full coverage.
+//
+//   selected (coverage.mode === 'selected' + coverage.selectedSourcePaths):
+//     the operator explicitly declares a NON-EMPTY subset of the current
+//     MISSING_SIDECAR candidates to backfill this time. Enforced:
+//       - selectedSourcePaths non-empty
+//       - each entry canonical repo-relative under content/blogger/posts/ (.md)
+//       - no duplicate selectedSourcePaths entry
+//       - manifest record set === declared selection set EXACTLY (declared-but-
+//         absent and undeclared-record are both hard errors — self-carrying
+//         explicit data, so a dropped record is caught rather than silently
+//         narrowing coverage)
+//       - every declared path is currently MISSING_SIDECAR (catches unknown paths,
+//         already-existing sidecars, and non-candidate paths)
+//     Selected mode deliberately does NOT require covering every current
+//     MISSING_SIDECAR candidate; unselected candidates remain reported as
+//     `missingCandidates` (informational) and continue to surface in the planner.
 function computeCoverage({ manifest, plan }) {
   const currentMissing = plan.candidates
     .filter((c) => c.sidecarStatus === 'MISSING_SIDECAR')
@@ -231,12 +279,99 @@ function computeCoverage({ manifest, plan }) {
     .filter((p) => !currentMissingSet.has(p))
     .sort();
 
+  const { mode, selectedSourcePaths } = resolveCoverageMode(manifest);
+  const errors = [];
+
+  if (mode === 'full') {
+    for (const p of missing) {
+      errors.push(
+        `coverage: current MISSING_SIDECAR candidate not covered by manifest: ${p}`,
+      );
+    }
+    for (const p of unknown) {
+      errors.push(
+        `coverage: manifest entry does not correspond to a current MISSING_SIDECAR candidate: ${p}`,
+      );
+    }
+    return {
+      mode: 'full',
+      selectedSourcePaths: null,
+      currentMissingSidecarPaths: [...currentMissing].sort(),
+      manifestSourcePaths: [...manifestPaths].sort(),
+      missingCandidates: missing,
+      unknownCandidates: unknown,
+      declaredButAbsent: [],
+      undeclaredRecords: [],
+      notMissingSelected: [],
+      coverageOk: errors.length === 0,
+      errors,
+    };
+  }
+
+  // ── selected mode ─────────────────────────────────────────────────────────
+  const declared = selectedSourcePaths; // array (possibly empty)
+  const declaredSorted = [...declared].sort();
+
+  if (declared.length === 0) {
+    errors.push(
+      'coverage(selected): coverage.selectedSourcePaths must declare a non-empty selection',
+    );
+  }
+
+  const seen = new Set();
+  const dupes = new Set();
+  for (const p of declared) {
+    const shapeErr = validateSelectedPathShape(p);
+    if (shapeErr) errors.push(`coverage(selected): ${shapeErr}`);
+    if (seen.has(p)) dupes.add(p);
+    seen.add(p);
+  }
+  for (const p of [...dupes].sort()) {
+    errors.push(`coverage(selected): duplicate selectedSourcePaths entry: ${p}`);
+  }
+
+  const declaredSet = new Set(declared);
+  const declaredButAbsent = [...declaredSet]
+    .filter((p) => !manifestPathSet.has(p))
+    .sort();
+  const undeclaredRecords = [...manifestPathSet]
+    .filter((p) => !declaredSet.has(p))
+    .sort();
+  for (const p of declaredButAbsent) {
+    errors.push(
+      `coverage(selected): declared selectedSourcePaths entry has no matching manifest record: ${p}`,
+    );
+  }
+  for (const p of undeclaredRecords) {
+    errors.push(
+      `coverage(selected): manifest record is not declared in coverage.selectedSourcePaths: ${p}`,
+    );
+  }
+
+  const notMissingSelected = [...declaredSet]
+    .filter((p) => !currentMissingSet.has(p))
+    .sort();
+  for (const p of notMissingSelected) {
+    errors.push(
+      `coverage(selected): selected path is not a current MISSING_SIDECAR candidate ` +
+        `(unknown / already has sidecar / not a candidate): ${p}`,
+    );
+  }
+
   return {
+    mode: 'selected',
+    selectedSourcePaths: declaredSorted,
     currentMissingSidecarPaths: [...currentMissing].sort(),
     manifestSourcePaths: [...manifestPaths].sort(),
+    // Informational in selected mode: candidates the operator did NOT select.
+    // NOT an error — they stay visible in the planner and are backfilled later.
     missingCandidates: missing,
     unknownCandidates: unknown,
-    coverageOk: missing.length === 0 && unknown.length === 0,
+    declaredButAbsent,
+    undeclaredRecords,
+    notMissingSelected,
+    coverageOk: errors.length === 0,
+    errors,
   };
 }
 
@@ -309,15 +444,9 @@ export async function validateTruthManifest({ manifestPath, repoRoot }) {
     }
   }
 
-  // Layer C: coverage.
+  // Layer C: coverage (mode-aware; full = exact-all, selected = declared subset).
   const coverage = computeCoverage({ manifest, plan });
-  for (const p of coverage.missingCandidates) {
-    const msg = `coverage: current MISSING_SIDECAR candidate not covered by manifest: ${p}`;
-    layerErrors.coverage.push(msg);
-    errors.push(msg);
-  }
-  for (const p of coverage.unknownCandidates) {
-    const msg = `coverage: manifest entry does not correspond to a current MISSING_SIDECAR candidate: ${p}`;
+  for (const msg of coverage.errors) {
     layerErrors.coverage.push(msg);
     errors.push(msg);
   }
@@ -502,6 +631,9 @@ export async function validateTruthManifest({ manifestPath, repoRoot }) {
       invalidCount,
       candidateCount: plan.candidateCount,
       currentMissingSidecarCount: plan.summary.sidecarStatus.MISSING_SIDECAR,
+      coverageMode: coverage.mode,
+      selectedCount:
+        coverage.mode === 'selected' ? coverage.selectedSourcePaths.length : null,
       missingCandidateCount: coverage.missingCandidates.length,
       unknownCandidateCount: coverage.unknownCandidates.length,
       duplicateUrlCount: duplicateUrls.length,
@@ -526,6 +658,10 @@ export function formatHumanReadable(report) {
   }
   lines.push(`candidate count:                     ${report.summary.candidateCount}`);
   lines.push(`current MISSING_SIDECAR count:       ${report.summary.currentMissingSidecarCount}`);
+  lines.push(`coverage mode:                       ${report.summary.coverageMode ?? '(unknown)'}`);
+  if (report.summary.coverageMode === 'selected') {
+    lines.push(`selected count:                      ${report.summary.selectedCount}`);
+  }
   lines.push(`manifest record count:               ${report.summary.recordCount}`);
   lines.push(`valid entries:                       ${report.summary.validCount}`);
   lines.push(`invalid entries:                     ${report.summary.invalidCount}`);
@@ -538,7 +674,11 @@ export function formatHumanReadable(report) {
   lines.push('');
 
   if (report.coverage && report.coverage.missingCandidates.length > 0) {
-    lines.push('---- missing candidates (manifest is incomplete) ----');
+    if (report.coverage.mode === 'selected') {
+      lines.push('---- unselected candidates (intentionally deferred; still in planner inventory) ----');
+    } else {
+      lines.push('---- missing candidates (manifest is incomplete) ----');
+    }
     for (const p of report.coverage.missingCandidates) {
       lines.push(`  - ${p}`);
     }
@@ -593,10 +733,15 @@ export function formatJson(report) {
     ok: report.ok,
     coverage: report.coverage
       ? {
+          mode: report.coverage.mode,
+          selectedSourcePaths: report.coverage.selectedSourcePaths,
           currentMissingSidecarPaths: report.coverage.currentMissingSidecarPaths,
           manifestSourcePaths: report.coverage.manifestSourcePaths,
           missingCandidates: report.coverage.missingCandidates,
           unknownCandidates: report.coverage.unknownCandidates,
+          declaredButAbsent: report.coverage.declaredButAbsent,
+          undeclaredRecords: report.coverage.undeclaredRecords,
+          notMissingSelected: report.coverage.notMissingSelected,
           coverageOk: report.coverage.coverageOk,
         }
       : null,

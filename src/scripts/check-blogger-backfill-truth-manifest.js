@@ -528,6 +528,127 @@ async function main() {
       });
     }
 
+    // ── SELECTED COVERAGE (Phase 20260720) ────────────────────────────────
+    // seedRichFixture exposes exactly two MISSING_SIDECAR candidates: alpha, foxtrot.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'selected-'));
+      const postsDir = seedRichFixture(repoRoot);
+      const invBefore = snapshotSidecarInventory(postsDir);
+      const ALPHA = 'content/blogger/posts/20260201-alpha.md';
+      const FOX = 'content/blogger/posts/20260206-foxtrot.md';
+
+      // Full mode (no --source-path) still emits NO coverage field.
+      await check('SEL full mode: manifest-only has no coverage field', () => {
+        const r = runCli(['--manifest-only', '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 0, r.stderr);
+        const j = JSON.parse(r.stdout);
+        assert.strictEqual(Object.prototype.hasOwnProperty.call(j, 'coverage'), false);
+        assert.deepStrictEqual(Object.keys(j).sort(), ['records', 'schemaVersion']);
+        assert.strictEqual(j.records.length, 2);
+      });
+
+      // Selected mode: one path → coverage block + single record.
+      await check('SEL one path: coverage block + 1 record + unselected foxtrot', () => {
+        const r = runCli(['--manifest-only', '--source-path', ALPHA, '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 0, r.stderr);
+        const j = JSON.parse(r.stdout);
+        assert.deepStrictEqual(Object.keys(j), ['schemaVersion', 'coverage', 'records']);
+        assert.strictEqual(j.coverage.mode, 'selected');
+        assert.deepStrictEqual(j.coverage.selectedSourcePaths, [ALPHA]);
+        assert.strictEqual(j.records.length, 1);
+        assert.strictEqual(j.records[0].sourcePath, ALPHA);
+        // records carry only empty truth (no guessed URL/date/bloggerPostId).
+        assert.strictEqual(j.records[0].blogger.publishedUrl, '');
+        assert.strictEqual(j.records[0].blogger.publishedAt, '');
+        assert.ok(!/bloggerPostId/.test(r.stdout));
+      });
+
+      // Selected mode: both paths → 2 records, records === selection.
+      await check('SEL both paths: 2 records match selection, no unselected', () => {
+        const r = runCli(['--manifest-only', '--source-path', ALPHA, '--source-path', FOX, '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 0, r.stderr);
+        const j = JSON.parse(r.stdout);
+        assert.deepStrictEqual(j.coverage.selectedSourcePaths, [ALPHA, FOX]);
+        assert.deepStrictEqual(j.records.map((rec) => rec.sourcePath).sort(), [ALPHA, FOX]);
+      });
+
+      // Selected mode human output lists unselected candidate.
+      await check('SEL human output: coverage mode + unselected section', () => {
+        const r = runCli(['--source-path', ALPHA, '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 0, r.stderr);
+        assert.ok(/Coverage mode:\s+selected/.test(r.stdout));
+        assert.ok(/unselected MISSING_SIDECAR candidates/i.test(r.stdout));
+        assert.ok(r.stdout.includes(FOX), 'unselected foxtrot must be listed');
+      });
+
+      // Deterministic across two runs.
+      await check('SEL deterministic across two runs', () => {
+        const a = runCli(['--manifest-only', '--source-path', FOX, '--source-path', ALPHA, '--repo-root', repoRoot]);
+        const b = runCli(['--manifest-only', '--source-path', FOX, '--source-path', ALPHA, '--repo-root', repoRoot]);
+        assert.strictEqual(a.stdout, b.stdout);
+        // Order-independent selection: selectedSourcePaths is always sorted.
+        const j = JSON.parse(a.stdout);
+        assert.deepStrictEqual(j.coverage.selectedSourcePaths, [ALPHA, FOX]);
+      });
+
+      // Hard-fails: duplicate / unknown / non-candidate (draft) / already-sidecar.
+      await check('SEL duplicate --source-path: exit 1, no output', () => {
+        const r = runCli(['--manifest-only', '--source-path', ALPHA, '--source-path', ALPHA, '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 1);
+        assert.ok(/duplicate --source-path/i.test(r.stderr));
+        assert.strictEqual(r.stdout, '');
+      });
+      await check('SEL unknown path: exit 1', () => {
+        const r = runCli(['--manifest-only', '--source-path', 'content/blogger/posts/20260299-ghost.md', '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 1);
+        assert.ok(/not a current MISSING_SIDECAR candidate/i.test(r.stderr));
+        assert.strictEqual(r.stdout, '');
+      });
+      await check('SEL non-candidate (draft charlie): exit 1', () => {
+        const r = runCli(['--manifest-only', '--source-path', 'content/blogger/posts/20260203-charlie.md', '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 1);
+        assert.ok(/not a current MISSING_SIDECAR candidate/i.test(r.stderr));
+      });
+      await check('SEL already-sidecar (PRESENT_COMPLETE bravo): exit 1', () => {
+        const r = runCli(['--manifest-only', '--source-path', 'content/blogger/posts/20260202-bravo.md', '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 1);
+        assert.ok(/not a current MISSING_SIDECAR candidate/i.test(r.stderr));
+      });
+      await check('SEL bad shape (outside prefix): exit 1', () => {
+        const r = runCli(['--manifest-only', '--source-path', 'content/github/posts/x.md', '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 1);
+        assert.ok(/must be within content\/blogger\/posts\//i.test(r.stderr));
+      });
+      await check('SEL .fb.md rejected: exit 1', () => {
+        const r = runCli(['--manifest-only', '--source-path', 'content/blogger/posts/20260201-alpha.fb.md', '--repo-root', repoRoot]);
+        assert.strictEqual(r.status, 1);
+        assert.ok(/\.fb\.md/i.test(r.stderr));
+      });
+      await check('SEL no --all / --yes selection bypass exists (still forbidden)', () => {
+        const rAll = runCli(['--manifest-only', '--all', '--repo-root', repoRoot]);
+        assert.strictEqual(rAll.status, 1);
+        const rYes = runCli(['--manifest-only', '--yes', '--repo-root', repoRoot]);
+        assert.strictEqual(rYes.status, 1);
+      });
+
+      await check('SEL selected-mode runs created no sidecar in fixture', () => {
+        const invAfter = snapshotSidecarInventory(postsDir);
+        assert.deepStrictEqual(invAfter, invBefore);
+      });
+    }
+
+    // ── parseArgs: --source-path repeatable ───────────────────────────────
+    await check('parseArgs: --source-path repeatable + selectionRequested', () => {
+      const o = parseArgs(['node', 'cli', '--source-path', 'a', '--source-path=b']);
+      assert.strictEqual(o.selectionRequested, true);
+      assert.deepStrictEqual(o.sourcePaths, ['a', 'b']);
+    });
+    await check('parseArgs: no --source-path → selectionRequested false', () => {
+      const o = parseArgs(['node', 'cli', '--manifest-only']);
+      assert.strictEqual(o.selectionRequested, false);
+      assert.deepStrictEqual(o.sourcePaths, []);
+    });
+
     // ── T5, T6-T9, T37: forbidden and unknown flags ─────────────────────────
     {
       const repoRoot = mkdtempSync(path.join(tmpRoot, 'forbidden-'));

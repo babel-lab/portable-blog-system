@@ -2,6 +2,11 @@
 
 Session：`260719 / add truth-manifest intake validator`
 
+> **Update（2026-07-20）**：validator 之 coverage 判定現為 mode-aware——full coverage（無 `coverage`
+> 欄位或 `coverage.mode: "full"`）維持本文件描述之 exact-all 行為；新增 explicit selected coverage
+> （`coverage.mode: "selected"` + `selectedSourcePaths`）允許非空合法子集合。current runbook 見
+> `docs/20260720-blogger-backfill-selected-coverage.md`。
+
 - Date：2026-07-19（Asia/Taipei）
 - Type：source implementation + targeted guard + minimal docs
 - 上游 policy：

@@ -319,8 +319,8 @@ export function buildApplyPlan({ report }) {
 // Deliberately does NOT depend on: manifest absolute path, repo root, current
 // time, hostname, OS separator, process ID, temporary directory. Same inputs
 // therefore produce the same fingerprint on any host or fixture root.
-export function fingerprintPlan({ manifestSchemaVersion, entries }) {
-  const canonical = canonicalize({
+export function fingerprintPlan({ manifestSchemaVersion, entries, coverage = null }) {
+  const input = {
     planSchemaVersion: PLAN_SCHEMA_VERSION,
     manifestSchemaVersion,
     entries: entries.map((e) => ({
@@ -329,12 +329,39 @@ export function fingerprintPlan({ manifestSchemaVersion, entries }) {
       operation: e.operation,
       payload: e.payload,
     })),
-  });
+  };
+  // Coverage binding (Phase 20260720). The descriptor is included ONLY for
+  // selected coverage. Full coverage (coverage == null) yields a canonical object
+  // byte-identical to the legacy fingerprint input, so existing full-coverage
+  // fingerprints — and any authorization bound to them — are unchanged. Selected
+  // coverage binds { mode, selectedSourcePaths } so that an authorization prepared
+  // for a selected plan can NEVER validate against a full plan, nor against a
+  // different selection, even in the degenerate case where the resulting entry set
+  // coincides. Changing the selected set therefore changes the plan fingerprint via
+  // BOTH the entries and this descriptor; downstream authorization fails closed.
+  if (coverage != null) {
+    input.coverage = coverage;
+  }
+  const canonical = canonicalize(input);
   return {
     algorithm: 'sha256',
     encoding: 'hex',
     value: sha256Hex(canonical),
   };
+}
+
+// Derive the fingerprint coverage descriptor from a validator report. Returns null
+// for full coverage (so the fingerprint stays byte-identical to legacy) and the
+// bound descriptor for selected coverage. Single source of truth so buildApplyPlan
+// and any downstream caller agree.
+export function coverageDescriptorFromReport(report) {
+  if (report && report.ok && report.coverage && report.coverage.mode === 'selected') {
+    return {
+      mode: 'selected',
+      selectedSourcePaths: report.coverage.selectedSourcePaths,
+    };
+  }
+  return null;
 }
 
 // ── formatting ──────────────────────────────────────────────────────────────
@@ -353,6 +380,7 @@ export function formatHumanReadable({ report, plan, fingerprint, manifestPath })
   if (report.envelopeOk) {
     lines.push(`candidate count:                     ${report.summary.candidateCount}`);
     lines.push(`current MISSING_SIDECAR count:       ${report.summary.currentMissingSidecarCount}`);
+    lines.push(`coverage mode:                       ${report.summary.coverageMode ?? '(unknown)'}`);
     lines.push(`manifest record count:               ${report.summary.recordCount}`);
   } else {
     lines.push(`envelope error:                      ${report.envelopeError}`);
@@ -428,6 +456,7 @@ export function formatJson({ report, plan, fingerprint, manifestPath }) {
     summary: {
       candidateCount: report.summary.candidateCount ?? 0,
       currentMissingSidecarCount: report.summary.currentMissingSidecarCount ?? 0,
+      coverageMode: report.summary.coverageMode ?? null,
       manifestRecordCount: report.summary.recordCount,
       plannedCreateCount: plan.plannedCreateCount,
       conflictCount: plan.conflictCount,
@@ -475,6 +504,7 @@ export async function planTruthApply({ manifestPath, repoRoot }) {
       ? fingerprintPlan({
           manifestSchemaVersion: report.manifest.schemaVersion,
           entries: plan.entries,
+          coverage: coverageDescriptorFromReport(report),
         })
       : null;
   return { report, plan, fingerprint };

@@ -493,6 +493,91 @@ async function main() {
       });
     }
 
+    // ── SELECTED COVERAGE fingerprint binding (Phase 20260720) ────────────
+    {
+      const FIRST = 'content/blogger/posts/20260301-first.md';
+      const SECOND = 'content/blogger/posts/20260302-second.md';
+      const R0 = () => validManifestForTwoMissing().records[0];
+      const R1 = () => validManifestForTwoMissing().records[1];
+      const sel = (paths, recs) => ({
+        schemaVersion: 1,
+        coverage: { mode: 'selected', selectedSourcePaths: paths },
+        records: recs,
+      });
+      function fpOf(repoRoot, manifestObj, name) {
+        const p = writeManifest(repoRoot, manifestObj, name);
+        const j = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+        assert.strictEqual(j.status, 0, `${name}: ${j.stderr}${j.stdout}`);
+        return JSON.parse(j.stdout);
+      }
+
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sel-fp-'));
+      const invBefore = snapshotSidecarInventory(seedTwoMissingCandidates(repoRoot));
+
+      const full = fpOf(repoRoot, validManifestForTwoMissing(), 'full.json');
+      const selBoth = fpOf(repoRoot, sel([FIRST, SECOND], [R0(), R1()]), 'sel-both.json');
+      const selFirst = fpOf(repoRoot, sel([FIRST], [R0()]), 'sel-first.json');
+      const selSecond = fpOf(repoRoot, sel([SECOND], [R1()]), 'sel-second.json');
+
+      await check('SEL plan JSON surfaces coverageMode (full vs selected)', () => {
+        assert.strictEqual(full.summary.coverageMode, 'full');
+        assert.strictEqual(selBoth.summary.coverageMode, 'selected');
+        assert.strictEqual(selFirst.summary.coverageMode, 'selected');
+      });
+      await check('SEL full vs selected same set → different plan fingerprint (coverage bound)', () => {
+        // Same entry set {first, second}, but full vs selected must NOT collide.
+        assert.notStrictEqual(full.fingerprint.value, selBoth.fingerprint.value);
+      });
+      await check('SEL different selected sets → different plan fingerprint', () => {
+        assert.notStrictEqual(selFirst.fingerprint.value, selSecond.fingerprint.value);
+        assert.notStrictEqual(selFirst.fingerprint.value, selBoth.fingerprint.value);
+        assert.notStrictEqual(selSecond.fingerprint.value, selBoth.fingerprint.value);
+      });
+      await check('SEL selected fingerprint deterministic across two runs', () => {
+        const again = fpOf(repoRoot, sel([FIRST], [R0()]), 'sel-first-2.json');
+        assert.strictEqual(again.fingerprint.value, selFirst.fingerprint.value);
+      });
+      await check('SEL authorization fail-closed: fp bound to {first,second} rejects narrowed {first}', () => {
+        // An authorization document persists expectedPlanFingerprint = selBoth's value.
+        // After the operator narrows the selection to {first}, plan:apply recomputes a
+        // different fingerprint. The apply / preflight binding compares strict equality,
+        // so the stale authorization can no longer match — fail-closed by construction.
+        const staleAuthorizedFingerprint = selBoth.fingerprint.value;
+        const currentFingerprint = selFirst.fingerprint.value;
+        assert.notStrictEqual(currentFingerprint, staleAuthorizedFingerprint);
+      });
+      await check('SEL selected-mode planning created no sidecar', () => {
+        const invAfter = snapshotSidecarInventory(path.join(repoRoot, 'content', 'blogger', 'posts'));
+        assert.deepStrictEqual(invAfter, invBefore);
+      });
+
+      // API-level: fingerprintPlan coverage descriptor differentiates full vs selected
+      // while remaining byte-identical to legacy when coverage omitted.
+      await check('API fingerprintPlan: omitting coverage === legacy full fingerprint', async () => {
+        const p = writeManifest(repoRoot, validManifestForTwoMissing(), 'api-full.json');
+        const { report, plan, fingerprint } = await planTruthApply({ manifestPath: p, repoRoot });
+        const legacy = fingerprintPlan({
+          manifestSchemaVersion: report.manifest.schemaVersion,
+          entries: plan.entries,
+        });
+        assert.strictEqual(legacy.value, fingerprint.value);
+      });
+      await check('API fingerprintPlan: selected descriptor changes the value', async () => {
+        const p = writeManifest(repoRoot, sel([FIRST], [R0()]), 'api-sel.json');
+        const { report, plan } = await planTruthApply({ manifestPath: p, repoRoot });
+        const withCoverage = fingerprintPlan({
+          manifestSchemaVersion: report.manifest.schemaVersion,
+          entries: plan.entries,
+          coverage: { mode: 'selected', selectedSourcePaths: [FIRST] },
+        });
+        const withoutCoverage = fingerprintPlan({
+          manifestSchemaVersion: report.manifest.schemaVersion,
+          entries: plan.entries,
+        });
+        assert.notStrictEqual(withCoverage.value, withoutCoverage.value);
+      });
+    }
+
     // ── T2: validator failure blocks planning ────────────────────────────
     {
       const repoRoot = mkdtempSync(path.join(tmpRoot, 't2-vf-'));

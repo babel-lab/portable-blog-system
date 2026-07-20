@@ -974,6 +974,242 @@ async function main() {
       });
     }
 
+    // ── SELECTED COVERAGE (Phase 20260720) — §7 acceptance matrix ─────────
+    // seedTwoMissingCandidates → first (20260301) + second (20260302) MISSING.
+    const REC0 = () => validManifestForTwoMissing().records[0]; // first
+    const REC1 = () => validManifestForTwoMissing().records[1]; // second
+    const FIRST = 'content/blogger/posts/20260301-first.md';
+    const SECOND = 'content/blogger/posts/20260302-second.md';
+    function selectedManifest(selectedSourcePaths, records) {
+      return { schemaVersion: 1, coverage: { mode: 'selected', selectedSourcePaths }, records };
+    }
+
+    // SC1: full-coverage manifest still PASS + coverage.mode=full.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc1-full-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, validManifestForTwoMissing());
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC1 full-coverage manifest → PASS + coverage.mode=full', () => {
+        assert.strictEqual(r.status, 0, r.stderr);
+        const obj = JSON.parse(r.stdout);
+        assert.strictEqual(obj.coverage.mode, 'full');
+        assert.strictEqual(obj.summary.coverageMode, 'full');
+      });
+    }
+
+    // SC2: legacy manifest missing one candidate → missing_candidate hard-fail (unchanged).
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc2-legacy-short-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, { schemaVersion: 1, records: [REC0()] });
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC2 legacy short manifest (no coverage) → missing_candidate hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        assert.strictEqual(obj.coverage.mode, 'full');
+        assert.strictEqual(obj.summary.missingCandidateCount, 1);
+        assert.deepStrictEqual(obj.coverage.missingCandidates, [SECOND]);
+      });
+    }
+
+    // SC3: explicit selected non-empty subset → PASS (omits second legitimately).
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc3-selected-ok-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, selectedManifest([FIRST], [REC0()]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC3 selected subset {first} → PASS; second stays informational', () => {
+        assert.strictEqual(r.status, 0, r.stderr);
+        const obj = JSON.parse(r.stdout);
+        assert.strictEqual(obj.ok, true);
+        assert.strictEqual(obj.coverage.mode, 'selected');
+        assert.deepStrictEqual(obj.coverage.selectedSourcePaths, [FIRST]);
+        // second is unselected → informational only, NOT an error.
+        assert.deepStrictEqual(obj.coverage.missingCandidates, [SECOND]);
+        assert.strictEqual(obj.summary.coverageMode, 'selected');
+        assert.strictEqual(obj.summary.selectedCount, 1);
+      });
+    }
+
+    // SC4: selected mode omitting a candidate is exactly the SC3 case — assert the
+    //      unselected one is still discoverable via the coverage report.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc4-omit-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, selectedManifest([SECOND], [REC1()]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC4 selected {second} PASS; first remains a missing candidate (informational)', () => {
+        assert.strictEqual(r.status, 0, r.stderr);
+        const obj = JSON.parse(r.stdout);
+        assert.deepStrictEqual(obj.coverage.missingCandidates, [FIRST]);
+      });
+    }
+
+    // SC5: selected mode with an unknown path → hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc5-unknown-'));
+      seedTwoMissingCandidates(repoRoot);
+      const ghost = {
+        sourcePath: 'content/blogger/posts/20260303-ghost.md',
+        blogger: { publishedUrl: 'https://example.blogspot.com/2026/03/ghost.html', publishedAt: '2026-03-03' },
+      };
+      const p = writeManifest(repoRoot, selectedManifest([FIRST, ghost.sourcePath], [REC0(), ghost]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC5 selected unknown path → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        assert.ok(obj.coverage.notMissingSelected.includes(ghost.sourcePath));
+      });
+    }
+
+    // SC6: selected mode with an already-existing sidecar path → hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc6-existing-'));
+      const postsDir = seedTwoMissingCandidates(repoRoot);
+      writeFileSyncMk(
+        path.join(postsDir, '20260301-first.publish.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          blogger: { type: 'post', permalink: 'first', status: 'published', publishedUrl: 'https://example.blogspot.com/2026/03/first.html', publishedAt: '2026-03-01', bloggerPostId: '' },
+        }, null, 2) + '\n',
+      );
+      // first is now PRESENT_COMPLETE (not MISSING); only second is MISSING.
+      const p = writeManifest(repoRoot, selectedManifest([FIRST], [REC0()]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC6 selected already-sidecar path → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        // first is no longer MISSING → notMissingSelected + shape SIDECAR_ALREADY_EXISTS
+        assert.ok(obj.coverage.notMissingSelected.includes(FIRST) || obj.summary.invalidCount > 0);
+      });
+    }
+
+    // SC7: selected mode with a non-candidate path (draft) → hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc7-noncand-'));
+      const postsDir = seedTwoMissingCandidates(repoRoot);
+      writeFileSyncMk(
+        path.join(postsDir, '20260304-draftpost.md'),
+        fmMd({ id: '20260304-draftpost', slug: 'draftpost', draft: true }),
+      );
+      const draftRec = {
+        sourcePath: 'content/blogger/posts/20260304-draftpost.md',
+        blogger: { publishedUrl: 'https://example.blogspot.com/2026/03/draftpost.html', publishedAt: '2026-03-04' },
+      };
+      const p = writeManifest(repoRoot, selectedManifest([draftRec.sourcePath], [draftRec]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC7 selected non-candidate (draft) path → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        assert.ok(obj.coverage.notMissingSelected.includes(draftRec.sourcePath));
+      });
+    }
+
+    // SC8: duplicate selected path → hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc8-dup-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, selectedManifest([FIRST, FIRST], [REC0(), REC0()]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC8 duplicate selected path → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        assert.ok(obj.errors.some((e) => /duplicate selectedSourcePaths entry/i.test(e)));
+      });
+    }
+
+    // SC9: empty selected set → hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc9-empty-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, selectedManifest([], []));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC9 empty selected set → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        assert.ok(obj.errors.some((e) => /non-empty selection/i.test(e)));
+      });
+    }
+
+    // SC10: explicit selected mode but a declared candidate has no record ("少 candidate").
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc10-declared-absent-'));
+      seedTwoMissingCandidates(repoRoot);
+      // declares {first, second} but only supplies record for first.
+      const p = writeManifest(repoRoot, selectedManifest([FIRST, SECOND], [REC0()]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC10 declared selection missing a record → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        assert.deepStrictEqual(obj.coverage.declaredButAbsent, [SECOND]);
+      });
+    }
+
+    // SC11: manifest record not declared in selection → hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc11-undeclared-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, selectedManifest([FIRST], [REC0(), REC1()]));
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC11 undeclared record → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        const obj = JSON.parse(r.stdout);
+        assert.deepStrictEqual(obj.coverage.undeclaredRecords, [SECOND]);
+      });
+    }
+
+    // SC12: coverage.mode invalid value → envelope hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc12-badmode-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, {
+        schemaVersion: 1,
+        coverage: { mode: 'partial', selectedSourcePaths: [FIRST] },
+        records: [REC0()],
+      });
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC12 coverage.mode invalid → hard-fail (envelope)', () => {
+        assert.strictEqual(r.status, 1);
+        assert.ok(/coverage\.mode must be/i.test(r.stdout + r.stderr));
+      });
+    }
+
+    // SC13: coverage.mode=full but selectedSourcePaths present → envelope hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc13-fullwithsel-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, {
+        schemaVersion: 1,
+        coverage: { mode: 'full', selectedSourcePaths: [FIRST] },
+        records: [REC0(), REC1()],
+      });
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC13 full mode with selectedSourcePaths → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        assert.ok(/selectedSourcePaths is only allowed when coverage/i.test(r.stdout + r.stderr));
+      });
+    }
+
+    // SC14: coverage unknown key → envelope hard-fail.
+    {
+      const repoRoot = mkdtempSync(path.join(tmpRoot, 'sc14-covkey-'));
+      seedTwoMissingCandidates(repoRoot);
+      const p = writeManifest(repoRoot, {
+        schemaVersion: 1,
+        coverage: { mode: 'selected', selectedSourcePaths: [FIRST], attacker: 'x' },
+        records: [REC0()],
+      });
+      const r = runCli(['--manifest', p, '--json', '--repo-root', repoRoot]);
+      await check('SC14 coverage unknown key → hard-fail', () => {
+        assert.strictEqual(r.status, 1);
+        assert.ok(/coverage has unknown field/i.test(r.stdout + r.stderr));
+      });
+    }
+
+    // SC15: selected mode never mutates repo (fixture bytes/mtime stable across all SC runs).
+    // (covered globally by the production side-effect audit + each fixture is temp-only.)
+
     // ── T25: source-level static assertions (no network / no Blogger API) ─
     await check('T25a source: no fetch(', () => {
       assert.ok(!/\bfetch\s*\(/.test(CLI_SRC));
