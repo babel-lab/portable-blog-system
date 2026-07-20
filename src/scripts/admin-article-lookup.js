@@ -39,6 +39,9 @@ import { fileURLToPath } from 'node:url';
 import fg from 'fast-glob';
 import matter from 'gray-matter';
 
+// Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 之 read-only 解析。
+import { resolvePublishTargetStage, formatPublishStage } from './publish-stage.js';
+
 // ── 常數 ─────────────────────────────────────────────────────────────────────────
 // allowlist content roots（repo-relative；只允許這兩個資料夾之直屬 *.md）。
 export const ALLOWED_CONTENT_ROOTS = Object.freeze([
@@ -215,14 +218,26 @@ async function readPublishSidecarSummary(absPath) {
   };
 }
 
-// publishTargets 摘要（只取 enabled / mode；不輸出整個巢狀物件）。
+// publishTargets 摘要（只取 enabled / mode / stage；不輸出整個巢狀物件）。
+//
+// Phase 20260720-publish-target-stage Slice 1（additive / read-only）：
+//   stage 為 enabled / mode 以外之第三個正交維度（production eligibility）。此處僅**顯示**
+//   解析結果，不改變任何 eligibility、不過濾任何文章、不寫回 frontmatter。
+//   缺漏 → stage:'production' / stageSource:'default'；非法 → stage:null / stageSource:'invalid'。
 function summarizePublishTargets(pt) {
   if (!pt || typeof pt !== 'object') return null;
-  const pick = (t) =>
-    t && typeof t === 'object'
-      ? { enabled: t.enabled === true, mode: typeof t.mode === 'string' ? t.mode : null }
-      : null;
-  return { github: pick(pt.github), blogger: pick(pt.blogger) };
+  const pick = (t, platform) => {
+    if (!t || typeof t !== 'object') return null;
+    const stage = resolvePublishTargetStage(pt, platform);
+    return {
+      enabled: t.enabled === true,
+      mode: typeof t.mode === 'string' ? t.mode : null,
+      stage: stage.ok ? stage.stage : null,
+      stageSource: stage.source,
+      stageDisplay: formatPublishStage(stage),
+    };
+  };
+  return { github: pick(pt.github, 'github'), blogger: pick(pt.blogger, 'blogger') };
 }
 
 // ── 核心 resolver（純函式；deterministic；不修改輸入 / 不寫檔）─────────────────────
@@ -376,7 +391,7 @@ export function formatArticleLookup(result, { json = false } = {}) {
   );
   if (a.publishTargets) {
     const pt = a.publishTargets;
-    const fmt = (t) => (t ? `enabled=${yn(t.enabled)} mode=${t.mode ?? '—'}` : '—');
+    const fmt = (t) => (t ? `enabled=${yn(t.enabled)} mode=${t.mode ?? '—'} stage=${t.stageDisplay ?? '—'}` : '—');
     lines.push(`  publishTargets   : github[${fmt(pt.github)}] blogger[${fmt(pt.blogger)}]`);
   } else {
     lines.push('  publishTargets   : —');

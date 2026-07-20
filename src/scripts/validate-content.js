@@ -24,6 +24,9 @@ import { resolveTitleTemplate } from './resolve-series-title.js';
 //   零 side-effect、無 circular import）。downloadFunnel role↔robots safety 重用此函式，確保「可索引」
 //   判定與 build 輸出對齊，避免 false-positive。**只讀不改**：不影響任何 indexing decision。
 import { resolvePostDetailRobots } from './page-type-robots.js';
+// Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 值域規則之
+//   單一事實來源（純函式；不 trim、不 normalize 大小寫、invalid fail-closed）。
+import { collectPublishTargetStageIssues } from './publish-stage.js';
 
 // Phase 5-g-3：ERROR 規則常數
 const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
@@ -2384,6 +2387,16 @@ export function validateContent({ posts, settings }) {
             });
           }
         }
+      }
+      // Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 值域檢查
+      //   - stage 缺漏（undefined）→ 無 diagnostics（backward compatibility：既有文章一律無此欄位）
+      //   - stage 存在但非法 → **error**（fail-closed；不得 fallback 成 production）
+      //   - 與 enabled / mode 正交：enabled:false 時非法 stage 仍為 error
+      //   - 平台獨立：github 與 blogger 各自報各自的 stage error，互不污染
+      //   - 值域與 fail-closed 語意單一事實來源為 publish-stage.js，本檔不另抄規格
+      //   - 型別錯誤僅回顯型別名稱，不回顯完整原始內容（見 describePublishStageValue）
+      for (const stageIssue of collectPublishTargetStageIssues(publishTargets, sourcePath)) {
+        issues.push(stageIssue);
       }
 
       // Phase 20260530-am-7 / am-13：download.fileUrl 結構檢查（warning-only；D1 + D2 + D3）

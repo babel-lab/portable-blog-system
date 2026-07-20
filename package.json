@@ -96,6 +96,7 @@
     "check:custom-promo-cross-field": "node src/scripts/check-custom-promo-cross-field.js",
     "check:adsense-cross-field": "node src/scripts/check-adsense-cross-field.js",
     "check:byline-contract": "node src/scripts/check-byline-contract.js",
+    "check:publish-target-stage": "node src/scripts/check-publish-target-stage.js",
     "check:metadata-guards": "npm run check:content-type-metadata && npm run check:adsense-mode-metadata && npm run check:campaign-purpose-metadata && npm run check:campaign-industry-metadata && npm run check:custom-promo-metadata",
     "check:metadata-cross-fields": "npm run check:campaign-metadata-cross-field && npm run check:custom-promo-cross-field && npm run check:adsense-cross-field",
     "check:metadata-all": "npm run check:metadata-all-contract && npm run check:metadata-guards && npm run check:metadata-cross-fields && npm run check:download-indexing-independence && npm run check:download-indexing-generated-output",

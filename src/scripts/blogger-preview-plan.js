@@ -50,6 +50,8 @@ import { fileURLToPath } from 'node:url';
 import { resolveArticleBySlug } from './admin-article-lookup.js';
 import { classify } from './load-posts.js';
 import { VALID_BLOGGER_MODES } from './load-blogger-posts.js';
+// Phase 20260720-publish-target-stage Slice 1：read-only stage 顯示（不參與 eligibility）。
+import { resolvePublishStage, formatPublishStage } from './publish-stage.js';
 
 // 未來 preview build（後續 phase）之隔離輸出根目錄。本檔**只計算路徑字串、不建立目錄**。
 export const PREVIEW_DIST_REL = 'dist-blogger-preview';
@@ -158,8 +160,33 @@ export async function planBloggerPreview({ slug, site, projectRoot } = {}) {
   const outputDir = `${PREVIEW_DIST_REL}/posts/${a.slug}`;
   const wouldWrite = PREVIEW_PLANNED_FILES.map((f) => `${outputDir}/${f}`);
 
+  // Phase 20260720-publish-target-stage Slice 1（additive / read-only）：
+  //   顯示 publishTargets.blogger.stage 之解析結果。**不**改變 preview eligibility —— preview
+  //   本來就不因 stage 被禁止（preview 正是 stage:"preview" 之用途）；此處純顯示。
+  //
+  //   注意：a.publishTargets 為 admin-article-lookup 之**摘要**視圖（其 stage 欄位已是解析後
+  //   結果，非 raw），故此處直接消費該摘要，不得再丟回 resolvePublishTargetStage 二次解析
+  //   （會把 default 誤判成 explicit）。平台節點不存在時才以 raw undefined 解出 default。
+  const bloggerPt = a.publishTargets?.blogger ?? null;
+  const bloggerStage = bloggerPt
+    ? {
+        stage: bloggerPt.stage ?? null,
+        source: bloggerPt.stageSource ?? 'invalid',
+        display: bloggerPt.stageDisplay ?? '—',
+      }
+    : (() => {
+        const r = resolvePublishStage(undefined, 'blogger');
+        return { stage: r.stage, source: r.source, display: formatPublishStage(r) };
+      })();
+
   const notes = [];
   if (t.modeNote) notes.push(t.modeNote);
+  if (bloggerStage.source === 'invalid') {
+    notes.push(
+      'publishTargets.blogger.stage 非法 → 合法值僅 preview / production；' +
+        'validate:content 會以 error 回報。**不**影響本 preview plan（preview 不因 stage 被禁止）。',
+    );
+  }
   if (verdict.include) {
     notes.push(
       `本文目前**已**被正式 build:blogger 收錄（classify: ${verdict.reason}）→ 直接跑 \`npm run build:blogger\` 即可於 dist-blogger/posts/${a.slug}/ 取得正式輸出；此時 preview build 非必要。`,
@@ -177,6 +204,14 @@ export async function planBloggerPreview({ slug, site, projectRoot } = {}) {
     contentRoot: a.contentRoot,
     sourceSite: t.sourceSite,
     current: { status: a.status, draft: a.draft },
+    // read-only stage 投影（Slice 1；不參與任何 eligibility 判定）
+    publishStage: {
+      blogger: {
+        stage: bloggerStage.stage,
+        source: bloggerStage.source,
+        display: bloggerStage.display,
+      },
+    },
     officialBuild: {
       // 正式 build:blogger（dist-blogger/）之收錄判定；本檔不改變其行為。
       includes: verdict.include,
@@ -226,6 +261,7 @@ export function formatPreviewPlan(result, { json = false } = {}) {
   if (p.title) lines.push(`  title       : ${p.title}`);
   lines.push(`  sourceSite  : ${p.sourceSite}  (contentRoot=${p.contentRoot})`);
   lines.push(`  status/draft: "${p.current.status ?? '—'}" / ${p.current.draft === null ? '—' : p.current.draft}`);
+  lines.push(`  blogger stage: ${p.publishStage.blogger.display}  (read-only；不影響 preview eligibility)`);
   lines.push('  ── 正式 build:blogger（dist-blogger/；本指令不改變其行為）──');
   if (p.officialBuild.includes) {
     lines.push(`  收錄     : YES  (classify: ${p.officialBuild.reason})`);

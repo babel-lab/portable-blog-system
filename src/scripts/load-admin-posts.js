@@ -43,6 +43,9 @@ import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
 //   - 純函式；委派既有 SP-3/4a/5a helper + mirror SP-2 validator warning；不啟用 write path
 //   - 只投影 gatedDownload / platformPolicy 之 safe 欄位；不洩 secret / token / 表單回覆 / 私有 URL
 import { derivePageMetadataView } from './page-metadata-summary.js';
+// Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 之 read-only 解析。
+//   - 只用於 Admin 顯示欄位；**不**參與任何 eligibility / 過濾 / production selector。
+import { resolvePublishTargetStage, formatPublishStage } from './publish-stage.js';
 
 const SITES = ['github', 'blogger'];
 
@@ -607,9 +610,17 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
   const coverAlt = typeof fm.coverAlt === 'string' ? fm.coverAlt : '';
   const titleEn = typeof fm.titleEn === 'string' ? fm.titleEn : '';
   const primaryPlatform = typeof fm.primaryPlatform === 'string' ? fm.primaryPlatform : '';
+  // Phase 20260720-publish-target-stage Slice 1：per-platform stage 之 **read-only** 解析。
+  //   - 只供 Admin 顯示；不寫回 frontmatter、不參與任何 eligibility / 過濾 / 排序。
+  //   - 缺漏 → 'production (default)'；非法 → 'invalid (...)'（絕不顯示成 production）。
+  const bloggerStage = resolvePublishTargetStage(fm?.publishTargets, 'blogger');
+  const githubStage = resolvePublishTargetStage(fm?.publishTargets, 'github');
   const blogger = {
     enabled: Boolean(fm?.publishTargets?.blogger?.enabled),
     mode: fm?.publishTargets?.blogger?.mode || '',
+    stage: bloggerStage.ok ? bloggerStage.stage : null,
+    stageSource: bloggerStage.source,
+    stageDisplay: formatPublishStage(bloggerStage),
     type: publishJson?.blogger?.type || '',
     status: publishJson?.blogger?.status || '',
     permalink: publishJson?.blogger?.permalink || '',
@@ -618,6 +629,9 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
   const github = {
     enabled: Boolean(fm?.publishTargets?.github?.enabled),
     mode: fm?.publishTargets?.github?.mode || '',
+    stage: githubStage.ok ? githubStage.stage : null,
+    stageSource: githubStage.source,
+    stageDisplay: formatPublishStage(githubStage),
     path: publishJson?.github?.path || (slug ? `/posts/${slug}/` : ''),
     previewUrl: githubBase && slug ? `${githubBase}/posts/${slug}/` : '',
   };
