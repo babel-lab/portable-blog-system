@@ -129,9 +129,14 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import matter from 'gray-matter';
 
 import { planTruthApply, PLAN_SCHEMA_VERSION } from './plan-blogger-backfill-truth-apply.js';
 import { evaluatePreflight } from './admin-git-safety-preflight.js';
+import {
+  resolvePublishTargetStage,
+  isProductionStage,
+} from './publish-stage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -846,6 +851,49 @@ export async function applyProductionSidecar({
     );
     return result;
   }
+
+  // ── Gate: publish-target stage re-parse from authoritative Markdown ──
+  // Phase 20260720 Slice 2 anti-bypass. Even after preflight / plan / fingerprint / authorization
+  // all match, re-read the source Markdown one more time immediately before mutation to guard
+  // against TOCTOU: someone flipping `publishTargets.blogger.stage` to `preview` after planning
+  // but before the write commit. Planner + authorization pin payload/fingerprint but neither
+  // binds `stage`; we do not trust planner cache, manifest cache, or authorization cache for
+  // the stage decision — the source Markdown at write-time is the sole authority. Missing stage
+  // resolves to production (backward compatibility); preview / invalid → zero mutation.
+  let reparseRaw;
+  try {
+    reparseRaw = await fs.readFile(absSource, 'utf-8');
+  } catch (err) {
+    errors.push(
+      `write-preflight: source re-read failed: ${err.code || err.message}`,
+    );
+    return result;
+  }
+  let reparseFm;
+  try {
+    reparseFm = matter(reparseRaw).data || {};
+  } catch (err) {
+    errors.push(
+      `write-preflight: source re-parse failed: ${err.message}`,
+    );
+    return result;
+  }
+  const stageResolved = resolvePublishTargetStage(reparseFm.publishTargets, 'blogger');
+  if (!stageResolved.ok) {
+    errors.push(
+      `write-preflight: source publishTargets.blogger.stage is invalid at write-time ` +
+        `(${stageResolved.value}); zero mutation performed`,
+    );
+    return result;
+  }
+  if (!isProductionStage(reparseFm.publishTargets?.blogger?.stage, 'blogger')) {
+    errors.push(
+      `write-preflight: source publishTargets.blogger.stage is not production at write-time ` +
+        `(resolved: ${stageResolved.stage}); zero mutation performed`,
+    );
+    return result;
+  }
+
   try {
     await fs.access(absTarget, fs.constants.F_OK);
     errors.push(

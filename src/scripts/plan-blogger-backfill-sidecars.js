@@ -53,6 +53,8 @@ import { fileURLToPath } from 'node:url';
 import fg from 'fast-glob';
 import matter from 'gray-matter';
 
+import { isProductionStage } from './publish-stage.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
@@ -198,7 +200,12 @@ function isCandidate(fm) {
   if (!enabled) return false;
   if (fm.draft === true) return false;
   const status = typeof fm.status === 'string' ? fm.status.trim() : '';
-  return status === 'ready' || status === 'published';
+  if (status !== 'ready' && status !== 'published') return false;
+  // Phase 20260720 Slice 2：Blogger production stage 過濾。preview / invalid 均排除；
+  //   downstream truth-manifest / apply-plan / apply 均以此 candidate set 為唯一事實來源，
+  //   故 preview-stage 之 Blogger target 不會出現於 truth-manifest 之 coverage。
+  //   missing stage → production（backward compat）。
+  return isProductionStage(blogger.stage, 'blogger');
 }
 
 async function readSidecarIfExists(mdFile) {

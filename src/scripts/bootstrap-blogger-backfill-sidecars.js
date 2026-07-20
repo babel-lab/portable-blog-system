@@ -73,6 +73,7 @@ import {
   resolvePublishedAt,
   deriveYearMonth,
 } from './backfill-published-url.js';
+import { isProductionStage } from './publish-stage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -265,7 +266,12 @@ function isCandidate(fm) {
   if (!enabled) return false;
   if (fm.draft === true) return false;
   const status = typeof fm.status === 'string' ? fm.status.trim() : '';
-  return status === 'ready' || status === 'published';
+  if (status !== 'ready' && status !== 'published') return false;
+  // Phase 20260720 Slice 2：Blogger production stage 過濾。preview / invalid 均排除；
+  //   manifest 若指向 preview-stage source，會於此 hard-fail 為 SOURCE_NOT_CANDIDATE，
+  //   即 anti-bypass：不能繞過 planner 直接餵 preview-stage 至 bootstrap writer。
+  //   missing stage → production（backward compat）。
+  return isProductionStage(blogger.stage, 'blogger');
 }
 
 // Build a deterministic sidecar body from human-supplied truth. Mirrors

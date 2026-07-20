@@ -1,7 +1,7 @@
 # Publish Target Stage 契約（`publishTargets.<platform>.stage`）
 
-**Phase**：20260720-publish-target-stage — **Slice 1**（schema / validator / read-only classification）
-**狀態**：Slice 1 landed。**尚未**接入任何 production selector（enforcement 屬 Slice 2）。
+**Phase**：20260720-publish-target-stage — **Slice 1**（schema / validator / read-only classification） + **Slice 2**（production selector enforcement + write-time anti-bypass）
+**狀態**：Slice 1 + Slice 2 landed。所有 production selector（loaders / backfill planner / bootstrap / report / truth-manifest / apply-plan / authorization prepare + validate / apply engine）皆已接入 stage 判定；apply engine 額外加 write-time re-parse anti-bypass。preview 流程（§5）不受影響。
 
 ---
 
@@ -126,18 +126,22 @@ blogger.stage 非法 → GitHub 也 hard fail
 
 | Slice | 範圍 | 狀態 |
 | --- | --- | --- |
-| Slice 1 | stage schema / helper、validator 規則、read-only 顯示、focused guard、docs | ✅ landed（本文件） |
-| Slice 2 | production selector enforcement（把 predicate 接入各平台 production entry point） | ❌ 未啟動 |
+| Slice 1 | stage schema / helper、validator 規則、read-only 顯示、focused guard、docs | ✅ landed |
+| Slice 2 | production selector enforcement（把 predicate 接入各平台 production entry point）+ apply write-time re-parse anti-bypass | ✅ landed |
 | Slice 3 | transitional warning（例如 `stage: preview` 但已有 landed publish sidecar） | ❌ 未啟動 |
 | Slice 4+ | landed sidecar withdrawal 等 | ❌ 未啟動 |
 
-Slice 1 **未改變任何 production 行為**：
+Slice 1 未改變任何 production 行為（helper 僅 wired 至 validator / Admin read-only 顯示 / preview planner 顯示）。
 
-- `assertProductionStage` / `isProductionStage` 於本 Slice **無任何 caller**。
-- helper 未被任何 build / deploy / apply / manifest / authorization 路徑引用。
-- 未修改任何文章 metadata、未修改任何 `.publish.json`。
+Slice 2 之 production 行為變化如下（**現行 repo 內無文章宣告 stage，所有既有斷言計數／輸出不變**）：
 
-上述邊界由 guard 靜態掃描守住（見 §9）。
+- Loader 之 production selector 對 native + cross-post 皆依 platform-target `stage` 過濾；preview / invalid → 排除（進 `filteredOut` 並帶 `<platform>:stage-not-production` reason）；missing / production → 納入（backward compat）。
+- Backfill candidate 判定（`check:blogger-backfill` / `plan:blogger-backfill-sidecars` / `bootstrap:blogger-backfill-sidecars`）在既有 `enabled + status + draft` 三條件之後加上 Blogger `stage` production 判定；preview-stage source 於整條 truth-manifest / apply-plan / authorization / apply 皆不會出現。
+- Truth-manifest intake validator、apply-plan、apply authorization prepare / validate 皆走 planner 之 candidate set；planner 排除 preview 即這幾條 rail 皆繼承。若 manifest 手動塞入 preview-stage source（繞過 planner），`bootstrap:blogger-backfill-sidecars` 之 `planBootstrap.isCandidate` 亦會拒絕（`SOURCE_NOT_CANDIDATE`）。
+- Apply engine（`apply-blogger-backfill-truth.js`）於 preflight 通過、write engine 觸發前，會**再次**從 authoritative source Markdown 讀 + parse frontmatter，並以 `resolvePublishTargetStage` + `isProductionStage` 驗證 Blogger `stage` 仍為 production。若 invalid 或 preview → hard-fail，零 mutation。此為反 TOCTOU / anti-bypass。
+- Preview 流程（`blogger-preview-plan.js` / `build-blogger-preview.js` / `check-blogger-preview.js`）**刻意**不接入 stage helper（契約 §5：preview 存在正是為了「尚未取得 production eligibility」；stage=preview 反而應該能繼續走 preview flow）。
+
+上述 wiring / anti-wiring 邊界由 focused guard 靜態掃描 + async fixture 端對端驗證（見 §9 / §10）。
 
 ---
 
@@ -157,7 +161,17 @@ Slice 1 **未改變任何 production 行為**：
 | Validator 規則 | `src/scripts/validate-content.js`（diagnostic type `invalid-publish-target-stage`） |
 | Admin read-only 顯示 | `src/scripts/load-admin-posts.js` / `src/scripts/admin-article-lookup.js` |
 | Preview planner read-only 顯示 | `src/scripts/blogger-preview-plan.js` |
+| GitHub production selector（native + blogger cross） | `src/scripts/load-github-posts.js` |
+| Blogger production selector（native + github cross） | `src/scripts/load-blogger-posts.js` |
+| Backfill report candidate 判定 | `src/scripts/check-blogger-backfill.js` |
+| Backfill planner candidate 判定（downstream truth-manifest / apply-plan / apply 之上游） | `src/scripts/plan-blogger-backfill-sidecars.js` |
+| Backfill bootstrap writer candidate 判定（manifest 反 bypass） | `src/scripts/bootstrap-blogger-backfill-sidecars.js` |
+| Apply engine write-time re-parse（TOCTOU anti-bypass） | `src/scripts/apply-blogger-backfill-truth.js` |
 | Focused guard | `src/scripts/check-publish-target-stage.js` |
+
+> Truth-manifest intake validator / apply-plan / authorization prepare / authorization validate 皆走
+> `planMissingSidecars` → `planBootstrap` 之 candidate set，因此 stage 過濾透過 planner + bootstrap
+> 之 `isCandidate` 自動繼承；無需重複實作。
 
 Helper 匯出：
 

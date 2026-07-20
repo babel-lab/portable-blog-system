@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 契約 guard。
+// Phase 20260720-publish-target-stage Slice 1 + Slice 2：publishTargets.<platform>.stage 契約 guard。
 //
 // 上位契約：docs/20260720-publish-target-stage-contract.md
 //
 // 範圍 / 邊界（read-only；negative test 完全隔離）：
-//   - 全部斷言使用 **in-memory 物件** 與 **repo 內既有真實檔案之靜態文字掃描**。
+//   - Slice 1 斷言：**in-memory 物件** 與 **repo 內既有真實檔案之靜態文字掃描**。
+//   - Slice 2 loader / planner 行為斷言：**mkdtempSync OS-temp fixture tree**，finally 清乾淨；
+//     **絕不**修改任何真實文章 / sidecar / manifest / authorization / settings。
 //   - **不**修改任何真實文章 / sidecar / manifest / authorization / settings。
-//   - **不**建立 fixture 檔、**不**寫暫存檔、**不**暫時弄髒 repo 再還原。
 //   - **不** build / deploy / push / 碰 gh-pages / 碰 dist* / 呼叫任何 API；零網路。
 //
 // 斷言分區：
@@ -17,10 +18,13 @@
 //   E. validator rule（collectPublishTargetStageIssues）：missing 無 diagnostics / invalid 為 error /
 //      enabled 值不影響 / 平台互不污染 / 型別錯誤不回顯完整原始內容
 //   F. 真實 repo：所有文章之 stage diagnostics = 0
-//   G. Slice 2 未提前實作（helper 尚未被 production selector 使用）之靜態掃描
+//   G. Slice 1 + Slice 2 wiring inventory（靜態掃描；importer 白名單、preview 路徑禁用、validator wiring）
+//   H. Slice 2 production selector 行為（planner 排除 preview / loader 排除 preview + reason /
+//      platform isolation / predicate 三態 / apply anti-bypass re-parse block）
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fg from 'fast-glob';
@@ -40,6 +44,11 @@ import {
   collectPublishTargetStageIssues,
   formatPublishStage,
 } from './publish-stage.js';
+
+// planMissingSidecars 支援 contentRoot 覆寫，因此本 guard 可對 planner 做 fixture-driven 端對端測試。
+// loadGithubPosts / loadBloggerPosts 之 PROJECT_ROOT 為 src/scripts/ 之 import.meta.url 固定，
+// 不受 process.cwd() 影響 → 端對端 loader 測試改以靜態 source-scan（見 H2s / H3s）。
+import { planMissingSidecars } from './plan-blogger-backfill-sidecars.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -400,20 +409,32 @@ check('真實 repo 目前無任何文章宣告 stage（Slice 1 未改動文章 m
   assert.deepEqual(declared, [], `unexpected stage declarations:\n${declared.join('\n')}`);
 });
 
-// ── G. Slice 2 未提前實作（靜態掃描）─────────────────────────────────────────────
+// ── G. Wiring inventory（靜態掃描；Slice 2 之後 helper 已進入 production 路徑）───
 
 const HELPER_REL = 'src/scripts/publish-stage.js';
-const ALLOWED_IMPORTERS = new Set([
+
+// Slice 1 importer（read-only display / validator）。
+const SLICE1_IMPORTERS = new Set([
   'src/scripts/validate-content.js',        // Step 4：validator 規則
   'src/scripts/load-admin-posts.js',        // Step 5：Admin read-only 顯示
   'src/scripts/admin-article-lookup.js',    // Step 5：read-only lookup 顯示
   'src/scripts/blogger-preview-plan.js',    // Step 5：preview planner read-only 顯示
   'src/scripts/check-publish-target-stage.js', // 本 guard
 ]);
+// Slice 2 importer（production selector / anti-bypass）。
+const SLICE2_IMPORTERS = new Set([
+  'src/scripts/load-github-posts.js',                 // GitHub production selector
+  'src/scripts/load-blogger-posts.js',                // Blogger production selector（build-blogger.js 之上游）
+  'src/scripts/check-blogger-backfill.js',            // Blogger backfill candidate 過濾
+  'src/scripts/plan-blogger-backfill-sidecars.js',    // Blogger backfill sidecar plan（truth-manifest / apply-plan / apply 之上游）
+  'src/scripts/bootstrap-blogger-backfill-sidecars.js', // Blogger backfill sidecar bootstrap
+  'src/scripts/apply-blogger-backfill-truth.js',      // Production apply 之 write-time re-parse 反 TOCTOU
+]);
+const ALLOWED_IMPORTERS = new Set([...SLICE1_IMPORTERS, ...SLICE2_IMPORTERS]);
 
 const jsFiles = fg.sync(['src/**/*.js'], { cwd: REPO_ROOT, absolute: false });
 
-check('publish-stage.js 之 importer 僅限 Slice 1 白名單', () => {
+check('publish-stage.js 之 importer 僅限 Slice 1 + Slice 2 白名單', () => {
   const importers = [];
   for (const rel of jsFiles) {
     const text = readFileSync(path.join(REPO_ROOT, rel), 'utf-8');
@@ -423,47 +444,39 @@ check('publish-stage.js 之 importer 僅限 Slice 1 白名單', () => {
   }
   assert.ok(importers.length > 0, 'helper 未被任何檔案 import（wiring 遺失？）');
   const unexpected = importers.filter((f) => !ALLOWED_IMPORTERS.has(f));
-  assert.deepEqual(unexpected, [], `Slice 2 提前實作？非白名單 importer：${unexpected.join(', ')}`);
+  assert.deepEqual(unexpected, [], `非白名單 importer（若新增 selector 請同步更新本 guard）：${unexpected.join(', ')}`);
 });
 
-check('assertProductionStage / isProductionStage 尚未被任何 production selector 使用', () => {
-  const callers = [];
-  for (const rel of jsFiles) {
-    const norm = rel.replace(/\\/g, '/');
-    if (norm === HELPER_REL || norm === 'src/scripts/check-publish-target-stage.js') continue;
+// Slice 2 明確要求接入之 production selector / anti-bypass；wiring 遺失即 fail-closed。
+for (const rel of SLICE2_IMPORTERS) {
+  check(`Slice 2 wiring：${rel} 已 import isProductionStage / resolvePublishTargetStage`, () => {
     const text = readFileSync(path.join(REPO_ROOT, rel), 'utf-8');
-    if (/\b(assertProductionStage|isProductionStage)\s*\(/.test(text)) callers.push(norm);
-  }
-  assert.deepEqual(callers, [], `Slice 2 提前實作？production predicate 已被使用：${callers.join(', ')}`);
-});
+    assert.ok(/from '\.\/publish-stage\.js'/.test(text), `${rel} 未 import helper`);
+    assert.ok(/\bisProductionStage|resolvePublishTargetStage\b/.test(text),
+      `${rel} import 存在但未呼叫 predicate`);
+  });
+}
 
-check('build / deploy / apply / manifest / authorization 路徑未接入 stage helper', () => {
-  const forbidden = [
-    'src/scripts/build-github.js',
-    'src/scripts/build-blogger.js',
+// Preview 路徑刻意不受 production stage 限制（契約 §5）；下列檔絕不得引入本 helper。
+check('preview 路徑（build-blogger-preview / check-blogger-preview）未接入 stage helper', () => {
+  const previewOnlyFiles = [
     'src/scripts/build-blogger-preview.js',
-    'src/scripts/build-sitemap.js',
-    'src/scripts/load-posts.js',
-    'src/scripts/load-github-posts.js',
-    'src/scripts/load-blogger-posts.js',
-    'src/scripts/apply-blogger-backfill-truth.js',
-    'src/scripts/plan-blogger-backfill-truth-apply.js',
-    'src/scripts/prepare-blogger-backfill-truth-manifest.js',
-    'src/scripts/prepare-blogger-backfill-apply-authorization.js',
-    'src/scripts/validate-blogger-backfill-apply-authorization.js',
+    'src/scripts/check-blogger-preview.js',
   ];
   const leaked = [];
-  for (const rel of forbidden) {
+  for (const rel of previewOnlyFiles) {
     const abs = path.join(REPO_ROOT, rel);
     let text;
     try {
       text = readFileSync(abs, 'utf-8');
     } catch {
-      continue; // 檔案不存在則略過（不硬編存在性）
+      continue;
     }
-    if (/publish-stage\.js|PublishStage|PUBLISH_STAGE/.test(text)) leaked.push(rel);
+    if (/from\s+['"]\.\/publish-stage\.js['"]|PUBLISH_STAGE|PublishStage/.test(text)) {
+      leaked.push(rel);
+    }
   }
-  assert.deepEqual(leaked, [], `Slice 2 提前實作？production 路徑已引用 stage：${leaked.join(', ')}`);
+  assert.deepEqual(leaked, [], `preview 路徑不得接入 production stage helper：${leaked.join(', ')}`);
 });
 
 check('validate-content.js 確實接上 stage 規則（wiring 存在性）', () => {
@@ -472,10 +485,207 @@ check('validate-content.js 確實接上 stage 規則（wiring 存在性）', () 
   assert.ok(/collectPublishTargetStageIssues\(/.test(text), 'validator 未呼叫 stage rule');
 });
 
-// ── 總結 ────────────────────────────────────────────────────────────────────────
+// ── H. Slice 2 production selector 行為（OS-temp fixture；不動任何真實檔）───────
+//
+// 這一區塊 mirror check-blogger-backfill-sidecar-plan.js 之 fixture 慣例：一切透過
+// OS temp 目錄之 synthetic content 樹跑，finally{} 清乾淨；絕不修改 repo bytes / mtime。
+// 所有 write 均為本 guard 自己的 temp fixtures，跟 production content 完全隔離。
 
-const passed = cases.filter((c) => c.ok).length;
-const total = cases.length;
-console.log('');
-console.log(`publish target stage contract guard: ${passed}/${total} PASS`);
-if (passed !== total) process.exit(1);
+function makeFrontmatter({ id, slug, stage, platform, extra = '' }) {
+  const stageLine = stage === undefined
+    ? ''
+    : `    stage: ${JSON.stringify(stage)}\n`;
+  const platformBlock = platform === 'blogger'
+    ? `publishTargets:\n  blogger:\n    enabled: true\n    mode: "full"\n${stageLine}`
+    : `publishTargets:\n  github:\n    enabled: true\n${stageLine}`;
+  return [
+    '---',
+    `id: "${id}"`,
+    `slug: "${slug}"`,
+    `title: "${slug}"`,
+    `date: "2026-05-01"`,
+    `status: "ready"`,
+    `draft: false`,
+    `category: "tech-note"`,
+    `tags: []`,
+    `description: "Stage guard fixture ${slug}"`,
+    platformBlock.trimEnd(),
+    extra ? extra : '',
+    '---',
+    '',
+    'body — selector must not read Markdown body.',
+    '',
+  ].filter((s) => s !== '').join('\n');
+}
+
+// ── Isolated fixture: cwd override via Vite/loader 不易，這裡直接以 in-memory
+//    assertion 驗證 predicate + 直接跑 planner（提供 contentRoot 覆寫）。
+
+// H1. planner 對 preview-stage 之排除（fixture 準備 sync；斷言於 asyncTests 內 await）
+{
+  try {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'stage-slice2-planner-'));
+    const posts = path.join(tmp, 'content', 'blogger', 'posts');
+    mkdirSync(posts, { recursive: true });
+    writeFileSync(path.join(posts, '20260401-prod.md'),
+      makeFrontmatter({ id: '20260401-prod', slug: 'prod', stage: 'production', platform: 'blogger' }), 'utf-8');
+    writeFileSync(path.join(posts, '20260402-prev.md'),
+      makeFrontmatter({ id: '20260402-prev', slug: 'prev', stage: 'preview', platform: 'blogger' }), 'utf-8');
+    writeFileSync(path.join(posts, '20260403-missing.md'),
+      makeFrontmatter({ id: '20260403-missing', slug: 'missing', stage: undefined, platform: 'blogger' }), 'utf-8');
+    globalThis.__slice2FixtureH1 = { tmp, posts };
+  } catch (err) {
+    check('H1 fixture prepare', () => { throw err; });
+  }
+}
+
+// H2/H3/H4：loader 之 PROJECT_ROOT 由 src/scripts/ 之 import.meta.url 固定，不受 process.cwd()
+//   影響，因此無法直接以 chdir + fixture 對 load-github-posts / load-blogger-posts 做端對端
+//   斷言。改為靜態 source-scan 驗證 filter 邏輯（H2s / H3s）+ predicate 平台獨立性（H4p）。
+//   Loader 之實際 preview 排除行為在 CLI 端經 `validate:content` + `check:blogger-backfill` 之
+//   real-repo run 交叉驗證：因目前 repo 內無任何文章宣告 stage，所有既有測試計數不變。
+//
+// H2s. Static source-scan: load-blogger-posts.js 之 stage filter 存在且 platform 正確。
+{
+  check('H2s loader source: load-blogger-posts.js 對 native blogger stage 過濾', () => {
+    const src = readFileSync(path.join(REPO_ROOT, 'src/scripts/load-blogger-posts.js'), 'utf-8');
+    assert.ok(/isProductionStage\(\s*p\.publishTargets\?\.blogger\?\.stage\s*,\s*['"]blogger['"]\s*\)/.test(src),
+      'load-blogger-posts.js 未對 native blogger 呼叫 isProductionStage 於 blogger 平台');
+    assert.ok(/blogger:stage-not-production/.test(src),
+      'load-blogger-posts.js 未含 blogger:stage-not-production 之 filteredOut reason');
+  });
+  check('H2s loader source: load-blogger-posts.js 對 github cross stage 過濾（enabled + stage）', () => {
+    const src = readFileSync(path.join(REPO_ROOT, 'src/scripts/load-blogger-posts.js'), 'utf-8');
+    // github cross-post 亦需檢 blogger.stage（我們發佈到 blogger）。
+    assert.ok(/publishTargets\?\.blogger\?\.enabled/.test(src),
+      'load-blogger-posts.js 未檢 publishTargets.blogger.enabled');
+    // 檢 blogger.stage 之 predicate 於同檔案（sanity；platform 正確性由上面斷言保證）。
+    const count = (src.match(/isProductionStage\([^)]*['"]blogger['"]/g) || []).length;
+    assert.ok(count >= 2, `expected ≥2 isProductionStage(...,'blogger') calls (native + cross), got ${count}`);
+  });
+}
+
+// H3s. Static source-scan: load-github-posts.js 之 stage filter 存在且 platform 正確。
+{
+  check('H3s loader source: load-github-posts.js 對 native github stage 過濾', () => {
+    const src = readFileSync(path.join(REPO_ROOT, 'src/scripts/load-github-posts.js'), 'utf-8');
+    assert.ok(/isProductionStage\(\s*p\.publishTargets\?\.github\?\.stage\s*,\s*['"]github['"]\s*\)/.test(src),
+      'load-github-posts.js 未對 native github 呼叫 isProductionStage 於 github 平台');
+    assert.ok(/github:stage-not-production/.test(src),
+      'load-github-posts.js 未含 github:stage-not-production 之 filteredOut reason');
+  });
+  check('H3s loader source: load-github-posts.js 對 blogger cross stage 過濾（enabled + stage）', () => {
+    const src = readFileSync(path.join(REPO_ROOT, 'src/scripts/load-github-posts.js'), 'utf-8');
+    assert.ok(/publishTargets\?\.github\?\.enabled/.test(src),
+      'load-github-posts.js 未檢 publishTargets.github.enabled');
+    const count = (src.match(/isProductionStage\([^)]*['"]github['"]/g) || []).length;
+    assert.ok(count >= 2, `expected ≥2 isProductionStage(...,'github') calls (native + cross), got ${count}`);
+  });
+}
+
+// H4p. Platform isolation on predicate：github.stage 與 blogger.stage 為獨立 axis；
+//   一者 preview 不影響另者 production。
+{
+  check('H4p isolation: blogger.stage=preview 不影響 github production predicate', () => {
+    // 一個文章可同時宣告 github: production + blogger: preview；兩個 predicate 各回各的。
+    assert.equal(isProductionStage('production', 'github'), true);
+    assert.equal(isProductionStage('preview', 'blogger'), false);
+  });
+  check('H4p isolation: github.stage=preview 不影響 blogger production predicate', () => {
+    assert.equal(isProductionStage('preview', 'github'), false);
+    assert.equal(isProductionStage('production', 'blogger'), true);
+  });
+  check('H4p isolation: platform axis 之 invalid stage 不污染另一平台', () => {
+    // github.stage 為非法值（'staging'）不影響 blogger.stage 之解析。
+    assert.equal(isProductionStage('staging', 'github'), false);
+    assert.equal(isProductionStage('production', 'blogger'), true);
+  });
+}
+
+async function asyncTests() {
+  // H1 planner classification（planMissingSidecars 支援 contentRoot 覆寫 → 端對端可測）
+  {
+    const fx = globalThis.__slice2FixtureH1;
+    const plan = await planMissingSidecars({ repoRoot: fx.tmp, contentRoot: fx.posts });
+    const slugs = plan.candidates.map((c) => c.slug);
+    check('H1 planner: production-stage candidate included', () => {
+      assert.ok(slugs.includes('prod'), `expected 'prod' in ${slugs}`);
+    });
+    check('H1 planner: missing-stage candidate included (backward compat)', () => {
+      assert.ok(slugs.includes('missing'), `expected 'missing' in ${slugs}`);
+    });
+    check('H1 planner: preview-stage candidate EXCLUDED', () => {
+      assert.ok(!slugs.includes('prev'), `unexpected 'prev' in ${slugs}`);
+    });
+    try { rmSync(fx.tmp, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+  }
+
+  // H5. isCandidate contract：bootstrap / plan / report 一致排除 preview（in-memory sanity）
+  {
+    const previewFm = {
+      status: 'ready',
+      draft: false,
+      publishTargets: { blogger: { enabled: true, stage: 'preview' } },
+    };
+    const productionFm = {
+      status: 'ready',
+      draft: false,
+      publishTargets: { blogger: { enabled: true, stage: 'production' } },
+    };
+    const missingFm = {
+      status: 'ready',
+      draft: false,
+      publishTargets: { blogger: { enabled: true } },
+    };
+    check('H5 predicate: production-stage → true', () => {
+      assert.equal(isProductionStage('production', 'blogger'), true);
+      assert.equal(isProductionStage(productionFm.publishTargets.blogger.stage, 'blogger'), true);
+    });
+    check('H5 predicate: missing-stage → true（backward compat）', () => {
+      assert.equal(isProductionStage(missingFm.publishTargets.blogger.stage, 'blogger'), true);
+    });
+    check('H5 predicate: preview-stage → false', () => {
+      assert.equal(isProductionStage('preview', 'blogger'), false);
+      assert.equal(isProductionStage(previewFm.publishTargets.blogger.stage, 'blogger'), false);
+    });
+    check('H5 predicate: invalid stage → false（不 fallback）', () => {
+      assert.equal(isProductionStage('Preview', 'blogger'), false);
+      assert.equal(isProductionStage('', 'blogger'), false);
+      assert.equal(isProductionStage(null, 'blogger'), false);
+      assert.equal(isProductionStage({}, 'blogger'), false);
+    });
+  }
+
+  // H6. apply engine anti-bypass：靜態掃描 src 檔以確認 re-parse 存在。
+  //   不執行 apply（本 guard 為 read-only + fixture-only；apply 觸發生產 write path）。
+  {
+    check('H6 apply anti-bypass: apply-blogger-backfill-truth.js contains write-time re-parse block', () => {
+      const text = readFileSync(
+        path.join(REPO_ROOT, 'src/scripts/apply-blogger-backfill-truth.js'), 'utf-8');
+      assert.ok(/fs\.readFile\(absSource/.test(text) || /source re-read/i.test(text),
+        'apply engine 未含 source re-read 之 anti-bypass');
+      assert.ok(/matter\(reparseRaw\)|matter\(mdRaw\)/.test(text) || /source re-parse/i.test(text),
+        'apply engine 未含 frontmatter re-parse');
+      assert.ok(/resolvePublishTargetStage|isProductionStage/.test(text),
+        'apply engine 未呼叫 stage predicate');
+      assert.ok(/stage is not production at write-time|stage is invalid at write-time/.test(text),
+        'apply engine 未含 write-time stage 拒絕 diagnostics');
+    });
+  }
+}
+
+// ── 總結（async tests 完成後計數）───────────────────────────────────────────────
+
+async function main() {
+  await asyncTests();
+  const passed = cases.filter((c) => c.ok).length;
+  const total = cases.length;
+  console.log('');
+  console.log(`publish target stage contract guard: ${passed}/${total} PASS`);
+  if (passed !== total) process.exit(1);
+}
+
+main().catch((err) => {
+  console.error(`publish target stage contract guard: UNEXPECTED ERROR: ${err.stack || err.message || err}`);
+  process.exit(1);
+});
