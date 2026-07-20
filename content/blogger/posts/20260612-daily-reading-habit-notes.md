@@ -35,6 +35,7 @@ publishTargets:
   blogger:
     enabled: true
     mode: "full"
+    stage: "preview"
 
 blocks:
   toc: false

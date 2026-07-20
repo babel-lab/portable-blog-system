@@ -26,7 +26,12 @@ import { resolveTitleTemplate } from './resolve-series-title.js';
 import { resolvePostDetailRobots } from './page-type-robots.js';
 // Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 值域規則之
 //   單一事實來源（純函式；不 trim、不 normalize 大小寫、invalid fail-closed）。
-import { collectPublishTargetStageIssues } from './publish-stage.js';
+// Phase 20260720-publish-target-stage Slice 3：另用 resolvePublishTargetStage 判定 preview
+//   × published-sidecar 之 transitional mismatch（warning-only；不改 selector 行為）。
+import {
+  collectPublishTargetStageIssues,
+  resolvePublishTargetStage,
+} from './publish-stage.js';
 
 // Phase 5-g-3：ERROR 規則常數
 const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
@@ -2397,6 +2402,46 @@ export function validateContent({ posts, settings }) {
       //   - 型別錯誤僅回顯型別名稱，不回顯完整原始內容（見 describePublishStageValue）
       for (const stageIssue of collectPublishTargetStageIssues(publishTargets, sourcePath)) {
         issues.push(stageIssue);
+      }
+
+      // Phase 20260720-publish-target-stage Slice 3：transitional mismatch warning
+      //   契約：docs/20260720-publish-target-stage-contract.md §7 Slice 3
+      //   觸發條件（全部成立）：
+      //     - resolvePublishTargetStage(publishTargets, 'blogger') 解析為 stage='preview'
+      //       （必為 explicit；default 為 production、invalid 為 ok:false，皆不觸發）
+      //     - post.publish（.publish.json sidecar）存在且為 plain object
+      //     - sidecar.blogger.status === 'published'
+      //   語意：作者已把 Blogger stage 標為 preview，但仍留著 landed 之 publish sidecar。
+      //     這是 transitional 狀態，需由未來獨立 landed-sidecar withdrawal phase（Slice 4+）
+      //     清理，本 Slice 只發 warning、**不**升 error、**不**改 selector 行為、**不**動 sidecar。
+      //   輸出限制：不得回顯 publishedUrl（避免把 landed URL 拉進 validator log）；
+      //     同時列 sourcePath 與 sidecarPath 供作者定位。
+      {
+        const bloggerStage = resolvePublishTargetStage(publishTargets, 'blogger');
+        const publishData = post.publish;
+        const bloggerSidecar =
+          publishData && typeof publishData === 'object' && !Array.isArray(publishData)
+            ? publishData.blogger
+            : null;
+        if (
+          bloggerStage.ok === true &&
+          bloggerStage.stage === 'preview' &&
+          bloggerSidecar &&
+          typeof bloggerSidecar === 'object' &&
+          !Array.isArray(bloggerSidecar) &&
+          bloggerSidecar.status === 'published'
+        ) {
+          const sidecarPath = post.sidecars?.publish?.path ?? '';
+          issues.push({
+            severity: 'warning',
+            type: 'publish-target-stage-conflicts-published-sidecar',
+            sourcePath,
+            sidecarPath,
+            value:
+              `blogger.stage="preview" but landed publish sidecar exists (sidecarPath=${sidecarPath}); ` +
+              `transitional mismatch — reconcile via a future landed-sidecar withdrawal phase (Slice 4+).`,
+          });
+        }
       }
 
       // Phase 20260530-am-7 / am-13：download.fileUrl 結構檢查（warning-only；D1 + D2 + D3）

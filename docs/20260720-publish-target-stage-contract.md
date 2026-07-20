@@ -1,7 +1,7 @@
 # Publish Target Stage 契約（`publishTargets.<platform>.stage`）
 
-**Phase**：20260720-publish-target-stage — **Slice 1**（schema / validator / read-only classification） + **Slice 2**（production selector enforcement + write-time anti-bypass）
-**狀態**：Slice 1 + Slice 2 landed。所有 production selector（loaders / backfill planner / bootstrap / report / truth-manifest / apply-plan / authorization prepare + validate / apply engine）皆已接入 stage 判定；apply engine 額外加 write-time re-parse anti-bypass。preview 流程（§5）不受影響。
+**Phase**：20260720-publish-target-stage — **Slice 1**（schema / validator / read-only classification） + **Slice 2**（production selector enforcement + write-time anti-bypass） + **Slice 3**（六篇 Blogger metadata 遷移 + transitional mismatch warning）
+**狀態**：Slice 1 + Slice 2 + Slice 3 landed。所有 production selector（loaders / backfill planner / bootstrap / report / truth-manifest / apply-plan / authorization prepare + validate / apply engine）皆已接入 stage 判定；apply engine 額外加 write-time re-parse anti-bypass。preview 流程（§5）不受影響。Slice 3 於六篇 Blogger 測試文章加上 `stage: "preview"`（見 §7 表格）並啟用 warning-only 之 `publish-target-stage-conflicts-published-sidecar` transitional 規則；六篇之 Blogger production 全線 selector 於本 Slice 之後皆已排除該六篇，但 preview 流程與 GitHub 輸出行為完全不變。
 
 ---
 
@@ -128,8 +128,33 @@ blogger.stage 非法 → GitHub 也 hard fail
 | --- | --- | --- |
 | Slice 1 | stage schema / helper、validator 規則、read-only 顯示、focused guard、docs | ✅ landed |
 | Slice 2 | production selector enforcement（把 predicate 接入各平台 production entry point）+ apply write-time re-parse anti-bypass | ✅ landed |
-| Slice 3 | transitional warning（例如 `stage: preview` 但已有 landed publish sidecar） | ❌ 未啟動 |
+| Slice 3 | 六篇 Blogger 測試文章遷移為 `blogger.stage: "preview"` + transitional warning（`publish-target-stage-conflicts-published-sidecar`；warning-only） | ✅ landed |
 | Slice 4+ | landed sidecar withdrawal 等 | ❌ 未啟動 |
+
+**Slice 3 遷移之六篇 Blogger 文章**（`publishTargets.blogger.stage = "preview"`）：
+
+```text
+content/blogger/posts/20260612-after-work-writing-time-blocking.md
+content/blogger/posts/20260612-blog-as-personal-knowledge-base.md
+content/blogger/posts/20260612-blog-restart-steady-rhythm-notes.md
+content/blogger/posts/20260612-daily-reading-habit-notes.md
+content/blogger/posts/20260612-reading-notes-three-questions.md
+content/blogger/posts/20260612-ai-tools-simplify-daily-workflow.md
+```
+
+**Slice 3 transitional warning 契約**（`publish-target-stage-conflicts-published-sidecar`）：
+
+- 觸發條件（三者必須全部成立）：
+  1. `resolvePublishTargetStage(publishTargets, 'blogger')` 解析為 `stage: "preview"`（explicit；missing default → production 不觸發、invalid → ok:false 不觸發）
+  2. 對應之 `.publish.json` sidecar 存在且為 plain object
+  3. `sidecar.blogger.status === "published"`
+- 邊界：
+  - `severity: "warning"`（絕不升 error，不使 `validate:content` exit non-zero）
+  - 不動任何 selector 行為（Slice 2 之 fail-closed 於 preview 不放寬）
+  - 不觸碰 `.publish.json`（本 Slice 為 **read-only observation**；withdrawal 屬 Slice 4+）
+  - **不得** echo `publishedUrl`；輸出僅含 `sourcePath` + `sidecarPath`
+  - 平台專限 Blogger：`github.stage` 對本 rule 不生效
+- 現行 repo 觸發計數 = 1（只有 `20260612-after-work-writing-time-blocking.md` 有 landed Blogger publish sidecar；其餘五篇尚無 sidecar）
 
 Slice 1 未改變任何 production 行為（helper 僅 wired 至 validator / Admin read-only 顯示 / preview planner 顯示）。
 
@@ -158,7 +183,7 @@ Slice 2 之 production 行為變化如下（**現行 repo 內無文章宣告 sta
 | 角色 | 檔案 |
 | --- | --- |
 | Helper（單一事實來源） | `src/scripts/publish-stage.js` |
-| Validator 規則 | `src/scripts/validate-content.js`（diagnostic type `invalid-publish-target-stage`） |
+| Validator 規則 | `src/scripts/validate-content.js`（diagnostic types `invalid-publish-target-stage` + Slice 3 `publish-target-stage-conflicts-published-sidecar`） |
 | Admin read-only 顯示 | `src/scripts/load-admin-posts.js` / `src/scripts/admin-article-lookup.js` |
 | Preview planner read-only 顯示 | `src/scripts/blogger-preview-plan.js` |
 | GitHub production selector（native + blogger cross） | `src/scripts/load-github-posts.js` |

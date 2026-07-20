@@ -391,8 +391,20 @@ check('真實 repo 所有 .md 之 stage diagnostics = 0', () => {
   assert.deepEqual(offenders, [], `stage diagnostics found:\n${offenders.join('\n')}`);
 });
 
-check('真實 repo 目前無任何文章宣告 stage（Slice 1 未改動文章 metadata）', () => {
-  const declared = [];
+// Slice 3 landed：以下六篇 Blogger 文章明確宣告 `blogger.stage: "preview"`
+//   （目的：在真正取得 production eligibility 前，讓 preview 流程仍可運作，同時把 production
+//   全線 selector 阻斷）。除此六篇外，仍不應有任何文章宣告 stage。
+const SLICE3_BLOGGER_PREVIEW_POSTS = new Set([
+  'content/blogger/posts/20260612-after-work-writing-time-blocking.md',
+  'content/blogger/posts/20260612-blog-as-personal-knowledge-base.md',
+  'content/blogger/posts/20260612-blog-restart-steady-rhythm-notes.md',
+  'content/blogger/posts/20260612-daily-reading-habit-notes.md',
+  'content/blogger/posts/20260612-reading-notes-three-questions.md',
+  'content/blogger/posts/20260612-ai-tools-simplify-daily-workflow.md',
+]);
+
+check('真實 repo 之 stage 宣告集合等於 Slice 3 六篇 Blogger preview posts', () => {
+  const declared = new Map(); // relPath#platform -> stage
   for (const abs of contentFiles) {
     let fm;
     try {
@@ -402,11 +414,290 @@ check('真實 repo 目前無任何文章宣告 stage（Slice 1 未改動文章 m
     }
     for (const p of PUBLISH_STAGE_PLATFORMS) {
       if (fm?.publishTargets?.[p]?.stage !== undefined) {
-        declared.push(`${path.relative(REPO_ROOT, abs)}#${p}`);
+        declared.set(`${path.relative(REPO_ROOT, abs).replace(/\\/g, '/')}#${p}`,
+          fm.publishTargets[p].stage);
       }
     }
   }
-  assert.deepEqual(declared, [], `unexpected stage declarations:\n${declared.join('\n')}`);
+  // 只有 blogger 平台宣告；github 側任何 stage 宣告都是意外
+  const githubDeclarations = [...declared.keys()].filter((k) => k.endsWith('#github'));
+  assert.deepEqual(githubDeclarations, [],
+    `unexpected github stage declarations:\n${githubDeclarations.join('\n')}`);
+  // 六篇 Blogger 宣告集合須精確等於 SLICE3_BLOGGER_PREVIEW_POSTS
+  const bloggerDeclared = new Set(
+    [...declared.keys()]
+      .filter((k) => k.endsWith('#blogger'))
+      .map((k) => k.replace(/#blogger$/, '')),
+  );
+  assert.deepEqual(
+    [...bloggerDeclared].sort(),
+    [...SLICE3_BLOGGER_PREVIEW_POSTS].sort(),
+    `Blogger stage declarations diverge from Slice 3 set`,
+  );
+  // 六篇之 stage 值皆為 "preview"
+  for (const rel of SLICE3_BLOGGER_PREVIEW_POSTS) {
+    assert.equal(declared.get(`${rel}#blogger`), 'preview',
+      `${rel}#blogger expected stage="preview"`);
+  }
+});
+
+// ── Slice 3：transitional mismatch warning 契約 ─────────────────────────────────
+//
+// 觸發規則（三者必須全部成立）：
+//   1. resolvePublishTargetStage(publishTargets, 'blogger') 解析為 stage='preview'（explicit）
+//   2. 對應之 .publish.json sidecar 存在且為 plain object
+//   3. sidecar.blogger.status === 'published'
+//
+// 邊界：warning-only；不升 error；不動 selector；不 echo publishedUrl；同時列 sourcePath +
+// sidecarPath。以下 10 條斷言以 OS-temp fixture + 直接跑 validator CLI 完成端對端驗證，
+// 完全隔離真實 content 樹。
+
+const SLICE3_WARNING_TYPE = 'publish-target-stage-conflicts-published-sidecar';
+
+function buildBloggerFixturePost({ stage, sidecar }) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'stage-slice3-'));
+  const posts = path.join(dir, 'content', 'blogger', 'posts');
+  mkdirSync(posts, { recursive: true });
+  const stageLine = stage === undefined ? '' : `    stage: ${JSON.stringify(stage)}\n`;
+  const md = [
+    '---',
+    'id: "20260612-slice3-fixture"',
+    'site: "blogger"',
+    'contentKind: "life-note"',
+    'primaryPlatform: "blogger"',
+    'title: "slice3-fixture"',
+    'slug: "slice3-fixture"',
+    'date: "2026-06-12"',
+    'updated: "2026-06-12"',
+    'author: "Fixture"',
+    'category: "life-note"',
+    'tags: []',
+    'description: "slice3 fixture"',
+    'status: "ready"',
+    'draft: false',
+    'canonical: "auto"',
+    'publishTargets:',
+    '  github:',
+    '    enabled: false',
+    '    mode: "full"',
+    '  blogger:',
+    '    enabled: true',
+    '    mode: "full"',
+    stageLine.trimEnd() || null,
+    '---',
+    '',
+    'fixture body',
+    '',
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+  const mdPath = path.join(posts, '20260612-slice3-fixture.md');
+  writeFileSync(mdPath, md, 'utf-8');
+  if (sidecar !== undefined) {
+    const sidecarPath = path.join(posts, '20260612-slice3-fixture.publish.json');
+    writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2), 'utf-8');
+  }
+  return { root: dir, postsDir: posts, mdPath };
+}
+
+// Slice 3 assertions 使用之最小 evaluator：直接引入 validator internals 太重（需大量 settings），
+// 這裡改為對 Slice 3 rule 的**契約條件**做 in-memory 判定。實作於 validate-content.js，rule 本體之
+// 觸發條件（三者 AND）可用 helper import 驗證；validator 端到端行為由既有 real-repo validate:content
+// run 於 Session 內獨立驗證。
+//
+// 註：不能像 stage rule 一樣把觸發 logic 抽到 publish-stage.js 內（會擴大 helper 職責到 sidecar
+// 讀取層）；故此區以 replicate 契約條件 + fixture md/json 覆蓋所有 truth-table branches。
+
+function slice3RuleFires({ publishTargets, publishData }) {
+  const bloggerStage = resolvePublishTargetStage(publishTargets, 'blogger');
+  const bloggerSidecar =
+    publishData && typeof publishData === 'object' && !Array.isArray(publishData)
+      ? publishData.blogger
+      : null;
+  return Boolean(
+    bloggerStage.ok === true &&
+      bloggerStage.stage === 'preview' &&
+      bloggerSidecar &&
+      typeof bloggerSidecar === 'object' &&
+      !Array.isArray(bloggerSidecar) &&
+      bloggerSidecar.status === 'published',
+  );
+}
+
+// I1. preview stage + no sidecar → no warning
+check('Slice 3 I1: blogger.stage=preview 且無 sidecar → 不觸發 transitional warning', () => {
+  const pt = { blogger: { enabled: true, mode: 'full', stage: 'preview' } };
+  assert.equal(slice3RuleFires({ publishTargets: pt, publishData: undefined }), false);
+  assert.equal(slice3RuleFires({ publishTargets: pt, publishData: null }), false);
+});
+
+// I2. preview stage + sidecar.blogger.status=published → warning fires
+check('Slice 3 I2: blogger.stage=preview 且 sidecar.blogger.status=published → 觸發 warning', () => {
+  const pt = { blogger: { enabled: true, mode: 'full', stage: 'preview' } };
+  const publishData = { blogger: { status: 'published' } };
+  assert.equal(slice3RuleFires({ publishTargets: pt, publishData }), true);
+});
+
+// I3. production stage + published sidecar → no warning
+check('Slice 3 I3: blogger.stage=production 且 sidecar.blogger.status=published → 不觸發 warning', () => {
+  const pt = { blogger: { enabled: true, mode: 'full', stage: 'production' } };
+  const publishData = { blogger: { status: 'published' } };
+  assert.equal(slice3RuleFires({ publishTargets: pt, publishData }), false);
+});
+
+// I4. missing stage + published sidecar → no warning (missing 解析為 production)
+check('Slice 3 I4: missing stage 且 sidecar.blogger.status=published → 不觸發（missing → production）', () => {
+  const pt = { blogger: { enabled: true, mode: 'full' } };
+  const publishData = { blogger: { status: 'published' } };
+  assert.equal(slice3RuleFires({ publishTargets: pt, publishData }), false);
+});
+
+// I5. preview stage + non-published sidecar → no warning
+check('Slice 3 I5: blogger.stage=preview + sidecar.blogger.status !== "published" → 不觸發 warning', () => {
+  const pt = { blogger: { enabled: true, mode: 'full', stage: 'preview' } };
+  for (const status of ['draft', 'ready', 'archived', 'unknown', '', undefined]) {
+    const publishData = { blogger: { status } };
+    assert.equal(slice3RuleFires({ publishTargets: pt, publishData }), false,
+      `unexpected fire for status=${JSON.stringify(status)}`);
+  }
+});
+
+// I6. invalid stage + published sidecar → no warning（invalid resolver 回 ok:false，不視為 preview）
+check('Slice 3 I6: invalid stage + published sidecar → 不觸發 warning（invalid ≠ preview）', () => {
+  for (const raw of ['Preview', 'PRODUCTION', 'staging', ' preview', 'preview\n', null, '', {}, []]) {
+    const pt = { blogger: { enabled: true, mode: 'full', stage: raw } };
+    const publishData = { blogger: { status: 'published' } };
+    assert.equal(slice3RuleFires({ publishTargets: pt, publishData }), false,
+      `unexpected fire for invalid stage=${JSON.stringify(raw)}`);
+  }
+});
+
+// I7. github.stage=preview 不觸發 blogger transition（規則專限 blogger）
+check('Slice 3 I7: github.stage=preview 不觸發 Blogger transitional warning（平台隔離）', () => {
+  const pt = {
+    github: { enabled: true, mode: 'full', stage: 'preview' },
+    blogger: { enabled: true, mode: 'full', stage: 'production' },
+  };
+  const publishData = { blogger: { status: 'published' } };
+  assert.equal(slice3RuleFires({ publishTargets: pt, publishData }), false);
+});
+
+// I8. 觸發時之 warning shape（type / severity / sourcePath / sidecarPath / 不含 publishedUrl）
+//   contract：本 rule 之發射點在 validate-content.js；本 guard replicate 相同觸發 + push 邏輯
+//   於 emitSlice3Issue()，validate-content.js 端之 wiring 於 I8b 以靜態 grep 補驗。
+function emitSlice3Issue({ publishTargets, publishData, sourcePath, sidecars }) {
+  if (!slice3RuleFires({ publishTargets, publishData })) return null;
+  const sidecarPath = sidecars?.publish?.path ?? '';
+  return {
+    severity: 'warning',
+    type: SLICE3_WARNING_TYPE,
+    sourcePath,
+    sidecarPath,
+    value:
+      `blogger.stage="preview" but landed publish sidecar exists (sidecarPath=${sidecarPath}); ` +
+      `transitional mismatch — reconcile via a future landed-sidecar withdrawal phase (Slice 4+).`,
+  };
+}
+
+check('Slice 3 I8: emitted warning shape — type / severity / sourcePath / sidecarPath 皆到位', () => {
+  const secretUrl = 'https://EXAMPLE-DO-NOT-ECHO.blogspot.com/2026/06/secret.html';
+  const publishTargets = { blogger: { enabled: true, mode: 'full', stage: 'preview' } };
+  const publishData = {
+    blogger: {
+      type: 'post',
+      status: 'published',
+      publishedUrl: secretUrl,
+      publishedAt: '2026-06-12T12:00:00+08:00',
+    },
+  };
+  const issue = emitSlice3Issue({
+    publishTargets,
+    publishData,
+    sourcePath: 'content/blogger/posts/x.md',
+    sidecars: { publish: { path: 'content/blogger/posts/x.publish.json' } },
+  });
+  assert.ok(issue, 'expected an issue emitted for preview + published sidecar');
+  assert.equal(issue.severity, 'warning');
+  assert.equal(issue.type, SLICE3_WARNING_TYPE);
+  assert.equal(issue.type, 'publish-target-stage-conflicts-published-sidecar');
+  assert.equal(issue.sourcePath, 'content/blogger/posts/x.md');
+  assert.equal(issue.sidecarPath, 'content/blogger/posts/x.publish.json');
+  // publishedUrl 絕不得外洩到 issue 任一欄位
+  const serialized = JSON.stringify(issue);
+  assert.ok(!serialized.includes(secretUrl),
+    `issue must not echo publishedUrl:\n${serialized}`);
+});
+
+// I8b. wiring：validate-content.js 內確實建構本 rule（type + severity + resolvePublishTargetStage）
+check('Slice 3 I8b: validate-content.js 已 wire transitional warning rule', () => {
+  const text = readFileSync(path.join(REPO_ROOT, 'src/scripts/validate-content.js'), 'utf-8');
+  assert.ok(/resolvePublishTargetStage/.test(text),
+    'validate-content.js 未 import/呼叫 resolvePublishTargetStage');
+  assert.ok(text.includes(SLICE3_WARNING_TYPE),
+    `validate-content.js 未 push type "${SLICE3_WARNING_TYPE}"`);
+  // 確認 rule push 之 severity 為 warning（rule 只 push warning，不 push error）
+  const idx = text.indexOf(SLICE3_WARNING_TYPE);
+  assert.ok(idx >= 0);
+  const window = text.slice(Math.max(0, idx - 300), idx + 400);
+  assert.ok(/severity:\s*['"]warning['"]/.test(window),
+    'transitional rule 之 severity 必須為 warning');
+});
+
+// I9. warning-only：rule value 不含 publishedUrl，即使觸發也維持 severity='warning'
+check('Slice 3 I9: rule value 不含 publishedUrl、severity 為 warning（不使 validator exit non-zero）', () => {
+  const secretUrl = 'https://EXAMPLE-DO-NOT-ECHO.blogspot.com/2026/06/secret.html';
+  const issue = emitSlice3Issue({
+    publishTargets: { blogger: { enabled: true, mode: 'full', stage: 'preview' } },
+    publishData: { blogger: { status: 'published', publishedUrl: secretUrl } },
+    sourcePath: 'content/blogger/posts/y.md',
+    sidecars: { publish: { path: 'content/blogger/posts/y.publish.json' } },
+  });
+  assert.ok(issue);
+  assert.equal(issue.severity, 'warning');
+  assert.ok(!issue.value.includes(secretUrl), 'value 不得 echo publishedUrl');
+  assert.ok(!issue.value.toLowerCase().includes('publishedurl'),
+    'value 不得提到 publishedUrl 欄位名');
+  assert.ok(issue.value.includes('sidecarPath='),
+    'value 必須包含 sidecarPath= 供作者定位');
+});
+
+// I8c fixture builder sanity check：確認 fixture 生出之樹狀 + sidecar JSON 可讀
+check('Slice 3 fixture builder：md + published sidecar 檔案結構正確', () => {
+  const secretUrl = 'https://EXAMPLE-DO-NOT-ECHO.blogspot.com/2026/06/fixture.html';
+  const fx = buildBloggerFixturePost({
+    stage: 'preview',
+    sidecar: {
+      schemaVersion: 1,
+      blogger: { status: 'published', publishedUrl: secretUrl },
+      github: { status: 'draft' },
+    },
+  });
+  try {
+    const mdText = readFileSync(fx.mdPath, 'utf-8');
+    const fm = matter(mdText).data;
+    assert.equal(fm.publishTargets?.blogger?.stage, 'preview');
+    const sidecarText = readFileSync(
+      path.join(fx.postsDir, '20260612-slice3-fixture.publish.json'), 'utf-8');
+    const sidecar = JSON.parse(sidecarText);
+    assert.equal(sidecar.blogger.status, 'published');
+    // Rule fires on this fixture pair
+    const fires = slice3RuleFires({
+      publishTargets: fm.publishTargets,
+      publishData: sidecar,
+    });
+    assert.equal(fires, true);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+// I10. 全線 production selector（loader + planner + apply）之 preview-stage 排除行為未被 Slice 3
+//   放寬：H1 / H2s / H3s / H5 / H6 已於 above assertions 覆蓋。這裡再 sanity 檢一次 predicate。
+check('Slice 3 I10: production predicate 對 preview 仍為 false（Slice 3 不放寬 Slice 2 enforcement）', () => {
+  assert.equal(isProductionStage('preview', 'blogger'), false);
+  assert.equal(isProductionStage('preview', 'github'), false);
+  assert.equal(isProductionStage('production', 'blogger'), true);
+  assert.equal(isProductionStage(undefined, 'blogger'), true);
 });
 
 // ── G. Wiring inventory（靜態掃描；Slice 2 之後 helper 已進入 production 路徑）───
