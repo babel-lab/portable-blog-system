@@ -27,7 +27,7 @@
 //  14. 排除 PRESENT_COMPLETE
 //  15. 排除 templates（planner scan 天然不含 content/templates）
 //  16. 排除 non-candidates（draft / status=draft / blogger.enabled=false）
-//  17. 真實 repo template record count = 6
+//  17. 真實 repo template record set == 目前 MISSING_SIDECAR candidate set
 //  18. 每筆 source path 唯一
 //  19. 每筆 target sidecar path 唯一
 //  20. Template 不包含 bloggerPostId
@@ -45,7 +45,7 @@
 //  32. Apply 只寫 temp fixture（產物 = 剛好一個新檔）
 //  33. 真實 Blogger Markdown bytes / mtime 不變
 //  34. 真實 `.publish.json` inventory 不變
-//  35. 六篇 `20260612-*` 仍為 MISSING_SIDECAR
+//  35. 真實 MISSING_SIDECAR candidate set 前後不變（含 `20260612-*` 子集）
 //  36. dist-blogger-preview/ 不存在
 //  37. Prepare CLI 不接受 --overwrite / --replace / --merge / --yes / -y / --fix / --out
 //
@@ -317,6 +317,16 @@ function seedRichFixture(repoRoot) {
 
 // ── main ────────────────────────────────────────────────────────────────────
 
+// Repo-wide MISSING_SIDECAR candidate paths, derived from the planner itself.
+// Never hardcode this count: it drops by one each time a backfill sidecar lands,
+// so any fixed number goes stale the moment a real apply succeeds.
+function missingSidecarPaths(plan) {
+  return plan.candidates
+    .filter((c) => c.sidecarStatus === 'MISSING_SIDECAR')
+    .map((c) => c.sourcePath)
+    .sort();
+}
+
 async function main() {
   // ── Real-repo baseline snapshots ─────────────────────────────────────────
   const prodPostsDir = path.join(REPO_ROOT, 'content', 'blogger', 'posts');
@@ -327,6 +337,11 @@ async function main() {
   const missing2026_0612Before = prodPlanBefore.candidates
     .filter((c) => c.sourcePath.includes('/20260612-'))
     .filter((c) => c.sidecarStatus === 'MISSING_SIDECAR')
+    .map((c) => c.sourcePath)
+    .sort();
+  const missingAllBefore = missingSidecarPaths(prodPlanBefore);
+  const presentCompleteBefore = prodPlanBefore.candidates
+    .filter((c) => c.sidecarStatus === 'PRESENT_COMPLETE')
     .map((c) => c.sourcePath)
     .sort();
 
@@ -740,11 +755,23 @@ async function main() {
         assert.strictEqual(r.status, 0, r.stderr);
       });
       const j = JSON.parse(r.stdout);
-      await check('T17b real-repo template record count = 6', () => {
-        assert.strictEqual(j.records.length, 6);
+      await check('T17b real-repo template record count matches missing-sidecar inventory', () => {
+        assert.strictEqual(j.records.length, missingAllBefore.length);
       });
       const paths = j.records.map((rec) => rec.sourcePath);
-      await check('T17c real-repo template records: all six 20260612-* posts', () => {
+      await check('T17b2 real-repo template record set == missing-sidecar candidate set', () => {
+        assert.deepStrictEqual([...paths].sort(), missingAllBefore);
+      });
+      await check('T17b3 real-repo template excludes already-landed sidecars', () => {
+        assert.ok(
+          presentCompleteBefore.length > 0,
+          'expected at least one PRESENT_COMPLETE post so this exclusion is not vacuous',
+        );
+        for (const src of presentCompleteBefore) {
+          assert.ok(!paths.includes(src), `PRESENT_COMPLETE ${src} must not appear in template`);
+        }
+      });
+      await check('T17c real-repo template records: every 20260612-* missing candidate', () => {
         for (const src of missing2026_0612Before) {
           assert.ok(paths.includes(src), `expected ${src} in template`);
         }
@@ -1026,9 +1053,14 @@ async function main() {
       .filter((c) => c.sidecarStatus === 'MISSING_SIDECAR')
       .map((c) => c.sourcePath)
       .sort();
-    await check('T35 six 20260612-* posts remain MISSING_SIDECAR after guard', () => {
+    const missingAllAfter = missingSidecarPaths(prodPlanAfter);
+    await check('T35 real-repo missing-sidecar candidate set unchanged after guard', () => {
       assert.deepStrictEqual(missing2026_0612After, missing2026_0612Before);
-      assert.strictEqual(missing2026_0612After.length, 6);
+      assert.deepStrictEqual(missingAllAfter, missingAllBefore);
+    });
+    await check('T35b real-repo planner reports no mutation (before + after)', () => {
+      assert.strictEqual(prodPlanBefore.summary.mutationPerformed, false);
+      assert.strictEqual(prodPlanAfter.summary.mutationPerformed, false);
     });
 
     // ── T36: dist-blogger-preview absent under repo root ──────────────────
