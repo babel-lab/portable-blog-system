@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "canonical": {
+    "url": "",
+    "source": "auto"
+  },
+  "ogImage": {
+    "url": "",
+    "alt": ""
+  },
+  "blogger": {
+    "type": "post",
+    "permalink": "",
+    "status": "published",
+    "publishedUrl": "https://babel-lab.blogspot.com/2026/06/after-work-writing-time-blocking.html",
+    "publishedAt": "2026-06-12T12:24:00+08:00",
+    "bloggerPostId": "",
+    "publishYear": "2026",
+    "publishMonth": "06",
+    "history": []
+  },
+  "github": {
+    "slug": "",
+    "path": "",
+    "status": "draft",
+    "publishedUrl": "",
+    "publishedAt": ""
+  },
+  "seo": {
+    "metaTitle": "",
+    "metaDescription": "",
+    "robots": "index,follow"
+  }
+}
