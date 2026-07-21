@@ -3,12 +3,21 @@
 // 對 publishTargets.blogger.enabled === true 的 ready/published 文章，檢查 frontmatter
 // blogger.publishedUrl 是否已回填。只報目前狀態，不會自動補 URL。
 // 純 read-only：只讀資料、只寫到 dist-reports/，不改 content。
+//
+// Phase 20260721-slice-4a：URL 分類為 active published 者，須同時滿足
+//   post.blogger?.status === 'published'（fail-closed；非 published / missing / invalid
+//   即使保留非空 publishedUrl 亦視為非 active，歸入 missing 供作者檢視 / 回收）。
+//   目前 read path 為 legacy top-level frontmatter（Phase 8-h-d-4 之後所有 production
+//   post 均無 frontmatter blogger 區塊，故本 gate 對現行 report 輸出 byte-identical——
+//   filled / missing 兩陣列不因本 gate 而改變。此 gate 為未來 withdrawal（Slice 4B+）
+//   之前置防護，確保未來新增之 status 值不因 URL 非空就被誤列為 active published。
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadPosts } from './load-posts.js';
+import { isActivePublishedTarget } from './active-publication.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), '..', '..');
@@ -33,14 +42,16 @@ export async function generatePublishedUrlsReport({ writeFiles = true } = {}) {
   for (const post of allPosts) {
     const target = post.publishTargets?.blogger;
     if (!target || target.enabled !== true) continue;
-    const url = post.blogger?.publishedUrl;
-    const hasUrl = typeof url === 'string' && url.trim() !== '';
-    if (hasUrl) {
+    // Phase 20260721-slice-4a：Active published URL = status === 'published' 且
+    //   publishedUrl 為 non-empty trimmed string；缺一即歸 missing（fail-closed）。
+    //   本 report 讀 legacy top-level frontmatter（post.blogger）；sidecar 之
+    //   status-gate 由 helper 統一實作，避免 status 判斷散落多處。
+    if (isActivePublishedTarget(post.blogger)) {
       filled.push({
         site: post.site,
         sourcePath: post.sourcePath,
         slug: post.slug,
-        publishedUrl: url,
+        publishedUrl: post.blogger.publishedUrl,
         bloggerPostId: post.blogger?.bloggerPostId ?? null,
         publishedAt: post.blogger?.publishedAt ?? null,
         bloggerStatus: post.blogger?.status ?? null,

@@ -17,11 +17,20 @@
 //   - 純函式：不讀檔、不寫檔、不執行 build
 //   - 不 mutate post / settings / options
 //   - 不 throw 作為一般欄位缺失之控制流程
-//   - 零 import（避免外部相依）
+//   - 零 import（避免外部相依）——Phase 20260721-slice-4a 例外：新增單一純函式
+//     import { getActivePublishedUrl }（本身亦零外部 dep），供 blogger.publishedUrl 之
+//     status-gated 讀取共用；避免與 canonical / placeholder / admin 各自散落 status 判斷。
 //   - 不依賴 Node 專屬 API
 //   - 不接入任何 caller（屬 8-d-2 之後）
 //   - 永遠不預測 Blogger URL（沿用 docs/publish-json-schema.md §5.3 強制規則）
 //   - GitHub URL 預設不推導；僅 options.deriveGithubUrl === true 時嘗試保守推導
+// Phase 20260721-slice-4a：publish.blogger.publishedUrl 只有在 sidecar.blogger.status === 'published'
+//   時才進 publishOut.blogger.publishedUrl；非 published 一律 null。此 gate 之影響：
+//     seo.canonicalUrl（canonicalPlatform=blogger 分支）與 promotion.facebook.finalUrl
+//     之 fallback chain 中之 publish.blogger.publishedUrl 一併自動 gate；下游 consumer
+//     不需各自加 status 判斷。
+
+import { getActivePublishedUrl } from './active-publication.js';
 
 // ─────────────────────────────────────────────────────────────
 // 內部工具（亦 export 供測試 / 共用）
@@ -541,11 +550,18 @@ export function normalizePostOutput(post = {}, settings = {}, options = {}) {
   }
 
   // publish.blogger.publishedUrl（嚴格規則：永不預測 Blogger URL）
+  // Phase 20260721-slice-4a：sidecar 之 blogger.publishedUrl 只有在
+  //   sidecar.blogger.status === 'published' 時才視為 active，方可進入 normalized 之
+  //   publish.blogger.publishedUrl；非 published（含 draft / ready / archived / 未來
+  //   withdrawn / missing / invalid）即使保留非空 publishedUrl 亦 fail-closed 為 null。
+  //   此 gate 對現行 3 筆 production sidecar 之輸出 byte-identical（皆為 published + URL
+  //   或 draft + empty URL；兩種原本都通過原 hasValue 判斷）。
   publishOut.blogger = {};
   {
+    const activeBloggerUrl = getActivePublishedUrl(getNestedValue(publish, 'blogger'));
     const r = getFieldValue([
       {
-        value: getNestedValue(publish, 'blogger.publishedUrl'),
+        value: activeBloggerUrl,
         source: 'publish.blogger.publishedUrl',
       },
       { value: getNestedValue(publish, 'publishedUrl'), source: 'publish.publishedUrl' },

@@ -46,6 +46,11 @@ import { derivePageMetadataView } from './page-metadata-summary.js';
 // Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 之 read-only 解析。
 //   - 只用於 Admin 顯示欄位；**不**參與任何 eligibility / 過濾 / production selector。
 import { resolvePublishTargetStage, formatPublishStage } from './publish-stage.js';
+// Phase 20260721-publish-target-stage Slice 4A：sidecar 之 blogger.publishedUrl 只有在
+//   sidecar.blogger.status === 'published' 時才視為 active。Admin display / completeness /
+//   canonicalTarget / platformUrl / gaHostname 皆以此 helper 判定，非 published sidecar
+//   即使保留非空 URL 亦不得顯示為 active Blogger 連結（隱藏；不新增 badge）。
+import { isActivePublishedTarget } from './active-publication.js';
 
 const SITES = ['github', 'blogger'];
 
@@ -625,6 +630,13 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
     status: publishJson?.blogger?.status || '',
     permalink: publishJson?.blogger?.permalink || '',
     publishedUrl: publishJson?.blogger?.publishedUrl || '',
+    // Phase 20260721-slice-4a：sidecar 之 publishedUrl 是否為 active（status === 'published'
+    //   且 URL 非空）。Admin 各處以此 derived 欄位為唯一 active 連結判定，避免只檢查
+    //   publishedUrl 非空而誤把未來 withdrawn / archived sidecar 之 preserved URL
+    //   顯示為 active 發布連結。原始 publishedUrl 保留（供 detail dt/dd 之 mono 顯示），
+    //   但外部連結渲染 / stats count / canonicalTarget / platformUrl 一律以 hasActivePublishedUrl
+    //   為 gate。
+    hasActivePublishedUrl: isActivePublishedTarget(publishJson?.blogger),
   };
   const github = {
     enabled: Boolean(fm?.publishTargets?.github?.enabled),
@@ -677,12 +689,17 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
   const isPostPublished = typeof fm.status === 'string' && fm.status === 'published';
   const hasFbPostUrl = typeof fb.postUrl === 'string' && fb.postUrl !== '';
   const fbPublishedMissing = fb.enabled === true && isPostPublished === true && hasFbPostUrl === false;
+  // Phase 20260721-slice-4a：blogger 完整度 / URL 有無 由 hasActivePublishedUrl 判定
+  //   （status === 'published' 且 URL 非空），而非只檢查 publishedUrl 非空——
+  //   避免未來 withdrawn / archived sidecar 之 preserved URL 被誤標為「已完成 backfill」。
+  //   現行 3 筆 production sidecar：published + URL 兩者兼有 → hasActivePublishedUrl=true；
+  //   draft + empty URL → 兩種判定皆 false；輸出 byte-identical。
   const completeness = {
     seo: descriptionExists && searchDescriptionExists ? 'ok' : 'missing',
     fb: fb.exists ? 'ok' : 'missing',
-    blogger: !blogger.enabled ? 'ok' : (blogger.publishedUrl ? 'ok' : 'missing'),
+    blogger: !blogger.enabled ? 'ok' : (blogger.hasActivePublishedUrl ? 'ok' : 'missing'),
     github: !github.enabled ? 'ok' : (github.previewUrl ? 'ok' : 'missing'),
-    url: (blogger.publishedUrl || github.previewUrl) ? 'ok' : 'missing',
+    url: (blogger.hasActivePublishedUrl || github.previewUrl) ? 'ok' : 'missing',
     categoryTags: (category && tags.length > 0) ? 'ok' : 'missing',
     fbPublished: fbPublishedMissing ? 'missing' : 'ok',
   };
@@ -696,7 +713,7 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
   if (!cover) missingFields.push('cover');
   if (!coverAlt) missingFields.push('coverAlt');
   if (!titleEn) missingFields.push('titleEn');
-  if (blogger.enabled && !blogger.publishedUrl) missingFields.push('blogger.publishedUrl');
+  if (blogger.enabled && !blogger.hasActivePublishedUrl) missingFields.push('blogger.publishedUrl');
   if (!fb.exists) missingFields.push('.fb.md sidecar');
   if (fbPublishedMissing) missingFields.push('fbPostUrl');
 
@@ -820,17 +837,23 @@ function toAdminView({ siteName, mdPath, fm, publishJson, fb }, settings, source
   //   - 純 derived；不新增 frontmatter schema；不影響 build / dist / deploy / validate baseline
   //   - 不含 utmPreviewUrl（屬 pm-58 B2；需 import ga4-url-builder helper + 讀 promotion.config）
   //   - 不含 platformMigrationNote（schema 未定；屬未來 phase）
+  // Phase 20260721-slice-4a：canonicalTarget / platformUrl / gaHostname 之 Blogger 分支
+  //   一律以 hasActivePublishedUrl 為 gate；非 active（含未來 withdrawn / archived）之
+  //   preserved URL 一律不 return，回落至 settings.site.bloggerSiteUrl 之 hostname
+  //   （gaHostname）或空字串（canonicalTarget / platformUrl），避免 admin surface
+  //   把 preserved historical URL 誤標為目前發布網址。
+  const activeBloggerUrl = blogger.hasActivePublishedUrl ? blogger.publishedUrl : '';
   const canonicalTarget =
-    primaryPlatform === 'blogger' ? (blogger.publishedUrl || '')
+    primaryPlatform === 'blogger' ? activeBloggerUrl
     : primaryPlatform === 'github' ? (github.previewUrl || '')
     : '';
   const platformUrl =
-    primaryPlatform === 'blogger' ? (blogger.publishedUrl || '')
+    primaryPlatform === 'blogger' ? activeBloggerUrl
     : primaryPlatform === 'github' ? (github.previewUrl || '')
-    : (blogger.publishedUrl || github.previewUrl || '');
+    : (activeBloggerUrl || github.previewUrl || '');
   const gaHostname =
     primaryPlatform === 'blogger'
-      ? (deriveHostname(blogger.publishedUrl) || deriveHostname(settings?.site?.bloggerSiteUrl) || null)
+      ? (deriveHostname(activeBloggerUrl) || deriveHostname(settings?.site?.bloggerSiteUrl) || null)
       : primaryPlatform === 'github'
         ? (deriveHostname(github.previewUrl) || deriveHostname(settings?.site?.githubSiteUrl) || null)
         : null;

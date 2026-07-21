@@ -16,6 +16,14 @@
 //   - 不實作 schema 深度驗證
 //   - **永遠不預測 Blogger URL**（沿用 docs/publish-json-schema.md §5.3 強制規則）
 //   - GitHub URL 推導本批不實作；無明確值即 unresolved
+// Phase 20260721-slice-4a：Blogger publishedUrl 只有在 sidecar.blogger.status === 'published'
+//   時才視為 active；非 published（含 draft / ready / archived / 未來 withdrawn）之
+//   preserved URL 不得由本 resolver 輸出。
+
+// ─────────────────────────────────────────────────────────────
+// import
+// ─────────────────────────────────────────────────────────────
+import { getActivePublishedUrl } from './active-publication.js';
 
 // ─────────────────────────────────────────────────────────────
 // 常數
@@ -81,10 +89,15 @@ export function extractPlaceholders(text) {
 
 function getBloggerPublishedUrl(post, publish) {
   // (1) post.publish.blogger.publishedUrl
-  if (publish && publish.blogger && isNonEmptyString(publish.blogger.publishedUrl)) {
-    return { value: publish.blogger.publishedUrl, source: 'post.publish.blogger.publishedUrl' };
+  //   Phase 20260721-slice-4a：僅在 sidecar.blogger.status === 'published' 時才視為 active。
+  //   非 published（含 draft / ready / archived / 未來 withdrawn / missing / invalid）之
+  //   preserved URL 一律 fail-closed；本 resolver 不輸出。fall through 至 (2) flat fallback。
+  const activeBloggerUrl = getActivePublishedUrl(publish && publish.blogger);
+  if (activeBloggerUrl !== null) {
+    return { value: activeBloggerUrl, source: 'post.publish.blogger.publishedUrl' };
   }
   // (2) post.publish.publishedUrl（flat fallback）
+  //   Flat fallback 為 legacy shape；無 status 欄位可 gate，沿用非空字串判定（不放寬語意）。
   if (publish && isNonEmptyString(publish.publishedUrl)) {
     return { value: publish.publishedUrl, source: 'post.publish.publishedUrl' };
   }

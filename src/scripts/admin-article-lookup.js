@@ -41,6 +41,9 @@ import matter from 'gray-matter';
 
 // Phase 20260720-publish-target-stage Slice 1：publishTargets.<platform>.stage 之 read-only 解析。
 import { resolvePublishTargetStage, formatPublishStage } from './publish-stage.js';
+// Phase 20260721-slice-4a：sidecar 之 blogger.publishedUrl 只有在 status === 'published'
+//   時才視為 active；hasActivePublishedUrl derived flag 由 CLI 顯示 / --json 輸出共用。
+import { isActivePublishedTarget } from './active-publication.js';
 
 // ── 常數 ─────────────────────────────────────────────────────────────────────────
 // allowlist content roots（repo-relative；只允許這兩個資料夾之直屬 *.md）。
@@ -168,6 +171,10 @@ function summarizePublishing(data) {
     summary.blogger = {
       status: typeof b.status === 'string' ? b.status : null,
       hasPublishedUrl: typeof b.publishedUrl === 'string' && b.publishedUrl.trim() !== '',
+      // Phase 20260721-slice-4a：hasActivePublishedUrl = status === 'published' 且 URL 非空。
+      //   下游 CLI 顯示以此為 gate；hasPublishedUrl 保留供 legacy diagnostics（其為
+      //   純字串非空判斷、不含 status）。
+      hasActivePublishedUrl: isActivePublishedTarget(b),
       publishedUrl: typeof b.publishedUrl === 'string' ? b.publishedUrl : null,
       publishedAt: typeof b.publishedAt === 'string' ? b.publishedAt : null,
       hasBloggerPostId: typeof b.bloggerPostId === 'string' && b.bloggerPostId.trim() !== '',
@@ -202,6 +209,9 @@ async function readPublishSidecarSummary(absPath) {
         ? {
             status: typeof b.status === 'string' ? b.status : null,
             hasPublishedUrl: typeof b.publishedUrl === 'string' && b.publishedUrl.trim() !== '',
+            // Phase 20260721-slice-4a：hasActivePublishedUrl = status === 'published' 且 URL 非空。
+            //   下游 CLI 顯示以此為 active-link gate；hasPublishedUrl 保留供 legacy diagnostics。
+            hasActivePublishedUrl: isActivePublishedTarget(b),
             publishedUrl: typeof b.publishedUrl === 'string' ? b.publishedUrl : null,
             publishedAt: typeof b.publishedAt === 'string' ? b.publishedAt : null,
             hasBloggerPostId: typeof b.bloggerPostId === 'string' && b.bloggerPostId.trim() !== '',
@@ -399,8 +409,14 @@ export function formatArticleLookup(result, { json = false } = {}) {
   const p = a.publishing;
   lines.push(`  publish sidecar  : ${yn(p.hasSidecar)}${p.sidecarParseError ? ' (⚠ parse error)' : ''}`);
   if (p.blogger) {
+    // Phase 20260721-slice-4a：active-link 顯示以 hasActivePublishedUrl 為 gate（status === 'published' 且 URL 非空）；
+    //   非 active（含未來 withdrawn / archived）之 preserved URL 顯示為 '(inactive)'，
+    //   避免作者誤把已撤回 URL 當成目前發布位置。原始 status 值仍以 status= 欄位顯示。
+    const bloggerUrlDisplay = p.blogger.hasActivePublishedUrl
+      ? p.blogger.publishedUrl
+      : (p.blogger.hasPublishedUrl ? '(inactive)' : '(none)');
     lines.push(
-      `  blogger publish  : status=${p.blogger.status ?? '—'} url=${p.blogger.hasPublishedUrl ? p.blogger.publishedUrl : '(none)'} publishedAt=${p.blogger.publishedAt ?? '—'} postId=${yn(p.blogger.hasBloggerPostId)}`,
+      `  blogger publish  : status=${p.blogger.status ?? '—'} url=${bloggerUrlDisplay} publishedAt=${p.blogger.publishedAt ?? '—'} postId=${yn(p.blogger.hasBloggerPostId)}`,
     );
   } else {
     lines.push('  blogger publish  : (no blogger publishing metadata)');

@@ -37,6 +37,8 @@ import { deriveRenderedAffiliateLinks, deriveRenderedAffiliateBlocks } from './r
 import { deriveRenderedAdsenseBlocks } from './resolve-adsense-blocks.js';
 // Phase 20260624-sp9d：platformPolicy secret-safe / inherit-aware projection helper（SP-9a 落地）。
 import { resolvePlatformPolicyValue } from './platform-policy-effective.js';
+// Phase 20260721-slice-4a：active-publication consumer read helper（status-gated publishedUrl）。
+import { getActivePublishedUrl } from './active-publication.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -250,15 +252,18 @@ export function buildBloggerToGithubUrl(rawUrl, slug) {
 
 // Phase 3-e-3 / 9-i-b2：canonical URL 解析（含 fallback）。
 //   **不**預測 Blogger URL：僅在 sidecar 已回填 publishedUrl 時採用該真值。
+// Phase 20260721-slice-4a：sidecar 之 blogger.publishedUrl 只有在
+//   sidecar.blogger.status === 'published' 時才視為 active canonical 來源；
+//   非 published（含 draft / ready / archived / 未來 withdrawn / missing / invalid）
+//   即使保留非空 publishedUrl 亦 fail-closed 為 inactive，回落 GitHub canonical。
 export function resolveCanonicalUrl(post, settings) {
   const raw = post.canonical;
   // sidecar publish data 由 load-posts.js attach 至 post.publish；不從 legacy post.blogger 讀
-  const bloggerPublishedUrl = post.publish?.blogger?.publishedUrl;
+  const bloggerPublishedUrl = getActivePublishedUrl(post.publish?.blogger);
   if (
     post.primaryPlatform === 'blogger' &&
     (!raw || raw === 'auto') &&
-    typeof bloggerPublishedUrl === 'string' &&
-    bloggerPublishedUrl !== ''
+    bloggerPublishedUrl !== null
   ) {
     return { url: bloggerPublishedUrl, warning: null };
   }

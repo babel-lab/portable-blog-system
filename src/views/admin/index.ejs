@@ -353,7 +353,7 @@
         var m = p.blogger.mode || 'other';
         if (m === 'full' || m === 'summary' || m === 'redirect-card') bloggerByMode[m]++;
         else bloggerByMode.other++;
-        if (p.blogger.publishedUrl) bloggerPublishedUrlCount++;
+        if (p.blogger.hasActivePublishedUrl) bloggerPublishedUrlCount++;
       }
       if (p.github && p.github.enabled) {
         githubEnabledLocal++;
@@ -802,7 +802,7 @@
             <span class="badge b-ok">enabled</span>
             <% if (p.blogger.mode) { %><span class="badge b-info"><%= p.blogger.mode %></span><% } %>
             <br>
-            <% if (p.blogger.publishedUrl) { %><span class="badge b-published">published</span>
+            <% if (p.blogger.hasActivePublishedUrl) { %><span class="badge b-published">published</span>
             <% } else { %><span class="badge b-missing">no URL</span><% } %>
           <% } else { %><span class="badge b-info">disabled</span><% } %>
         </td>
@@ -861,9 +861,9 @@
           <br><span class="badge <%= govSum > 0 ? 'b-warn' : 'b-ok' %>" title="taxonomy governance signals (derived, read-only)：unknown tag/category + cross-site mismatch 合計；展開查看明細。Admin 不自動修。"><% if (govSum > 0) { %>gov: <%= govSum %><% } else { %>gov ✓<% } %></span>
         </td>
         <td class="col-urls">
-          <% if (p.blogger.publishedUrl) { %><div class="mono">📘 <a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a></div><% } %>
+          <% if (p.blogger.hasActivePublishedUrl) { %><div class="mono">📘 <a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a></div><% } %>
           <% if (p.github.previewUrl) { %><div class="mono">🐙 <a href="<%= p.github.previewUrl %>" target="_blank" rel="noopener noreferrer"><%= p.github.previewUrl %></a></div><% } %>
-          <% if (!p.blogger.publishedUrl && !p.github.previewUrl) { %><span class="text-muted">(empty)</span><% } %>
+          <% if (!p.blogger.hasActivePublishedUrl && !p.github.previewUrl) { %><span class="text-muted">(empty)</span><% } %>
         </td>
       </tr>
       <tr class="post-detail" data-idx="<%= idx %>" hidden>
@@ -1433,7 +1433,7 @@
               <dt>blogger.type</dt><dd class="mono"><%= p.blogger.type || '(empty)' %></dd>
               <dt>blogger.status</dt><dd class="mono"><%= p.blogger.status || '(empty)' %></dd>
               <dt>blogger.permalink</dt><dd class="mono"><%= p.blogger.permalink || '(empty)' %></dd>
-              <dt>blogger.publishedUrl</dt><dd class="mono"><% if (p.blogger.publishedUrl) { %><a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a><% } else { %>(empty)<% } %></dd>
+              <dt>blogger.publishedUrl</dt><dd class="mono"><% if (p.blogger.hasActivePublishedUrl) { %><a href="<%= p.blogger.publishedUrl %>" target="_blank" rel="noopener noreferrer"><%= p.blogger.publishedUrl %></a><% } else if (p.blogger.publishedUrl) { %><%= p.blogger.publishedUrl %> <span class="text-muted">(inactive; status=<%= p.blogger.status || '(empty)' %>)</span><% } else { %>(empty)<% } %></dd>
             </dl>
           </div>
 

@@ -18,6 +18,8 @@ import { resolvePostDetailRobots } from './page-type-robots.js';
 // Phase 20260623-pm-sp4a：站內列表 includeInListings selector（純函式；SP-4a）。
 //   預設一律 include → 既有 listing 輸出 byte-identical。
 import { shouldIncludeInListings } from './include-in-listings.js';
+// Phase 20260721-slice-4a：active-publication consumer read helper（status-gated publishedUrl）。
+import { getActivePublishedUrl } from './active-publication.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -172,9 +174,12 @@ function buildCanonicalUrl({ pageType, post, slug, settings }) {
       // Phase 9-i-f-b：cross-source mirror page → Blogger publishedUrl as canonical
       //   per docs/phase-9h-known-blockers.md §3（Blocker #1）
       //   對稱於 build-blogger.js 之 Phase 9-i-b2 修正
+      // Phase 20260721-slice-4a：sidecar 之 blogger.publishedUrl 只有在
+      //   sidecar.blogger.status === 'published' 時才 active；非 published（含未來 withdrawn）
+      //   即使保留 publishedUrl 亦 fail-closed 為 inactive，回落 GitHub canonical。
       if (post?.primaryPlatform === 'blogger') {
-        const bloggerPublishedUrl = post.publish?.blogger?.publishedUrl;
-        if (typeof bloggerPublishedUrl === 'string' && bloggerPublishedUrl !== '') {
+        const bloggerPublishedUrl = getActivePublishedUrl(post.publish?.blogger);
+        if (bloggerPublishedUrl !== null) {
           return bloggerPublishedUrl;
         }
       }
