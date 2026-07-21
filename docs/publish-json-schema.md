@@ -68,7 +68,7 @@ content/github/pages/tools-index.publish.json
 
 | 欄位 | 型別 | 必填 | 預設值 | 摘要 |
 | --- | --- | --- | --- | --- |
-| `schemaVersion` | number | 是 | `1` | schema 版本，第一版固定為 `1` |
+| `schemaVersion` | integer | 是 | `1`（缺省視同 `1`） | schema 版本；合法值 `1`（legacy）/ `2`（見 §5.7）。缺省 → `1`。非整數 / `0` / 負數 / 大於目前支援版本 → **error**（fail-closed，見 §9.2） |
 | `canonical` | object | 是 | 見 §3 | canonical URL 與來源平台 |
 | `ogImage` | object | 是 | 見 §4 | 社群分享預覽圖 |
 | `blogger` | object | 是 | 見 §5 | Blogger 平台發布資料 |
@@ -160,13 +160,14 @@ ogImage: {
 blogger: {
   type:          "post" | "page",
   permalink:     string,
-  status:        "draft" | "ready" | "published" | "archived",
+  status:        "draft" | "ready" | "published" | "archived" | "withdrawn",
   publishedUrl:  string,
   publishedAt:   string,
   bloggerPostId: string,
   publishYear:   string,
   publishMonth:  string,
-  history:       array<object>
+  history:       array<object>,
+  lifecycle:     array<object>   // schemaVersion 2 only；見 §5.7
 }
 ```
 
@@ -176,13 +177,14 @@ blogger: {
 | --- | --- | --- | --- | --- |
 | `type` | enum | 否 | `"post"` | Blogger 發布端型態（§5.6）；列舉值 `"post"` / `"page"` |
 | `permalink` | string | 否 | `""` | Blogger 自訂網址；空字串時 fallback 至 `.md` frontmatter `slug` |
-| `status` | enum | 是 | `"draft"` | 平台發布狀態；列舉值見 §10 |
+| `status` | enum | 是 | `"draft"` | 平台發布狀態；列舉值見 §10；`"withdrawn"` 僅 schemaVersion 2 合法（見 §5.7） |
 | `publishedUrl` | string | 否 | `""` | Blogger 發布後之正式 URL；唯一真相來源（見 §5.3） |
 | `publishedAt` | string | 否 | `""` | ISO 8601 發布時間 |
 | `bloggerPostId` | string | 否 | `""` | Blogger 後台之文章 / 網頁 ID |
 | `publishYear` | string | 否 | `""` | 4 位年份；僅由 `publishedAt` 推導（見 §5.4）；對 `type === "page"` 無語意意義 |
 | `publishMonth` | string | 否 | `""` | 2 位月份；僅由 `publishedAt` 推導（見 §5.4）；對 `type === "page"` 無語意意義 |
-| `history` | array | 否 | `[]` | 搬家保留之舊 URL 紀錄；結構見 §5.5 |
+| `history` | array | 否 | `[]` | 搬家保留之舊 URL 紀錄；結構見 §5.5。**不得**與 `lifecycle` 混同：`history` 只記 URL migration，withdrawal event **不得**寫入 `history` |
+| `lifecycle` | array | 否 | 缺省 | Blogger publication lifecycle transition 紀錄；**僅 schemaVersion 2 合法**；結構與契約見 §5.7 |
 
 ### 5.3 `publishedUrl` 與月份路徑規則（重要）
 
@@ -284,6 +286,90 @@ publishedAt = "2026-08-01T00:30:00+08:00"
 `type` 不得寫入 `.md` frontmatter；`contentKind` 不得寫入 `.publish.json`。違反者於 validate 階段列 warning（實作落地時機為 Phase 8-b / 8-c）。
 
 `type` 之取值決定 §5.3 之 URL 規則分支：`post` 走 §5.3.1、`page` 走 §5.3.2。Page 與 post 之共通原則為「`publishedUrl` 為唯一真相」（§5.3.1 / §5.3.2）。
+
+### 5.7 `status: "withdrawn"` 與 `lifecycle`（schemaVersion 2；Slice 4B）
+
+> 上位契約：`docs/20260720-publish-target-stage-contract.md` §11（Slice 4B）。
+> 實作：`src/scripts/sidecar-withdrawal-contract.js`（純函式 helper）+ `src/scripts/validate-content.js`（wiring）+ guard `check:sidecar-withdrawal-schema`。
+
+#### 5.7.1 語意
+
+`status: "withdrawn"` 表示：**該 sidecar 仍保留 Blogger publication truth，但目前已不再代表 active Blogger publication**。它不同於 `draft` / `ready` / `published` / `archived`，且**不得**以 `archived` 取代 `withdrawn`。
+
+`withdrawn` 只描述 **repository publication truth**，**不**代表遠端 Blogger 文章的真實狀態（可能已刪除 / 轉草稿 / 仍公開 / 已失效 / permalink 已改變）。遠端狀態由 lifecycle event 的 `remoteDisposition` 獨立記錄（operator-confirmed observation，**不**代表系統執行任何 remote action）。
+
+**eligibility 仍由 stage 決定**：Blogger production eligibility 只由 `publishTargets.blogger.stage` 決定（§`docs/20260720-...` §1–§4）。`status` **不得**成為第二套 production stage selector。
+
+#### 5.7.2 schemaVersion 相容（§9.2）
+
+- 缺省 / `schemaVersion: 1`：維持既有合法行為；**不得**使用 `blogger.status: "withdrawn"` 或 `blogger.lifecycle`。v1 誤用上述 v2-only 功能 → **error**。
+- `schemaVersion: 2`：可繼續使用 `draft` / `ready` / `published` / `archived`，亦可使用 `withdrawn`；並可新增 `blogger.lifecycle`。
+- 未知 / 非整數 / `0` / 負數 / 大於目前支援版本 → **error**（fail-closed）。
+- 本契約**不要求**既有 sidecar 全面 migration；既有 v1 sidecar 不因本契約被升版或改寫。
+
+#### 5.7.3 active publication evidence 保留
+
+withdrawal **不得**清空、刪除或搬移下列既有發布證據（歷史發布真值，保留原值）：
+
+```
+blogger.publishedUrl / blogger.publishedAt / blogger.bloggerPostId
+blogger.publishYear / blogger.publishMonth / blogger.permalink
+```
+
+consumer 讀取端（Slice 4A，`src/scripts/active-publication.js`）契約：**只有** `blogger.status === "published"` **且** `publishedUrl` 為非空字串時，`publishedUrl` 才是 active publication URL；`withdrawn` 一律視為 inactive。
+
+#### 5.7.4 `lifecycle[]` 結構
+
+`lifecycle` 為陣列，記錄 publication lifecycle transition，**不得**取代 `history[]` 的 URL migration 語意。本 Slice 只正式支援 `event: "withdrawn"`。
+
+當 `status === "withdrawn"` 時，下列全部必須成立（否則 error；schema 不完整**不得**只是 warning）：
+
+- `schemaVersion === 2`
+- `blogger.publishedUrl` 為非空字串、`blogger.publishedAt` 為含時區之合法 ISO-8601
+- `blogger.lifecycle` 為非空陣列，且最後一個 event 為 `event="withdrawn"` / `fromStatus="published"` / `toStatus="withdrawn"`
+- `bloggerPostId` 可為空字串（現行 contract 禁止 fabrication）
+
+每個 withdrawn event 必含欄位（精確值 `event="withdrawn"` / `fromStatus="published"` / `toStatus="withdrawn"`）：
+
+```
+event / fromStatus / toStatus / recordedAt / remoteVerifiedAt / reason /
+remoteDisposition / sourcePath / sourceSha256 / priorSidecarSha256 /
+gitHead / authorizationFingerprint
+```
+
+格式與 enum：
+
+| 欄位 | 規則 |
+| --- | --- |
+| `sourceSha256` / `priorSidecarSha256` / `authorizationFingerprint` | 64 字元 lowercase hex |
+| `gitHead` | 40 字元 lowercase hex |
+| `sourcePath` | POSIX-relative；位於 `content/blogger/posts/`；以 `.md` 結尾；不得含 `..`；不得為 absolute |
+| `recordedAt` / `remoteVerifiedAt` | 含時區之 ISO-8601；`remoteVerifiedAt` 不得晚於 `recordedAt` |
+| `reason` | `stage-preview` / `content-retirement` / `publication-error` / `policy` / `migration` / `other`；`other` 可帶非空 `reasonDetail`；非 `other` 時不要求 `reasonDetail`，若存在須非空字串 |
+| `remoteDisposition` | `remote-live` / `remote-draft` / `remote-deleted` / `remote-unavailable` / `remote-permalink-changed` / `confirmed-inactive` |
+
+排序與去重：`recordedAt` 須按陣列順序不遞減；本 Slice 最多允許一個 `withdrawn` event；重複 withdrawn event、status/last-event 不一致（status 為 withdrawn 但最後 event 不是 withdrawn，或反之）皆為 error。
+
+#### 5.7.5 public / private 邊界
+
+lifecycle event **不得**包含私人核准資訊：`approvedBy` / `operatorName` / `operatorEmail` / `approvalNote` / `privateManifestPath` / `authorizationPath`（違反 → error）。公開 sidecar 只保存 `authorizationFingerprint`；核准者與私人 authorization 內容未來只存在於 repo 外之 `operator-private/`（本 Slice **不**建立）。
+
+lifecycle event 亦**不得**重複保存 active publication evidence（`publishedUrl` / `publishedAt` / `bloggerPostId` / `publishYear` / `publishMonth` / `permalink`）——這些已保留在 `blogger` 區塊（違反 → error）。
+
+#### 5.7.6 append-only（範圍聲明）
+
+`blogger.lifecycle[]` 於契約上為 **append-only**。惟 validator 只能檢查目前 snapshot 的結構與順序，**無法**從單一檔案證明歷史未被改寫；append-only 之實際 mutation enforcement 留待 future apply capability（本 Slice 未實作 planner / authorization / rehearsal / apply）。
+
+#### 5.7.7 stage × status 診斷（§8 truth table 摘要）
+
+| stage | status | 診斷 |
+| --- | --- | --- |
+| preview | published | warning `publish-target-stage-conflicts-published-sidecar`（既有） |
+| preview | withdrawn | 無診斷（合法 steady state；前提 withdrawn schema 有效） |
+| production（含 missing→default） | withdrawn | warning `publish-target-stage-conflicts-withdrawn-sidecar`（新增） |
+| invalid stage | 任意 | invalid-stage error 優先（不因 withdrawn 而 downgrade / fallback / 隱藏） |
+
+validator output **不得**回顯 `publishedUrl`、lifecycle 內任何 URL 值、operator identity 或 authorization / private path；只回顯 `sourcePath` / `sidecarPath` / error type / 欄位名稱 / 安全短碼。
 
 ---
 
@@ -416,8 +502,11 @@ seo: {
 
 ### 9.2 schemaVersion 驗證
 
-- `schemaVersion` 必須為 number `1` → 其他值列為 error
-- 後續版本升級時，本規則於 `docs/publish-bundle.md` §5 同步更新
+- `schemaVersion` 缺省 → 視同 `1`（legacy backward compatibility）
+- 合法整數值：`1` / `2`（`2` 之新增能力見 §5.7）
+- 非整數 / `0` / 負數 / 大於目前支援版本（目前為 `2`）→ **error**（fail-closed）
+- v1 / legacy sidecar 使用 v2-only 功能（`blogger.status: "withdrawn"` 或 `blogger.lifecycle`）→ **error**
+- 本規則（Slice 4B）已於 `validate-content.js` 落地（單一事實來源：`src/scripts/sidecar-withdrawal-contract.js`）；後續版本升級時於 `docs/publish-bundle.md` §5 同步更新
 
 ### 9.3 列舉值驗證
 
@@ -425,7 +514,7 @@ seo: {
 | --- | --- | --- |
 | `canonical.source` | `"auto"` / `"github"` / `"blogger"` / `"manual"` | error |
 | `blogger.type` | `"post"` / `"page"` | error |
-| `blogger.status` | §10 列舉值 | error |
+| `blogger.status` | §10 列舉值（`"withdrawn"` 僅 schemaVersion 2；見 §5.7） | error |
 | `github.status` | §10 列舉值 | error |
 
 ### 9.4 字串格式驗證
@@ -466,7 +555,9 @@ seo: {
 
 ### 9.8 規則生效時機
 
-§9 全部驗證規則之**實作落地時機為 Phase 8-b 之後**。Phase 8-a 階段本文件僅作為規範依據，`validate-content.js` 尚未加入對應規則。
+§9.1 / §9.3–§9.7 之驗證規則之**實作落地時機為 Phase 8-b 之後**，Phase 8-a 階段本文件僅作為規範依據。
+
+**例外（已落地）**：§9.2 schemaVersion 驗證與 §5.7 withdrawn / lifecycle 契約已於 Phase 20260721 Slice 4B 落地於 `validate-content.js`（單一事實來源 `src/scripts/sidecar-withdrawal-contract.js`，focused guard `check:sidecar-withdrawal-schema`）。此落地僅涵蓋 schemaVersion + withdrawn + lifecycle read-only classification / validation，**不含** planner / authorization / rehearsal / apply / remote action。
 
 ---
 
@@ -484,6 +575,7 @@ seo: {
 
 - `.md` frontmatter 之 `status` 與 `draft` 為**文件層級**狀態（沿用 Phase 1-7 既有定義）
 - `.publish.json` 之 `blogger.status` / `github.status` 為**平台層級**狀態，可分別管理
+- `blogger.status` 平台層級列舉值：`draft` / `ready` / `published` / `archived` / `withdrawn`（`withdrawn` 僅 schemaVersion 2 合法，語意見 §5.7；`withdrawn` **不**改變文件層級 `status`，亦**不**構成 production stage selector）
 - 兩層級狀態可不同。例：`.md` frontmatter `status: "ready"`、`.publish.json` `blogger.status: "published"` 同時 `github.status: "draft"`，視為「文件已備好；Blogger 已發；GitHub 仍草稿」之合法狀態
 
 文件層級 `status` 用於 `load-posts` 過濾（既有 Phase 1-7 邏輯不變）；平台層級 `status` 用於各平台 build 之必填驗證與 publishedUrl 強制度判定。

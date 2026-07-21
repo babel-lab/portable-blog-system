@@ -32,6 +32,15 @@ import {
   collectPublishTargetStageIssues,
   resolvePublishTargetStage,
 } from './publish-stage.js';
+// Phase 20260721-publish-target-stage Slice 4B：Blogger withdrawn sidecar schema 契約（純函式）。
+//   collectSidecarWithdrawalIssues = schemaVersion 2 / withdrawn / lifecycle 之 schema 驗證（不完整為 error）；
+//   withdrawnStageStatusWarning = production（含 missing→default）× withdrawn 之 stage/status warning
+//   （additive；published-sidecar transitional rule 維持既有 inline，不重構）。
+//   本 helper **不** import publish-stage.js（stage 已於 validate-content.js 端解析後傳入 resolved 值）。
+import {
+  collectSidecarWithdrawalIssues,
+  withdrawnStageStatusWarning,
+} from './sidecar-withdrawal-contract.js';
 
 // Phase 5-g-3：ERROR 規則常數
 const VALID_STATUS = new Set(['draft', 'ready', 'published', 'archived']);
@@ -2416,6 +2425,9 @@ export function validateContent({ posts, settings }) {
       //     清理，本 Slice 只發 warning、**不**升 error、**不**改 selector 行為、**不**動 sidecar。
       //   輸出限制：不得回顯 publishedUrl（避免把 landed URL 拉進 validator log）；
       //     同時列 sourcePath 與 sidecarPath 供作者定位。
+      //   Phase 20260721 Slice 4B（additive）：於同一 block 再判 production（含 missing→default）× withdrawn
+      //     之 publish-target-stage-conflicts-withdrawn-sidecar warning；決策 + 訊息（含 redaction）之
+      //     單一事實來源為 sidecar-withdrawal-contract.js#withdrawnStageStatusWarning。既有 published rule 不變。
       {
         const bloggerStage = resolvePublishTargetStage(publishTargets, 'blogger');
         const publishData = post.publish;
@@ -2423,6 +2435,7 @@ export function validateContent({ posts, settings }) {
           publishData && typeof publishData === 'object' && !Array.isArray(publishData)
             ? publishData.blogger
             : null;
+        const sidecarPath = post.sidecars?.publish?.path ?? '';
         if (
           bloggerStage.ok === true &&
           bloggerStage.stage === 'preview' &&
@@ -2431,7 +2444,6 @@ export function validateContent({ posts, settings }) {
           !Array.isArray(bloggerSidecar) &&
           bloggerSidecar.status === 'published'
         ) {
-          const sidecarPath = post.sidecars?.publish?.path ?? '';
           issues.push({
             severity: 'warning',
             type: 'publish-target-stage-conflicts-published-sidecar',
@@ -2441,6 +2453,34 @@ export function validateContent({ posts, settings }) {
               `blogger.stage="preview" but landed publish sidecar exists (sidecarPath=${sidecarPath}); ` +
               `transitional mismatch — reconcile via a future landed-sidecar withdrawal phase (Slice 4+).`,
           });
+        }
+        // Slice 4B（additive）：production（含 missing→default production）× withdrawn。
+        //   invalid stage（bloggerStage.ok === false）→ predicate 回 null（不 downgrade / 不隱藏 invalid-stage error）。
+        const withdrawnWarning = withdrawnStageStatusWarning({
+          stageResolvedOk: bloggerStage.ok === true,
+          stage: bloggerStage.stage,
+          status: bloggerSidecar && typeof bloggerSidecar === 'object' && !Array.isArray(bloggerSidecar)
+            ? bloggerSidecar.status
+            : undefined,
+          sourcePath,
+          sidecarPath,
+        });
+        if (withdrawnWarning) issues.push(withdrawnWarning);
+      }
+
+      // Phase 20260721-publish-target-stage Slice 4B：Blogger withdrawn sidecar schema 契約驗證。
+      //   契約：docs/publish-json-schema.md §5.7 / §9、docs/20260720-publish-target-stage-contract.md §11
+      //   schemaVersion 2 / withdrawn status / lifecycle[] 之結構、hash、timestamp、enum、evidence
+      //   preservation、private-field、duplicate-evidence、transition 一致性驗證（不完整為 **error**）。
+      //   legacy / v1 sidecar 維持既有合法行為；只有 v1 誤用 withdrawn / lifecycle 時才報 error。
+      //   純函式；不動 sidecar bytes；append-only 歷史保證留待 future apply capability（見 docs §5.7）。
+      {
+        const sidecarPath = post.sidecars?.publish?.path ?? '';
+        for (const issue of collectSidecarWithdrawalIssues(post.publish, {
+          sourcePath,
+          sidecarPath,
+        })) {
+          issues.push(issue);
         }
       }
 
