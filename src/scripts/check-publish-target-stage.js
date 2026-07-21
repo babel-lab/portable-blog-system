@@ -710,6 +710,7 @@ const SLICE1_IMPORTERS = new Set([
   'src/scripts/load-admin-posts.js',        // Step 5：Admin read-only 顯示
   'src/scripts/admin-article-lookup.js',    // Step 5：read-only lookup 顯示
   'src/scripts/blogger-preview-plan.js',    // Step 5：preview planner read-only 顯示
+  'src/scripts/plan-blogger-withdrawals.js', // Slice 4C：withdrawal read-only planner（reuse resolvePublishTargetStage；非 production selector）
   'src/scripts/check-publish-target-stage.js', // 本 guard
 ]);
 // Slice 2 importer（production selector / anti-bypass）。
