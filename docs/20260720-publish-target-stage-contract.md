@@ -187,7 +187,7 @@ Slice 2 之 production 行為變化如下（**現行 repo 內無文章宣告 sta
 | Helper（單一事實來源） | `src/scripts/publish-stage.js` |
 | Validator 規則 | `src/scripts/validate-content.js`（diagnostic types `invalid-publish-target-stage` + Slice 3 `publish-target-stage-conflicts-published-sidecar` + Slice 4B `publish-target-stage-conflicts-withdrawn-sidecar` + withdrawal schema errors） |
 | Consumer read helper（Slice 4A） | `src/scripts/active-publication.js`（`isActivePublishedTarget` / `getActivePublishedUrl`） |
-| Withdrawal schema helper（Slice 4B；單一事實來源） | `src/scripts/sidecar-withdrawal-contract.js`（`collectSidecarWithdrawalIssues` / `collectBloggerStageStatusIssues` / `resolveSchemaVersion`） |
+| Withdrawal schema helper（Slice 4B；單一事實來源） | `src/scripts/sidecar-withdrawal-contract.js`（`collectSidecarWithdrawalIssues` / `withdrawnStageStatusWarning` / `resolveSchemaVersion`） |
 | Withdrawal focused guard（Slice 4B） | `src/scripts/check-sidecar-withdrawal-schema.js`（`check:sidecar-withdrawal-schema`；fixture-only） |
 | Admin read-only 顯示 | `src/scripts/load-admin-posts.js` / `src/scripts/admin-article-lookup.js` |
 | Preview planner read-only 顯示 | `src/scripts/blogger-preview-plan.js` |
@@ -270,7 +270,7 @@ Guard 未接入任何 umbrella（`check:metadata-guards` / `check:metadata-cross
 | invalid stage | 任意 | invalid-stage error 優先；**不**因 withdrawn 而 downgrade / fallback / 隱藏 |
 | 其餘組合 | — | 維持現行語意，不新增 warning |
 
-**severity**：schema 不完整（缺 evidence / 缺 lifecycle / malformed lifecycle / malformed hash / malformed timestamp / invalid reason / invalid remoteDisposition / invalid sourcePath / duplicate withdrawn event / transition 不一致 / 重複 publication evidence / 含私人 operator 欄位 / unsupported schemaVersion / v1 誤用 v2 功能）一律 **error**（**不得**只是 warning）；stage × status product-state mismatch 為 **warning**。
+**severity**：schema 不完整（缺 evidence / 缺 lifecycle / malformed lifecycle / malformed hash / malformed strict-ISO timestamp / invalid reason / invalid remoteDisposition〔含舊 `confirmed-inactive`〕/ invalid canonical sourcePath / duplicate withdrawn event / transition 不一致 / 重複 publication evidence / 含私人 operator 欄位 / lifecycle 未知 key〔strict allowlist〕/ v2 `blogger.status` fail-closed〔缺漏 / 非字串 / 空 / 未知 / 大小寫變體〕/ unsupported schemaVersion / v1 誤用 v2 功能）一律 **error**（**不得**只是 warning）；stage × status product-state mismatch 為 **warning**。
 
 **redaction**：validator output **不得** echo `publishedUrl` / lifecycle 內任何 URL 值 / operator identity / authorization file path / private directory path；只回顯 `sourcePath` / `sidecarPath` / error type / 欄位名稱 / 安全短碼。
 

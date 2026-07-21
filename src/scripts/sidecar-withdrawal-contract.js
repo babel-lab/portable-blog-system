@@ -24,6 +24,8 @@
 //   withdrawnStageStatusWarning，避免本 helper 成為 publish-stage.js 的新 importer（維持既有 importer
 //   白名單不變），亦不重複 stage 值域判斷。
 
+import path from 'node:path';
+
 // ── 常數（單一事實來源）────────────────────────────────────────────────────────────
 
 // 目前支援之最高 schemaVersion。legacy（缺省）與 1 皆視為 v1。
@@ -41,6 +43,7 @@ export const LIFECYCLE_REASONS = Object.freeze(
 );
 
 // remoteDisposition enum（§六 6.6）。operator-confirmed observation；不代表本 Slice 執行 remote action。
+// 正式命名為 operator-confirmed-inactive（correction §八）；舊值 confirmed-inactive 已移除、須 fail。
 export const REMOTE_DISPOSITIONS = Object.freeze(
   new Set([
     'remote-live',
@@ -48,8 +51,13 @@ export const REMOTE_DISPOSITIONS = Object.freeze(
     'remote-deleted',
     'remote-unavailable',
     'remote-permalink-changed',
-    'confirmed-inactive',
+    'operator-confirmed-inactive',
   ]),
+);
+
+// schemaVersion 2 之 blogger.status 合法 enum（correction §七 fail-closed）。case-sensitive（小寫）。
+export const V2_BLOGGER_STATUSES = Object.freeze(
+  new Set(['draft', 'ready', 'published', 'archived', 'withdrawn']),
 );
 
 // 公開 sidecar 之 lifecycle event **不得**含下列私人核准欄位（§六 6.7）。
@@ -89,10 +97,23 @@ export const REQUIRED_WITHDRAWN_EVENT_FIELDS = Object.freeze([
   'authorizationFingerprint',
 ]);
 
+// lifecycle event 之 strict allowlist（correction §六）。除 required fields 外，額外允許 optional
+//   reasonDetail。任何不在本白名單之 key 皆為 error（fail-closed 第一層 gate）；private operator
+//   欄位與重複 publication evidence 仍分別以更精確之 issue type 回報，但 allowlist 才是主要 gate。
+export const ALLOWED_LIFECYCLE_EVENT_KEYS = Object.freeze(
+  new Set([...REQUIRED_WITHDRAWN_EVENT_FIELDS, 'reasonDetail']),
+);
+
+// 內部查詢用 Set（PRIVATE / DUPLICATE 保留為 export array 以維持既有 API；此處另建 Set 供 O(1) 分類）。
+const PRIVATE_LIFECYCLE_FIELDS_SET = new Set(PRIVATE_LIFECYCLE_FIELDS);
+const DUPLICATE_EVIDENCE_FIELDS_SET = new Set(DUPLICATE_EVIDENCE_FIELDS);
+
 // diagnostic type 集合（stable slug；guard 依此斷言）。
 export const WITHDRAWAL_ISSUE_TYPES = Object.freeze({
   schemaVersionUnsupported: 'sidecar-schema-version-unsupported',
   v1UsesV2Feature: 'sidecar-v1-uses-v2-feature',
+  bloggerStatusInvalid: 'blogger-status-invalid',
+  lifecycleUnknownField: 'lifecycle-unknown-field',
   withdrawnMissingEvidence: 'withdrawn-missing-evidence',
   withdrawnMissingLifecycle: 'withdrawn-missing-lifecycle',
   lifecycleMalformed: 'lifecycle-malformed',
@@ -129,28 +150,85 @@ function isLowercaseHex(v, len) {
   return typeof v === 'string' && new RegExp(`^[0-9a-f]{${len}}$`).test(v);
 }
 
-// 含明確時區之 ISO-8601 時間（§六 6.4）。回傳 { ok, epoch?, reason? }。
-//   - 非字串 / 空字串 → fail
-//   - 無時區設計符（Z 或 ±HH:MM）→ fail（reason: 'no-timezone'）
-//   - 無法 parse → fail（reason: 'invalid'）
+// 含明確時區之 strict ISO-8601 timestamp（correction §五）。回傳 { ok, epoch?, reason? }。
+//   格式必須完整符合（fractional seconds optional，contract 允許）：
+//     YYYY-MM-DDTHH:mm:ss[.sss]Z
+//     YYYY-MM-DDTHH:mm:ss[.sss]±HH:MM
+//   逐 component 驗證曆法（含 leap year）；timezone offset 上限 ±14:00（14 時 minute 只能 00）。
+//   禁止：前後 whitespace、無時區、date-only、number、null、trim 後才合法。
+//   只有 lexical + calendar 皆通過後，才用 Date.parse 取 epoch milliseconds（供 <= 比較，非字串排序）。
+const TZ_ISO_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isLeapYear(y) {
+  return y % 400 === 0 || (y % 4 === 0 && y % 100 !== 0);
+}
+
 function parseTzIso(v) {
   if (typeof v !== 'string') return { ok: false, reason: 'non-string' };
-  if (v.trim() === '') return { ok: false, reason: 'empty' };
-  if (!/(Z|[+-]\d{2}:\d{2})$/.test(v)) return { ok: false, reason: 'no-timezone' };
+  if (v === '') return { ok: false, reason: 'empty' };
+  const m = TZ_ISO_RE.exec(v);
+  if (!m) {
+    // 區分 no-timezone（無 Z / ±HH:MM 結尾）以保留既有 diagnostic short code。
+    if (!/(Z|[+-]\d{2}:\d{2})$/.test(v)) return { ok: false, reason: 'no-timezone' };
+    return { ok: false, reason: 'invalid' };
+  }
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = Number(m[6]);
+  if (month < 1 || month > 12) return { ok: false, reason: 'invalid' };
+  const maxDay = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1];
+  if (day < 1 || day > maxDay) return { ok: false, reason: 'invalid' };
+  if (hour > 23) return { ok: false, reason: 'invalid' };
+  if (minute > 59) return { ok: false, reason: 'invalid' };
+  if (second > 59) return { ok: false, reason: 'invalid' };
+  if (m[7] !== 'Z') {
+    const offHour = Number(m[9]);
+    const offMinute = Number(m[10]);
+    if (offHour > 14) return { ok: false, reason: 'invalid' };
+    if (offMinute > 59) return { ok: false, reason: 'invalid' };
+    if (offHour === 14 && offMinute !== 0) return { ok: false, reason: 'invalid' };
+  }
   const epoch = Date.parse(v);
   if (Number.isNaN(epoch)) return { ok: false, reason: 'invalid' };
   return { ok: true, epoch };
 }
 
-// POSIX-relative path，必須位於 content/blogger/posts/、以 .md 結尾、無 ..、非 absolute（§六 6.3）。
-// 回傳 null（合法）或錯誤原因短碼（不回顯原始 path 內容）。
+// canonical POSIX-relative path（correction §九）。必須：string、非空、無 NUL、無 `\`、非 whitespace-padded、
+//   無 URI scheme、非 absolute、無空 segment（含 `//` 與前後 `/`）、無 `.` / `..` segment、
+//   path.posix.normalize(v) === v、位於 content/blogger/posts/、以 .md 結尾。
+//   回傳 null（合法）或錯誤原因短碼（**不回顯**原始 path 內容）。不得 normalize 後默默接受非法原值。
 function classifySourcePath(v) {
-  if (typeof v !== 'string' || v === '') return 'non-string-or-empty';
+  if (typeof v !== 'string') return 'non-string';
+  if (v === '') return 'empty';
+  if (v.includes('\0')) return 'nul';
   if (v.includes('\\')) return 'not-posix';
-  if (v.startsWith('/') || /^[A-Za-z]:/.test(v)) return 'absolute';
-  if (v.split('/').includes('..')) return 'dotdot';
+  if (v.trim() !== v) return 'whitespace'; // 不得 trim 後才合法
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(v)) return 'uri-scheme'; // file:// 等（drive letter C: 亦落此）
+  if (v.startsWith('/')) return 'absolute';
+  const segments = v.split('/');
+  if (segments.some((s) => s === '')) return 'empty-segment'; // // 或前後 /
+  if (segments.some((s) => s === '.')) return 'dot-segment';
+  if (segments.some((s) => s === '..')) return 'dotdot';
+  if (path.posix.normalize(v) !== v) return 'not-normalized';
   if (!v.startsWith('content/blogger/posts/')) return 'not-under-blogger-posts';
   if (!v.endsWith('.md')) return 'not-md';
+  return null;
+}
+
+// schemaVersion 2 之 blogger.status fail-closed 分類（correction §七）。
+//   回傳 null（合法 enum）或錯誤原因短碼。**不回顯** raw status 值（redaction）。
+function classifyV2Status(blogger) {
+  if (!Object.prototype.hasOwnProperty.call(blogger, 'status')) return 'missing';
+  const s = blogger.status;
+  if (typeof s !== 'string') return 'non-string';
+  if (s === '') return 'empty';
+  if (s.trim() === '') return 'whitespace';
+  if (!V2_BLOGGER_STATUSES.has(s)) return 'unknown'; // 含大小寫變體（"Published" / "WITHDRAWN"）
   return null;
 }
 
@@ -186,6 +264,20 @@ function validateWithdrawnEvent(event, index, push, T) {
     // 本 Slice 只支援 withdrawn event（§六 6.1）。
     push(T.lifecycleMalformed, 'unsupported-event');
     return;
+  }
+
+  // strict allowlist（correction §六）：unknown key 一律 fail-closed（第一層 gate）。
+  //   只回顯 key 名稱、**絕不**回顯 key 值（redaction）。private operator / duplicate evidence
+  //   仍以更精確之 issue type 回報；其餘未知 key → lifecycleUnknownField。
+  for (const key of Object.keys(event)) {
+    if (ALLOWED_LIFECYCLE_EVENT_KEYS.has(key)) continue;
+    if (PRIVATE_LIFECYCLE_FIELDS_SET.has(key)) {
+      push(T.lifecyclePrivateField, key);
+    } else if (DUPLICATE_EVIDENCE_FIELDS_SET.has(key)) {
+      push(T.lifecycleDuplicateEvidence, key);
+    } else {
+      push(T.lifecycleUnknownField, key);
+    }
   }
 
   // required fields（§六 6.2）。
@@ -233,15 +325,9 @@ function validateWithdrawnEvent(event, index, push, T) {
     push(T.lifecycleRemoteDispositionInvalid, 'remoteDisposition');
   }
 
-  // 私人 operator 欄位（§六 6.7）。
-  for (const field of PRIVATE_LIFECYCLE_FIELDS) {
-    if (Object.prototype.hasOwnProperty.call(event, field)) push(T.lifecyclePrivateField, field);
-  }
-
-  // 重複 publication evidence（§六 6.8）。只回顯欄位名稱、不回顯值。
-  for (const field of DUPLICATE_EVIDENCE_FIELDS) {
-    if (Object.prototype.hasOwnProperty.call(event, field)) push(T.lifecycleDuplicateEvidence, field);
-  }
+  // 註：private operator 欄位（§六 6.7）與重複 publication evidence（§六 6.8）已由上方 strict
+  //   allowlist scan 以更精確之 issue type（lifecyclePrivateField / lifecycleDuplicateEvidence）
+  //   一併攔截，不再另跑 blacklist 迴圈。
 }
 
 // ── 主入口：schema-level withdrawal 契約驗證（§五 / §六 / §七 / §九 error）──────────
@@ -277,6 +363,14 @@ export function collectSidecarWithdrawalIssues(sidecar, { sourcePath = '', sidec
   }
 
   // ── v2 ────────────────────────────────────────────────────────────────────────
+  // blogger.status fail-closed enum（correction §七）。blogger 區塊存在時，status 必為 §10 列舉值之一；
+  //   missing / 非字串 / 空 / whitespace / unknown / 大小寫變體 → error。缺 blogger 區塊之情形由
+  //   validate-content.js 之頂層 required-key 檢查負責，不在本 helper 重複。
+  if (blogger) {
+    const statusReason = classifyV2Status(blogger);
+    if (statusReason) push(T.bloggerStatusInvalid, statusReason);
+  }
+
   const isWithdrawn = status === WITHDRAWN_STATUS;
 
   // lifecycle 結構（若存在）。

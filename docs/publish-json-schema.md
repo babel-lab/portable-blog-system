@@ -303,7 +303,7 @@ publishedAt = "2026-08-01T00:30:00+08:00"
 #### 5.7.2 schemaVersion 相容（§9.2）
 
 - 缺省 / `schemaVersion: 1`：維持既有合法行為；**不得**使用 `blogger.status: "withdrawn"` 或 `blogger.lifecycle`。v1 誤用上述 v2-only 功能 → **error**。
-- `schemaVersion: 2`：可繼續使用 `draft` / `ready` / `published` / `archived`，亦可使用 `withdrawn`；並可新增 `blogger.lifecycle`。
+- `schemaVersion: 2`：可繼續使用 `draft` / `ready` / `published` / `archived`，亦可使用 `withdrawn`；並可新增 `blogger.lifecycle`。`blogger.status` **fail-closed**：缺漏 / 非字串 / 空 / whitespace / 未知值 / 大小寫變體（如 `"Published"` / `"WITHDRAWN"`）皆 → **error**（僅接受 §10 五個小寫列舉值）。
 - 未知 / 非整數 / `0` / 負數 / 大於目前支援版本 → **error**（fail-closed）。
 - 本契約**不要求**既有 sidecar 全面 migration；既有 v1 sidecar 不因本契約被升版或改寫。
 
@@ -343,18 +343,20 @@ gitHead / authorizationFingerprint
 | --- | --- |
 | `sourceSha256` / `priorSidecarSha256` / `authorizationFingerprint` | 64 字元 lowercase hex |
 | `gitHead` | 40 字元 lowercase hex |
-| `sourcePath` | POSIX-relative；位於 `content/blogger/posts/`；以 `.md` 結尾；不得含 `..`；不得為 absolute |
-| `recordedAt` / `remoteVerifiedAt` | 含時區之 ISO-8601；`remoteVerifiedAt` 不得晚於 `recordedAt` |
+| `sourcePath` | canonical POSIX-relative；string、非空、無 NUL、無 `\`、非 whitespace-padded（不得 trim 後才合法）、無 URI scheme（如 `file://`）、非 absolute；segment 不得為空（禁 `//` 與前後 `/`）/ `.` / `..`；`path.posix.normalize(v) === v`；位於 `content/blogger/posts/`；以 `.md` 結尾。不得 normalize 後默默接受非法原值 |
+| `recordedAt` / `remoteVerifiedAt` | 含時區之 **strict** ISO-8601：`YYYY-MM-DDTHH:mm:ss[.sss]Z` 或 `YYYY-MM-DDTHH:mm:ss[.sss]±HH:MM`（fractional seconds optional）。必為 string，逐 component 驗證曆法（month 01–12、day 依當月與 leap year、hour 00–23、minute 00–59、second 00–59；leap year = 被 400 整除，或被 4 整除但不被 100 整除）；timezone offset 上限 `±14:00`（`14` 時 minute 只能 `00`）。禁前後 whitespace / 無時區 / date-only / number / null / trim 後才接受。lexical + calendar 皆通過後才以 epoch milliseconds 比較：`remoteVerifiedAt` 不得晚於 `recordedAt`（不用字串排序） |
 | `reason` | `stage-preview` / `content-retirement` / `publication-error` / `policy` / `migration` / `other`；`other` 可帶非空 `reasonDetail`；非 `other` 時不要求 `reasonDetail`，若存在須非空字串 |
-| `remoteDisposition` | `remote-live` / `remote-draft` / `remote-deleted` / `remote-unavailable` / `remote-permalink-changed` / `confirmed-inactive` |
+| `remoteDisposition` | `remote-live` / `remote-draft` / `remote-deleted` / `remote-unavailable` / `remote-permalink-changed` / `operator-confirmed-inactive`（operator-confirmed observation；非本 Slice 執行之 remote action。舊值 `confirmed-inactive` 已移除、視為 error） |
 
 排序與去重：`recordedAt` 須按陣列順序不遞減；本 Slice 最多允許一個 `withdrawn` event；重複 withdrawn event、status/last-event 不一致（status 為 withdrawn 但最後 event 不是 withdrawn，或反之）皆為 error。
 
-#### 5.7.5 public / private 邊界
+#### 5.7.5 public / private 邊界（strict allowlist）
 
-lifecycle event **不得**包含私人核准資訊：`approvedBy` / `operatorName` / `operatorEmail` / `approvalNote` / `privateManifestPath` / `authorizationPath`（違反 → error）。公開 sidecar 只保存 `authorizationFingerprint`；核准者與私人 authorization 內容未來只存在於 repo 外之 `operator-private/`（本 Slice **不**建立）。
+lifecycle event 採 **strict allowlist**（fail-closed 第一層 gate）：僅允許 `event` / `fromStatus` / `toStatus` / `recordedAt` / `remoteVerifiedAt` / `reason` / `reasonDetail`（optional）/ `remoteDisposition` / `sourcePath` / `sourceSha256` / `priorSidecarSha256` / `gitHead` / `authorizationFingerprint`。**任何**不在白名單之 key（含下列私人核准欄位、重複 publication evidence 欄位，及任意未知 key 如 `approved_by` / `email` / `operator` / `previous` / `randomJunk`）皆 → error。
 
-lifecycle event 亦**不得**重複保存 active publication evidence（`publishedUrl` / `publishedAt` / `bloggerPostId` / `publishYear` / `publishMonth` / `permalink`）——這些已保留在 `blogger` 區塊（違反 → error）。
+其中私人核准資訊（`approvedBy` / `operatorName` / `operatorEmail` / `approvalNote` / `privateManifestPath` / `authorizationPath` 等）與重複之 active publication evidence（`publishedUrl` / `publishedAt` / `bloggerPostId` / `publishYear` / `publishMonth` / `permalink`）另以更精確之 error type 回報，但 allowlist 才是主要 gate。公開 sidecar 只保存 `authorizationFingerprint`；核准者與私人 authorization 內容未來只存在於 repo 外之 `operator-private/`（本 Slice **不**建立）。active publication evidence 已保留在 `blogger` 區塊，lifecycle event 不得重複保存。
+
+error output **只**回顯 field name / error type / `sidecarPath` / `sourcePath`，**絕不**回顯任何 key 值（unknown key 值、URL、email、path、`reasonDetail` 值皆不得出現於 issues / stdout / stderr）。
 
 #### 5.7.6 append-only（範圍聲明）
 

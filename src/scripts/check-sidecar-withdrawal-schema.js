@@ -11,12 +11,16 @@
 //   - **不** build / deploy / push / 碰 gh-pages / 碰 dist* / 呼叫任何 API；零網路。
 //   - 只呼叫純函式 helper（sidecar-withdrawal-contract.js / publish-stage.js / active-publication.js）。
 //
-// 斷言分區（對齊 spec §十一 case 1–40）：
+// 斷言分區：
 //   Compatibility（1–6）／Withdrawn happy path（7–11）／Evidence preservation（12–17）／
-//   Lifecycle（18–36）／Existing behavior（37–40）＋ echo-guard。
+//   Lifecycle（18–36）／Existing behavior（37–40）／
+//   Correction hardening（41–54：strict calendar parser、v2 status fail-closed、remoteDisposition
+//     rename、strict lifecycle allowlist、canonical sourcePath、docs alignment、redaction、
+//     reason/reasonDetail contract）＋ echo-guard。
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -344,6 +348,191 @@ check('40. 既有形狀 sidecar corpus（proxy of production summary 不變）�
   ];
   const total = corpus.flatMap((s) => run(s));
   assert.deepEqual(total, []);
+});
+
+// ── Correction hardening：strict calendar parser（41–43）─────────────────────────────
+check('41. strict parser：不可能之曆法日期（含非閏年 2/29）→ error', () => {
+  for (const bad of [
+    '2026-02-30T10:00:00+08:00',
+    '2026-04-31T10:00:00+08:00',
+    '2026-11-31T10:00:00+08:00',
+    '2026-13-01T10:00:00+08:00',
+    '2026-00-01T10:00:00+08:00',
+    '2026-02-29T10:00:00+08:00', // 2026 非閏年
+  ]) {
+    const s = validWithdrawnSidecar();
+    s.blogger.lifecycle[0].recordedAt = bad;
+    assert.ok(valuesOf(run(s), WT.lifecycleTimestampMalformed).includes('recordedAt:invalid'), `date=${bad}`);
+  }
+});
+check('42. strict parser：合法閏日 pass / 非閏年 2/29 fail', () => {
+  const good = validWithdrawnSidecar();
+  good.blogger.lifecycle[0].recordedAt = '2028-02-29T10:00:00+08:00';
+  good.blogger.lifecycle[0].remoteVerifiedAt = '2028-02-29T09:00:00+08:00';
+  assert.ok(!hasType(run(good), WT.lifecycleTimestampMalformed), '2028-02-29 為合法閏日');
+  const bad = validWithdrawnSidecar();
+  bad.blogger.lifecycle[0].recordedAt = '2027-02-29T10:00:00+08:00';
+  assert.ok(valuesOf(run(bad), WT.lifecycleTimestampMalformed).includes('recordedAt:invalid'));
+});
+check('43. strict parser：越界 month/hour/minute/second → error', () => {
+  for (const bad of [
+    '2026-07-21T24:30:00+08:00', // hour 24
+    '2026-07-21T10:60:00+08:00', // minute 60
+    '2026-07-21T10:00:60+08:00', // second 60
+  ]) {
+    const s = validWithdrawnSidecar();
+    s.blogger.lifecycle[0].recordedAt = bad;
+    assert.ok(valuesOf(run(s), WT.lifecycleTimestampMalformed).includes('recordedAt:invalid'), `ts=${bad}`);
+  }
+});
+
+// ── Correction hardening：v2 blogger.status fail-closed（44–45）───────────────────────
+check('44. v2 blogger.status：五個合法 enum 皆不報 status error', () => {
+  for (const st of ['draft', 'ready', 'published', 'archived', 'withdrawn']) {
+    assert.ok(!hasType(run({ schemaVersion: 2, blogger: { status: st } }), WT.bloggerStatusInvalid), `status=${st}`);
+  }
+});
+check('45. v2 blogger.status：missing/null/true/number/empty/whitespace/unknown/case-variant → error（且不 echo 原值）', () => {
+  const rejected = [
+    { blogger: {} }, // missing
+    { blogger: { status: null } }, // null → non-string
+    { blogger: { status: true } }, // boolean → non-string
+    { blogger: { status: 0 } }, // number
+    { blogger: { status: '' } }, // empty
+    { blogger: { status: '   ' } }, // whitespace
+    { blogger: { status: 'bogus' } }, // unknown
+    { blogger: { status: 'Published' } }, // case variant
+    { blogger: { status: 'WITHDRAWN' } }, // case variant
+  ];
+  for (const c of rejected) {
+    assert.ok(hasType(run({ schemaVersion: 2, ...c }), WT.bloggerStatusInvalid), JSON.stringify(c));
+  }
+  // redaction：raw status 值不得被回顯（只回顯 reason 短碼）。
+  const blob = run({ schemaVersion: 2, blogger: { status: 'SUPERSECRETSTATUS' } })
+    .map((i) => String(i.value)).join('\n');
+  assert.ok(!blob.includes('SUPERSECRETSTATUS'), 'must not echo raw status value');
+});
+
+// ── Correction hardening：remoteDisposition rename（46–47）─────────────────────────────
+check('46. remoteDisposition：operator-confirmed-inactive → pass', () => {
+  const s = validWithdrawnSidecar();
+  s.blogger.lifecycle[0].remoteDisposition = 'operator-confirmed-inactive';
+  assert.ok(!hasType(run(s), WT.lifecycleRemoteDispositionInvalid));
+});
+check('47. remoteDisposition：舊 confirmed-inactive / case variant / empty / non-string → error', () => {
+  for (const bad of ['confirmed-inactive', 'Operator-confirmed-inactive', '', 42, null]) {
+    const s = validWithdrawnSidecar();
+    s.blogger.lifecycle[0].remoteDisposition = bad;
+    assert.ok(hasType(run(s), WT.lifecycleRemoteDispositionInvalid), `disp=${JSON.stringify(bad)}`);
+  }
+});
+
+// ── Correction hardening：strict lifecycle allowlist（48–49）───────────────────────────
+check('48. strict allowlist：未知 key 一律 fail-closed（unknown-field）', () => {
+  for (const key of ['approved_by', 'email', 'operator', 'authorizationFile', 'privateData', 'previous', 'randomJunk']) {
+    const s = validWithdrawnSidecar();
+    s.blogger.lifecycle[0][key] = 'x';
+    assert.ok(valuesOf(run(s), WT.lifecycleUnknownField).includes(key), `key=${key}`);
+  }
+});
+check('49. strict allowlist：private/duplicate 精確 type + 全 allowed key（含 reasonDetail）happy path', () => {
+  const p = validWithdrawnSidecar();
+  p.blogger.lifecycle[0].approvedBy = 'x';
+  assert.ok(valuesOf(run(p), WT.lifecyclePrivateField).includes('approvedBy'));
+  const d = validWithdrawnSidecar();
+  d.blogger.lifecycle[0].publishedAt = '2026-01-01T00:00:00Z';
+  assert.ok(valuesOf(run(d), WT.lifecycleDuplicateEvidence).includes('publishedAt'));
+  const ok = validWithdrawnSidecar();
+  ok.blogger.lifecycle[0].reason = 'other';
+  ok.blogger.lifecycle[0].reasonDetail = 'legitimate detail';
+  assert.deepEqual(run(ok), []);
+});
+
+// ── Correction hardening：canonical POSIX sourcePath（50–51）──────────────────────────
+check('50. sourcePath：valid root + nested → pass', () => {
+  for (const good of ['content/blogger/posts/example.md', 'content/blogger/posts/subdir/example.md']) {
+    const s = validWithdrawnSidecar();
+    s.blogger.lifecycle[0].sourcePath = good;
+    assert.ok(!hasType(run(s), WT.lifecycleSourcePathInvalid), `path=${good}`);
+  }
+});
+check('51. sourcePath：dot/double-slash/backslash/absolute/uri/wrong-root/wrong-ext/traversal/trailing-slash → error', () => {
+  for (const bad of [
+    'content/blogger/posts/./example.md',
+    'content/blogger/posts//example.md',
+    'content\\blogger\\posts\\example.md',
+    '/content/blogger/posts/example.md',
+    'file://content/blogger/posts/example.md',
+    'content/github/posts/example.md',
+    'content/blogger/posts/example.txt',
+    'content/blogger/posts/../secret.md',
+    'content/blogger/posts/example.md/',
+  ]) {
+    const s = validWithdrawnSidecar();
+    s.blogger.lifecycle[0].sourcePath = bad;
+    assert.ok(hasType(run(s), WT.lifecycleSourcePathInvalid), `path=${bad}`);
+  }
+});
+
+// ── Correction hardening：docs alignment（52；read-only static assertion）──────────────
+check('52. docs alignment：不再引用 collectBloggerStageStatusIssues，且引用實際 export', () => {
+  const repoRoot = resolve(dirname(__filename), '../../');
+  const contractDoc = readFileSync(resolve(repoRoot, 'docs/20260720-publish-target-stage-contract.md'), 'utf8');
+  const schemaDoc = readFileSync(resolve(repoRoot, 'docs/publish-json-schema.md'), 'utf8');
+  const stale = 'collectBlogger' + 'StageStatusIssues'; // fragment 組裝，避免本行自我誤判
+  assert.ok(!contractDoc.includes(stale), 'contract doc 不得引用不存在之 export');
+  assert.ok(!schemaDoc.includes(stale), 'schema doc 不得引用不存在之 export');
+  assert.ok(contractDoc.includes('withdrawnStageStatusWarning'), 'contract doc 須引用實際 export withdrawnStageStatusWarning');
+  assert.ok(contractDoc.includes('collectSidecarWithdrawalIssues'), 'contract doc 須引用實際 export collectSidecarWithdrawalIssues');
+});
+
+// ── Correction hardening：redaction kitchen-sink（53）──────────────────────────────────
+check('53. redaction：unknown-key 值 / URL / email / path / reasonDetail 皆不出現於 issues', () => {
+  const s = validWithdrawnSidecar();
+  const ev = s.blogger.lifecycle[0];
+  ev.randomJunk = 'SECRET_JUNK_VALUE';
+  ev.email = 'leak@secret.invalid';
+  ev.authorizationFile = '/private/authz/secret.json';
+  ev.publishedUrl = 'https://example.invalid/leaked-permalink-xyz';
+  ev.reason = 'other';
+  ev.reasonDetail = 'SENSITIVE_REASON_DETAIL';
+  const issues = run(s);
+  const blob = issues.map((i) => `${i.type}|${i.value}|${i.sourcePath}|${i.sidecarPath}`).join('\n');
+  for (const secret of [
+    'SECRET_JUNK_VALUE',
+    'leak@secret.invalid',
+    '/private/authz/secret.json',
+    'leaked-permalink-xyz',
+    'SENSITIVE_REASON_DETAIL',
+  ]) {
+    assert.ok(!blob.includes(secret), `must not echo ${secret}`);
+  }
+  // fail-closed 證據：key 名稱本身仍須被回報。
+  assert.ok(valuesOf(issues, WT.lifecycleUnknownField).includes('randomJunk'));
+  assert.ok(valuesOf(issues, WT.lifecycleDuplicateEvidence).includes('publishedUrl'));
+});
+
+// ── Correction hardening：reason / reasonDetail contract（54；依現有正式 docs）─────────
+check('54. reason/reasonDetail：unknown reason error；reasonDetail optional 但存在須非空', () => {
+  // unknown reason → error
+  const bad = validWithdrawnSidecar();
+  bad.blogger.lifecycle[0].reason = 'bogus';
+  assert.ok(valuesOf(run(bad), WT.lifecycleReasonInvalid).includes('reason'));
+  // reasonDetail empty / whitespace / non-string → error（依 docs：若存在須非空字串）
+  for (const rd of ['', '   ', 42, null]) {
+    const s = validWithdrawnSidecar();
+    s.blogger.lifecycle[0].reasonDetail = rd;
+    assert.ok(hasType(run(s), WT.lifecycleReasonInvalid), `reasonDetail=${JSON.stringify(rd)}`);
+  }
+  // reason='other' 且無 reasonDetail → OK（docs：optional，非 required）
+  const otherNoDetail = validWithdrawnSidecar();
+  otherNoDetail.blogger.lifecycle[0].reason = 'other';
+  assert.deepEqual(run(otherNoDetail), []);
+  // reason 非 other 且帶合法 reasonDetail → OK（docs：若存在須非空即可）
+  const nonOtherWithDetail = validWithdrawnSidecar();
+  nonOtherWithDetail.blogger.lifecycle[0].reason = 'migration';
+  nonOtherWithDetail.blogger.lifecycle[0].reasonDetail = 'migrated from legacy';
+  assert.deepEqual(run(nonOtherWithDetail), []);
 });
 
 // ── echo-guard：本 guard source 只用 synthetic host（.invalid），不含真實 production host ───────
