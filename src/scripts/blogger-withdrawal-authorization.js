@@ -300,71 +300,154 @@ export function serializeDraft(draft) {
 }
 
 // ── duplicate-key detection（§七：duplicate semantic fields fail-closed）──────────
-// JSON.parse collapses duplicate keys (last-wins)，故 shape 檢查無法偵測 raw duplicate key。
-// 本 tokenizer 掃描 raw JSON text，於任一 object level 偵測重複 key（正確跳過字串內容與 escapes）。
-// 只在 JSON.parse 成功（text 為合法 JSON）後呼叫。回 true 表存在 duplicate key。
-export function jsonTextHasDuplicateKeys(text) {
-  const stack = []; // frames: { type:'object', keys:Set } | { type:'array' }
-  let expectKey = false;
-  let i = 0;
+// JSON.parse collapses duplicate object keys (last-value-wins)，故 shape 檢查與 JSON.parse 結果
+// 皆無法偵測 raw duplicate key —— 更危險的是 escaped duplicate（`explicitlyAuthorized` 與
+// `explicitlyAuthorized` JSON 解碼後語意相同），會靜默落入 last-value-wins。
+//
+// 本掃描以**嚴格 recursive-descent JSON parser**（方案 A）獨立於 JSON.parse 之外完整解析 grammar，
+// 並於建構每個 object scope 時：
+//   1. 切出完整 JSON string token（正確處理 \" / \\ / \uXXXX / surrogate 等 escape，找出真正的
+//      terminating quote）。
+//   2. 以 JSON.parse(rawStringToken) 取得與 JSON.parse property-name **一致**的 decoded 字串。
+//   3. 於**該 object scope**（不跨 array / 不跨 nested object）比較 decoded key；已存在即 duplicate。
+// duplicate 的定義 = decoded property name 之 exact string equality（不做 case-fold / normalize /
+// trim / locale transform）。任何 grammar 違反、malformed escape、unterminated string、trailing
+// comma、trailing 非空白、控制字元未 escape 等 → malformed（fail-closed）。
+//
+// 回傳 discriminated status：'ok' | 'duplicate' | 'malformed'。**絕不**回顯 key 名 / 內容 / offset。
+const _DUP = Symbol('duplicate-decoded-key');
+const _JSON_WS = new Set([' ', '\t', '\n', '\r']);
+
+export function scanJsonForDuplicateKeys(text) {
+  if (typeof text !== 'string') return { status: 'malformed' };
   const n = text.length;
-  while (i < n) {
-    const c = text[i];
-    if (c === '"') {
-      let j = i + 1;
-      let s = '';
-      while (j < n) {
-        const cj = text[j];
-        if (cj === '\\') {
-          s += text[j + 1] ?? '';
-          j += 2;
-          continue;
-        }
-        if (cj === '"') break;
-        s += cj;
-        j += 1;
-      }
-      const top = stack[stack.length - 1];
-      if (top && top.type === 'object' && expectKey) {
-        if (top.keys.has(s)) return true;
-        top.keys.add(s);
-        expectKey = false;
-      }
-      i = j + 1;
-      continue;
-    }
-    if (c === '{') {
-      stack.push({ type: 'object', keys: new Set() });
-      expectKey = true;
-      i += 1;
-      continue;
-    }
-    if (c === '[') {
-      stack.push({ type: 'array' });
-      expectKey = false;
-      i += 1;
-      continue;
-    }
-    if (c === '}' || c === ']') {
-      stack.pop();
-      expectKey = false;
-      i += 1;
-      continue;
-    }
-    if (c === ',') {
-      const top = stack[stack.length - 1];
-      expectKey = !!(top && top.type === 'object');
-      i += 1;
-      continue;
-    }
-    if (c === ':') {
-      expectKey = false;
-      i += 1;
-      continue;
-    }
+  let i = 0;
+
+  const fail = () => {
+    throw undefined; // 內部 sentinel：任何 grammar 違反 → malformed（不攜帶內容）
+  };
+  const skipWs = () => {
+    while (i < n && _JSON_WS.has(text[i])) i += 1;
+  };
+
+  // 假設 text[i] === '"'；回 decoded 字串並將 i 前移至 closing quote 之後。
+  const parseStringDecoded = () => {
+    const start = i;
     i += 1;
+    while (i < n) {
+      const c = text[i];
+      if (c === '\\') {
+        if (i + 1 >= n) fail(); // dangling escape
+        i += 2; // backslash escapes exactly the next char（用於找 terminating quote）
+        continue;
+      }
+      if (c === '"') {
+        const raw = text.slice(start, i + 1);
+        i += 1;
+        let decoded;
+        try {
+          decoded = JSON.parse(raw); // 精確 JSON 解碼（含 \uXXXX / surrogate / malformed → throw）
+        } catch {
+          fail();
+        }
+        if (typeof decoded !== 'string') fail();
+        return decoded;
+      }
+      if (c < ' ') fail(); // 未 escape 的控制字元（U+0000..U+001F）在 JSON string 內非法
+      i += 1;
+    }
+    fail(); // unterminated string
+  };
+
+  const parseNumber = () => {
+    const start = i;
+    if (text[i] === '-') i += 1;
+    if (text[i] === '0') {
+      i += 1;
+    } else if (text[i] >= '1' && text[i] <= '9') {
+      while (i < n && text[i] >= '0' && text[i] <= '9') i += 1;
+    } else {
+      fail();
+    }
+    if (text[i] === '.') {
+      i += 1;
+      if (!(text[i] >= '0' && text[i] <= '9')) fail();
+      while (i < n && text[i] >= '0' && text[i] <= '9') i += 1;
+    }
+    if (text[i] === 'e' || text[i] === 'E') {
+      i += 1;
+      if (text[i] === '+' || text[i] === '-') i += 1;
+      if (!(text[i] >= '0' && text[i] <= '9')) fail();
+      while (i < n && text[i] >= '0' && text[i] <= '9') i += 1;
+    }
+    if (i === start) fail();
+  };
+
+  const parseObject = () => {
+    i += 1; // consume '{'
+    const seen = new Set(); // 本 object scope 獨立的 decoded-key set
+    skipWs();
+    if (text[i] === '}') { i += 1; return; }
+    for (;;) {
+      skipWs();
+      if (text[i] !== '"') fail(); // key 必為 string
+      const key = parseStringDecoded();
+      if (seen.has(key)) throw _DUP; // duplicate decoded property name → fail-closed
+      seen.add(key);
+      skipWs();
+      if (text[i] !== ':') fail();
+      i += 1;
+      parseValue();
+      skipWs();
+      if (text[i] === ',') { i += 1; continue; }
+      if (text[i] === '}') { i += 1; return; }
+      fail(); // 缺 comma / closing brace（含 trailing comma）
+    }
+  };
+
+  const parseArray = () => {
+    i += 1; // consume '['
+    skipWs();
+    if (text[i] === ']') { i += 1; return; }
+    for (;;) {
+      parseValue();
+      skipWs();
+      if (text[i] === ',') { i += 1; continue; }
+      if (text[i] === ']') { i += 1; return; }
+      fail(); // 缺 comma / closing bracket（含 trailing comma）
+    }
+  };
+
+  function parseValue() {
+    skipWs();
+    if (i >= n) fail();
+    const c = text[i];
+    if (c === '{') return parseObject();
+    if (c === '[') return parseArray();
+    if (c === '"') { parseStringDecoded(); return; }
+    if (c === '-' || (c >= '0' && c <= '9')) { parseNumber(); return; }
+    if (text.startsWith('true', i)) { i += 4; return; }
+    if (text.startsWith('false', i)) { i += 5; return; }
+    if (text.startsWith('null', i)) { i += 4; return; }
+    fail();
   }
-  return false;
+
+  try {
+    parseValue();
+    skipWs();
+    if (i !== n) return { status: 'malformed' }; // trailing 非空白
+    return { status: 'ok' };
+  } catch (e) {
+    if (e === _DUP) return { status: 'duplicate' };
+    return { status: 'malformed' }; // 含 grammar 違反 / native RangeError（極端 nesting）→ fail-closed
+  }
+}
+
+// backward-compatible boolean helper（既有匯入 / 單元測試沿用）：僅回報 duplicate。
+// 注意：malformed JSON 於此回 false（非 duplicate）；contract-level fail-closed 由
+// parseAndValidateAuthorization 依 status 分流（malformed → parse-error）。
+export function jsonTextHasDuplicateKeys(text) {
+  return scanJsonForDuplicateKeys(text).status === 'duplicate';
 }
 
 // ── strict authorization document parser（§七）────────────────────────────────────
@@ -375,15 +458,23 @@ export function jsonTextHasDuplicateKeys(text) {
 export function parseAndValidateAuthorization(rawText) {
   if (typeof rawText !== 'string') return { ok: false, blocker: 'authorization-unreadable' };
 
-  // duplicate semantic key（§七）—— 在 JSON.parse 前先確認可 parse，再掃 duplicate。
+  // §七：duplicate semantic key + grammar 驗證必須發生在 JSON.parse **之前**，否則 last-value-wins
+  // 會先把 escaped-duplicate 的 approval key 收斂成一個被信任的值。property name 以 JSON escape
+  // 解碼後比較（literal 與 \uXXXX 拼法解碼後相同 → duplicate）。
+  const scan = scanJsonForDuplicateKeys(rawText);
+  if (scan.status === 'duplicate') {
+    return { ok: false, blocker: 'authorization-duplicate-key' };
+  }
+  if (scan.status === 'malformed') {
+    return { ok: false, blocker: 'authorization-parse-error' };
+  }
+  // scan.status === 'ok'：grammar 合法且任一 object scope 皆無 duplicate decoded key。
+  // JSON.parse 作為第二道防線（理應與 scanner 一致；不一致時仍 fail-closed）。
   let parsed;
   try {
     parsed = JSON.parse(rawText);
   } catch {
     return { ok: false, blocker: 'authorization-parse-error' };
-  }
-  if (jsonTextHasDuplicateKeys(rawText)) {
-    return { ok: false, blocker: 'authorization-duplicate-key' };
   }
   if (!isPlainObject(parsed)) return { ok: false, blocker: 'authorization-not-object' };
 

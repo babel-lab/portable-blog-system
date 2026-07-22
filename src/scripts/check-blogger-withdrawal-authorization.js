@@ -49,6 +49,7 @@ import {
   computeRecordFingerprint,
   parseAndValidateAuthorization,
   jsonTextHasDuplicateKeys,
+  scanJsonForDuplicateKeys,
   isLandedStrictTzIso,
   classifyBloggerSourcePath,
   deriveSidecarPath,
@@ -427,6 +428,82 @@ async function main() {
       assert.strictEqual(jsonTextHasDuplicateKeys('{"purpose":"x","purpose":"y"}'), true);
     });
 
+    // ── scanJsonForDuplicateKeys: decoded-key semantics (§五 targeted cases) ──────────
+    // duplicate = JSON-decoded property-name exact equality per object scope. Literal and
+    // \uXXXX spellings that decode to the same name MUST be duplicate; different scopes MUST NOT.
+    await check('scan §5.1 top-level exact duplicate → duplicate', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"purpose":"blogger-sidecar-withdrawal","purpose":"other"}').status, 'duplicate');
+    });
+    await check('scan §5.2 nested exact duplicate → duplicate', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"approval":{"explicitlyAuthorized":false,"explicitlyAuthorized":true}}').status, 'duplicate');
+    });
+    await check('scan §5.3 unicode-escaped top-level duplicate → duplicate', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"purpose":"blogger-sidecar-withdrawal","\\u0070urpose":"other"}').status, 'duplicate');
+    });
+    await check('scan §5.4 escaped nested approval duplicate → duplicate', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"approval":{"explicitlyAuthorized":false,"explicitly\\u0041uthorized":true}}').status, 'duplicate');
+    });
+    await check('scan §5.5 first-safe/second-dangerous → duplicate (not last-value-wins true)', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"approval":{"explicitlyAuthorized":false,"explicitly\\u0041uthorized":true}}').status, 'duplicate');
+    });
+    await check('scan §5.6 first-dangerous/second-safe → duplicate (not accepted via last false)', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"approval":{"explicitlyAuthorized":true,"explicitly\\u0041uthorized":false}}').status, 'duplicate');
+    });
+    await check('scan §5.7 escaped key first → duplicate', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"approval":{"explicitly\\u0041uthorized":true,"explicitlyAuthorized":false}}').status, 'duplicate');
+    });
+    await check('scan §5.8 multi-char escape composing same key → duplicate', () => {
+      // "explicitlyAuthorized" decodes to "explicitlyAuthorized"
+      assert.strictEqual(scanJsonForDuplicateKeys('{"approval":{"explicitlyAuthorized":false,"\\u0065\\u0078plicitlyAuthorized":true}}').status, 'duplicate');
+    });
+    await check('scan §5.9 same key in different object scope → ok (not duplicate)', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"repository":{"expectedBranch":"main"},"other":{"expectedBranch":"main"}}').status, 'ok');
+    });
+    await check('scan §5.10 array of distinct-scope objects → ok', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('[{"a":1},{"a":2}]').status, 'ok');
+    });
+    await check('scan §5.11 nested-in-array object duplicate → duplicate', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('[{"a":1,"\\u0061":2}]').status, 'duplicate');
+    });
+    await check('scan §5.12 string value content not treated as key → ok', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"note":"\\"purpose\\": \\"x\\"","purpose":"y"}').status, 'ok');
+    });
+    await check('scan §5.13 escaped-quote vs escaped-backslash keys distinct → ok', () => {
+      // "a\"b" and "a\\b" decode to different property names
+      assert.strictEqual(scanJsonForDuplicateKeys('{"a\\"b":1,"a\\\\b":2}').status, 'ok');
+    });
+    await check('scan §5.14 malformed unicode escape → malformed', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"a":"\\u12\\uZZZZ"}').status, 'malformed');
+    });
+    await check('scan §5.15 unterminated string → malformed', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"a":"unterminated}').status, 'malformed');
+    });
+    await check('scan §5.16 missing colon / comma / brace / trailing comma → malformed', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"a" 1}').status, 'malformed');
+      assert.strictEqual(scanJsonForDuplicateKeys('{"a":1 "b":2}').status, 'malformed');
+      assert.strictEqual(scanJsonForDuplicateKeys('{"a":1').status, 'malformed');
+      assert.strictEqual(scanJsonForDuplicateKeys('{"a":1,}').status, 'malformed');
+      assert.strictEqual(scanJsonForDuplicateKeys('[1,2,]').status, 'malformed');
+    });
+    await check('scan §5.17 duplicate unknown key still detected → duplicate', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"totallyUnknownKey":1,"totallyUnknownKey":2}').status, 'duplicate');
+    });
+    await check('scan §5.18 deep nesting: duplicate detected + clean scope', () => {
+      let open = '';
+      let close = '';
+      for (let d = 0; d < 40; d += 1) { open += '{"n":'; close += '}'; }
+      assert.strictEqual(scanJsonForDuplicateKeys(`${open}{"x":1,"x":2}${close}`).status, 'duplicate');
+      assert.strictEqual(scanJsonForDuplicateKeys(`${open}{"x":1}${close}`).status, 'ok');
+    });
+    await check('scan: valid authorization-shaped doc → ok (no false positive)', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys('{"schemaVersion":1,"purpose":"blogger-sidecar-withdrawal","approval":{"explicitlyAuthorized":false}}').status, 'ok');
+    });
+    await check('scan: non-string input → malformed (fail-closed)', () => {
+      assert.strictEqual(scanJsonForDuplicateKeys(null).status, 'malformed');
+      assert.strictEqual(scanJsonForDuplicateKeys(undefined).status, 'malformed');
+      assert.strictEqual(scanJsonForDuplicateKeys(42).status, 'malformed');
+    });
+
     // ══ E. shared schema loader: happy + fail-closed (in-memory) ═════════
     const goodHead = 'a'.repeat(40);
     const goodFp = 'b'.repeat(64);
@@ -493,6 +570,80 @@ async function main() {
       const r = parseAndValidateAuthorization(JSON.stringify(rest));
       assert.strictEqual(r.ok, false);
       assert.strictEqual(r.blocker, 'authorization-repository-invalid');
+    });
+
+    // ── E-dup. escaped/semantic duplicate-key fail-closed via parseAndValidateAuthorization ──
+    // Duplicate object property names can only exist in RAW text (JS objects collapse them), so
+    // these fixtures are built by injecting a raw escaped-duplicate spelling into an otherwise
+    // legal, shape-valid authorization. The decisive requirement: the escaped duplicate must
+    // fail closed with 'authorization-duplicate-key' BEFORE JSON.parse last-value-wins can make
+    // approval trusted — regardless of which spelling carries the dangerous `true`.
+    function withRawApproval(authObj, rawApprovalObjText) {
+      const compact = JSON.stringify(authObj);
+      const m = compact.match(/"approval":\{[^}]*\}/);
+      assert.ok(m, 'approval block not found in serialized authorization');
+      return compact.replace(m[0], `"approval":${rawApprovalObjText}`);
+    }
+    await check('loader e2e: escaped approval duplicate (false,true) → authorization-duplicate-key, not authorized', () => {
+      const raw = withRawApproval(goodAuthObj, '{"explicitlyAuthorized":false,"explicitly\\u0041uthorized":true}');
+      const r = parseAndValidateAuthorization(raw);
+      assert.strictEqual(r.ok, false, JSON.stringify(r));
+      assert.strictEqual(r.blocker, 'authorization-duplicate-key');
+      assert.notStrictEqual(r.explicitlyAuthorized, true); // never collapses to true
+    });
+    await check('loader e2e: escaped approval duplicate (true,false) → duplicate (not accepted via last false)', () => {
+      const raw = withRawApproval(goodAuthObj, '{"explicitlyAuthorized":true,"explicitly\\u0041uthorized":false}');
+      const r = parseAndValidateAuthorization(raw);
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.blocker, 'authorization-duplicate-key');
+    });
+    await check('loader e2e: escaped approval duplicate (escaped-first) → duplicate', () => {
+      const raw = withRawApproval(goodAuthObj, '{"explicitly\\u0041uthorized":true,"explicitlyAuthorized":false}');
+      const r = parseAndValidateAuthorization(raw);
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.blocker, 'authorization-duplicate-key');
+    });
+    await check('loader e2e: escaped top-level purpose duplicate → authorization-duplicate-key', () => {
+      const compact = JSON.stringify(goodAuthObj);
+      const raw = compact.replace('"purpose":"blogger-sidecar-withdrawal"', '"purpose":"blogger-sidecar-withdrawal","\\u0070urpose":"other"');
+      const r = parseAndValidateAuthorization(raw);
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.blocker, 'authorization-duplicate-key');
+    });
+    await check('loader e2e: legal unapproved authorization unaffected → documentValid', () => {
+      // regression guard: the corrected scanner must not reject a legal document.
+      const r = parseAndValidateAuthorization(JSON.stringify(goodAuthObj));
+      assert.strictEqual(r.ok, true, JSON.stringify(r));
+      assert.strictEqual(r.explicitlyAuthorized, false);
+    });
+
+    // ── E-cli. §9 synthetic validator CLI reproduction (OS-temp fixture; read-only) ──────
+    // Build a legal authorization JSON, hand-insert a semantic duplicate approval key (literal
+    // false + escaped true), write it to an OS-temp file OUTSIDE the repo, run the validator CLI,
+    // and assert fail-closed: exit 1, no ready payload, fixed duplicate-key blocker, not approved,
+    // zero secrets, fixture bytes byte-stable across the read-only run.
+    await check('cli §9: escaped duplicate authorization → exit 1 + authorization-duplicate-key, no approval', () => {
+      const legal = makeAuth({ head: goodHead, planFp: goodFp, recFp: goodFp, target: goodTarget, approved: false });
+      const rawDoc = withRawApproval(legal, '{"explicitlyAuthorized":false,"explicitly\\u0041uthorized":true}');
+      const fixtureAbs = path.join(tmpRoot, 'cli-escaped-duplicate-authorization.json');
+      writeFileSync(fixtureAbs, rawDoc, 'utf-8');
+      const bytesBefore = readFileSync(fixtureAbs, 'utf-8');
+      const r = runCli(VALIDATE_CLI, ['--authorization', fixtureAbs, '--source-path', CAND_SOURCE, '--json']);
+      allOutputs.push(r.stdout, r.stderr);
+      assert.strictEqual(r.status, 1, r.stderr);
+      const j = JSON.parse(r.stdout);
+      assert.strictEqual(j.documentValid, false);
+      assert.strictEqual(j.applyReady, false);
+      assert.strictEqual(j.explicitlyAuthorized, false);
+      assert.strictEqual(j.mutationPerformed, false);
+      assert.ok(j.blockers.includes('authorization-duplicate-key'), JSON.stringify(j.blockers));
+      assert.ok(!('authorizationPath' in j), 'must not echo authorization path');
+      // fixture bytes unchanged by the read-only validator run.
+      assert.strictEqual(readFileSync(fixtureAbs, 'utf-8'), bytesBefore);
+      // safe slug only: the escaped duplicate-key spelling from the document must not leak.
+      // (`explicitlyAuthorized` is a legitimate report status field, so it is expected in output.)
+      const out = r.stdout + r.stderr;
+      assert.ok(!/u0041|\\u/.test(out), 'must not echo raw escaped key spelling');
     });
 
     // ══ F. generator happy path (synthetic repo) ═════════════════════════

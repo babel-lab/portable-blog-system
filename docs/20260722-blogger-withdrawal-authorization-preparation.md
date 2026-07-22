@@ -209,6 +209,18 @@ segment / `.fb.md`）、`sidecarPath` 唯一由 sourcePath 推導且吻合、`ex
 `approval.explicitlyAuthorized` 必為真正 boolean（`1` / `"true"` / `"yes"` 皆非授權）、duplicate semantic
 key fail-closed。
 
+**Duplicate object property names — decoded-key semantics（fail-closed）**：Authorization JSON rejects
+duplicate object property names **after JSON escape decoding**. Literal and Unicode-escaped spellings that
+decode to the same property name are treated as duplicates and fail closed before ordinary object
+last-value-wins semantics can occur. 亦即 `explicitlyAuthorized` 與 `explicitlyAuthorized`（JSON 解碼後
+皆為 `explicitlyAuthorized`）視為 duplicate、回固定 safe slug `authorization-duplicate-key`，**不**因 last-value
+覆蓋而讓危險值靜默生效。實作以獨立於 `JSON.parse` 之外的 strict recursive-descent JSON parser（於 `JSON.parse`
+**之前**）完整解析 grammar，逐 object scope 以「切出完整 JSON string token → `JSON.parse(token)` 解碼」取得與
+`JSON.parse` property-name 一致的 decoded key 後比較；duplicate 定義為 decoded property name 之 exact string
+equality（**不**做 case-fold / Unicode normalization / trim / locale transform）；malformed JSON、malformed
+escape、unterminated string、trailing comma、trailing 非空白等一律收斂為 `authorization-parse-error`。比較僅在
+duplicate detector 內部進行，**不**回顯 key 名 / 內容 / offset。
+
 reason enum（沿用 `sidecar-withdrawal-contract.js`）：`stage-preview` / `content-retirement` /
 `publication-error` / `policy` / `migration` / `other`。
 
