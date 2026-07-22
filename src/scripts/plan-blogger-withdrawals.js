@@ -40,7 +40,7 @@
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, lstatSync, statSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fg from 'fast-glob';
@@ -57,6 +57,30 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+
+// ── safe error boundary（§五）─────────────────────────────────────────────────
+// Planner 對外拋出的 error 必為 PlannerError：stable code + safe message；code / safeMessage
+// **絕不**含動態 path、raw fs error（`ENOENT: ... <abs path>`）、URL、post id、operator identity。
+// CLI 只回顯 err.safeMessage（= code），unknown / unexpected error 一律轉為 'unexpected-internal-error'。
+export class PlannerError extends Error {
+  constructor(code, { exitCode = 1 } = {}) {
+    // super(code)：message 即 code（安全短碼）。不接受 raw fs error / dynamic path。
+    super(code);
+    this.name = 'PlannerError';
+    this.code = code;
+    this.safeMessage = code;
+    this.exitCode = exitCode;
+  }
+}
+
+// 讀取文字檔；任何錯誤（ENOENT / EISDIR / EACCES / …）→ null（**不**外洩 raw fs error 之 path）。
+function safeReadTextSync(p) {
+  try {
+    return readFileSync(p, 'utf-8');
+  } catch {
+    return null;
+  }
+}
 
 // Plan-output schema version（下游 consumer 需適配時 bump）。
 export const PLAN_VERSION = 1;
@@ -78,6 +102,7 @@ export const CLASSIFICATION = Object.freeze({
   blockedSidecarMalformed: 'BLOCKED_SIDECAR_MALFORMED',
   blockedSidecarInvalid: 'BLOCKED_SIDECAR_INVALID',
   blockedSourceUnreadable: 'BLOCKED_SOURCE_UNREADABLE',
+  blockedUnsafeSourcePath: 'BLOCKED_UNSAFE_SOURCE_PATH',
 });
 
 const BLOCKED_CLASSIFICATIONS = new Set([
@@ -85,6 +110,7 @@ const BLOCKED_CLASSIFICATIONS = new Set([
   CLASSIFICATION.blockedSidecarMalformed,
   CLASSIFICATION.blockedSidecarInvalid,
   CLASSIFICATION.blockedSourceUnreadable,
+  CLASSIFICATION.blockedUnsafeSourcePath,
 ]);
 
 const USAGE = `Usage: plan-blogger-withdrawals [--json] [--help]
@@ -185,38 +211,157 @@ function getBloggerBlock(sidecar) {
   return b;
 }
 
-// gitHead 解析（純 fs 讀 .git；不啟動子行程、不連網）。支援 loose ref / packed-refs /
-// detached HEAD。任何無法解析之情況 → throw（CLI 以 exit 1 回報，並不回顯檔案內容）。
+// gitHead 解析（純 fs 讀 .git；不啟動子行程、不連網）。支援：
+//   - primary worktree（`.git` 目錄）loose ref / packed-refs / detached HEAD
+//   - linked worktree（`.git` 為 `gitdir: <path>` 指標檔）：branch ref 可能位於 common git dir
+//     （`commondir`），packed-refs 亦可能只在 common dir。
+// 任何無法解析之情況 → throw PlannerError（safe code；CLI 以 exit 1 回報，**不**回顯檔案內容 /
+// 動態 path / raw fs error）。fail-closed：只產生 `unresolvable-git-head:<reason>` 安全短碼。
 export function resolveGitHead(repoRoot) {
-  const gitDir = path.join(repoRoot, '.git');
-  const head = readFileSync(path.join(gitDir, 'HEAD'), 'utf-8').trim();
+  const dotGit = path.join(repoRoot, '.git');
+  let dgStat;
+  try {
+    dgStat = lstatSync(dotGit);
+  } catch {
+    throw new PlannerError('unresolvable-git-head:missing-dot-git');
+  }
+
+  // worktreeGitDir：`.git` 目錄 → 自身；`.git` 指標檔 → 解析 gitdir 指向之目錄。
+  let worktreeGitDir;
+  if (dgStat.isDirectory()) {
+    worktreeGitDir = dotGit;
+  } else if (dgStat.isFile()) {
+    worktreeGitDir = resolveGitdirPointer(safeReadTextSync(dotGit), repoRoot);
+  } else {
+    throw new PlannerError('unresolvable-git-head:missing-dot-git');
+  }
+
+  // commonGitDir：linked worktree 之 branch ref / packed-refs 常只在 common dir。
+  const commonGitDir = resolveCommonGitDir(worktreeGitDir);
+  const refBases = worktreeGitDir === commonGitDir ? [worktreeGitDir] : [worktreeGitDir, commonGitDir];
+
+  // HEAD
+  const rawHead = safeReadTextSync(path.join(worktreeGitDir, 'HEAD'));
+  if (rawHead == null) throw new PlannerError('unresolvable-git-head:invalid-head');
+  const head = rawHead.trim();
   if (!head.startsWith('ref:')) {
-    // detached HEAD：內容應為 40-hex。
+    // detached HEAD：只接受 40-char lowercase hex；short / uppercase / whitespace / 其他文字 → invalid。
     if (isLowercaseHex40(head)) return head;
-    throw new Error('unresolvable-git-head:detached');
+    throw new PlannerError('unresolvable-git-head:invalid-head');
   }
   const ref = head.slice(4).trim();
-  try {
-    const loose = readFileSync(path.join(gitDir, ...ref.split('/')), 'utf-8').trim();
-    if (isLowercaseHex40(loose)) return loose;
-  } catch {
-    // fall through to packed-refs
+  if (!isValidRefName(ref)) throw new PlannerError('unresolvable-git-head:invalid-head');
+
+  // loose ref：worktree git dir 優先，再 common git dir。
+  for (const base of refBases) {
+    const raw = safeReadTextSync(path.join(base, ...ref.split('/')));
+    if (raw == null) continue;
+    const sha = raw.trim();
+    if (isLowercaseHex40(sha)) return sha;
+    throw new PlannerError('unresolvable-git-head:invalid-ref');
   }
-  let packed;
-  try {
-    packed = readFileSync(path.join(gitDir, 'packed-refs'), 'utf-8');
-  } catch {
-    throw new Error('unresolvable-git-head:no-ref');
+
+  // packed-refs：worktree git dir 優先，再 common git dir。
+  for (const base of refBases) {
+    const packed = safeReadTextSync(path.join(base, 'packed-refs'));
+    if (packed == null) continue;
+    const found = findPackedRef(packed, ref);
+    if (found && found.invalid) throw new PlannerError('unresolvable-git-head:invalid-packed-refs');
+    if (found && isLowercaseHex40(found.sha)) return found.sha;
   }
-  for (const line of packed.split('\n')) {
-    if (!line || line.startsWith('#') || line.startsWith('^')) continue;
+
+  throw new PlannerError('unresolvable-git-head:missing-ref');
+}
+
+// `.git` 指標檔內容必須嚴格為單一有效 `gitdir: <path>` 行。支援 absolute / relative-to-repoRoot；
+// normalize 後必須指向一個存在之目錄。任何偏差 → invalid-gitdir-pointer / missing-gitdir（安全短碼）。
+function resolveGitdirPointer(pointer, repoRoot) {
+  if (pointer == null) throw new PlannerError('unresolvable-git-head:invalid-gitdir-pointer');
+  const lines = pointer.split('\n').map((l) => l.trim()).filter((l) => l !== '');
+  if (lines.length !== 1) throw new PlannerError('unresolvable-git-head:invalid-gitdir-pointer');
+  const m = /^gitdir:\s*(.+)$/.exec(lines[0]);
+  if (!m) throw new PlannerError('unresolvable-git-head:invalid-gitdir-pointer');
+  const target = m[1].trim();
+  if (target === '') throw new PlannerError('unresolvable-git-head:invalid-gitdir-pointer');
+  const abs = path.normalize(path.isAbsolute(target) ? target : path.resolve(repoRoot, target));
+  let tStat;
+  try {
+    tStat = statSync(abs); // 跟隨至實際目標；目標須存在且為目錄。
+  } catch {
+    throw new PlannerError('unresolvable-git-head:missing-gitdir');
+  }
+  if (!tStat.isDirectory()) throw new PlannerError('unresolvable-git-head:missing-gitdir');
+  return abs;
+}
+
+// commondir 檔（若存在）指向 common git directory；relative 以 worktree git dir 為基準。
+// 缺 commondir → common == worktree（primary worktree）。
+function resolveCommonGitDir(worktreeGitDir) {
+  const raw = safeReadTextSync(path.join(worktreeGitDir, 'commondir'));
+  if (raw == null) return worktreeGitDir;
+  const val = raw.trim();
+  if (val === '') return worktreeGitDir;
+  return path.normalize(path.isAbsolute(val) ? val : path.resolve(worktreeGitDir, val));
+}
+
+// ref 名稱基本健全性（防止 path traversal / 空白 / 控制字元注入 ref 查找）。
+function isValidRefName(ref) {
+  return (
+    typeof ref === 'string' &&
+    ref.startsWith('refs/') &&
+    !ref.includes('..') &&
+    !/[\s\0]/.test(ref) &&
+    /^[A-Za-z0-9._/-]+$/.test(ref)
+  );
+}
+
+// 於 packed-refs 內查 ref。回傳 { sha } / { invalid:true }（找到但 SHA 非 40-hex）/ null（未找到）。
+function findPackedRef(packed, ref) {
+  for (const raw of packed.split('\n')) {
+    const line = raw.trim();
+    if (line === '' || line.startsWith('#') || line.startsWith('^')) continue;
     const sp = line.indexOf(' ');
     if (sp < 0) continue;
     const sha = line.slice(0, sp).trim();
     const r = line.slice(sp + 1).trim();
-    if (r === ref && isLowercaseHex40(sha)) return sha;
+    if (r === ref) {
+      return isLowercaseHex40(sha) ? { sha } : { invalid: true };
+    }
   }
-  throw new Error('unresolvable-git-head:no-ref');
+  return null;
+}
+
+// ── symlink / junction containment（§六）──────────────────────────────────────
+// segment-safe：以 path segment 判斷 canonicalTarget 是否位於 canonicalRoot 內，**不**用字串 prefix
+// （避免 `.../posts-evil/` 被誤判為 `.../posts/` 內）。root 自身視為 inside。
+export function isInsideCanonicalRoot(canonicalRoot, canonicalTarget) {
+  const rel = path.relative(canonicalRoot, canonicalTarget);
+  if (rel === '') return true;
+  if (rel === '..' || rel.startsWith(`..${path.sep}`)) return false;
+  return !path.isAbsolute(rel);
+}
+
+// 判斷 file 是否為「位於 canonicalScanRoot 內之一般檔案」。回傳安全 reason slug（不安全）或 null（安全）。
+//   kind ∈ { 'source', 'sidecar' }。回傳值只含 kind + 固定短碼，**不**含 realpath / absolute path。
+function unsafeRegularFileReason(file, canonicalScanRoot, kind) {
+  let lst;
+  try {
+    lst = lstatSync(file);
+  } catch {
+    return `${kind}-lstat-error`;
+  }
+  if (lst.isSymbolicLink()) return `unsafe-${kind}-symlink`;
+  if (!lst.isFile()) return `unsafe-${kind}-not-regular-file`;
+  let real;
+  try {
+    real = realpathSync(file);
+  } catch {
+    return `unsafe-${kind}-unresolvable`;
+  }
+  if (canonicalScanRoot == null || !isInsideCanonicalRoot(canonicalScanRoot, real)) {
+    return `unsafe-${kind}-outside-root`;
+  }
+  return null;
 }
 
 // ── per-post classification ───────────────────────────────────────────────────
@@ -224,12 +369,41 @@ export function resolveGitHead(repoRoot) {
 //   kind ∈ { 'candidate', 'no-action', 'blocked' }。
 // 純粹依 frontmatter（stage）+ sidecar（status / publishedUrl / schema）分類；不看 frontmatter
 // 之 draft / status（withdrawal candidacy 只由 sidecar 之 active publication 真值決定）。
-async function classifyPost({ file, repoRoot }) {
+async function classifyPost({ file, repoRoot, canonicalScanRoot }) {
   const sourcePath = toRelPosix(file, repoRoot);
   const dir = path.dirname(file);
   const stem = path.basename(file, path.extname(file));
   const sidecarFile = path.join(dir, `${stem}.publish.json`);
   const sidecarPath = toRelPosix(sidecarFile, repoRoot);
+
+  // §六：source 必為位於 canonical scan root 內之一般檔（拒 symlink / junction escape / outside realpath）。
+  // blocker 只輸出 logical sourcePath + 安全短碼，**不**讀取內容、**不**輸出 realpath / outside path。
+  const srcUnsafe = unsafeRegularFileReason(file, canonicalScanRoot, 'source');
+  if (srcUnsafe) {
+    return blocked(CLASSIFICATION.blockedUnsafeSourcePath, sourcePath, null, [srcUnsafe]);
+  }
+
+  // §6.4：sidecar 即使 markdown 合法亦須獨立檢查。symlink sidecar 一律拒讀（blocker）；regular-file
+  // sidecar 其 realpath 若逸出 scan root 亦拒讀。directory / 其他非檔 → 交由既有讀取路徑（sidecar-read-error）。
+  try {
+    const sLst = lstatSync(sidecarFile);
+    if (sLst.isSymbolicLink()) {
+      return blocked(CLASSIFICATION.blockedUnsafeSourcePath, sourcePath, sidecarPath, ['unsafe-sidecar-symlink']);
+    }
+    if (sLst.isFile()) {
+      let sReal;
+      try {
+        sReal = realpathSync(sidecarFile);
+      } catch {
+        sReal = null;
+      }
+      if (sReal == null || !isInsideCanonicalRoot(canonicalScanRoot, sReal)) {
+        return blocked(CLASSIFICATION.blockedUnsafeSourcePath, sourcePath, sidecarPath, ['unsafe-sidecar-outside-root']);
+      }
+    }
+  } catch {
+    // lstat 失敗（ENOENT）→ sidecar 不存在；交由下方既有 no-sidecar 路徑處理。
+  }
 
   // markdown / frontmatter（fail-closed；不回顯 raw 內容）。
   let rawMd;
@@ -364,11 +538,25 @@ export async function planBloggerWithdrawals({ repoRoot, gitHead } = {}) {
   const root = repoRoot || PROJECT_ROOT;
   const resolvedGitHead = gitHead != null ? gitHead : resolveGitHead(root);
   if (!isLowercaseHex40(resolvedGitHead)) {
-    throw new Error('invalid-git-head');
+    throw new PlannerError('invalid-git-head');
   }
 
+  // canonical scan root（realpath）：symlink / junction containment 之基準。scan root 不存在 → 空掃描。
   const scanRoot = path.join(root, ...BLOGGER_POSTS_SUBDIR.split('/'));
-  const files = await fg('**/*.md', { cwd: scanRoot, absolute: true });
+  let canonicalScanRoot;
+  try {
+    canonicalScanRoot = realpathSync(scanRoot);
+  } catch {
+    canonicalScanRoot = null;
+  }
+
+  // followSymbolicLinks:false → fast-glob 不走進 symlink / junction 目錄（其下檔案永不被讀取）。
+  // onlyFiles:false → symlink 檔項與非一般檔仍會被列出（**不**被 fast-glob 靜默丟棄），交由
+  // classifyPost / unsafeRegularFileReason 以 lstat + realpath containment 分類為 blocker——
+  // 「不靜默忽略潛在 Blogger 文章、讓 operator 看得到不安全 entry」（§6.3）。
+  const files = canonicalScanRoot == null
+    ? []
+    : await fg('**/*.md', { cwd: scanRoot, absolute: true, followSymbolicLinks: false, onlyFiles: false });
   const postFiles = files.filter((f) => !f.endsWith('.fb.md')).sort(cmpString);
 
   const candidates = [];
@@ -379,7 +567,7 @@ export async function planBloggerWithdrawals({ repoRoot, gitHead } = {}) {
 
   for (const file of postFiles) {
     scannedPostCount += 1;
-    const record = await classifyPost({ file, repoRoot: root });
+    const record = await classifyPost({ file, repoRoot: root, canonicalScanRoot });
     // preview-target tally：任何 resolved preview stage 之 record（candidate / preview no-action /
     // preview-sidecar blocker）都算 preview target；invalid-stage / production / no-blogger-target 不算。
     if (isPreviewTargetRecord(record)) previewTargetCount += 1;
@@ -554,8 +742,12 @@ if (isMain) {
   main()
     .then((code) => process.exit(typeof code === 'number' ? code : 0))
     .catch((err) => {
-      // 只回顯安全短碼（err.message 已由本檔全程控制為 code-like；不含檔案內容 / secret）。
-      process.stderr.write(`[plan-blogger-withdrawals] UNEXPECTED ERROR: ${err.message || 'error'}\n`);
-      process.exit(1);
+      // 安全錯誤邊界（§五）：PlannerError → 回顯其 safeMessage（stable code）+ 專屬 exit code；
+      // 其他任何 unknown / unexpected error → 一律 'unexpected-internal-error'。**絕不**回顯 raw
+      // err.message / stack / absolute path / secret。
+      const code = err instanceof PlannerError ? err.safeMessage : 'unexpected-internal-error';
+      const exit = err instanceof PlannerError && typeof err.exitCode === 'number' ? err.exitCode : 1;
+      process.stderr.write(`[plan-blogger-withdrawals] ERROR: ${code}\n`);
+      process.exit(exit);
     });
 }

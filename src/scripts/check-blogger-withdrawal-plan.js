@@ -18,7 +18,15 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  readFileSync,
+  readdirSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +38,8 @@ import {
   resolveGitHead,
   parseArgs,
   exitCodeForPlan,
+  isInsideCanonicalRoot,
+  PlannerError,
   CLASSIFICATION,
   CANDIDATE_NEXT_ACTION,
   CANDIDATE_REASON,
@@ -151,6 +161,130 @@ function runCli(repoRoot, extraArgs = []) {
   } catch (err) {
     return { status: err.status, stdout: err.stdout || '', stderr: err.stderr || '' };
   }
+}
+
+// 不注入 --git-head：迫使 CLI 走真正 resolveGitHead（用於 linked-worktree / invalid-layout / redaction）。
+function runCliNoHead(repoRoot, extraArgs = []) {
+  const args = [PLANNER, '--repo-root', repoRoot, ...extraArgs];
+  try {
+    const stdout = execFileSync(process.execPath, args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { status: 0, stdout, stderr: '' };
+  } catch (err) {
+    return { status: err.status, stdout: err.stdout || '', stderr: err.stderr || '' };
+  }
+}
+
+// ── synthetic .git layout builders（純檔案；於 OS temp 內自建自清）─────────────────
+const SHA_A = 'a'.repeat(40); // synthetic 40-hex（**非**真 commit）
+const SHA_B = 'b'.repeat(40);
+const GIT_SECRET_ABS = process.platform === 'win32'
+  ? 'C:\\Users\\secret\\repo\\SECRET-GIT-PATH\\gitdir'
+  : '/d/private/repo/SECRET-GIT-PATH/gitdir';
+
+function newTmp(prefix) {
+  return mkdtempSync(path.join(tmpdir(), prefix));
+}
+
+// 於 <root>/.git（目錄）建 primary worktree 佈局。head='ref'|'detached'；ref via loose|packed。
+function writePrimaryGit(root, { detached = false, sha = SHA_A, via = 'loose', ref = 'refs/heads/main', headSha } = {}) {
+  const gitDir = path.join(root, '.git');
+  mkdirSync(gitDir, { recursive: true });
+  if (detached) {
+    writeFileSync(path.join(gitDir, 'HEAD'), `${headSha != null ? headSha : sha}\n`);
+    return gitDir;
+  }
+  writeFileSync(path.join(gitDir, 'HEAD'), `ref: ${ref}\n`);
+  if (via === 'loose') {
+    const refPath = path.join(gitDir, ...ref.split('/'));
+    mkdirSync(path.dirname(refPath), { recursive: true });
+    writeFileSync(refPath, `${sha}\n`);
+  } else if (via === 'packed') {
+    writeFileSync(path.join(gitDir, 'packed-refs'), `# pack-refs with: peeled fully-peeled sorted\n${sha} ${ref}\n`);
+  }
+  return gitDir;
+}
+
+// 建 linked worktree 佈局：<root>/.git 為指標檔 → worktreeGitDir；commonGitDir 內含 branch ref。
+//   ptr: 'absolute'|'relative'；refLoc: 'worktree'|'common'；via: 'loose'|'packed'；detached
+function writeLinkedWorktreeGit(root, { ptr = 'absolute', refLoc = 'common', via = 'loose', ref = 'refs/heads/wt', sha = SHA_B, detached = false, withCommondir = true } = {}) {
+  // common git dir（模擬主 repo 的 .git）
+  const commonDir = path.join(root, 'maingit');
+  mkdirSync(commonDir, { recursive: true });
+  // worktree git dir（模擬 .git/worktrees/<name>）
+  const wtDir = path.join(commonDir, 'worktrees', 'wt1');
+  mkdirSync(wtDir, { recursive: true });
+
+  if (detached) {
+    writeFileSync(path.join(wtDir, 'HEAD'), `${sha}\n`);
+  } else {
+    writeFileSync(path.join(wtDir, 'HEAD'), `ref: ${ref}\n`);
+    const base = refLoc === 'common' ? commonDir : wtDir;
+    if (via === 'loose') {
+      const refPath = path.join(base, ...ref.split('/'));
+      mkdirSync(path.dirname(refPath), { recursive: true });
+      writeFileSync(refPath, `${sha}\n`);
+    } else {
+      writeFileSync(path.join(base, 'packed-refs'), `# pack-refs\n${sha} ${ref}\n`);
+    }
+  }
+  if (withCommondir) {
+    const rel = path.relative(wtDir, commonDir);
+    writeFileSync(path.join(wtDir, 'commondir'), `${rel}\n`);
+  }
+  // .git 指標檔
+  const pointerTarget = ptr === 'absolute' ? wtDir : path.relative(root, wtDir);
+  writeFileSync(path.join(root, '.git'), `gitdir: ${pointerTarget}\n`);
+  return { wtDir, commonDir };
+}
+
+// symlink / junction 能力探測（Windows 上 symlink 常需權限；junction 通常可）。
+function probeCapability(type) {
+  const d = newTmp('cap-');
+  try {
+    const target = path.join(d, 'target');
+    mkdirSync(target, { recursive: true });
+    if (type === 'junction') {
+      symlinkSync(target, path.join(d, 'link'), 'junction');
+    } else {
+      const f = path.join(d, 'f');
+      writeFileSync(f, 'x');
+      symlinkSync(f, path.join(d, 'l'), 'file');
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    try { rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+}
+const SYMLINK_OK = probeCapability('file');
+const JUNCTION_OK = probeCapability('junction');
+const skippedOsFixtures = [];
+
+// deterministic JSON via CLI with a controlled env (for TZ determinism proof)。
+function runCliEnv(repoRoot, env) {
+  const args = [PLANNER, '--repo-root', repoRoot, '--git-head', HEX40, '--json'];
+  try {
+    const stdout = execFileSync(process.execPath, args, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
+    });
+    return { status: 0, stdout };
+  } catch (err) {
+    return { status: err.status, stdout: err.stdout || '' };
+  }
+}
+
+// 於 dir 外部（scan root 之外）寫一組看似合格的 preview 候選（含 SECRET_URL），用以證明 escape 不被讀取。
+function writeOutsideCandidate(dir, name) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, `${name}.md`), mdText({ stage: 'preview' }), 'utf-8');
+  writeFileSync(
+    path.join(dir, `${name}.publish.json`),
+    JSON.stringify(activePublishedSidecar({ publishedUrl: SECRET_URL }), null, 2),
+    'utf-8',
+  );
 }
 
 // ── real-repo sidecar hash manifest / posts listing（read-only）────────────────────
@@ -460,6 +594,405 @@ async function main() {
     const banned = ['blog' + 'spot.com', 'babel' + '-lab', 'git' + 'hub.io'];
     for (const needle of banned) assert.ok(!src.includes(needle), 'guard source must not contain a real production host');
     assert.ok(src.includes('.invalid'), 'guard must use .invalid synthetic host');
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // Phase 5：git HEAD resolution across layouts（synthetic .git in OS temp；純函式）
+  // ════════════════════════════════════════════════════════════════════════════════
+  const withTmp = (prefix, fn) => {
+    const root = newTmp(prefix);
+    try {
+      return fn(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+  const expectGitHeadError = (root, expectedCode) => {
+    let thrown = null;
+    try {
+      resolveGitHead(root);
+    } catch (e) {
+      thrown = e;
+    }
+    assert.ok(thrown, 'expected resolveGitHead to throw');
+    assert.ok(thrown instanceof PlannerError, 'must throw PlannerError, not raw fs error');
+    assert.equal(thrown.code, expectedCode);
+    return thrown;
+  };
+
+  check('G1. primary worktree loose ref → resolves SHA', () => {
+    withTmp('gl-', (root) => {
+      writePrimaryGit(root, { via: 'loose', sha: SHA_A });
+      assert.equal(resolveGitHead(root), SHA_A);
+    });
+  });
+  check('G2. primary worktree packed ref → resolves SHA', () => {
+    withTmp('gl-', (root) => {
+      writePrimaryGit(root, { via: 'packed', sha: SHA_A });
+      assert.equal(resolveGitHead(root), SHA_A);
+    });
+  });
+  check('G3. detached HEAD (40-hex) → resolves SHA', () => {
+    withTmp('gl-', (root) => {
+      writePrimaryGit(root, { detached: true, sha: SHA_B });
+      assert.equal(resolveGitHead(root), SHA_B);
+    });
+  });
+  check('G4. linked worktree .git pointer file (absolute) + common branch ref → resolves', () => {
+    withTmp('gl-', (root) => {
+      writeLinkedWorktreeGit(root, { ptr: 'absolute', refLoc: 'common', via: 'loose', sha: SHA_B });
+      assert.equal(resolveGitHead(root), SHA_B);
+    });
+  });
+  check('G5. linked worktree relative gitdir pointer → resolves', () => {
+    withTmp('gl-', (root) => {
+      writeLinkedWorktreeGit(root, { ptr: 'relative', refLoc: 'common', via: 'loose', sha: SHA_A });
+      assert.equal(resolveGitHead(root), SHA_A);
+    });
+  });
+  check('G6. linked worktree commondir honored (ref lives only in common dir)', () => {
+    withTmp('gl-', (root) => {
+      writeLinkedWorktreeGit(root, { refLoc: 'common', via: 'loose', sha: SHA_B, withCommondir: true });
+      assert.equal(resolveGitHead(root), SHA_B);
+    });
+  });
+  check('G7. linked worktree branch ref in common dir (non-default branch name)', () => {
+    withTmp('gl-', (root) => {
+      writeLinkedWorktreeGit(root, { refLoc: 'common', via: 'loose', ref: 'refs/heads/feature', sha: SHA_A });
+      assert.equal(resolveGitHead(root), SHA_A);
+    });
+  });
+  check('G8. linked worktree packed ref in common dir → resolves', () => {
+    withTmp('gl-', (root) => {
+      writeLinkedWorktreeGit(root, { refLoc: 'common', via: 'packed', sha: SHA_B });
+      assert.equal(resolveGitHead(root), SHA_B);
+    });
+  });
+  check('G9. missing .git → missing-dot-git', () => {
+    withTmp('gl-', (root) => expectGitHeadError(root, 'unresolvable-git-head:missing-dot-git'));
+  });
+  check('G10. malformed gitdir pointer → invalid-gitdir-pointer', () => {
+    withTmp('gl-', (root) => {
+      writeFileSync(path.join(root, '.git'), 'not-a-gitdir-pointer\n');
+      expectGitHeadError(root, 'unresolvable-git-head:invalid-gitdir-pointer');
+    });
+  });
+  check('G11. missing gitdir target → missing-gitdir', () => {
+    withTmp('gl-', (root) => {
+      writeFileSync(path.join(root, '.git'), `gitdir: ${GIT_SECRET_ABS}\n`);
+      expectGitHeadError(root, 'unresolvable-git-head:missing-gitdir');
+    });
+  });
+  check('G12. malformed HEAD → invalid-head', () => {
+    withTmp('gl-', (root) => {
+      const g = path.join(root, '.git');
+      mkdirSync(g, { recursive: true });
+      writeFileSync(path.join(g, 'HEAD'), 'garbage-not-ref-not-sha\n');
+      expectGitHeadError(root, 'unresolvable-git-head:invalid-head');
+    });
+  });
+  check('G13. missing symbolic ref (loose + packed absent) → missing-ref', () => {
+    withTmp('gl-', (root) => {
+      const g = path.join(root, '.git');
+      mkdirSync(g, { recursive: true });
+      writeFileSync(path.join(g, 'HEAD'), 'ref: refs/heads/main\n');
+      expectGitHeadError(root, 'unresolvable-git-head:missing-ref');
+    });
+  });
+  check('G14. invalid loose ref SHA → invalid-ref', () => {
+    withTmp('gl-', (root) => {
+      const g = writePrimaryGit(root, { via: 'loose', sha: SHA_A });
+      writeFileSync(path.join(g, 'refs', 'heads', 'main'), 'ZZZZ-not-hex\n');
+      expectGitHeadError(root, 'unresolvable-git-head:invalid-ref');
+    });
+  });
+  check('G15. malformed packed-refs (matching ref, non-hex SHA) → invalid-packed-refs', () => {
+    withTmp('gl-', (root) => {
+      const g = path.join(root, '.git');
+      mkdirSync(g, { recursive: true });
+      writeFileSync(path.join(g, 'HEAD'), 'ref: refs/heads/main\n');
+      writeFileSync(path.join(g, 'packed-refs'), '# hdr\nNOThex40 refs/heads/main\n');
+      expectGitHeadError(root, 'unresolvable-git-head:invalid-packed-refs');
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // Phase 6：error redaction（no absolute path / no raw fs error / safe stderr only）
+  // ════════════════════════════════════════════════════════════════════════════════
+  const REDACT_BANNED = [
+    'C:\\Users\\secret\\repo\\.git\\HEAD',
+    '/d/private/repo/.git/HEAD',
+    'operator@example.invalid',
+    'SECRET-GIT-PATH',
+    GIT_SECRET_ABS,
+  ];
+  const assertNoBannedPath = (text) => {
+    for (const b of REDACT_BANNED) assert.ok(!text.includes(b), `must not leak ${b}`);
+    assert.ok(!/ENOENT/.test(text), 'must not leak raw ENOENT');
+    assert.ok(!/\.git[\\/]HEAD/.test(text), 'must not leak .git/HEAD path');
+  };
+
+  check('R16. linked-worktree failure error carries no absolute path / secret', () => {
+    withTmp('rd-', (root) => {
+      writeFileSync(path.join(root, '.git'), `gitdir: ${GIT_SECRET_ABS}\n`);
+      const e = expectGitHeadError(root, 'unresolvable-git-head:missing-gitdir');
+      assertNoBannedPath(e.code);
+      assertNoBannedPath(String(e.message));
+    });
+  });
+  check('R17. missing .git error carries no repo path', () => {
+    withTmp('rd-', (root) => {
+      const e = expectGitHeadError(root, 'unresolvable-git-head:missing-dot-git');
+      assert.ok(!e.code.includes(root) && !String(e.message).includes(root));
+      assertNoBannedPath(e.code);
+    });
+  });
+  check('R18. missing HEAD fs error → invalid-head, no ENOENT raw path', () => {
+    withTmp('rd-', (root) => {
+      mkdirSync(path.join(root, '.git'), { recursive: true }); // .git dir, but no HEAD file
+      const e = expectGitHeadError(root, 'unresolvable-git-head:invalid-head');
+      assert.ok(!/ENOENT/.test(String(e.message)));
+      assert.ok(!String(e.message).includes(root));
+    });
+  });
+  check('R19. CLI maps non-PlannerError → unexpected-internal-error; never echoes raw err.message', () => {
+    const src = readFileSync(PLANNER, 'utf-8');
+    assert.ok(src.includes('unexpected-internal-error'), 'planner must define unexpected-internal-error fallback');
+    assert.ok(!/stderr\.write\([^)]*err\.message/.test(src), 'CLI must not write raw err.message to stderr');
+  });
+  check('R20. CLI stderr on git-head failure = single safe code line only', () => {
+    withTmp('rd-', (root) => {
+      mkdirSync(path.join(root, 'content', 'blogger', 'posts'), { recursive: true });
+      writeFileSync(path.join(root, '.git'), `gitdir: ${GIT_SECRET_ABS}\n`);
+      const r = runCliNoHead(root, ['--json']);
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, /^\[plan-blogger-withdrawals\] ERROR: unresolvable-git-head:[a-z-]+\n$/);
+      assertNoBannedPath(r.stderr);
+      assert.equal(r.stdout, '');
+    });
+  });
+  check('R21. CLI stderr on failure has no stack trace / file:line / secret', () => {
+    withTmp('rd-', (root) => {
+      mkdirSync(path.join(root, 'content', 'blogger', 'posts'), { recursive: true });
+      writeFileSync(path.join(root, '.git'), 'totally-invalid-gitdir\n');
+      const r = runCliNoHead(root);
+      assert.equal(r.status, 1);
+      assert.ok(!/\bat\s+\w/.test(r.stderr), 'no stack frames');
+      assert.ok(!/\.js:\d+/.test(r.stderr), 'no file:line');
+      assertNoBannedPath(r.stderr);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // Phase 7：symlink / junction containment + segment-safe root check
+  // ════════════════════════════════════════════════════════════════════════════════
+  check('S31. containment segment-safe: root itself + nested inside → true', () => {
+    const root = path.sep === '\\' ? 'C:\\repo\\posts' : '/repo/posts';
+    assert.equal(isInsideCanonicalRoot(root, root), true);
+    assert.equal(isInsideCanonicalRoot(root, path.join(root, 'sub', 'a.md')), true);
+  });
+  check('S32. containment: sibling prefix NOT inside (posts-evil vs posts) + parent outside', () => {
+    const root = path.sep === '\\' ? 'C:\\repo\\posts' : '/repo/posts';
+    assert.equal(isInsideCanonicalRoot(root, `${root}-evil${path.sep}a.md`), false);
+    assert.equal(isInsideCanonicalRoot(root, path.join(path.dirname(root), 'outside.md')), false);
+  });
+
+  // S30：安全巢狀一般檔仍被掃描為 candidate
+  const nestRepo = makeTempRepo();
+  mkdirSync(path.join(nestRepo.postsDir, 'sub'), { recursive: true });
+  writeFileSync(path.join(nestRepo.postsDir, 'sub', 'nested.md'), mdText({ stage: 'preview' }), 'utf-8');
+  writeFileSync(
+    path.join(nestRepo.postsDir, 'sub', 'nested.publish.json'),
+    JSON.stringify(activePublishedSidecar({ publishedUrl: 'https://example.invalid/nested' }), null, 2),
+    'utf-8',
+  );
+  const nestPlan = await planBloggerWithdrawals({ repoRoot: nestRepo.root, gitHead: HEX40 });
+  nestRepo.dispose();
+  check('S30. safe nested regular file still scanned as candidate', () => {
+    assert.ok(nestPlan.candidates.some((c) => c.sourcePath === 'content/blogger/posts/sub/nested.md'));
+  });
+
+  // S22/S24：junction 目錄指向 repo 外
+  let jPlan = null;
+  let jOutside = null;
+  if (JUNCTION_OK) {
+    const repo = makeTempRepo();
+    jOutside = newTmp('evil-out-');
+    try {
+      repo.writePost('good', { stage: 'preview' }, activePublishedSidecar({ publishedUrl: 'https://example.invalid/good' }));
+      writeOutsideCandidate(jOutside, 'evil');
+      symlinkSync(jOutside, path.join(repo.postsDir, 'jdir'), 'junction');
+      jPlan = await planBloggerWithdrawals({ repoRoot: repo.root, gitHead: HEX40 });
+    } finally {
+      try { rmSync(path.join(repo.postsDir, 'jdir'), { recursive: false, force: true }); } catch { /* ignore */ }
+      try { repo.dispose(); } catch { /* ignore */ }
+      try { rmSync(jOutside, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  } else {
+    skippedOsFixtures.push('S22/S24 junction-dir-to-outside (junction unsupported)');
+  }
+  check('S22/S24. junction dir → outside candidate NOT admitted; good candidate intact; no leak', () => {
+    if (!JUNCTION_OK) {
+      assert.ok(skippedOsFixtures.some((s) => s.startsWith('S22')));
+      return;
+    }
+    const evilPath = 'content/blogger/posts/jdir/evil.md';
+    assert.ok(!jPlan.candidates.some((c) => c.sourcePath === evilPath), 'outside candidate must not be admitted');
+    assert.equal(jPlan.summary.candidateCount, 1);
+    const evilBlocker = jPlan.blockers.find((b) => b.sourcePath === evilPath);
+    if (evilBlocker) assert.equal(evilBlocker.classification, CLASSIFICATION.blockedUnsafeSourcePath);
+    const j = formatJson(jPlan);
+    assert.ok(!j.includes('secret.invalid'), 'no outside URL host leak');
+    assert.ok(!j.includes(SECRET_URL));
+    assert.ok(!j.includes(jOutside), 'no outside absolute path leak');
+  });
+
+  // S23：symlink 檔指向 repo 外
+  let symFilePlan = null;
+  let symFileOutsideDir = null;
+  if (SYMLINK_OK) {
+    const repo = makeTempRepo();
+    symFileOutsideDir = newTmp('evil-file-');
+    try {
+      writeOutsideCandidate(symFileOutsideDir, 'evilfile');
+      symlinkSync(path.join(symFileOutsideDir, 'evilfile.md'), path.join(repo.postsDir, 'evillink.md'), 'file');
+      symFilePlan = await planBloggerWithdrawals({ repoRoot: repo.root, gitHead: HEX40 });
+    } finally {
+      try { rmSync(path.join(repo.postsDir, 'evillink.md'), { force: true }); } catch { /* ignore */ }
+      try { repo.dispose(); } catch { /* ignore */ }
+      try { rmSync(symFileOutsideDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  } else {
+    skippedOsFixtures.push('S23 symlink-file-to-outside (symlink unsupported)');
+  }
+  check('S23/S26. symlink file → outside markdown not read; unsafe-source blocker; no leak', () => {
+    if (!SYMLINK_OK) {
+      assert.ok(skippedOsFixtures.some((s) => s.startsWith('S23')));
+      return;
+    }
+    const linkPath = 'content/blogger/posts/evillink.md';
+    assert.ok(!symFilePlan.candidates.some((c) => c.sourcePath === linkPath), 'symlink must not become candidate');
+    const b = symFilePlan.blockers.find((x) => x.sourcePath === linkPath);
+    assert.ok(b, 'symlink source must surface as blocker');
+    assert.equal(b.classification, CLASSIFICATION.blockedUnsafeSourcePath);
+    assert.deepEqual(b.details, ['unsafe-source-symlink']);
+    const j = formatJson(symFilePlan);
+    assert.ok(!j.includes('secret.invalid') && !j.includes(SECRET_URL) && !j.includes(symFileOutsideDir));
+  });
+
+  // S25：symlink sidecar（markdown 合法但 sidecar 為 symlink）
+  let symSidePlan = null;
+  let symSideOutsideDir = null;
+  if (SYMLINK_OK) {
+    const repo = makeTempRepo();
+    symSideOutsideDir = newTmp('evil-side-');
+    try {
+      mkdirSync(symSideOutsideDir, { recursive: true });
+      writeFileSync(
+        path.join(symSideOutsideDir, 'secret.publish.json'),
+        JSON.stringify(activePublishedSidecar({ publishedUrl: SECRET_URL }), null, 2),
+        'utf-8',
+      );
+      writeFileSync(path.join(repo.postsDir, 'legit.md'), mdText({ stage: 'preview' }), 'utf-8');
+      symlinkSync(path.join(symSideOutsideDir, 'secret.publish.json'), path.join(repo.postsDir, 'legit.publish.json'), 'file');
+      symSidePlan = await planBloggerWithdrawals({ repoRoot: repo.root, gitHead: HEX40 });
+    } finally {
+      try { rmSync(path.join(repo.postsDir, 'legit.publish.json'), { force: true }); } catch { /* ignore */ }
+      try { repo.dispose(); } catch { /* ignore */ }
+      try { rmSync(symSideOutsideDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  } else {
+    skippedOsFixtures.push('S25 symlink-sidecar-to-outside (symlink unsupported)');
+  }
+  check('S25/S27. symlink sidecar → not read; unsafe-sidecar blocker; no leak', () => {
+    if (!SYMLINK_OK) {
+      assert.ok(skippedOsFixtures.some((s) => s.startsWith('S25')));
+      return;
+    }
+    const src = 'content/blogger/posts/legit.md';
+    assert.ok(!symSidePlan.candidates.some((c) => c.sourcePath === src), 'symlink sidecar must not yield candidate');
+    const b = symSidePlan.blockers.find((x) => x.sourcePath === src);
+    assert.ok(b, 'symlink sidecar must surface as blocker');
+    assert.equal(b.classification, CLASSIFICATION.blockedUnsafeSourcePath);
+    assert.deepEqual(b.details, ['unsafe-sidecar-symlink']);
+    const j = formatJson(symSidePlan);
+    assert.ok(!j.includes('secret.invalid') && !j.includes(SECRET_URL) && !j.includes(symSideOutsideDir));
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // Phase 8：real linked worktree（git worktree add --detach；OS temp；primary 不受污染）
+  // ════════════════════════════════════════════════════════════════════════════════
+  let lwRan = false;
+  let lwCli = null;
+  let lwPrimaryHead = null;
+  let lwWtDir = null;
+  let lwPrimaryJson = null;
+  try {
+    lwWtDir = newTmp('wt-');
+    rmSync(lwWtDir, { recursive: true, force: true }); // `git worktree add` requires a non-existent path
+    execFileSync('git', ['-C', PROJECT_ROOT, 'worktree', 'add', '--detach', lwWtDir, 'HEAD'], { stdio: 'ignore' });
+    lwPrimaryHead = resolveGitHead(PROJECT_ROOT);
+    lwCli = runCliNoHead(lwWtDir, ['--json']); // current planner, repoRoot = linked worktree → real resolveGitHead
+    lwPrimaryJson = formatJson(await planBloggerWithdrawals({ repoRoot: PROJECT_ROOT, gitHead: lwPrimaryHead }));
+    lwRan = true;
+  } catch (e) {
+    skippedOsFixtures.push(`real-linked-worktree (${(e && e.code) || 'error'})`);
+  } finally {
+    if (lwWtDir) {
+      try { execFileSync('git', ['-C', PROJECT_ROOT, 'worktree', 'remove', '--force', lwWtDir], { stdio: 'ignore' }); } catch { /* ignore */ }
+      try { execFileSync('git', ['-C', PROJECT_ROOT, 'worktree', 'prune'], { stdio: 'ignore' }); } catch { /* ignore */ }
+      try { rmSync(lwWtDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  }
+  const lw = lwRan ? JSON.parse(lwCli.stdout) : null;
+  check('LW1. real linked worktree: CLI exit 0 + gitHead full 40-hex matching primary', () => {
+    assert.ok(lwRan, 'real linked-worktree fixture must run in a git repo');
+    assert.equal(lwCli.status, 0);
+    assert.match(lw.gitHead, /^[0-9a-f]{40}$/);
+    assert.equal(lw.gitHead, lwPrimaryHead);
+  });
+  check('LW2. real linked worktree: candidate identity + summary structurally match primary', () => {
+    assert.ok(lwRan);
+    const primary = JSON.parse(lwPrimaryJson);
+    // 結構一致：candidate 路徑 / summary counts / gitHead 全等（證明 linked-worktree gitHead 解析 +
+    // 掃描與 primary 等價）。**不**斷言跨 checkout 的 content-byte hash 相等——`git worktree add` 會
+    // 重新 checkout，Windows 上 git 會依 core.autocrlf 正規化行尾，使 checkout bytes 與 working tree
+    // 不同；此為 git checkout artifact，**非** planner 屬性。
+    assert.equal(lw.summary.candidateCount, 1);
+    assert.equal(lw.candidates[0].sourcePath, TARGET_SOURCE);
+    assert.equal(lw.candidates[0].sidecarPath, TARGET_SIDECAR);
+    assert.deepEqual(lw.summary, primary.summary);
+    assert.equal(lw.gitHead, primary.gitHead);
+    assert.deepEqual(
+      lw.candidates.map((c) => c.sourcePath),
+      primary.candidates.map((c) => c.sourcePath),
+    );
+  });
+  check('LW3. real linked worktree: output leaks no absolute worktree path / gitdir', () => {
+    assert.ok(lwRan);
+    assert.ok(!lwCli.stdout.includes(lwWtDir), 'no absolute worktree path in JSON');
+    assert.ok(!/gitdir/.test(lwCli.stdout), 'no gitdir token in JSON');
+    assert.equal(lwCli.stderr, '');
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // Phase 9：determinism（TZ-independent）+ OS-fixture disclosure
+  // ════════════════════════════════════════════════════════════════════════════════
+  const tzA = runCliEnv(PROJECT_ROOT, { TZ: 'UTC' });
+  const tzB = runCliEnv(PROJECT_ROOT, { TZ: 'Asia/Taipei' });
+  check('D-TZ. real repo --json byte-identical under TZ=UTC vs TZ=Asia/Taipei', () => {
+    assert.equal(tzA.status, 0);
+    assert.equal(tzB.status, 0);
+    assert.equal(tzA.stdout, tzB.stdout);
+  });
+  check('OS-fixture disclosure: skipped OS-specific fixtures are explicitly recorded', () => {
+    // 本檢查恆通過；其副作用是在 summary 前印出被略過之 OS-specific fixture（供 final report）。
+    if (skippedOsFixtures.length > 0) {
+      console.log(`[NOTE] skipped OS-specific fixtures: ${skippedOsFixtures.join('; ')}`);
+    } else {
+      console.log('[NOTE] no OS-specific fixtures skipped (symlink + junction both exercised)');
+    }
+    assert.ok(true);
   });
 }
 
