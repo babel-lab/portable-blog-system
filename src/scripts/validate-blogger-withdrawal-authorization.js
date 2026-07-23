@@ -46,6 +46,10 @@ import {
   computePlanFingerprint,
   computeRecordFingerprint,
 } from './blogger-withdrawal-authorization.js';
+import {
+  isWithdrawalEligibleRemoteDisposition,
+  REMOTE_LIVE_BLOCKER,
+} from './sidecar-withdrawal-contract.js';
 
 function sha256HexOfString(text) {
   return createHash('sha256').update(text, 'utf-8').digest('hex');
@@ -158,6 +162,11 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
     repositoryBindingsMatched: false,
     planBindingsMatched: false,
     recordBindingsMatched: false,
+    // Slice 4G：syntactically-valid remote disposition ≠ withdrawal-eligible remote disposition。
+    //   `remote-live` 是合法遠端觀察值（documentValid 可為 true），但代表 Blogger 文章仍公開，
+    //   撤回會讓 metadata 與遠端真值脫節，故 applyReady 必為 false。任何只讀 applyReady 之 consumer
+    //   不會被誤導：applyReady=true ⇒ remoteDispositionEligible=true。
+    remoteDispositionEligible: false,
     explicitlyAuthorized: false,
     applyReady: false,
     mutationPerformed: false,
@@ -196,6 +205,12 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
   result.documentValid = true;
   const auth = parsed.authorization;
   result.explicitlyAuthorized = parsed.explicitlyAuthorized;
+  // Slice 4G：withdrawal-eligibility gate 獨立於 schema enum check。
+  //   parseAndValidateAuthorization 已保證 remoteDisposition ∈ REMOTE_DISPOSITIONS（含 remote-live）；
+  //   本 gate 於 documentValid 之後、repo/plan/record binding 之前決定，讓 blocker 順序 deterministic：
+  //   fully-valid remote-live authorization 之 blockers = [remote-disposition-still-live]。
+  result.remoteDispositionEligible = isWithdrawalEligibleRemoteDisposition(auth.withdrawal.remoteDisposition);
+  if (!result.remoteDispositionEligible) blockers.push(REMOTE_LIVE_BLOCKER);
   // Bind the exact raw authorization bytes that passed schema validation. Post-preflight
   // re-reads compare their SHA-256 against this value; any byte-level drift (whitespace,
   // key order, reasonDetail, reason, remoteDisposition, operator identity) is refused.
@@ -290,8 +305,10 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
   if (!result.explicitlyAuthorized) blockers.push('explicit-authorization-not-granted');
 
   // ── applyReady classification（即使 true 也不 apply）──────────────────
+  //   Slice 4G：remoteDispositionEligible 必為 true 才可能 applyReady。
   result.applyReady =
     result.documentValid &&
+    result.remoteDispositionEligible &&
     result.repositoryBindingsMatched &&
     result.planBindingsMatched &&
     result.recordBindingsMatched &&
@@ -314,6 +331,7 @@ export function formatJson(result) {
     repositoryBindingsMatched: result.repositoryBindingsMatched,
     planBindingsMatched: result.planBindingsMatched,
     recordBindingsMatched: result.recordBindingsMatched,
+    remoteDispositionEligible: result.remoteDispositionEligible,
     explicitlyAuthorized: result.explicitlyAuthorized,
     applyReady: result.applyReady,
     mutationPerformed: result.mutationPerformed,
@@ -339,6 +357,7 @@ export function formatHumanReadable(result) {
   lines.push(`repository bindings matched:     ${result.repositoryBindingsMatched ? 'YES' : 'NO'}`);
   lines.push(`plan bindings matched:           ${result.planBindingsMatched ? 'YES' : 'NO'}`);
   lines.push(`record bindings matched:         ${result.recordBindingsMatched ? 'YES' : 'NO'}`);
+  lines.push(`remote disposition eligible:     ${result.remoteDispositionEligible ? 'YES' : 'NO'}`);
   lines.push(`explicitly authorized:           ${result.explicitlyAuthorized ? 'YES' : 'NO'}`);
   lines.push(`apply ready:                     ${result.applyReady ? 'YES' : 'NO'}`);
   lines.push('mutation performed:              NO');

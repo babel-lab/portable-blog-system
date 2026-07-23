@@ -55,6 +55,23 @@ export const REMOTE_DISPOSITIONS = Object.freeze(
   ]),
 );
 
+// Slice 4G：syntactically-valid remote disposition ≠ withdrawal-eligible remote disposition。
+// `remote-live` 代表 operator 已查證遠端 Blogger 文章仍公開；此為合法觀察值（保留於 REMOTE_DISPOSITIONS），
+// 但**不得**構成 withdrawal authorization 依據 —— 撤回一篇仍公開之文章即代表 metadata 與遠端真值脫節。
+// 其他既有 disposition（remote-draft / remote-deleted / remote-unavailable / remote-permalink-changed /
+// operator-confirmed-inactive）於本 Slice 維持既有 withdrawal-eligible 行為，不重新定義其語意。
+// 未來若需針對其他 disposition 收緊：**另開 phase + explicit approval**；本 helper 只封鎖 remote-live。
+// Unknown value → false（fail-closed；與 REMOTE_DISPOSITIONS enum 檢查串接，不作為 shape gate）。
+export const WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS = Object.freeze(new Set(['remote-live']));
+
+// 穩定 blocker slug；preparation / preflight / rehearsal / guards / docs 一致使用。
+export const REMOTE_LIVE_BLOCKER = 'remote-disposition-still-live';
+
+export function isWithdrawalEligibleRemoteDisposition(value) {
+  if (!REMOTE_DISPOSITIONS.has(value)) return false;
+  return !WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS.has(value);
+}
+
 // schemaVersion 2 之 blogger.status 合法 enum（correction §七 fail-closed）。case-sensitive（小寫）。
 export const V2_BLOGGER_STATUSES = Object.freeze(
   new Set(['draft', 'ready', 'published', 'archived', 'withdrawn']),

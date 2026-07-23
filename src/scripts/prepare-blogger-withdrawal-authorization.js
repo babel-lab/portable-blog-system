@@ -48,6 +48,8 @@ import { planBloggerWithdrawals } from './plan-blogger-withdrawals.js';
 import {
   REMOTE_DISPOSITIONS,
   LIFECYCLE_REASONS,
+  isWithdrawalEligibleRemoteDisposition,
+  REMOTE_LIVE_BLOCKER,
 } from './sidecar-withdrawal-contract.js';
 import {
   classifyBloggerSourcePath,
@@ -170,6 +172,9 @@ export async function prepareWithdrawalAuthorizationDraft({
   // ── input validation ────────────────────────────────────────────────
   if (classifyBloggerSourcePath(sourcePath) !== null) { blockers.push('source-path-invalid'); return { ok: false, blockers }; }
   if (!REMOTE_DISPOSITIONS.has(remoteDisposition)) { blockers.push('remote-disposition-invalid'); return { ok: false, blockers }; }
+  // Slice 4G：remote-live 是合法遠端觀察值，但**不得**構成 withdrawal authorization 依據。
+  //   refuse before any planner / repo-state work so no half-baked draft is produced.
+  if (!isWithdrawalEligibleRemoteDisposition(remoteDisposition)) { blockers.push(REMOTE_LIVE_BLOCKER); return { ok: false, blockers }; }
   if (!isLandedStrictTzIso(remoteVerifiedAt)) { blockers.push('remote-verified-at-invalid'); return { ok: false, blockers }; }
   if (!LIFECYCLE_REASONS.has(reason)) { blockers.push('reason-invalid'); return { ok: false, blockers }; }
   if (typeof reasonDetail !== 'string') { blockers.push('reason-detail-invalid'); return { ok: false, blockers }; }

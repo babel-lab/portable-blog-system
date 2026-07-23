@@ -48,6 +48,9 @@ import {
   WITHDRAWN_STATUS,
   LIFECYCLE_WITHDRAWN_EVENT,
   REMOTE_DISPOSITIONS,
+  WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS,
+  REMOTE_LIVE_BLOCKER,
+  isWithdrawalEligibleRemoteDisposition,
   LIFECYCLE_REASONS,
   collectSidecarWithdrawalIssues,
 } from './sidecar-withdrawal-contract.js';
@@ -971,7 +974,10 @@ async function main() {
     // ══ N. remote disposition / reason enum coverage ═════════════════════
     {
       const fx = await setupCandidateRepo(tmpRoot, 'rh-enums');
+      // Slice 4G: remote-live is a valid enum but not withdrawal-eligible; refusal is asserted
+      //   in Section R (Slice 4G) below. Skip it in the positive-control loop.
       for (const rd of REMOTE_DISPOSITIONS) {
+        if (!isWithdrawalEligibleRemoteDisposition(rd)) continue;
         // Only certain enum values pair with each reason cleanly; we're using stage-preview reason to keep valid.
         // eslint-disable-next-line no-await-in-loop
         await check(`enum: remote-disposition ${rd} → rehearsal ok`, async () => {
@@ -1307,6 +1313,112 @@ async function main() {
       }
       // No stack frames pointing at rehearse module.
       assert.ok(!/rehearse-blogger-withdrawal\.js:\d+:/.test(joined), 'leaked stack frame from rehearse module');
+    });
+
+    // ══ R-pre. Slice 4G shared helper truth table (rehearsal-side regression) ═══
+    await check('4G helper (rehearsal): isWithdrawalEligibleRemoteDisposition truth table', () => {
+      assert.strictEqual(REMOTE_LIVE_BLOCKER, 'remote-disposition-still-live');
+      assert.deepStrictEqual([...WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS], ['remote-live']);
+      assert.strictEqual(isWithdrawalEligibleRemoteDisposition('remote-live'), false);
+      for (const d of ['remote-draft', 'remote-deleted', 'remote-unavailable', 'remote-permalink-changed', 'operator-confirmed-inactive']) {
+        assert.strictEqual(REMOTE_DISPOSITIONS.has(d), true, d);
+        assert.strictEqual(isWithdrawalEligibleRemoteDisposition(d), true, d);
+      }
+    });
+
+    // ══ R. Slice 4G: rehearsal fail-closed on remote-live authorization ═══
+    // Rehearsal inherits preflight authority: even a fully-valid, approved authorization whose
+    //   only defect is remoteDisposition=remote-live must produce
+    //     ok=false, applyReady=false, rehearsalPerformed=false, scratchMutationPerformed=false,
+    //     readBackOk=false, productionMutationPerformed=false, outputSha256=null,
+    //     cleanupPerformed=true (no scratch created), blockers=[remote-disposition-still-live]
+    //   and leave source + sidecar bytes unchanged.
+    async function seedRemoteLiveApprovedAuth(fx, filename) {
+      const intent = { ...INTENT, remoteDisposition: 'remote-live' };
+      return seedApprovedAuth(fx, filename, intent);
+    }
+    {
+      const fx = await setupCandidateRepo(tmpRoot, 'rh-4g-live');
+      const authPath = await seedRemoteLiveApprovedAuth(fx, '4g-remote-live-approved.json');
+      const srcBefore = readFileSync(path.join(fx.repoRoot, CAND_SOURCE), 'utf-8');
+      const sidecarBefore = readFileSync(path.join(fx.repoRoot, CAND_SIDECAR), 'utf-8');
+      const prodInvBefore = snapshotTree(fx.repoRoot, ['.md', '.publish.json']);
+      const scratchBefore = countOsTempScratchDirs();
+      const r = await rehearseBloggerWithdrawal({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+      });
+      const scratchAfter = countOsTempScratchDirs();
+      const prodInvAfter = snapshotTree(fx.repoRoot, ['.md', '.publish.json']);
+      allOutputs.push(rehearseFormatJson(r), rehearseFormatHuman(r), r.blockers.join('\n'));
+
+      await check('4G rehearsal: fully-valid approved remote-live → fail-closed report shape', () => {
+        assert.strictEqual(r.ok, false, JSON.stringify(r.blockers));
+        assert.strictEqual(r.applyReady, false);
+        assert.strictEqual(r.rehearsalPerformed, false);
+        assert.strictEqual(r.scratchMutationPerformed, false);
+        assert.strictEqual(r.readBackOk, false);
+        assert.strictEqual(r.productionMutationPerformed, false);
+        assert.strictEqual(r.outputSha256, null);
+        assert.strictEqual(r.cleanupPerformed, true);
+        assert.strictEqual(r.remoteDispositionEligible, false);
+        assert.strictEqual(r.documentValid, true);
+        assert.strictEqual(r.explicitlyAuthorized, true);
+        assert.deepStrictEqual(r.blockers, [REMOTE_LIVE_BLOCKER],
+          `expected only ${REMOTE_LIVE_BLOCKER}; got ${JSON.stringify(r.blockers)}`);
+      });
+      await check('4G rehearsal: source + sidecar bytes unchanged', () => {
+        assert.strictEqual(readFileSync(path.join(fx.repoRoot, CAND_SOURCE), 'utf-8'), srcBefore);
+        assert.strictEqual(readFileSync(path.join(fx.repoRoot, CAND_SIDECAR), 'utf-8'), sidecarBefore);
+        assert.deepStrictEqual(invMap(prodInvAfter), invMap(prodInvBefore));
+      });
+      await check('4G rehearsal: no scratch residue', () => {
+        if (scratchBefore < 0 || scratchAfter < 0) { assert.ok(true); return; }
+        assert.ok(scratchAfter <= scratchBefore,
+          `scratch dirs grew: ${scratchBefore} → ${scratchAfter}`);
+      });
+      await check('4G rehearsal report: JSON exposes remoteDispositionEligible=false + blocker', () => {
+        const j = JSON.parse(rehearseFormatJson(r));
+        assert.strictEqual(j.remoteDispositionEligible, false);
+        assert.strictEqual(j.applyReady, false);
+        assert.ok(j.blockers.includes(REMOTE_LIVE_BLOCKER));
+      });
+    }
+
+    // Hand-edited legacy remote-live authorization: same fail-closed outcome from rehearsal.
+    {
+      const fx = await setupCandidateRepo(tmpRoot, 'rh-4g-legacy');
+      const target = makeTargetFromCandidate(fx.candidate);
+      const intent = { ...INTENT, remoteDisposition: 'remote-live' };
+      const recFp = recordFpFor(fx.candidate, intent);
+      const draft = makeAuth({ head: fx.head, planFp: fx.planFp, recFp, target, intent, approved: false });
+      // Simulate operator manually flipping approval on an old (pre-fix) generator's draft.
+      draft.approval = { explicitlyAuthorized: true };
+      const legacyPath = writeAuthFixture(fx.repoRoot, draft, '4g-legacy-remote-live.json');
+      await check('4G rehearsal: hand-edited legacy remote-live → fail-closed', async () => {
+        const r = await rehearseBloggerWithdrawal({
+          projectRoot: fx.repoRoot, authorizationPath: legacyPath, sourcePath: CAND_SOURCE,
+        });
+        allOutputs.push(rehearseFormatJson(r), rehearseFormatHuman(r));
+        assert.strictEqual(r.ok, false);
+        assert.strictEqual(r.applyReady, false);
+        assert.strictEqual(r.rehearsalPerformed, false);
+        assert.strictEqual(r.scratchMutationPerformed, false);
+        assert.strictEqual(r.productionMutationPerformed, false);
+        assert.strictEqual(r.outputSha256, null);
+        assert.strictEqual(r.cleanupPerformed, true);
+        assert.deepStrictEqual(r.blockers, [REMOTE_LIVE_BLOCKER],
+          `expected only ${REMOTE_LIVE_BLOCKER}; got ${JSON.stringify(r.blockers)}`);
+      });
+    }
+
+    // Redaction for 4G outputs.
+    await check('4G redaction: no leaks in Slice 4G outputs (no path / stack / raw fs error)', () => {
+      const joined = allOutputs.join('\n');
+      for (const needle of ['at Object.', 'ENOENT:', 'EEXIST:', 'EACCES:', 'EBUSY:', 'EPERM:', 'errno:']) {
+        assert.ok(!joined.includes(needle), `leaked: ${needle}`);
+      }
+      // No stack frame from the rehearse module.
+      assert.ok(!/rehearse-blogger-withdrawal\.js:\d+:/.test(joined), 'leaked stack frame');
     });
 
     // final aggregate leak scan

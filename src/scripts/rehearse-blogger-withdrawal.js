@@ -316,6 +316,10 @@ function baseReport(sourcePath) {
     repositoryBindingsMatched: false,
     planBindingsMatched: false,
     recordBindingsMatched: false,
+    // Slice 4G：mirrored from preflight so rehearsal report also carries the remote-live gate
+    //   visibly. Preflight remains the single authority — rehearsal does not compute eligibility
+    //   independently; it inherits the blocker via pf.blockers and the applyReady=false short-circuit.
+    remoteDispositionEligible: false,
     explicitlyAuthorized: false,
     preflightEligible: false,
     authorizationValidated: false,
@@ -407,6 +411,7 @@ export async function rehearseBloggerWithdrawal({
   report.repositoryBindingsMatched = pf.repositoryBindingsMatched;
   report.planBindingsMatched = pf.planBindingsMatched;
   report.recordBindingsMatched = pf.recordBindingsMatched;
+  report.remoteDispositionEligible = pf.remoteDispositionEligible === true;
   report.explicitlyAuthorized = pf.explicitlyAuthorized;
   report.applyReady = pf.applyReady;
   for (const b of pf.blockers) push(b);
@@ -730,6 +735,7 @@ export function formatJson(result) {
     repositoryBindingsMatched: result.repositoryBindingsMatched,
     planBindingsMatched: result.planBindingsMatched,
     recordBindingsMatched: result.recordBindingsMatched,
+    remoteDispositionEligible: result.remoteDispositionEligible,
     explicitlyAuthorized: result.explicitlyAuthorized,
     preflightEligible: result.preflightEligible,
     authorizationValidated: result.authorizationValidated,
@@ -763,6 +769,7 @@ export function formatHumanReadable(result) {
   lines.push(`repository bindings matched:     ${result.repositoryBindingsMatched ? 'YES' : 'NO'}`);
   lines.push(`plan bindings matched:           ${result.planBindingsMatched ? 'YES' : 'NO'}`);
   lines.push(`record bindings matched:         ${result.recordBindingsMatched ? 'YES' : 'NO'}`);
+  lines.push(`remote disposition eligible:     ${result.remoteDispositionEligible ? 'YES' : 'NO'}`);
   lines.push(`explicitly authorized:           ${result.explicitlyAuthorized ? 'YES' : 'NO'}`);
   lines.push(`preflight eligible:              ${result.preflightEligible ? 'YES' : 'NO'}`);
   lines.push(`authorization validated:         ${result.authorizationValidated ? 'YES' : 'NO'}`);

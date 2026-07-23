@@ -73,6 +73,41 @@ deploy helper
 - **不**接受 caller-provided scratch / test / repo / output root（CLI 級）。
 - CLI 只接受 `--source-path` / `--authorization` / `--json` / `--help`；forbidden flag 出現即 exit 2。
 
+### 2.1 `remote-live` 是合法觀察值、但**非** withdrawal-eligible disposition（Slice 4G）
+
+Rehearsal 繼承 Slice 4D preflight 的 withdrawal-eligibility gate；本節與
+`docs/20260722-blogger-withdrawal-authorization-preparation.md` §2.1 一致。
+
+`remote-live` 代表 operator 已查證遠端 Blogger 文章**仍公開**。這是合法的遠端觀察值（保留於
+`REMOTE_DISPOSITIONS` enum、`documentValid` 可為 true），但**不得**構成 withdrawal authorization
+依據：撤回一篇仍公開的 Blogger 文章會使 repository metadata 與遠端真值脫節。單一權威 helper
+`isWithdrawalEligibleRemoteDisposition(value)`（於 `src/scripts/sidecar-withdrawal-contract.js`）
+對 `remote-live` 回 false；其他 landed disposition 於本 Slice 維持既有 withdrawal-eligible 行為。
+
+`remote-live` 於 rehearsal 的具體行為：
+
+- **不**建立 scratch root。若 rehearsal 已進入 preflight 階段（invocation entry 之後），
+  preflight 因 `remoteDispositionEligible:false` 而 `applyReady:false`，rehearsal 立即 short-circuit
+  return，**不** enter mutation phase、**不** enter scratch containment classification。
+- 最終 report：`ok:false`、`applyReady:false`、`rehearsalPerformed:false`、
+  `scratchMutationPerformed:false`、`readBackOk:false`、`productionMutationPerformed:false`、
+  `outputSha256:null`、`cleanupPerformed:true`（尚未建立 scratch，等同已清除）、
+  `documentValid:true`、`remoteDispositionEligible:false`、`blockers` 含穩定 slug
+  `remote-disposition-still-live`（與 preparation / preflight 共用同一 slug）。
+- **不**呼叫 `buildWithdrawnSidecar`；**不**將 `remote-live` URL 視為 inactive；**不**回顯
+  Blogger URL / host / post id / operator identity / authorization path / project path / scratch path
+  / stack trace / raw fs error。
+
+Operator 面對 `remote-live` 之後續選項（**由 operator 決定，不由本工具建議**）：
+
+1. 保留 Blogger 公開（暫緩 withdrawal，維持 metadata 與遠端真值一致）；或
+2. 先在 Blogger 後台將該文轉草稿或刪除，然後**重新查證**遠端 disposition。
+   在重新查證取得 withdrawal-eligible disposition 前，本 pipeline 不會產生可核准之
+   authorization，rehearsal 也不會建立 scratch mutation。
+
+以下**不**成立：`remote-live` 是 invalid enum；Blogger 已由工具自動查證；production apply 已存在；
+rehearsal 等於 apply；五篇 frontmatter 已 reconciliation；四篇 missing sidecar 已 backfill。
+
 ## 3. Public CLI contract
 
 ```

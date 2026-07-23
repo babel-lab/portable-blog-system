@@ -60,6 +60,48 @@ remote-permalink-changed
 operator-confirmed-inactive
 ```
 
+### 2.1 `remote-live` 是合法觀察值、但**非** withdrawal-eligible disposition（Slice 4G）
+
+「合法 remote observation」與「withdrawal-eligible remote disposition」是兩個獨立語意，
+本 pipeline 之後續 gate（preparation / preflight / rehearsal）**不得**混用：
+
+- `remote-live` 代表 operator 已查證遠端 Blogger 文章**仍公開**；它是合法的遠端觀察值，因此
+  保留於 `REMOTE_DISPOSITIONS` enum，schema / documentValid 不會因此失敗。
+- 但撤回一篇**仍公開**的 Blogger 文章會使 repository metadata 與遠端真值脫節，因此
+  `remote-live` **不得**構成 withdrawal authorization 依據。判定使用 `sidecar-withdrawal-contract.js`
+  之單一權威 helper `isWithdrawalEligibleRemoteDisposition(value)`（`remote-live → false`；其他
+  landed disposition 於本 Slice 維持既有 withdrawal-eligible 行為，不重新定義）。
+
+各階段對 `remote-live` 的具體行為：
+
+- **Preparation**（`prepare:blogger-withdrawal-authorization`）：拒絕產生 draft，`ok:false`、無
+  `draft`、無 `approval` block、無檔案寫入；穩定 blocker slug =
+  `remote-disposition-still-live`。CLI 亦以 exit code 1（既有 semantic refusal contract）退出，
+  stdout 為空、stderr 只含穩定 blocker slug（無 Blogger URL / post id / operator identity / 私人
+  path 洩漏）。
+- **Preflight**（`validate:blogger-withdrawal-authorization`）：即使外部工具或手工修改後產出
+  一份 schema-valid、所有 fingerprint / HEAD / record binding 皆合法、`explicitlyAuthorized:true`
+  但 `remoteDisposition:"remote-live"` 之 authorization，preflight 仍必須 `documentValid:true`
+  但 `remoteDispositionEligible:false`、`applyReady:false`、`blockers` 含穩定 slug
+  `remote-disposition-still-live`。`documentValid` 可維持 true（enum + schema 本身合法），但
+  withdrawal eligibility 為 false；`applyReady` 亦已納入 `remoteDispositionEligible` 為必要條件，
+  只讀 `applyReady` 之 consumer 不會被誤導。
+- **Rehearsal**（`rehearse:blogger-withdrawal`）：繼承 preflight authority，不建立 scratch mutation、
+  不呼叫 `buildWithdrawnSidecar`、不視 `remote-live` URL 為 inactive；最終 `ok:false`、
+  `applyReady:false`、`rehearsalPerformed:false`、`scratchMutationPerformed:false`、
+  `readBackOk:false`、`productionMutationPerformed:false`、`outputSha256:null`、
+  `cleanupPerformed:true`（尚未建立 scratch）、`blockers` 含穩定 slug。
+
+Operator 面對 `remote-live` 之後續選項（**由 operator 決定，不由本工具建議**）：
+
+1. 保留 Blogger 公開（維持 repository metadata 與遠端真值一致，暫緩 withdrawal）；或
+2. 先在 Blogger 後台將該文轉草稿或刪除，然後**重新查證**遠端 disposition。
+   在重新查證取得 `remote-draft` / `remote-deleted` / `remote-unavailable` / ... 等
+   withdrawal-eligible disposition 前，本 pipeline 不會產生可核准之 authorization。
+
+以下**不**成立：`remote-live` 是 invalid enum；Blogger 已由工具自動查證；production apply 已存在；
+rehearsal 等於 apply；五篇 frontmatter 已 reconciliation；四篇 missing sidecar 已 backfill。
+
 ## 3. Authorization draft preparation（★ 本 Slice）
 
 指令：

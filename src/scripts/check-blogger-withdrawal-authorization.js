@@ -57,7 +57,13 @@ import {
   buildDraft,
   serializeDraft,
 } from './blogger-withdrawal-authorization.js';
-import { REMOTE_DISPOSITIONS, LIFECYCLE_REASONS } from './sidecar-withdrawal-contract.js';
+import {
+  REMOTE_DISPOSITIONS,
+  LIFECYCLE_REASONS,
+  WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS,
+  REMOTE_LIVE_BLOCKER,
+  isWithdrawalEligibleRemoteDisposition,
+} from './sidecar-withdrawal-contract.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -696,8 +702,11 @@ async function main() {
         assert.ok(!/"publishedUrl"/.test(s) && !/"publishedAt"/.test(s) && !/"bloggerPostId"/.test(s));
         assert.ok(!s.includes('example.invalid'));
       });
-      // all 6 remote dispositions + all reason enums produce a valid draft
+      // withdrawal-eligible remote dispositions + all reason enums produce a valid draft.
+      //   Slice 4G: remote-live is a valid enum but not withdrawal-eligible; refusal is asserted
+      //   in Section N (Slice 4G) below, not here.
       for (const rd of REMOTE_DISPOSITIONS) {
+        if (!isWithdrawalEligibleRemoteDisposition(rd)) continue;
         await check(`gen: remote-disposition ${rd} → ok`, async () => {
           const r = await prepareWithdrawalAuthorizationDraft({ projectRoot: fx.repoRoot, sourcePath: CAND_SOURCE, ...INTENT, remoteDisposition: rd });
           assert.strictEqual(r.ok, true, JSON.stringify(r.blockers));
@@ -960,6 +969,177 @@ async function main() {
       assert.strictEqual(r.status, 2, r.stderr);
       assert.strictEqual(r.stdout, '', 'no draft on stdout');
       assert.ok(/--remote-disposition.*is required/i.test(r.stderr));
+    });
+
+    // ══ N. Slice 4G: remote-live withdrawal-eligibility gate ═══════════════
+    // remote-live 是合法遠端觀察值（保留於 REMOTE_DISPOSITIONS），但 operator 已確認 Blogger 文章
+    //   仍公開 → withdrawal authorization 不得成立。gate 必須：
+    //     - preparation 拒絕產生 draft、blocker = remote-disposition-still-live。
+    //     - preflight documentValid 可為 true（enum + schema 合法），
+    //       但 remoteDispositionEligible=false、applyReady=false、blockers 含穩定 slug。
+    //     - hand-edited legacy draft（explicitlyAuthorized 手動 flip、其他 fingerprint 皆合法）
+    //       仍只因 remote-live blocker 而 fail-closed。
+    //   本節所有 fixture 於 tmpRoot 之下，測試後隨 finally cleanup 一起清除。
+    await check('4G helper: REMOTE_DISPOSITIONS enum ⊇ known set + isWithdrawalEligibleRemoteDisposition truth table', () => {
+      assert.deepStrictEqual([...REMOTE_DISPOSITIONS].sort(),
+        ['operator-confirmed-inactive', 'remote-deleted', 'remote-draft', 'remote-live', 'remote-permalink-changed', 'remote-unavailable']);
+      assert.deepStrictEqual([...WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS], ['remote-live']);
+      // remote-live: valid enum yet not eligible for withdrawal.
+      assert.strictEqual(REMOTE_DISPOSITIONS.has('remote-live'), true);
+      assert.strictEqual(isWithdrawalEligibleRemoteDisposition('remote-live'), false);
+      // other landed dispositions preserve their eligibility (no regression).
+      for (const d of ['remote-draft', 'remote-deleted', 'remote-unavailable', 'remote-permalink-changed', 'operator-confirmed-inactive']) {
+        assert.strictEqual(REMOTE_DISPOSITIONS.has(d), true, d);
+        assert.strictEqual(isWithdrawalEligibleRemoteDisposition(d), true, d);
+      }
+      // unknown values fail closed on both axes.
+      for (const v of ['bogus', '', null, undefined, 'REMOTE-LIVE', 'live', 42, {}, []]) {
+        assert.strictEqual(isWithdrawalEligibleRemoteDisposition(v), false, `${JSON.stringify(v)}`);
+      }
+    });
+    await check('4G helper: stable blocker slug', () => {
+      assert.strictEqual(REMOTE_LIVE_BLOCKER, 'remote-disposition-still-live');
+    });
+
+    // ── prepare programmatic API refuses remote-live ─────────────────────
+    {
+      const fx = await setupCandidateRepo(tmpRoot, '4g-prep');
+      await check('4G prep: remote-live refused; no draft; blocker exact', async () => {
+        const r = await prepareWithdrawalAuthorizationDraft({
+          projectRoot: fx.repoRoot, sourcePath: CAND_SOURCE,
+          remoteDisposition: 'remote-live',
+          remoteVerifiedAt: INTENT.remoteVerifiedAt,
+          reason: INTENT.reason, reasonDetail: '',
+        });
+        assert.strictEqual(r.ok, false);
+        assert.ok(!r.draft, 'no draft on refusal');
+        assert.deepStrictEqual(r.blockers, [REMOTE_LIVE_BLOCKER],
+          `expected only ${REMOTE_LIVE_BLOCKER}; got ${JSON.stringify(r.blockers)}`);
+      });
+      await check('4G prep: no filesystem write on remote-live refusal', () => {
+        const inv = snapshotTree(fx.repoRoot, ['.md', '.publish.json']);
+        assert.deepStrictEqual(invMap(inv), invMap(snapshotTree(fx.repoRoot, ['.md', '.publish.json'])));
+      });
+      // positive controls: at least two other dispositions still emit a draft (regression proof).
+      for (const d of ['remote-draft', 'remote-deleted']) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4G prep positive control: ${d} still emits draft`, async () => {
+          const r = await prepareWithdrawalAuthorizationDraft({
+            projectRoot: fx.repoRoot, sourcePath: CAND_SOURCE,
+            remoteDisposition: d,
+            remoteVerifiedAt: INTENT.remoteVerifiedAt,
+            reason: 'content-retirement', reasonDetail: '',
+          });
+          assert.strictEqual(r.ok, true, JSON.stringify(r.blockers));
+          assert.strictEqual(r.draft.withdrawal.remoteDisposition, d);
+          assert.strictEqual(r.draft.approval.explicitlyAuthorized, false);
+        });
+      }
+    }
+
+    // ── prepare CLI e2e: remote-live → exit 1, refused message, no draft, no leaks ─
+    await check('4G prep CLI: remote-live → exit 1, no stdout draft, safe stderr blocker only', () => {
+      const r = runCli(PREPARE_CLI, [
+        '--source-path', CAND_SOURCE,
+        '--remote-disposition', 'remote-live',
+        '--remote-verified-at', INTENT.remoteVerifiedAt,
+        '--reason', 'content-retirement',
+      ]);
+      allOutputs.push(r.stdout, r.stderr);
+      // Real repo has no candidate matching CAND_SOURCE, but the remote-live gate fires first in the
+      //   programmatic API — the CLI simply exits 1 with the blocker on stderr. Either way, no draft.
+      assert.strictEqual(r.status, 1, `stderr=${r.stderr}`);
+      assert.strictEqual(r.stdout, '', 'no draft on stdout');
+      assert.ok(r.stderr.includes(REMOTE_LIVE_BLOCKER)
+        || r.stderr.includes('refused'), `stderr must indicate refusal: ${r.stderr}`);
+      // safe slug only: no Blogger host / post id / operator identity should ever appear.
+      for (const secret of ['blog' + 'spot.com', 'babel' + '-lab', 'https://', '@example.invalid']) {
+        assert.ok(!r.stderr.includes(secret), `leak: ${secret}`);
+        assert.ok(!r.stdout.includes(secret), `leak: ${secret}`);
+      }
+    });
+
+    // ── preflight fully-valid approved remote-live → applyReady false ─────
+    async function seedFullyValidRemoteLiveAuthorization(fx, filename) {
+      const target = makeTargetFromCandidate(fx.candidate);
+      const intent = { ...INTENT, remoteDisposition: 'remote-live' };
+      const recFp = recordFpFor(fx.candidate, intent);
+      const auth = makeAuth({ head: fx.head, planFp: fx.planFp, recFp, target, intent, approved: true });
+      return { authPath: writeAuthFixture(fx.repoRoot, auth, filename), auth, intent };
+    }
+    {
+      const fx = await setupCandidateRepo(tmpRoot, '4g-preflight');
+      const { authPath } = await seedFullyValidRemoteLiveAuthorization(fx, '4g-remote-live-approved.json');
+      const invBefore = snapshotTree(fx.repoRoot, ['.md', '.publish.json']);
+      const res = await preflightWithdrawalAuthorization({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+      });
+      const invAfter = snapshotTree(fx.repoRoot, ['.md', '.publish.json']);
+      allOutputs.push(validateFormatJson(res), validateFormatHuman(res));
+      await check('4G preflight: fully-valid approved remote-live → applyReady false, exact blocker', () => {
+        assert.strictEqual(res.documentValid, true, JSON.stringify(res.blockers));
+        assert.strictEqual(res.repositoryBindingsMatched, true, JSON.stringify(res.blockers));
+        assert.strictEqual(res.planBindingsMatched, true, JSON.stringify(res.blockers));
+        assert.strictEqual(res.recordBindingsMatched, true, JSON.stringify(res.blockers));
+        assert.strictEqual(res.explicitlyAuthorized, true);
+        assert.strictEqual(res.remoteDispositionEligible, false);
+        assert.strictEqual(res.applyReady, false);
+        assert.strictEqual(res.ok, false);
+        assert.strictEqual(res.mutationPerformed, false);
+        // Blocker ordering deterministic: remote-live is the ONLY blocker (nothing else fails).
+        assert.deepStrictEqual(res.blockers, [REMOTE_LIVE_BLOCKER],
+          `expected only ${REMOTE_LIVE_BLOCKER}; got ${JSON.stringify(res.blockers)}`);
+      });
+      await check('4G preflight: no repo mutation on refusal', () => {
+        assert.deepStrictEqual(invMap(invAfter), invMap(invBefore));
+      });
+      await check('4G preflight: JSON report contains remoteDispositionEligible boolean', () => {
+        const j = JSON.parse(validateFormatJson(res));
+        assert.strictEqual(j.remoteDispositionEligible, false);
+        assert.strictEqual(j.applyReady, false);
+        assert.ok(j.blockers.includes(REMOTE_LIVE_BLOCKER));
+      });
+      await check('4G preflight: human report surfaces remote-disposition-eligible line + blocker', () => {
+        const h = validateFormatHuman(res);
+        assert.ok(/remote disposition eligible:\s+NO/.test(h), h);
+        assert.ok(h.includes(REMOTE_LIVE_BLOCKER), h);
+      });
+    }
+
+    // ── hand-edited legacy remote-live authorization: same fail-closed ────
+    // 舊版 generator（假想）產出過 remote-live draft，operator 手動改 explicitlyAuthorized=true 並
+    //   重算所有 fingerprint。preflight 仍必須僅因 remote-live blocker 而 fail-closed。
+    {
+      const fx = await setupCandidateRepo(tmpRoot, '4g-legacy');
+      const intent = { ...INTENT, remoteDisposition: 'remote-live' };
+      const recFp = recordFpFor(fx.candidate, intent);
+      const target = makeTargetFromCandidate(fx.candidate);
+      // Start with an UNAPPROVED draft (as if pre-fix generator produced it), then manually flip
+      //   approval. All fingerprints already track the remote-live intent.
+      const legacyDraft = makeAuth({ head: fx.head, planFp: fx.planFp, recFp, target, intent, approved: false });
+      legacyDraft.approval = { explicitlyAuthorized: true };
+      const legacyPath = writeAuthFixture(fx.repoRoot, legacyDraft, '4g-legacy-remote-live.json');
+      await check('4G hand-edited legacy remote-live → preflight fails only via remote-live blocker', async () => {
+        const r = await preflightWithdrawalAuthorization({
+          projectRoot: fx.repoRoot, authorizationPath: legacyPath, sourcePath: CAND_SOURCE,
+        });
+        allOutputs.push(validateFormatJson(r));
+        assert.strictEqual(r.documentValid, true, JSON.stringify(r.blockers));
+        assert.strictEqual(r.explicitlyAuthorized, true);
+        assert.strictEqual(r.remoteDispositionEligible, false);
+        assert.strictEqual(r.applyReady, false);
+        assert.deepStrictEqual(r.blockers, [REMOTE_LIVE_BLOCKER],
+          `expected only ${REMOTE_LIVE_BLOCKER}; got ${JSON.stringify(r.blockers)}`);
+      });
+    }
+
+    // ── redaction across 4G outputs ──────────────────────────────────────
+    await check('4G redaction: no leaks across 4G captured outputs', () => {
+      const joined = allOutputs.join('\n');
+      for (const s of SECRET_STRINGS) assert.ok(!joined.includes(s), `LEAK: ${s}`);
+      for (const needle of ['at Object.', 'ENOENT:', 'EEXIST:', 'EACCES:', 'errno:']) {
+        assert.ok(!joined.includes(needle), `leaked: ${needle}`);
+      }
     });
 
     // final aggregate leak scan (includes real-repo CLI output)
