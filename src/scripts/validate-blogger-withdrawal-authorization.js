@@ -148,7 +148,20 @@ function readAuthorizationFile(authorizationPath) {
 
 // ── preflight orchestrator（唯讀）─────────────────────────────────────────────────
 // `projectRoot` 只在程式 API 暴露；CLI 硬編碼 PROJECT_ROOT。
-export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_ROOT, authorizationPath, sourcePath }) {
+//
+// authorizationText（Slice 4I 追加；default-preserving）：optional caller-provided raw
+//   authorization text. When present, preflight uses this in-memory bytes for schema /
+//   binding / TOCTOU-hash validation and **skips** any file read of authorizationPath.
+//   Guarantees the apply pipeline can bind the exact same bytes that preflight validated
+//   without a second `readFileSync(authorizationPath)`. CLI **does not** wire this
+//   parameter — it remains programmatic-only. Existing pathname-only callers get
+//   identical behavior.
+export async function preflightWithdrawalAuthorization({
+  projectRoot = PROJECT_ROOT,
+  authorizationPath,
+  authorizationText,
+  sourcePath,
+}) {
   const blockers = [];
   const result = {
     ok: false,
@@ -192,12 +205,25 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
   }
 
   // ── read + strict-parse authorization ───────────────────────────────
-  const read = readAuthorizationFile(authorizationPath);
-  if (!read.ok) {
-    blockers.push(read.blocker);
-    return result;
+  // authorizationText overrides authorizationPath: apply pipelines pass in-memory bytes so
+  //   preflight and apply-time binding share the exact same byte source (no pathname re-read).
+  //   Type is enforced strictly: non-string authorizationText → authorization-unreadable.
+  let rawText;
+  if (authorizationText !== undefined) {
+    if (typeof authorizationText !== 'string') {
+      blockers.push('authorization-unreadable');
+      return result;
+    }
+    rawText = authorizationText;
+  } else {
+    const read = readAuthorizationFile(authorizationPath);
+    if (!read.ok) {
+      blockers.push(read.blocker);
+      return result;
+    }
+    rawText = read.rawText;
   }
-  const parsed = parseAndValidateAuthorization(read.rawText);
+  const parsed = parseAndValidateAuthorization(rawText);
   if (!parsed.ok) {
     blockers.push(parsed.blocker);
     return result;
@@ -214,7 +240,7 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
   // Bind the exact raw authorization bytes that passed schema validation. Post-preflight
   // re-reads compare their SHA-256 against this value; any byte-level drift (whitespace,
   // key order, reasonDetail, reason, remoteDisposition, operator identity) is refused.
-  result.validatedAuthorizationSha256 = sha256HexOfString(read.rawText);
+  result.validatedAuthorizationSha256 = sha256HexOfString(rawText);
 
   // authorization.target.sourcePath 必須等於 CLI --source-path（兩者同一 candidate）。
   if (auth.target.sourcePath !== sourcePath) {
