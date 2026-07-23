@@ -23,7 +23,7 @@ import {
 import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   parseArgs as rehearseParseArgs,
@@ -47,17 +47,19 @@ import {
 import {
   WITHDRAWN_STATUS,
   LIFECYCLE_WITHDRAWN_EVENT,
-  REMOTE_DISPOSITIONS,
-  WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS,
+  REMOTE_DISPOSITION_VALUES,
+  WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES,
   REMOTE_LIVE_BLOCKER,
+  isRemoteDisposition,
   isWithdrawalEligibleRemoteDisposition,
-  LIFECYCLE_REASONS,
+  LIFECYCLE_REASON_VALUES,
   collectSidecarWithdrawalIssues,
 } from './sidecar-withdrawal-contract.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const CONTRACT = path.join(REPO_ROOT, 'src', 'scripts', 'sidecar-withdrawal-contract.js');
 const REHEARSE_CLI = path.join(REPO_ROOT, 'src', 'scripts', 'rehearse-blogger-withdrawal.js');
 const DEPLOY_ROOT_CANDIDATE = path.resolve(REPO_ROOT, '..', 'portable-blog-deploy');
 
@@ -976,7 +978,7 @@ async function main() {
       const fx = await setupCandidateRepo(tmpRoot, 'rh-enums');
       // Slice 4G: remote-live is a valid enum but not withdrawal-eligible; refusal is asserted
       //   in Section R (Slice 4G) below. Skip it in the positive-control loop.
-      for (const rd of REMOTE_DISPOSITIONS) {
+      for (const rd of REMOTE_DISPOSITION_VALUES) {
         if (!isWithdrawalEligibleRemoteDisposition(rd)) continue;
         // Only certain enum values pair with each reason cleanly; we're using stage-preview reason to keep valid.
         // eslint-disable-next-line no-await-in-loop
@@ -987,7 +989,7 @@ async function main() {
           assert.strictEqual(r.ok, true, `${rd}: ${JSON.stringify(r.blockers)}`);
         });
       }
-      for (const rs of LIFECYCLE_REASONS) {
+      for (const rs of LIFECYCLE_REASON_VALUES) {
         // eslint-disable-next-line no-await-in-loop
         await check(`enum: reason ${rs} → rehearsal ok`, async () => {
           const intent = { ...INTENT, reason: rs };
@@ -1318,10 +1320,10 @@ async function main() {
     // ══ R-pre. Slice 4G shared helper truth table (rehearsal-side regression) ═══
     await check('4G helper (rehearsal): isWithdrawalEligibleRemoteDisposition truth table', () => {
       assert.strictEqual(REMOTE_LIVE_BLOCKER, 'remote-disposition-still-live');
-      assert.deepStrictEqual([...WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS], ['remote-live']);
+      assert.deepStrictEqual([...WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES], ['remote-live']);
       assert.strictEqual(isWithdrawalEligibleRemoteDisposition('remote-live'), false);
       for (const d of ['remote-draft', 'remote-deleted', 'remote-unavailable', 'remote-permalink-changed', 'operator-confirmed-inactive']) {
-        assert.strictEqual(REMOTE_DISPOSITIONS.has(d), true, d);
+        assert.strictEqual(isRemoteDisposition(d), true, d);
         assert.strictEqual(isWithdrawalEligibleRemoteDisposition(d), true, d);
       }
     });
@@ -1408,6 +1410,77 @@ async function main() {
         assert.strictEqual(r.cleanupPerformed, true);
         assert.deepStrictEqual(r.blockers, [REMOTE_LIVE_BLOCKER],
           `expected only ${REMOTE_LIVE_BLOCKER}; got ${JSON.stringify(r.blockers)}`);
+      });
+    }
+
+    // ══ R-post. Slice 4G correction: rehearsal survives contract mutation attempts ══
+    // Guard against the regression where exported Sets could be mutated. This attack targets the
+    //   full rehearsal pipeline: re-import the contract namespace, run every mutation attempt an
+    //   attacker could make, then re-run rehearsal against a fully-valid approved remote-live
+    //   authorization. Rehearsal must remain fail-closed with the exact same shape.
+    {
+      const contractNs = await import(pathToFileURL(CONTRACT).href);
+      // No exported Set/Map (Object.freeze does NOT lock Set/Map slots).
+      await check('4G-Rmut: contract exports contain no Set or Map', () => {
+        for (const [k, v] of Object.entries(contractNs)) {
+          assert.ok(!(v instanceof Set), `export ${k} is a Set`);
+          assert.ok(!(v instanceof Map), `export ${k} is a Map`);
+        }
+      });
+      // Attempt every conceivable mutation on the two frozen arrays.
+      await check('4G-Rmut: frozen array mutation attempts leave arrays unchanged', () => {
+        const rdBefore = [...contractNs.REMOTE_DISPOSITION_VALUES];
+        const iBefore = [...contractNs.WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES];
+        for (const [name, fn] of [
+          ['push',   (a) => a.push('bogus')],
+          ['pop',    (a) => a.pop()],
+          ['splice', (a) => a.splice(0, 1)],
+          ['index',  (a) => { a[0] = 'bogus'; }],
+          ['length', (a) => { a.length = 0; }],
+        ]) {
+          try { fn(contractNs.REMOTE_DISPOSITION_VALUES); } catch { /* accept throw */ }
+          try { fn(contractNs.WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES); } catch { /* accept throw */ }
+          assert.deepStrictEqual([...contractNs.REMOTE_DISPOSITION_VALUES], rdBefore, `${name} mutated REMOTE_DISPOSITION_VALUES`);
+          assert.deepStrictEqual([...contractNs.WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES], iBefore, `${name} mutated WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES`);
+        }
+      });
+      // Attempt to overwrite / delete the exported bindings themselves.
+      await check('4G-Rmut: exported bindings cannot be overwritten or deleted', () => {
+        for (const key of ['isRemoteDisposition', 'isWithdrawalEligibleRemoteDisposition', 'REMOTE_DISPOSITION_VALUES', 'WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES']) {
+          const orig = contractNs[key];
+          try { contractNs[key] = () => true; } catch { /* accept */ }
+          try { delete contractNs[key]; } catch { /* accept */ }
+          assert.strictEqual(contractNs[key], orig, `${key} was overwritten`);
+        }
+      });
+      // Full pipeline post-attack: rehearsal against a fully-valid approved remote-live auth must
+      //   still fail closed with the exact same report shape.
+      const fx2 = await setupCandidateRepo(tmpRoot, 'rh-4g-mut');
+      const authPath2 = await seedApprovedAuth(fx2, '4g-mut-remote-live-approved.json', { ...INTENT, remoteDisposition: 'remote-live' });
+      const srcBefore = readFileSync(path.join(fx2.repoRoot, CAND_SOURCE), 'utf-8');
+      const sidecarBefore = readFileSync(path.join(fx2.repoRoot, CAND_SIDECAR), 'utf-8');
+      const scratchBefore = countOsTempScratchDirs();
+      const r2 = await rehearseBloggerWithdrawal({
+        projectRoot: fx2.repoRoot, authorizationPath: authPath2, sourcePath: CAND_SOURCE,
+      });
+      const scratchAfter = countOsTempScratchDirs();
+      allOutputs.push(rehearseFormatJson(r2));
+      await check('4G-Rmut post-attack: rehearsal(remote-live) fail-closed report shape identical', () => {
+        assert.strictEqual(r2.ok, false);
+        assert.strictEqual(r2.applyReady, false);
+        assert.strictEqual(r2.rehearsalPerformed, false);
+        assert.strictEqual(r2.scratchMutationPerformed, false);
+        assert.strictEqual(r2.readBackOk, false);
+        assert.strictEqual(r2.productionMutationPerformed, false);
+        assert.strictEqual(r2.outputSha256, null);
+        assert.strictEqual(r2.cleanupPerformed, true);
+        assert.strictEqual(r2.remoteDispositionEligible, false);
+        assert.deepStrictEqual(r2.blockers, [REMOTE_LIVE_BLOCKER]);
+      });
+      await check('4G-Rmut post-attack: source + sidecar + scratch untouched', () => {
+        assert.strictEqual(readFileSync(path.join(fx2.repoRoot, CAND_SOURCE), 'utf-8'), srcBefore);
+        assert.strictEqual(readFileSync(path.join(fx2.repoRoot, CAND_SIDECAR), 'utf-8'), sidecarBefore);
+        if (scratchBefore >= 0 && scratchAfter >= 0) assert.ok(scratchAfter <= scratchBefore);
       });
     }
 

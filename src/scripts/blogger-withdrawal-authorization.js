@@ -43,8 +43,8 @@ import path from 'node:path';
 
 import {
   collectSidecarWithdrawalIssues,
-  REMOTE_DISPOSITIONS,
-  LIFECYCLE_REASONS,
+  isRemoteDisposition,
+  isLifecycleReason,
   WITHDRAWN_STATUS,
   LIFECYCLE_WITHDRAWN_EVENT,
   WITHDRAWAL_ISSUE_TYPES,
@@ -548,13 +548,13 @@ export function parseAndValidateAuthorization(rawText) {
   if (parsed.withdrawal.event !== WITHDRAWAL_EVENT) {
     return { ok: false, blocker: 'authorization-withdrawal-event-invalid' };
   }
-  if (!REMOTE_DISPOSITIONS.has(parsed.withdrawal.remoteDisposition)) {
+  if (!isRemoteDisposition(parsed.withdrawal.remoteDisposition)) {
     return { ok: false, blocker: 'authorization-remote-disposition-invalid' };
   }
   if (!isLandedStrictTzIso(parsed.withdrawal.remoteVerifiedAt)) {
     return { ok: false, blocker: 'authorization-remote-verified-at-invalid' };
   }
-  if (!LIFECYCLE_REASONS.has(parsed.withdrawal.reason)) {
+  if (!isLifecycleReason(parsed.withdrawal.reason)) {
     return { ok: false, blocker: 'authorization-reason-invalid' };
   }
   // reasonDetail：本 authorization contract 要求為字串（允許空字串；§四 schema literal 之預設值）。

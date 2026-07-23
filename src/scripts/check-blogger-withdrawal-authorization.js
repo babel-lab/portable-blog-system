@@ -24,7 +24,7 @@ import {
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   parseArgs as prepareParseArgs,
@@ -58,10 +58,11 @@ import {
   serializeDraft,
 } from './blogger-withdrawal-authorization.js';
 import {
-  REMOTE_DISPOSITIONS,
-  LIFECYCLE_REASONS,
-  WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS,
+  REMOTE_DISPOSITION_VALUES,
+  WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES,
+  LIFECYCLE_REASON_VALUES,
   REMOTE_LIVE_BLOCKER,
+  isRemoteDisposition,
   isWithdrawalEligibleRemoteDisposition,
 } from './sidecar-withdrawal-contract.js';
 
@@ -71,6 +72,7 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const PREPARE_CLI = path.join(REPO_ROOT, 'src', 'scripts', 'prepare-blogger-withdrawal-authorization.js');
 const VALIDATE_CLI = path.join(REPO_ROOT, 'src', 'scripts', 'validate-blogger-withdrawal-authorization.js');
 const SHARED = path.join(REPO_ROOT, 'src', 'scripts', 'blogger-withdrawal-authorization.js');
+const CONTRACT = path.join(REPO_ROOT, 'src', 'scripts', 'sidecar-withdrawal-contract.js');
 const DEPLOY_ROOT_CANDIDATE = path.resolve(REPO_ROOT, '..', 'portable-blog-deploy');
 
 // ── injected secrets（§八；下列字串在所有 stdout / stderr / serialized blocker 中須零命中）──
@@ -302,8 +304,8 @@ async function main() {
     await check('src[shared]: reuses landed enums + planner + contract (single source of truth)', () => {
       assert.ok(/from ['"]\.\/sidecar-withdrawal-contract\.js['"]/.test(SHARED_SRC));
       assert.ok(/from ['"]\.\/plan-blogger-withdrawals\.js['"]/.test(SHARED_SRC));
-      assert.ok(/REMOTE_DISPOSITIONS/.test(SHARED_SRC));
-      assert.ok(/LIFECYCLE_REASONS/.test(SHARED_SRC));
+      assert.ok(/isRemoteDisposition\b/.test(SHARED_SRC));
+      assert.ok(/isLifecycleReason\b/.test(SHARED_SRC));
     });
 
     // ══ B. parseArgs smoke ═══════════════════════════════════════════════
@@ -705,7 +707,7 @@ async function main() {
       // withdrawal-eligible remote dispositions + all reason enums produce a valid draft.
       //   Slice 4G: remote-live is a valid enum but not withdrawal-eligible; refusal is asserted
       //   in Section N (Slice 4G) below, not here.
-      for (const rd of REMOTE_DISPOSITIONS) {
+      for (const rd of REMOTE_DISPOSITION_VALUES) {
         if (!isWithdrawalEligibleRemoteDisposition(rd)) continue;
         await check(`gen: remote-disposition ${rd} → ok`, async () => {
           const r = await prepareWithdrawalAuthorizationDraft({ projectRoot: fx.repoRoot, sourcePath: CAND_SOURCE, ...INTENT, remoteDisposition: rd });
@@ -713,7 +715,7 @@ async function main() {
           assert.strictEqual(r.draft.withdrawal.remoteDisposition, rd);
         });
       }
-      for (const rs of LIFECYCLE_REASONS) {
+      for (const rs of LIFECYCLE_REASON_VALUES) {
         await check(`gen: reason ${rs} → ok`, async () => {
           const r = await prepareWithdrawalAuthorizationDraft({ projectRoot: fx.repoRoot, sourcePath: CAND_SOURCE, ...INTENT, reason: rs });
           assert.strictEqual(r.ok, true, JSON.stringify(r.blockers));
@@ -972,28 +974,29 @@ async function main() {
     });
 
     // ══ N. Slice 4G: remote-live withdrawal-eligibility gate ═══════════════
-    // remote-live 是合法遠端觀察值（保留於 REMOTE_DISPOSITIONS），但 operator 已確認 Blogger 文章
-    //   仍公開 → withdrawal authorization 不得成立。gate 必須：
+    // remote-live 是合法遠端觀察值（保留於 REMOTE_DISPOSITION_VALUES），但 operator 已確認 Blogger
+    //   文章仍公開 → withdrawal authorization 不得成立。gate 必須：
     //     - preparation 拒絕產生 draft、blocker = remote-disposition-still-live。
     //     - preflight documentValid 可為 true（enum + schema 合法），
     //       但 remoteDispositionEligible=false、applyReady=false、blockers 含穩定 slug。
     //     - hand-edited legacy draft（explicitlyAuthorized 手動 flip、其他 fingerprint 皆合法）
     //       仍只因 remote-live blocker 而 fail-closed。
     //   本節所有 fixture 於 tmpRoot 之下，測試後隨 finally cleanup 一起清除。
-    await check('4G helper: REMOTE_DISPOSITIONS enum ⊇ known set + isWithdrawalEligibleRemoteDisposition truth table', () => {
-      assert.deepStrictEqual([...REMOTE_DISPOSITIONS].sort(),
+    await check('4G helper: REMOTE_DISPOSITION_VALUES enum ⊇ known set + isWithdrawalEligibleRemoteDisposition truth table', () => {
+      assert.deepStrictEqual([...REMOTE_DISPOSITION_VALUES].sort(),
         ['operator-confirmed-inactive', 'remote-deleted', 'remote-draft', 'remote-live', 'remote-permalink-changed', 'remote-unavailable']);
-      assert.deepStrictEqual([...WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS], ['remote-live']);
+      assert.deepStrictEqual([...WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES], ['remote-live']);
       // remote-live: valid enum yet not eligible for withdrawal.
-      assert.strictEqual(REMOTE_DISPOSITIONS.has('remote-live'), true);
+      assert.strictEqual(isRemoteDisposition('remote-live'), true);
       assert.strictEqual(isWithdrawalEligibleRemoteDisposition('remote-live'), false);
       // other landed dispositions preserve their eligibility (no regression).
       for (const d of ['remote-draft', 'remote-deleted', 'remote-unavailable', 'remote-permalink-changed', 'operator-confirmed-inactive']) {
-        assert.strictEqual(REMOTE_DISPOSITIONS.has(d), true, d);
+        assert.strictEqual(isRemoteDisposition(d), true, d);
         assert.strictEqual(isWithdrawalEligibleRemoteDisposition(d), true, d);
       }
       // unknown values fail closed on both axes.
       for (const v of ['bogus', '', null, undefined, 'REMOTE-LIVE', 'live', 42, {}, []]) {
+        assert.strictEqual(isRemoteDisposition(v), false, `${JSON.stringify(v)}`);
         assert.strictEqual(isWithdrawalEligibleRemoteDisposition(v), false, `${JSON.stringify(v)}`);
       }
     });
@@ -1130,6 +1133,161 @@ async function main() {
         assert.strictEqual(r.applyReady, false);
         assert.deepStrictEqual(r.blockers, [REMOTE_LIVE_BLOCKER],
           `expected only ${REMOTE_LIVE_BLOCKER}; got ${JSON.stringify(r.blockers)}`);
+      });
+    }
+
+    // ══ O. Slice 4G correction: adversarial mutation resistance ═══════════
+    // Regression driver: `Object.freeze(new Set(...))` does NOT block `.add` / `.delete` /
+    //   `.clear` from mutating the Set's internal slots. Exporting such a Set from
+    //   sidecar-withdrawal-contract.js let external callers holding the module namespace flip
+    //   `isWithdrawalEligibleRemoteDisposition('remote-live')` from false → true and drive the
+    //   entire preparation + preflight pipeline into a false apply-ready state.
+    //
+    // This section is an ACTUAL attack: it re-imports the contract namespace, enumerates every
+    //   export, refuses to accept any exported Set/Map, hits every frozen array with mutation
+    //   attempts (delete/push/splice/index/length), and then re-runs the pipeline (prepare
+    //   programmatic API + preflight) against remote-live to confirm the fail-closed verdict
+    //   survives every attack. Guard fails hard if any mutation is observable OR if remote-live
+    //   ever becomes withdrawal-eligible / applyReady.
+    {
+      const contractNs = await import(pathToFileURL(CONTRACT).href);
+      const fx = await setupCandidateRepo(tmpRoot, '4g-immut');
+      const runRemoteLivePipeline = async () => {
+        const prep = await prepareWithdrawalAuthorizationDraft({
+          projectRoot: fx.repoRoot, sourcePath: CAND_SOURCE,
+          remoteDisposition: 'remote-live',
+          remoteVerifiedAt: INTENT.remoteVerifiedAt,
+          reason: INTENT.reason, reasonDetail: '',
+        });
+        const target = makeTargetFromCandidate(fx.candidate);
+        const intent = { ...INTENT, remoteDisposition: 'remote-live' };
+        const recFp = recordFpFor(fx.candidate, intent);
+        const auth = makeAuth({ head: fx.head, planFp: fx.planFp, recFp, target, intent, approved: true });
+        const authPath = writeAuthFixture(fx.repoRoot, auth, '4g-immut-remote-live-approved.json');
+        const preflight = await preflightWithdrawalAuthorization({
+          projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+        });
+        return { prep, preflight };
+      };
+
+      await check('4G-O: no exported binding is a Set or Map (frozen Set is still mutable)', () => {
+        for (const [k, v] of Object.entries(contractNs)) {
+          assert.ok(!(v instanceof Set), `export ${k} is a Set (Object.freeze does NOT lock Set slots)`);
+          assert.ok(!(v instanceof Map), `export ${k} is a Map (Object.freeze does NOT lock Map slots)`);
+        }
+      });
+      await check('4G-O: exported REMOTE_DISPOSITION_VALUES is a frozen array with expected members', () => {
+        const v = contractNs.REMOTE_DISPOSITION_VALUES;
+        assert.ok(Array.isArray(v), 'expected an Array');
+        assert.strictEqual(Object.isFrozen(v), true);
+        assert.deepStrictEqual([...v].sort(),
+          ['operator-confirmed-inactive', 'remote-deleted', 'remote-draft', 'remote-live', 'remote-permalink-changed', 'remote-unavailable']);
+      });
+      await check('4G-O: exported WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES is a frozen ["remote-live"] array', () => {
+        const v = contractNs.WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES;
+        assert.ok(Array.isArray(v));
+        assert.strictEqual(Object.isFrozen(v), true);
+        assert.deepStrictEqual([...v], ['remote-live']);
+      });
+      // Baseline invariants (must hold BEFORE any attack).
+      await check('4G-O baseline: helpers report remote-live not eligible + pipeline blocked', async () => {
+        assert.strictEqual(contractNs.isRemoteDisposition('remote-live'), true);
+        assert.strictEqual(contractNs.isWithdrawalEligibleRemoteDisposition('remote-live'), false);
+        const { prep, preflight } = await runRemoteLivePipeline();
+        assert.strictEqual(prep.ok, false);
+        assert.deepStrictEqual(prep.blockers, [REMOTE_LIVE_BLOCKER]);
+        assert.strictEqual(preflight.remoteDispositionEligible, false);
+        assert.strictEqual(preflight.applyReady, false);
+        assert.ok(preflight.blockers.includes(REMOTE_LIVE_BLOCKER));
+      });
+      // Mutation attacks on exported frozen arrays.
+      const arrayAttacks = [
+        { label: 'REMOTE_DISPOSITION_VALUES.push("invented")', apply: (a) => a.push('invented') },
+        { label: 'REMOTE_DISPOSITION_VALUES.splice(0, 1)',     apply: (a) => a.splice(0, 1) },
+        { label: 'REMOTE_DISPOSITION_VALUES[0] = "invented"',  apply: (a) => { a[0] = 'invented'; } },
+        { label: 'REMOTE_DISPOSITION_VALUES.length = 0',       apply: (a) => { a.length = 0; } },
+      ];
+      for (const atk of arrayAttacks) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4G-O attack: ${atk.label} rejected + no observable change`, async () => {
+          const snapshot = [...contractNs.REMOTE_DISPOSITION_VALUES];
+          let threw = false;
+          try { atk.apply(contractNs.REMOTE_DISPOSITION_VALUES); } catch { threw = true; }
+          // Frozen arrays under ESM/strict mode either throw OR silently no-op; in both cases the
+          //   observable contents must be unchanged.
+          assert.deepStrictEqual([...contractNs.REMOTE_DISPOSITION_VALUES], snapshot,
+            `${atk.label} mutated array (threw=${threw})`);
+          // Helper truth must not change.
+          assert.strictEqual(contractNs.isRemoteDisposition('remote-live'), true);
+          assert.strictEqual(contractNs.isWithdrawalEligibleRemoteDisposition('remote-live'), false);
+        });
+      }
+      const ineligibleAttacks = [
+        { label: 'WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES.pop()',           apply: (a) => a.pop() },
+        { label: 'WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES.push("bogus")',    apply: (a) => a.push('bogus') },
+        { label: 'WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES[0] = "bogus"',      apply: (a) => { a[0] = 'bogus'; } },
+        { label: 'WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES.length = 0',        apply: (a) => { a.length = 0; } },
+      ];
+      for (const atk of ineligibleAttacks) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4G-O attack: ${atk.label} rejected + no observable change`, async () => {
+          const snapshot = [...contractNs.WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES];
+          try { atk.apply(contractNs.WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES); } catch { /* accept throw */ }
+          assert.deepStrictEqual([...contractNs.WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES], snapshot,
+            `${atk.label} mutated array`);
+          assert.strictEqual(contractNs.isWithdrawalEligibleRemoteDisposition('remote-live'), false);
+        });
+      }
+      // Attempts to overwrite the exported bindings themselves (via the namespace object) must
+      //   not stick — ESM module namespace objects are non-writable + sealed. This also proves
+      //   consumers cannot monkey-patch `isRemoteDisposition` / `isWithdrawalEligibleRemoteDisposition`.
+      const bindingAttacks = [
+        'isRemoteDisposition',
+        'isWithdrawalEligibleRemoteDisposition',
+        'REMOTE_DISPOSITION_VALUES',
+        'WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES',
+      ];
+      for (const key of bindingAttacks) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4G-O attack: cannot overwrite namespace binding ${key}`, () => {
+          const original = contractNs[key];
+          try { contractNs[key] = () => true; } catch { /* accept throw */ }
+          try { delete contractNs[key]; } catch { /* accept throw */ }
+          assert.strictEqual(contractNs[key], original, `${key} binding was mutated`);
+        });
+      }
+      // Full-pipeline post-attack verification: prepare + preflight must still fail closed.
+      await check('4G-O post-attack: prepare + preflight remain fail-closed for remote-live', async () => {
+        const { prep, preflight } = await runRemoteLivePipeline();
+        assert.strictEqual(prep.ok, false, 'prepare must refuse remote-live');
+        assert.ok(!prep.draft, 'no draft on refusal');
+        assert.deepStrictEqual(prep.blockers, [REMOTE_LIVE_BLOCKER]);
+        assert.strictEqual(preflight.documentValid, true);
+        assert.strictEqual(preflight.remoteDispositionEligible, false);
+        assert.strictEqual(preflight.applyReady, false);
+        assert.strictEqual(preflight.ok, false);
+        assert.strictEqual(preflight.mutationPerformed, false);
+        assert.ok(preflight.blockers.includes(REMOTE_LIVE_BLOCKER));
+      });
+      // Enum truth table: full set (including invalid inputs) unchanged after attacks.
+      await check('4G-O post-attack: isRemoteDisposition / isWithdrawalEligibleRemoteDisposition truth tables intact', () => {
+        const validAll = ['remote-live', 'remote-draft', 'remote-deleted', 'remote-unavailable', 'remote-permalink-changed', 'operator-confirmed-inactive'];
+        const eligibleOnly = ['remote-draft', 'remote-deleted', 'remote-unavailable', 'remote-permalink-changed', 'operator-confirmed-inactive'];
+        for (const v of validAll) assert.strictEqual(contractNs.isRemoteDisposition(v), true, v);
+        for (const v of eligibleOnly) assert.strictEqual(contractNs.isWithdrawalEligibleRemoteDisposition(v), true, v);
+        assert.strictEqual(contractNs.isWithdrawalEligibleRemoteDisposition('remote-live'), false);
+        for (const v of ['bogus', '', null, undefined, 'REMOTE-LIVE', 'remote_live', 'confirmed-inactive', 'remote-live ', ' remote-live', 42, {}, []]) {
+          assert.strictEqual(contractNs.isRemoteDisposition(v), false, `isRemoteDisposition ${JSON.stringify(v)}`);
+          assert.strictEqual(contractNs.isWithdrawalEligibleRemoteDisposition(v), false, `eligible ${JSON.stringify(v)}`);
+        }
+      });
+      // Source-text ban: the pre-fix pattern `Object.freeze(new Set(...))` must be gone from the
+      //   contract module. Prevents accidental regression to the broken idiom.
+      await check('4G-O source: contract no longer uses Object.freeze(new Set(...)) for exported bindings', () => {
+        const src = readFileSync(CONTRACT, 'utf-8');
+        // Any `export const X = Object.freeze(new Set(...))` for the two migrated names is banned.
+        assert.ok(!/export\s+const\s+REMOTE_DISPOSITIONS\s*=\s*Object\.freeze\(\s*new\s+Set/.test(src));
+        assert.ok(!/export\s+const\s+WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS\s*=\s*Object\.freeze\(\s*new\s+Set/.test(src));
       });
     }
 

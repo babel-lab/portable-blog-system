@@ -206,7 +206,7 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
   const auth = parsed.authorization;
   result.explicitlyAuthorized = parsed.explicitlyAuthorized;
   // Slice 4G：withdrawal-eligibility gate 獨立於 schema enum check。
-  //   parseAndValidateAuthorization 已保證 remoteDisposition ∈ REMOTE_DISPOSITIONS（含 remote-live）；
+  //   parseAndValidateAuthorization 已保證 remoteDisposition ∈ REMOTE_DISPOSITION_VALUES（含 remote-live）；
   //   本 gate 於 documentValid 之後、repo/plan/record binding 之前決定，讓 blocker 順序 deterministic：
   //   fully-valid remote-live authorization 之 blockers = [remote-disposition-still-live]。
   result.remoteDispositionEligible = isWithdrawalEligibleRemoteDisposition(auth.withdrawal.remoteDisposition);

@@ -37,45 +37,61 @@ export const WITHDRAWN_STATUS = 'withdrawn';
 // lifecycle 於本 Slice 只正式支援 withdrawn event（§六 6.1）。
 export const LIFECYCLE_WITHDRAWN_EVENT = 'withdrawn';
 
-// reason enum（§六 6.5）。
-export const LIFECYCLE_REASONS = Object.freeze(
-  new Set(['stage-preview', 'content-retirement', 'publication-error', 'policy', 'migration', 'other']),
-);
+// reason enum（§六 6.5）。以 frozen array + module-private lookup Set + helper 表達；不 export Set。
+export const LIFECYCLE_REASON_VALUES = Object.freeze([
+  'stage-preview', 'content-retirement', 'publication-error', 'policy', 'migration', 'other',
+]);
+const LIFECYCLE_REASON_SET = new Set(LIFECYCLE_REASON_VALUES);
+
+export function isLifecycleReason(value) {
+  return LIFECYCLE_REASON_SET.has(value);
+}
 
 // remoteDisposition enum（§六 6.6）。operator-confirmed observation；不代表本 Slice 執行 remote action。
 // 正式命名為 operator-confirmed-inactive（correction §八）；舊值 confirmed-inactive 已移除、須 fail。
-export const REMOTE_DISPOSITIONS = Object.freeze(
-  new Set([
-    'remote-live',
-    'remote-draft',
-    'remote-deleted',
-    'remote-unavailable',
-    'remote-permalink-changed',
-    'operator-confirmed-inactive',
-  ]),
-);
+//
+// Slice 4G correction: `Object.freeze(new Set(...))` **does not** prevent `.add` / `.delete` /
+//   `.clear` from mutating the Set's internal slots. Exporting a Set here would let any caller
+//   holding the module namespace flip withdrawal eligibility from the outside. Public contract is
+//   therefore expressed as a frozen value array + read-only helpers; the O(1) lookup Set is kept
+//   module-private and never handed out.
+export const REMOTE_DISPOSITION_VALUES = Object.freeze([
+  'remote-live',
+  'remote-draft',
+  'remote-deleted',
+  'remote-unavailable',
+  'remote-permalink-changed',
+  'operator-confirmed-inactive',
+]);
+
+// module-private lookup set；**不** export、**不**外洩。
+const REMOTE_DISPOSITION_SET = new Set(REMOTE_DISPOSITION_VALUES);
 
 // Slice 4G：syntactically-valid remote disposition ≠ withdrawal-eligible remote disposition。
-// `remote-live` 代表 operator 已查證遠端 Blogger 文章仍公開；此為合法觀察值（保留於 REMOTE_DISPOSITIONS），
-// 但**不得**構成 withdrawal authorization 依據 —— 撤回一篇仍公開之文章即代表 metadata 與遠端真值脫節。
-// 其他既有 disposition（remote-draft / remote-deleted / remote-unavailable / remote-permalink-changed /
-// operator-confirmed-inactive）於本 Slice 維持既有 withdrawal-eligible 行為，不重新定義其語意。
-// 未來若需針對其他 disposition 收緊：**另開 phase + explicit approval**；本 helper 只封鎖 remote-live。
-// Unknown value → false（fail-closed；與 REMOTE_DISPOSITIONS enum 檢查串接，不作為 shape gate）。
-export const WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS = Object.freeze(new Set(['remote-live']));
+// `remote-live` 代表 operator 已查證遠端 Blogger 文章仍公開；此為合法觀察值（保留於
+// REMOTE_DISPOSITION_VALUES），但**不得**構成 withdrawal authorization 依據 —— 撤回一篇仍公開之文章即
+// 代表 metadata 與遠端真值脫節。其他既有 disposition（remote-draft / remote-deleted / remote-unavailable
+// / remote-permalink-changed / operator-confirmed-inactive）於本 Slice 維持既有 withdrawal-eligible
+// 行為，不重新定義其語意。未來若需針對其他 disposition 收緊：**另開 phase + explicit approval**。
+// Unknown value → false（fail-closed；與 REMOTE_DISPOSITION_VALUES enum 檢查串接，不作為 shape gate）。
+export const WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES = Object.freeze(['remote-live']);
+const WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_SET = new Set(WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_VALUES);
 
 // 穩定 blocker slug；preparation / preflight / rehearsal / guards / docs 一致使用。
 export const REMOTE_LIVE_BLOCKER = 'remote-disposition-still-live';
 
+export function isRemoteDisposition(value) {
+  return REMOTE_DISPOSITION_SET.has(value);
+}
+
 export function isWithdrawalEligibleRemoteDisposition(value) {
-  if (!REMOTE_DISPOSITIONS.has(value)) return false;
-  return !WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITIONS.has(value);
+  if (!REMOTE_DISPOSITION_SET.has(value)) return false;
+  return !WITHDRAWAL_INELIGIBLE_REMOTE_DISPOSITION_SET.has(value);
 }
 
 // schemaVersion 2 之 blogger.status 合法 enum（correction §七 fail-closed）。case-sensitive（小寫）。
-export const V2_BLOGGER_STATUSES = Object.freeze(
-  new Set(['draft', 'ready', 'published', 'archived', 'withdrawn']),
-);
+// Module-private lookup set — never exported so external callers cannot mutate the whitelist.
+const V2_BLOGGER_STATUS_SET = new Set(['draft', 'ready', 'published', 'archived', 'withdrawn']);
 
 // 公開 sidecar 之 lifecycle event **不得**含下列私人核准欄位（§六 6.7）。
 export const PRIVATE_LIFECYCLE_FIELDS = Object.freeze([
@@ -117,9 +133,8 @@ export const REQUIRED_WITHDRAWN_EVENT_FIELDS = Object.freeze([
 // lifecycle event 之 strict allowlist（correction §六）。除 required fields 外，額外允許 optional
 //   reasonDetail。任何不在本白名單之 key 皆為 error（fail-closed 第一層 gate）；private operator
 //   欄位與重複 publication evidence 仍分別以更精確之 issue type 回報，但 allowlist 才是主要 gate。
-export const ALLOWED_LIFECYCLE_EVENT_KEYS = Object.freeze(
-  new Set([...REQUIRED_WITHDRAWN_EVENT_FIELDS, 'reasonDetail']),
-);
+// Module-private set — never exported so external callers cannot expand the allowlist.
+const ALLOWED_LIFECYCLE_EVENT_KEY_SET = new Set([...REQUIRED_WITHDRAWN_EVENT_FIELDS, 'reasonDetail']);
 
 // 內部查詢用 Set（PRIVATE / DUPLICATE 保留為 export array 以維持既有 API；此處另建 Set 供 O(1) 分類）。
 const PRIVATE_LIFECYCLE_FIELDS_SET = new Set(PRIVATE_LIFECYCLE_FIELDS);
@@ -245,7 +260,7 @@ function classifyV2Status(blogger) {
   if (typeof s !== 'string') return 'non-string';
   if (s === '') return 'empty';
   if (s.trim() === '') return 'whitespace';
-  if (!V2_BLOGGER_STATUSES.has(s)) return 'unknown'; // 含大小寫變體（"Published" / "WITHDRAWN"）
+  if (!V2_BLOGGER_STATUS_SET.has(s)) return 'unknown'; // 含大小寫變體（"Published" / "WITHDRAWN"）
   return null;
 }
 
@@ -287,7 +302,7 @@ function validateWithdrawnEvent(event, index, push, T) {
   //   只回顯 key 名稱、**絕不**回顯 key 值（redaction）。private operator / duplicate evidence
   //   仍以更精確之 issue type 回報；其餘未知 key → lifecycleUnknownField。
   for (const key of Object.keys(event)) {
-    if (ALLOWED_LIFECYCLE_EVENT_KEYS.has(key)) continue;
+    if (ALLOWED_LIFECYCLE_EVENT_KEY_SET.has(key)) continue;
     if (PRIVATE_LIFECYCLE_FIELDS_SET.has(key)) {
       push(T.lifecyclePrivateField, key);
     } else if (DUPLICATE_EVIDENCE_FIELDS_SET.has(key)) {
@@ -332,13 +347,13 @@ function validateWithdrawnEvent(event, index, push, T) {
   }
 
   // reason enum（§六 6.5）。
-  if (!LIFECYCLE_REASONS.has(event.reason)) push(T.lifecycleReasonInvalid, 'reason');
+  if (!isLifecycleReason(event.reason)) push(T.lifecycleReasonInvalid, 'reason');
   if (Object.prototype.hasOwnProperty.call(event, 'reasonDetail') && !isNonEmptyString(event.reasonDetail)) {
     push(T.lifecycleReasonInvalid, 'reasonDetail-empty');
   }
 
   // remoteDisposition enum（§六 6.6）。
-  if (!REMOTE_DISPOSITIONS.has(event.remoteDisposition)) {
+  if (!isRemoteDisposition(event.remoteDisposition)) {
     push(T.lifecycleRemoteDispositionInvalid, 'remoteDisposition');
   }
 

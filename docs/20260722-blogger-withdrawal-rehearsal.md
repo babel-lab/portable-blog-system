@@ -79,7 +79,8 @@ Rehearsal 繼承 Slice 4D preflight 的 withdrawal-eligibility gate；本節與
 `docs/20260722-blogger-withdrawal-authorization-preparation.md` §2.1 一致。
 
 `remote-live` 代表 operator 已查證遠端 Blogger 文章**仍公開**。這是合法的遠端觀察值（保留於
-`REMOTE_DISPOSITIONS` enum、`documentValid` 可為 true），但**不得**構成 withdrawal authorization
+`REMOTE_DISPOSITION_VALUES` frozen array、`isRemoteDisposition('remote-live') === true`、
+`documentValid` 可為 true），但**不得**構成 withdrawal authorization
 依據：撤回一篇仍公開的 Blogger 文章會使 repository metadata 與遠端真值脫節。單一權威 helper
 `isWithdrawalEligibleRemoteDisposition(value)`（於 `src/scripts/sidecar-withdrawal-contract.js`）
 對 `remote-live` 回 false；其他 landed disposition 於本 Slice 維持既有 withdrawal-eligible 行為。

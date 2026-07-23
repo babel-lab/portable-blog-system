@@ -66,7 +66,8 @@ operator-confirmed-inactive
 本 pipeline 之後續 gate（preparation / preflight / rehearsal）**不得**混用：
 
 - `remote-live` 代表 operator 已查證遠端 Blogger 文章**仍公開**；它是合法的遠端觀察值，因此
-  保留於 `REMOTE_DISPOSITIONS` enum，schema / documentValid 不會因此失敗。
+  保留於 `REMOTE_DISPOSITION_VALUES`（透過 `isRemoteDisposition` helper 查詢），schema /
+  documentValid 不會因此失敗。
 - 但撤回一篇**仍公開**的 Blogger 文章會使 repository metadata 與遠端真值脫節，因此
   `remote-live` **不得**構成 withdrawal authorization 依據。判定使用 `sidecar-withdrawal-contract.js`
   之單一權威 helper `isWithdrawalEligibleRemoteDisposition(value)`（`remote-live → false`；其他
