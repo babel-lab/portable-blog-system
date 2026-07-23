@@ -66,27 +66,37 @@ export const PLAN_FINGERPRINT_KIND = 'blogger-sidecar-withdrawal-plan';
 export const RECORD_FINGERPRINT_KIND = 'blogger-sidecar-withdrawal-record';
 
 // strict allowlist（每層 nested object 皆有；unknown key fail-closed）。
-export const ALLOWED_TOP_KEYS = Object.freeze(
-  new Set(['schemaVersion', 'purpose', 'repository', 'plan', 'target', 'withdrawal', 'approval']),
-);
-export const ALLOWED_REPO_KEYS = Object.freeze(new Set(['expectedBranch', 'expectedHead']));
-export const ALLOWED_PLAN_KEYS = Object.freeze(
-  new Set(['expectedPlanFingerprint', 'expectedRecordFingerprint', 'recordCount']),
-);
-export const ALLOWED_TARGET_KEYS = Object.freeze(
-  new Set([
-    'sourcePath',
-    'sidecarPath',
-    'expectedSourceSha256',
-    'expectedSidecarSha256',
-    'expectedCurrentStatus',
-    'expectedPublishedUrlFingerprint',
-  ]),
-);
-export const ALLOWED_WITHDRAWAL_KEYS = Object.freeze(
-  new Set(['event', 'remoteDisposition', 'remoteVerifiedAt', 'reason', 'reasonDetail']),
-);
-export const ALLOWED_APPROVAL_KEYS = Object.freeze(new Set(['explicitlyAuthorized']));
+// Contract：`Object.freeze(new Set(...))` **不會**凍結 Set 的 internal slots —— 外部持有 Set
+//   reference 的 caller 仍可用 `.add` / `.delete` / `.clear` 放寬或破壞 allowlist（Slice 4H 已
+//   reproduce）。因此每層 allowlist 對外只暴露 **frozen value array**（`ALLOWED_*_KEY_VALUES`），
+//   parser 內部 membership check 使用 **module-private** lookup Set（永不 export、永不透過 getter
+//   回傳），如此 caller 無法拿到可 mutate 的 Set。
+export const ALLOWED_TOP_KEY_VALUES = Object.freeze([
+  'schemaVersion', 'purpose', 'repository', 'plan', 'target', 'withdrawal', 'approval',
+]);
+export const ALLOWED_REPO_KEY_VALUES = Object.freeze(['expectedBranch', 'expectedHead']);
+export const ALLOWED_PLAN_KEY_VALUES = Object.freeze([
+  'expectedPlanFingerprint', 'expectedRecordFingerprint', 'recordCount',
+]);
+export const ALLOWED_TARGET_KEY_VALUES = Object.freeze([
+  'sourcePath',
+  'sidecarPath',
+  'expectedSourceSha256',
+  'expectedSidecarSha256',
+  'expectedCurrentStatus',
+  'expectedPublishedUrlFingerprint',
+]);
+export const ALLOWED_WITHDRAWAL_KEY_VALUES = Object.freeze([
+  'event', 'remoteDisposition', 'remoteVerifiedAt', 'reason', 'reasonDetail',
+]);
+export const ALLOWED_APPROVAL_KEY_VALUES = Object.freeze(['explicitlyAuthorized']);
+
+const _ALLOWED_TOP_KEY_SET = new Set(ALLOWED_TOP_KEY_VALUES);
+const _ALLOWED_REPO_KEY_SET = new Set(ALLOWED_REPO_KEY_VALUES);
+const _ALLOWED_PLAN_KEY_SET = new Set(ALLOWED_PLAN_KEY_VALUES);
+const _ALLOWED_TARGET_KEY_SET = new Set(ALLOWED_TARGET_KEY_VALUES);
+const _ALLOWED_WITHDRAWAL_KEY_SET = new Set(ALLOWED_WITHDRAWAL_KEY_VALUES);
+const _ALLOWED_APPROVAL_KEY_SET = new Set(ALLOWED_APPROVAL_KEY_VALUES);
 
 // ── safe error boundary（§八 / §十）──────────────────────────────────────────────
 // 對外拋出的 error 必為 WithdrawalAuthorizationError：stable code + safe message；code / safeMessage
@@ -480,7 +490,7 @@ export function parseAndValidateAuthorization(rawText) {
 
   // top-level strict allowlist
   for (const k of Object.keys(parsed)) {
-    if (!ALLOWED_TOP_KEYS.has(k)) return { ok: false, blocker: 'authorization-unknown-top-level-key' };
+    if (!_ALLOWED_TOP_KEY_SET.has(k)) return { ok: false, blocker: 'authorization-unknown-top-level-key' };
   }
   if (parsed.schemaVersion !== AUTHORIZATION_SCHEMA_VERSION) {
     return { ok: false, blocker: 'authorization-schema-version-invalid' };
@@ -492,7 +502,7 @@ export function parseAndValidateAuthorization(rawText) {
   // repository
   if (!isPlainObject(parsed.repository)) return { ok: false, blocker: 'authorization-repository-invalid' };
   for (const k of Object.keys(parsed.repository)) {
-    if (!ALLOWED_REPO_KEYS.has(k)) return { ok: false, blocker: 'authorization-repository-unknown-key' };
+    if (!_ALLOWED_REPO_KEY_SET.has(k)) return { ok: false, blocker: 'authorization-repository-unknown-key' };
   }
   if (parsed.repository.expectedBranch !== AUTHORIZATION_BRANCH) {
     return { ok: false, blocker: 'authorization-branch-invalid' };
@@ -504,7 +514,7 @@ export function parseAndValidateAuthorization(rawText) {
   // plan
   if (!isPlainObject(parsed.plan)) return { ok: false, blocker: 'authorization-plan-invalid' };
   for (const k of Object.keys(parsed.plan)) {
-    if (!ALLOWED_PLAN_KEYS.has(k)) return { ok: false, blocker: 'authorization-plan-unknown-key' };
+    if (!_ALLOWED_PLAN_KEY_SET.has(k)) return { ok: false, blocker: 'authorization-plan-unknown-key' };
   }
   if (!isSha256HexLower(parsed.plan.expectedPlanFingerprint)) {
     return { ok: false, blocker: 'authorization-plan-fingerprint-invalid' };
@@ -519,7 +529,7 @@ export function parseAndValidateAuthorization(rawText) {
   // target
   if (!isPlainObject(parsed.target)) return { ok: false, blocker: 'authorization-target-invalid' };
   for (const k of Object.keys(parsed.target)) {
-    if (!ALLOWED_TARGET_KEYS.has(k)) return { ok: false, blocker: 'authorization-target-unknown-key' };
+    if (!_ALLOWED_TARGET_KEY_SET.has(k)) return { ok: false, blocker: 'authorization-target-unknown-key' };
   }
   if (classifyBloggerSourcePath(parsed.target.sourcePath) !== null) {
     return { ok: false, blocker: 'authorization-target-source-path-invalid' };
@@ -543,7 +553,7 @@ export function parseAndValidateAuthorization(rawText) {
   // withdrawal
   if (!isPlainObject(parsed.withdrawal)) return { ok: false, blocker: 'authorization-withdrawal-invalid' };
   for (const k of Object.keys(parsed.withdrawal)) {
-    if (!ALLOWED_WITHDRAWAL_KEYS.has(k)) return { ok: false, blocker: 'authorization-withdrawal-unknown-key' };
+    if (!_ALLOWED_WITHDRAWAL_KEY_SET.has(k)) return { ok: false, blocker: 'authorization-withdrawal-unknown-key' };
   }
   if (parsed.withdrawal.event !== WITHDRAWAL_EVENT) {
     return { ok: false, blocker: 'authorization-withdrawal-event-invalid' };
@@ -565,7 +575,7 @@ export function parseAndValidateAuthorization(rawText) {
   // approval
   if (!isPlainObject(parsed.approval)) return { ok: false, blocker: 'authorization-approval-invalid' };
   for (const k of Object.keys(parsed.approval)) {
-    if (!ALLOWED_APPROVAL_KEYS.has(k)) return { ok: false, blocker: 'authorization-approval-unknown-key' };
+    if (!_ALLOWED_APPROVAL_KEY_SET.has(k)) return { ok: false, blocker: 'authorization-approval-unknown-key' };
   }
   // boolean 必須是真正 boolean（§七）；1 / "true" / "yes" / null → document invalid。
   if (typeof parsed.approval.explicitlyAuthorized !== 'boolean') {

@@ -1291,6 +1291,264 @@ async function main() {
       });
     }
 
+    // ══ P. Slice 4H: authorization allowlist immutability (adversarial) ══
+    // Regression driver: `Object.freeze(new Set(...))` does NOT lock a Set's internal slots — a
+    //   caller holding the exported Set reference could `.add` / `.delete` / `.clear` and either
+    //   (a) let unknown keys through the parser, or (b) reject legit authorizations. Slice 4H
+    //   moves every authorization key allowlist to a module-private lookup Set and exposes only
+    //   frozen value arrays (`ALLOWED_*_KEY_VALUES`). This section proves the fix in the SAME
+    //   module cache used by the parser: enumerate exports, hit every frozen array with 14
+    //   mutation attempts, attempt to overwrite namespace bindings, then re-run parser + full
+    //   pipeline (eligible / remote-live / unknown-key oracles) and assert nothing changed.
+    //   Expected results are hardcoded per level (NOT derived from the tested arrays).
+    {
+      const sharedNs = await import(pathToFileURL(SHARED).href);
+
+      await check('4H-P: no exported binding on shared is a Set/Map', () => {
+        for (const [k, v] of Object.entries(sharedNs)) {
+          assert.ok(!(v instanceof Set), `export ${k} is a Set (mutable via .add/.delete/.clear)`);
+          assert.ok(!(v instanceof Map), `export ${k} is a Map (mutable)`);
+        }
+      });
+      await check('4H-P: legacy mutable Set names no longer exported', () => {
+        for (const name of ['ALLOWED_TOP_KEYS', 'ALLOWED_REPO_KEYS', 'ALLOWED_PLAN_KEYS',
+          'ALLOWED_TARGET_KEYS', 'ALLOWED_WITHDRAWAL_KEYS', 'ALLOWED_APPROVAL_KEYS']) {
+          assert.strictEqual(sharedNs[name], undefined, `${name} must be undefined`);
+        }
+      });
+
+      const EXPECTED_ARRAYS = {
+        ALLOWED_TOP_KEY_VALUES:        ['schemaVersion', 'purpose', 'repository', 'plan', 'target', 'withdrawal', 'approval'],
+        ALLOWED_REPO_KEY_VALUES:       ['expectedBranch', 'expectedHead'],
+        ALLOWED_PLAN_KEY_VALUES:       ['expectedPlanFingerprint', 'expectedRecordFingerprint', 'recordCount'],
+        ALLOWED_TARGET_KEY_VALUES:     ['sourcePath', 'sidecarPath', 'expectedSourceSha256', 'expectedSidecarSha256', 'expectedCurrentStatus', 'expectedPublishedUrlFingerprint'],
+        ALLOWED_WITHDRAWAL_KEY_VALUES: ['event', 'remoteDisposition', 'remoteVerifiedAt', 'reason', 'reasonDetail'],
+        ALLOWED_APPROVAL_KEY_VALUES:   ['explicitlyAuthorized'],
+      };
+      for (const [name, expected] of Object.entries(EXPECTED_ARRAYS)) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4H-P: ${name} is a frozen non-extensible array with exact members`, () => {
+          const v = sharedNs[name];
+          assert.ok(Array.isArray(v), `${name} not Array`);
+          assert.strictEqual(Object.isFrozen(v), true, `${name} not frozen`);
+          assert.strictEqual(Object.isExtensible(v), false, `${name} extensible`);
+          assert.deepStrictEqual([...v], expected, `${name} unexpected members: ${JSON.stringify([...v])}`);
+        });
+      }
+
+      // Every mutation primitive the JS spec exposes on Array — must leave the observable
+      //   contents unchanged (either throws in strict mode or silently no-ops on a frozen array).
+      const ARRAY_ATTACKS = [
+        ['push',           (a) => a.push('unexpected')],
+        ['pop',            (a) => a.pop()],
+        ['shift',          (a) => a.shift()],
+        ['unshift',        (a) => a.unshift('unexpected')],
+        ['splice',         (a) => a.splice(0, 1)],
+        ['sort',           (a) => a.sort()],
+        ['reverse',        (a) => a.reverse()],
+        ['copyWithin',     (a) => a.copyWithin(0, 1)],
+        ['fill',           (a) => a.fill('unexpected')],
+        ['index-assign',   (a) => { a[0] = 'unexpected'; }],
+        ['delete-index',   (a) => { delete a[0]; }],
+        ['length-zero',    (a) => { a.length = 0; }],
+        ['defineProperty', (a) => Object.defineProperty(a, '0', { value: 'unexpected' })],
+        ['setPrototype',   (a) => Object.setPrototypeOf(a, {})],
+      ];
+      for (const name of Object.keys(EXPECTED_ARRAYS)) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4H-P: ${name} unchanged after all ${ARRAY_ATTACKS.length} mutation attacks`, () => {
+          const arr = sharedNs[name];
+          const snapshot = [...arr];
+          for (const [, fn] of ARRAY_ATTACKS) { try { fn(arr); } catch { /* accept throw */ } }
+          assert.deepStrictEqual([...arr], snapshot, `${name} mutated`);
+        });
+      }
+
+      // ESM namespace object is non-writable + sealed; consumers cannot monkey-patch the parser.
+      const BINDING_ATTACK_TARGETS = [
+        'parseAndValidateAuthorization', 'scanJsonForDuplicateKeys', 'jsonTextHasDuplicateKeys',
+        'ALLOWED_TOP_KEY_VALUES', 'ALLOWED_REPO_KEY_VALUES', 'ALLOWED_PLAN_KEY_VALUES',
+        'ALLOWED_TARGET_KEY_VALUES', 'ALLOWED_WITHDRAWAL_KEY_VALUES', 'ALLOWED_APPROVAL_KEY_VALUES',
+        'computePlanFingerprint', 'computeRecordFingerprint',
+      ];
+      for (const key of BINDING_ATTACK_TARGETS) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4H-P: cannot overwrite namespace binding ${key}`, () => {
+          const orig = sharedNs[key];
+          try { sharedNs[key] = () => 'attacker'; } catch { /* accept */ }
+          try { delete sharedNs[key]; } catch { /* accept */ }
+          try { Object.defineProperty(sharedNs, key, { value: 'attacker' }); } catch { /* accept */ }
+          try { Object.setPrototypeOf(sharedNs, { attacker: true }); } catch { /* accept */ }
+          assert.strictEqual(sharedNs[key], orig, `${key} binding mutated`);
+        });
+      }
+
+      await check('4H-P: user copy mutation does not affect production array', () => {
+        const snapshot = [...sharedNs.ALLOWED_TOP_KEY_VALUES];
+        const copy = [...sharedNs.ALLOWED_TOP_KEY_VALUES];
+        copy.push('unexpected');
+        copy[0] = 'attacker';
+        assert.deepStrictEqual([...sharedNs.ALLOWED_TOP_KEY_VALUES], snapshot);
+        assert.ok(!sharedNs.ALLOWED_TOP_KEY_VALUES.includes('unexpected'));
+      });
+
+      // Parser strictness oracles (hardcoded expected results per level). Build a legal
+      //   authorization once via existing helper, then inject an unknown key at each level.
+      const goodHead = 'a'.repeat(40);
+      const goodFp = 'b'.repeat(64);
+      const goodTarget = {
+        sourcePath: CAND_SOURCE, sidecarPath: CAND_SIDECAR,
+        expectedSourceSha256: 'c'.repeat(64), expectedSidecarSha256: 'd'.repeat(64),
+        expectedCurrentStatus: 'published', expectedPublishedUrlFingerprint: 'e'.repeat(64),
+      };
+      const baseAuth = makeAuth({ head: goodHead, planFp: goodFp, recFp: goodFp, target: goodTarget, approved: false });
+      const UNKNOWN_KEY_ORACLES = [
+        ['top',        { ...baseAuth, unexpectedTopLevel: 'x' },                                             'authorization-unknown-top-level-key'],
+        ['repository', { ...baseAuth, repository: { ...baseAuth.repository, unexpectedRepo: 'x' } },         'authorization-repository-unknown-key'],
+        ['plan',       { ...baseAuth, plan: { ...baseAuth.plan, unexpectedPlan: 'x' } },                     'authorization-plan-unknown-key'],
+        ['target',     { ...baseAuth, target: { ...baseAuth.target, unexpectedTarget: 'x' } },               'authorization-target-unknown-key'],
+        ['withdrawal', { ...baseAuth, withdrawal: { ...baseAuth.withdrawal, unexpectedWithdrawal: 'x' } },   'authorization-withdrawal-unknown-key'],
+        ['approval',   { ...baseAuth, approval: { explicitlyAuthorized: false, operatorOverride: true } },   'authorization-approval-unknown-key'],
+      ];
+      for (const [level, doc, expected] of UNKNOWN_KEY_ORACLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4H-P: unknown ${level} key → ${expected}`, () => {
+          const r = sharedNs.parseAndValidateAuthorization(JSON.stringify(doc));
+          assert.strictEqual(r.ok, false);
+          assert.strictEqual(r.blocker, expected);
+        });
+      }
+
+      // Explicit approval cannot be substituted by any invented approval field.
+      const APPROVAL_SUBSTITUTIONS = ['operatorOverride', 'approved', 'authorized', 'explicitAuthorization'];
+      for (const field of APPROVAL_SUBSTITUTIONS) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4H-P: approval substitution ${field} → unknown-key + explicitlyAuthorized false`, () => {
+          const doc = { ...baseAuth, approval: { [field]: true } };
+          const r = sharedNs.parseAndValidateAuthorization(JSON.stringify(doc));
+          assert.strictEqual(r.ok, false);
+          assert.strictEqual(r.blocker, 'authorization-approval-unknown-key');
+          assert.notStrictEqual(r.explicitlyAuthorized, true);
+        });
+      }
+      await check('4H-P: real approval + extra approval field → still rejected (not accepted via real approval)', () => {
+        const doc = { ...baseAuth, approval: { explicitlyAuthorized: true, operatorOverride: true } };
+        const r = sharedNs.parseAndValidateAuthorization(JSON.stringify(doc));
+        assert.strictEqual(r.ok, false);
+        assert.strictEqual(r.blocker, 'authorization-approval-unknown-key');
+      });
+
+      // remoteDisposition cannot be shadowed by any invented withdrawal field.
+      for (const shadow of ['remoteDispositionOverride', 'remoteDisposition2', 'operatorRemoteDisposition']) {
+        // eslint-disable-next-line no-await-in-loop
+        await check(`4H-P: withdrawal shadow ${shadow} → unknown-key`, () => {
+          const doc = { ...baseAuth, withdrawal: { ...baseAuth.withdrawal, [shadow]: 'remote-deleted' } };
+          const r = sharedNs.parseAndValidateAuthorization(JSON.stringify(doc));
+          assert.strictEqual(r.ok, false);
+          assert.strictEqual(r.blocker, 'authorization-withdrawal-unknown-key');
+        });
+      }
+
+      // Fingerprints bind explicit named parameters — an extra field on the input object must
+      //   not alter the computed value.
+      await check('4H-P: computeRecordFingerprint ignores extra input fields (explicit binding)', () => {
+        const base = {
+          sourcePath: CAND_SOURCE, sidecarPath: CAND_SIDECAR,
+          expectedCurrentStatus: 'published',
+          expectedSourceSha256: 'c'.repeat(64), expectedSidecarSha256: 'd'.repeat(64),
+          expectedPublishedUrlFingerprint: 'e'.repeat(64),
+          remoteDisposition: 'remote-deleted', remoteVerifiedAt: INTENT.remoteVerifiedAt,
+          reason: 'content-retirement', reasonDetail: '',
+        };
+        const fp1 = sharedNs.computeRecordFingerprint(base).value;
+        const fp2 = sharedNs.computeRecordFingerprint({ ...base, injectedField: 'x' }).value;
+        assert.strictEqual(fp1, fp2);
+      });
+
+      // Same-cache full-pipeline post-attack oracles.
+      {
+        const fxE = await setupCandidateRepo(tmpRoot, '4h-elig');
+        await check('4H-P pipeline: remote-draft prepare → ok + explicitlyAuthorized false', async () => {
+          const r = await prepareWithdrawalAuthorizationDraft({
+            projectRoot: fxE.repoRoot, sourcePath: CAND_SOURCE,
+            remoteDisposition: 'remote-draft', remoteVerifiedAt: INTENT.remoteVerifiedAt,
+            reason: 'content-retirement', reasonDetail: '',
+          });
+          assert.strictEqual(r.ok, true, JSON.stringify(r.blockers));
+          assert.strictEqual(r.draft.approval.explicitlyAuthorized, false);
+        });
+        await check('4H-P pipeline: eligible approved authorization → applyReady true, no mutation', async () => {
+          const intentE = { ...INTENT, remoteDisposition: 'remote-draft' };
+          const target = makeTargetFromCandidate(fxE.candidate);
+          const recFp = recordFpFor(fxE.candidate, intentE);
+          const auth = makeAuth({ head: fxE.head, planFp: fxE.planFp, recFp, target, intent: intentE, approved: true });
+          const authPath = writeAuthFixture(fxE.repoRoot, auth, '4h-elig-approved.json');
+          const invBefore = snapshotTree(fxE.repoRoot, ['.md', '.publish.json']);
+          const res = await preflightWithdrawalAuthorization({
+            projectRoot: fxE.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+          });
+          const invAfter = snapshotTree(fxE.repoRoot, ['.md', '.publish.json']);
+          assert.strictEqual(res.documentValid, true, JSON.stringify(res.blockers));
+          assert.strictEqual(res.remoteDispositionEligible, true);
+          assert.strictEqual(res.explicitlyAuthorized, true);
+          assert.strictEqual(res.applyReady, true, JSON.stringify(res.blockers));
+          assert.strictEqual(res.mutationPerformed, false);
+          assert.deepStrictEqual(invMap(invAfter), invMap(invBefore));
+        });
+
+        const fxL = await setupCandidateRepo(tmpRoot, '4h-live');
+        await check('4H-P pipeline: fully-valid approved remote-live → applyReady false, remote-live blocker', async () => {
+          const intentL = { ...INTENT, remoteDisposition: 'remote-live' };
+          const target = makeTargetFromCandidate(fxL.candidate);
+          const recFp = recordFpFor(fxL.candidate, intentL);
+          const auth = makeAuth({ head: fxL.head, planFp: fxL.planFp, recFp, target, intent: intentL, approved: true });
+          const authPath = writeAuthFixture(fxL.repoRoot, auth, '4h-live-approved.json');
+          const res = await preflightWithdrawalAuthorization({
+            projectRoot: fxL.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+          });
+          assert.strictEqual(res.documentValid, true, JSON.stringify(res.blockers));
+          assert.strictEqual(res.remoteDispositionEligible, false);
+          assert.strictEqual(res.applyReady, false);
+          assert.ok(res.blockers.includes(REMOTE_LIVE_BLOCKER), JSON.stringify(res.blockers));
+        });
+
+        const fxU = await setupCandidateRepo(tmpRoot, '4h-unknown');
+        await check('4H-P pipeline: approved authorization + extra approval key → documentValid false', async () => {
+          const target = makeTargetFromCandidate(fxU.candidate);
+          const recFp = recordFpFor(fxU.candidate);
+          const auth = makeAuth({ head: fxU.head, planFp: fxU.planFp, recFp, target, approved: true });
+          auth.approval = { explicitlyAuthorized: true, operatorOverride: true };
+          const authPath = writeAuthFixture(fxU.repoRoot, auth, '4h-unknown-approval.json');
+          const res = await preflightWithdrawalAuthorization({
+            projectRoot: fxU.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+          });
+          assert.strictEqual(res.documentValid, false);
+          assert.strictEqual(res.applyReady, false);
+          assert.ok(res.blockers.includes('authorization-approval-unknown-key'), JSON.stringify(res.blockers));
+        });
+      }
+
+      // Source-text ban: pre-fix pattern `export const ALLOWED_*_KEYS = Object.freeze(new Set(...))`
+      //   must not be re-added; allowlists must be exported as frozen value arrays.
+      await check('4H-P source: pre-fix ALLOWED_*_KEYS Object.freeze(new Set(...)) exports removed', () => {
+        const src = readFileSync(SHARED, 'utf-8');
+        for (const legacy of ['ALLOWED_TOP_KEYS', 'ALLOWED_REPO_KEYS', 'ALLOWED_PLAN_KEYS',
+          'ALLOWED_TARGET_KEYS', 'ALLOWED_WITHDRAWAL_KEYS', 'ALLOWED_APPROVAL_KEYS']) {
+          assert.ok(!new RegExp(`export\\s+const\\s+${legacy}\\b`).test(src), `${legacy} must not be re-exported`);
+        }
+        assert.ok(!/export\s+const\s+ALLOWED_[A-Z_]+_KEYS\s*=\s*Object\.freeze\s*\(\s*new\s+Set/.test(src),
+          'legacy Object.freeze(new Set(...)) pattern must be gone from allowlist exports');
+      });
+      await check('4H-P source: authorization allowlists exported as frozen value arrays', () => {
+        const src = readFileSync(SHARED, 'utf-8');
+        for (const name of ['ALLOWED_TOP_KEY_VALUES', 'ALLOWED_REPO_KEY_VALUES', 'ALLOWED_PLAN_KEY_VALUES',
+          'ALLOWED_TARGET_KEY_VALUES', 'ALLOWED_WITHDRAWAL_KEY_VALUES', 'ALLOWED_APPROVAL_KEY_VALUES']) {
+          assert.ok(new RegExp(`export\\s+const\\s+${name}\\s*=\\s*Object\\.freeze\\s*\\(\\s*\\[`).test(src),
+            `${name} must be exported as Object.freeze([...])`);
+        }
+      });
+    }
+
     // ── redaction across 4G outputs ──────────────────────────────────────
     await check('4G redaction: no leaks across 4G captured outputs', () => {
       const joined = allOutputs.join('\n');
