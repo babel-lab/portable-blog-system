@@ -33,6 +33,7 @@
 //   2  CLI misuse（unknown / forbidden flag / missing required flag）。
 //   --help → 0（不掃描 repo）。
 
+import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +46,10 @@ import {
   computePlanFingerprint,
   computeRecordFingerprint,
 } from './blogger-withdrawal-authorization.js';
+
+function sha256HexOfString(text) {
+  return createHash('sha256').update(text, 'utf-8').digest('hex');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -156,6 +161,18 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
     explicitlyAuthorized: false,
     applyReady: false,
     mutationPerformed: false,
+    // Post-preflight TOCTOU binding surfaces（Slice 4E correction）：
+    //   validatedAuthorizationSha256 = SHA-256 of the exact raw authorization bytes that passed
+    //     initial preflight schema/binding validation. Any post-preflight re-read whose SHA-256
+    //     differs — even whitespace / key order / reasonDetail — is authorization drift.
+    //   observedSourceSha256 / observedSidecarSha256 = SHA-256 of the source / sidecar bytes the
+    //     planner actually read and matched during preflight. Post-preflight re-hash must equal
+    //     these observed values, not merely the re-read authorization's expected values (which
+    //     could be replaced together with the authorization document).
+    // All three are null when preflight has not observed / validated the corresponding artifact.
+    validatedAuthorizationSha256: null,
+    observedSourceSha256: null,
+    observedSidecarSha256: null,
     blockers,
   };
 
@@ -179,6 +196,10 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
   result.documentValid = true;
   const auth = parsed.authorization;
   result.explicitlyAuthorized = parsed.explicitlyAuthorized;
+  // Bind the exact raw authorization bytes that passed schema validation. Post-preflight
+  // re-reads compare their SHA-256 against this value; any byte-level drift (whitespace,
+  // key order, reasonDetail, reason, remoteDisposition, operator identity) is refused.
+  result.validatedAuthorizationSha256 = sha256HexOfString(read.rawText);
 
   // authorization.target.sourcePath 必須等於 CLI --source-path（兩者同一 candidate）。
   if (auth.target.sourcePath !== sourcePath) {
@@ -233,6 +254,12 @@ export async function preflightWithdrawalAuthorization({ projectRoot = PROJECT_R
     recordOk = false;
   } else {
     const c = matches[0];
+    // Record the source/sidecar SHA-256 the planner actually observed and matched, so a later
+    // rehearsal step can compare its own re-hash against the truth we saw here — not merely
+    // against the re-read authorization's expected fields (which an attacker could rotate
+    // together with the source/sidecar bytes).
+    result.observedSourceSha256 = c.sourceSha256;
+    result.observedSidecarSha256 = c.sidecarSha256;
     if (c.sidecarPath !== auth.target.sidecarPath) { blockers.push('sidecar-path-mismatch'); recordOk = false; }
     if (c.sourceSha256 !== auth.target.expectedSourceSha256) { blockers.push('source-sha-mismatch'); recordOk = false; }
     if (c.sidecarSha256 !== auth.target.expectedSidecarSha256) { blockers.push('sidecar-sha-mismatch'); recordOk = false; }
@@ -290,6 +317,9 @@ export function formatJson(result) {
     explicitlyAuthorized: result.explicitlyAuthorized,
     applyReady: result.applyReady,
     mutationPerformed: result.mutationPerformed,
+    validatedAuthorizationSha256: result.validatedAuthorizationSha256,
+    observedSourceSha256: result.observedSourceSha256,
+    observedSidecarSha256: result.observedSidecarSha256,
     blockers: result.blockers,
   };
   return JSON.stringify(body, null, 2) + '\n';

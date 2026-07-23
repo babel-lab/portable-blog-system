@@ -328,7 +328,10 @@ function baseReport(sourcePath) {
     rehearsalPerformed: false,
     productionMutationPerformed: false,
     applyReady: false,
-    cleanupPerformed: false,
+    // Default true = "no scratch was ever created, so there is nothing to clean" (vacuous
+    //   success). When the code path enters the scratch try{}, its finally{} block explicitly
+    //   downgrades this to false if rmSync leaves residue. See §Correction C.
+    cleanupPerformed: true,
     blockers: [],
   };
 }
@@ -337,15 +340,47 @@ function baseReport(sourcePath) {
 // `projectRoot` 在程式 API 暴露（供 focused guard 以 synthetic git repo 驅動）；CLI 硬編碼 PROJECT_ROOT、
 //   不暴露此參數。`scratchRootFactory` / `tmpBase` 供 guard 注入 canonical containment 測試（如
 //   simulate scratch under project-root）；CLI 不暴露。
+//
+// applyReady semantics (Slice 4E correction)：
+//   `applyReady` describes the FINAL state — i.e. "given everything this run observed, is this
+//   authorization still safe for a future production apply." Any blocker discovered *after* initial
+//   preflight (authorization / source / sidecar TOCTOU drift, scratch containment / copy / write
+//   / rename / read-back failure, or cleanup failure) must clear applyReady. Preflight-time
+//   applyReady=true is a necessary condition to enter the mutation phase, but it does not
+//   guarantee the final report is apply-ready — the post-preflight gates can still refuse.
+//
+// Cleanup contract (Slice 4E correction)：
+//   Full cleanup of the OS-temp scratch tree is part of a successful rehearsal contract. If a
+//   scratch root was created and the final rmSync leaves any residue, the run reports
+//   ok=false, applyReady=false, cleanupPerformed=false, and appends the stable blocker
+//   `scratch-cleanup-failed` in deterministic order (after any primary blocker). The scratch
+//   absolute path, raw fs error, and stack trace are never surfaced.
 export async function rehearseBloggerWithdrawal({
   projectRoot = PROJECT_ROOT,
   authorizationPath,
   sourcePath,
   scratchRootFactory,
   tmpBase,
+  // Guard-only hooks (never exposed via CLI). Two members are honored:
+  //   hooks.afterPreflight()   — called synchronously after preflight resolves and before the
+  //                              authorization / source / sidecar re-read. Guards use it to
+  //                              rewrite fixture bytes and prove the post-preflight TOCTOU
+  //                              gates fail closed. Hook exceptions are swallowed.
+  //   hooks.beforeCleanup()    — called synchronously inside the finally{} block before rmSync.
+  //                              Guards use it to acquire / release scratch-tree locks. Hook
+  //                              exceptions are swallowed.
+  // These hooks never influence production behavior because the CLI does not construct a hooks
+  //   object; they exist solely so focused adversarial guards can exercise safety branches.
+  hooks,
 } = {}) {
   const report = baseReport(sourcePath);
   const push = (b) => { if (!report.blockers.includes(b)) report.blockers.push(b); };
+  // Post-preflight refusal helper: dedup-push blocker AND clear applyReady, so any blocker
+  //   discovered after initial preflight cannot leave a stale applyReady=true in the report.
+  const refusePostPreflight = (blocker) => {
+    push(blocker);
+    report.applyReady = false;
+  };
 
   // ── source-path shape ───────────────────────────────────────────────
   if (classifyBloggerSourcePath(sourcePath) !== null) {
@@ -379,24 +414,59 @@ export async function rehearseBloggerWithdrawal({
   if (!pf.applyReady) return report;
   report.authorizationValidated = true;
 
-  // ── re-load authorization for authorization fingerprint（bytes hash；deterministic）──
+  // Guard-only hook — swallowed on error so hook faults never mask the fail-closed contract.
+  if (hooks && typeof hooks.afterPreflight === 'function') {
+    try { hooks.afterPreflight(); } catch { /* ignore */ }
+  }
+
+  // preflight returns the exact raw bytes / observed-content hashes it verified. Post-preflight
+  //   TOCTOU gates must compare against THESE preflight-observed values, not against fields on
+  //   the authorization we re-read next — an attacker who rotates the authorization file could
+  //   also declare matching source/sidecar hashes inside it. The preflight-observed truth is the
+  //   only stable ground for detecting drift.
+  const preflightAuthorizationSha256 = pf.validatedAuthorizationSha256;
+  const preflightSourceSha256 = pf.observedSourceSha256;
+  const preflightSidecarSha256 = pf.observedSidecarSha256;
+  if (!isSha256HexLower(preflightAuthorizationSha256)
+    || !isSha256HexLower(preflightSourceSha256)
+    || !isSha256HexLower(preflightSidecarSha256)) {
+    // preflight signaled applyReady but omitted one of the SHA-256 bindings; treat as an
+    //   internal drift condition rather than trusting incomplete state.
+    refusePostPreflight('preflight-binding-incomplete');
+    return report;
+  }
+
+  // ── re-read authorization bytes and enforce raw-byte SHA-256 equality against
+  //    the exact bytes preflight validated (§Correction A2). Any drift — whitespace,
+  //    key order, reasonDetail, reason, remoteDisposition, operator identity — is refused
+  //    BEFORE any scratch directory is created or any authorization value is used to build
+  //    a mutation payload.
   let rawAuthorization;
   try {
     rawAuthorization = readFileSync(authorizationPath, 'utf-8');
   } catch {
-    push('authorization-unreadable');
+    refusePostPreflight('authorization-unreadable');
     return report;
   }
+  const rereadAuthorizationSha256 = sha256HexOfString(rawAuthorization);
+  if (rereadAuthorizationSha256 !== preflightAuthorizationSha256) {
+    refusePostPreflight('authorization-hash-toctou-drift');
+    return report;
+  }
+  // At this point re-read auth is byte-identical to preflight's validated bytes, so re-parsing
+  //   must succeed and match; keep the parse as an internal-consistency assertion.
   const parsed = parseAndValidateAuthorization(rawAuthorization);
   if (!parsed.ok || parsed.explicitlyAuthorized !== true) {
-    // preflight 已 pass；此處若不一致代表 TOCTOU drift。
-    push('authorization-drift');
+    refusePostPreflight('authorization-hash-toctou-drift');
     return report;
   }
   const authorization = parsed.authorization;
-  const authorizationFingerprint = sha256HexOfString(rawAuthorization);
+  const authorizationFingerprint = rereadAuthorizationSha256;
 
-  // ── re-read source + sidecar（TOCTOU: SHA-256 必再次符合 authorization 綁定值）──
+  // ── re-read source + sidecar; compare re-computed SHA-256 against preflight-observed
+  //    hashes (§Correction A3). Comparing against the re-read authorization's expected
+  //    fields would let a coordinated authorization+content rotation slip through; we bind
+  //    to the truth the planner saw during preflight.
   const absSource = path.join(projectRoot, ...sourcePath.split('/'));
   const absSidecar = path.join(projectRoot, ...derivedSidecarPath.split('/'));
 
@@ -404,38 +474,38 @@ export async function rehearseBloggerWithdrawal({
   try {
     srcStat = lstatSync(absSource);
   } catch {
-    push('source-unreadable');
+    refusePostPreflight('source-unreadable');
     return report;
   }
   if (srcStat.isSymbolicLink() || !srcStat.isFile()) {
-    push('source-not-regular-file');
+    refusePostPreflight('source-not-regular-file');
     return report;
   }
   let sidecarStat;
   try {
     sidecarStat = lstatSync(absSidecar);
   } catch {
-    push('sidecar-unreadable');
+    refusePostPreflight('sidecar-unreadable');
     return report;
   }
   if (sidecarStat.isSymbolicLink() || !sidecarStat.isFile()) {
-    push('sidecar-not-regular-file');
+    refusePostPreflight('sidecar-not-regular-file');
     return report;
   }
 
   let sourceBuf; let sidecarBuf;
-  try { sourceBuf = readFileSync(absSource); } catch { push('source-unreadable'); return report; }
-  try { sidecarBuf = readFileSync(absSidecar); } catch { push('sidecar-unreadable'); return report; }
+  try { sourceBuf = readFileSync(absSource); } catch { refusePostPreflight('source-unreadable'); return report; }
+  try { sidecarBuf = readFileSync(absSidecar); } catch { refusePostPreflight('sidecar-unreadable'); return report; }
 
   const sourceSha256 = sha256HexOfBuffer(sourceBuf);
   const sidecarSha256 = sha256HexOfBuffer(sidecarBuf);
-  if (sourceSha256 !== authorization.target.expectedSourceSha256) {
-    push('source-hash-toctou-drift');
+  if (sourceSha256 !== preflightSourceSha256) {
+    refusePostPreflight('source-hash-toctou-drift');
     return report;
   }
   report.sourceHashMatched = true;
-  if (sidecarSha256 !== authorization.target.expectedSidecarSha256) {
-    push('sidecar-hash-toctou-drift');
+  if (sidecarSha256 !== preflightSidecarSha256) {
+    refusePostPreflight('sidecar-hash-toctou-drift');
     return report;
   }
   report.sidecarHashMatched = true;
@@ -445,14 +515,14 @@ export async function rehearseBloggerWithdrawal({
   try {
     priorSidecar = JSON.parse(sidecarBuf.toString('utf-8'));
   } catch {
-    push('sidecar-parse-error');
+    refusePostPreflight('sidecar-parse-error');
     return report;
   }
 
   // ── build rehearsal payload（immutable；bytes reused verbatim in scratch write）──
   if (!isGitSha40Lower(report.sourceHead)) {
     // preflight should always resolve HEAD; guard against silent drift.
-    push('git-head-invalid');
+    refusePostPreflight('git-head-invalid');
     return report;
   }
   const newSidecar = buildWithdrawnSidecar({
@@ -475,7 +545,7 @@ export async function rehearseBloggerWithdrawal({
   });
   if (issues.length > 0) {
     const types = [...new Set(issues.map((i) => i.type))].sort();
-    for (const t of types) push(`rehearsal-semantic-invalid:${t}`);
+    for (const t of types) refusePostPreflight(`rehearsal-semantic-invalid:${t}`);
     return report;
   }
   report.semanticValidationOk = true;
@@ -484,7 +554,7 @@ export async function rehearseBloggerWithdrawal({
   const canonicalProjectRoot = safeRealpath(projectRoot);
   const tmpBaseResolved = typeof tmpBase === 'string' ? tmpBase : os.tmpdir();
   const canonicalTmpBase = safeRealpath(tmpBaseResolved);
-  if (canonicalTmpBase == null) { push('os-tmp-unresolvable'); return report; }
+  if (canonicalTmpBase == null) { refusePostPreflight('os-tmp-unresolvable'); return report; }
 
   let scratchRoot = null;
   let canonicalScratch = null;
@@ -497,18 +567,18 @@ export async function rehearseBloggerWithdrawal({
       scratchRoot = mkdtempSync(path.join(canonicalTmpBase, SCRATCH_PREFIX));
     }
     if (typeof scratchRoot !== 'string' || scratchRoot === '') {
-      push('scratch-unresolvable');
+      refusePostPreflight('scratch-unresolvable');
       return report;
     }
     canonicalScratch = safeRealpath(scratchRoot);
-    if (canonicalScratch == null) { push('scratch-unresolvable'); return report; }
+    if (canonicalScratch == null) { refusePostPreflight('scratch-unresolvable'); return report; }
 
     const containmentReason = classifyScratchContainment({
       canonicalScratch,
       canonicalTmpBase,
       canonicalProjectRoot,
     });
-    if (containmentReason != null) { push(containmentReason); return report; }
+    if (containmentReason != null) { refusePostPreflight(containmentReason); return report; }
 
     // marker 由本次 invocation 建立；`wx` 拒絕已存在的 marker（外部預置不視為信任證據）。
     const markerAbs = path.join(canonicalScratch, SCRATCH_MARKER_FILENAME);
@@ -519,7 +589,7 @@ export async function rehearseBloggerWithdrawal({
     try {
       writeFileSync(markerAbs, markerBytes, { encoding: 'utf-8', flag: 'wx' });
     } catch {
-      push('scratch-marker-write-failed');
+      refusePostPreflight('scratch-marker-write-failed');
       return report;
     }
 
@@ -532,7 +602,7 @@ export async function rehearseBloggerWithdrawal({
       writeFileSync(scratchSource, sourceBuf, { flag: 'wx' });
       writeFileSync(scratchSidecar, sidecarBuf, { flag: 'wx' });
     } catch {
-      push('scratch-copy-failed');
+      refusePostPreflight('scratch-copy-failed');
       return report;
     }
 
@@ -543,7 +613,7 @@ export async function rehearseBloggerWithdrawal({
     try {
       writeFileSync(tempAbs, newBytes, { flag: 'wx' });
     } catch {
-      push('scratch-tempfile-write-failed');
+      refusePostPreflight('scratch-tempfile-write-failed');
       return report;
     }
     // 2) pre-rename: verify scratch target still regular file, not symlink（防被換掉）。
@@ -552,12 +622,12 @@ export async function rehearseBloggerWithdrawal({
       preTargetLst = lstatSync(scratchSidecar);
     } catch {
       try { rmSync(tempAbs, { force: true }); } catch { /* ignore */ }
-      push('scratch-sidecar-vanished-pre-rename');
+      refusePostPreflight('scratch-sidecar-vanished-pre-rename');
       return report;
     }
     if (preTargetLst.isSymbolicLink() || !preTargetLst.isFile()) {
       try { rmSync(tempAbs, { force: true }); } catch { /* ignore */ }
-      push('scratch-sidecar-not-regular-pre-rename');
+      refusePostPreflight('scratch-sidecar-not-regular-pre-rename');
       return report;
     }
     // 3) same-directory rename replace。
@@ -565,7 +635,7 @@ export async function rehearseBloggerWithdrawal({
       renameSync(tempAbs, scratchSidecar);
     } catch {
       try { rmSync(tempAbs, { force: true }); } catch { /* ignore */ }
-      push('scratch-rename-failed');
+      refusePostPreflight('scratch-rename-failed');
       return report;
     }
     report.scratchMutationPerformed = true;
@@ -575,16 +645,16 @@ export async function rehearseBloggerWithdrawal({
     try {
       readBack = readFileSync(scratchSidecar, 'utf-8');
     } catch {
-      push('scratch-readback-failed');
+      refusePostPreflight('scratch-readback-failed');
       return report;
     }
-    if (readBack !== newBytes) { push('rehearsal-readback-mismatch'); return report; }
-    if (sha256HexOfString(readBack) !== outputSha256) { push('rehearsal-readback-hash-mismatch'); return report; }
+    if (readBack !== newBytes) { refusePostPreflight('rehearsal-readback-mismatch'); return report; }
+    if (sha256HexOfString(readBack) !== outputSha256) { refusePostPreflight('rehearsal-readback-hash-mismatch'); return report; }
     let readBackObj;
     try {
       readBackObj = JSON.parse(readBack);
     } catch {
-      push('rehearsal-readback-parse-error');
+      refusePostPreflight('rehearsal-readback-parse-error');
       return report;
     }
     if (
@@ -592,7 +662,7 @@ export async function rehearseBloggerWithdrawal({
       || readBackObj.schemaVersion !== OUTPUT_SCHEMA_VERSION
       || readBackObj.blogger == null || readBackObj.blogger.status !== WITHDRAWN_STATUS
     ) {
-      push('rehearsal-readback-semantic-mismatch');
+      refusePostPreflight('rehearsal-readback-semantic-mismatch');
       return report;
     }
     const readBackIssues = collectSidecarWithdrawalIssues(readBackObj, {
@@ -601,7 +671,7 @@ export async function rehearseBloggerWithdrawal({
     });
     if (readBackIssues.length > 0) {
       const types = [...new Set(readBackIssues.map((i) => i.type))].sort();
-      for (const t of types) push(`rehearsal-readback-invalid:${t}`);
+      for (const t of types) refusePostPreflight(`rehearsal-readback-invalid:${t}`);
       return report;
     }
     report.readBackOk = true;
@@ -609,14 +679,30 @@ export async function rehearseBloggerWithdrawal({
     report.ok = true;
     return report;
   } finally {
-    // unconditional cleanup：清除 scratch tree（含 marker、copy、tmp 殘留）。cleanup 失敗
-    //   不改變 report.ok（rehearsal 是否成功已由上方分支決定），但 cleanupPerformed 反映實際結果。
+    // Guard-only pre-cleanup hook. Never throws; guard uses it to release / re-acquire
+    //   scratch-tree locks the way real cleanup would encounter them.
+    if (hooks && typeof hooks.beforeCleanup === 'function') {
+      try { hooks.beforeCleanup({ scratchRoot: canonicalScratch || scratchRoot }); } catch { /* ignore */ }
+    }
+    // Cleanup contract (§Correction C)：full removal of the scratch tree is part of the
+    //   successful-rehearsal contract. Failure to clean up leaks operator-facing OS-temp data
+    //   and violates the privacy invariant, so it must surface as an overall failure with
+    //   a stable blocker slug. Primary blocker (if any) is preserved; cleanup blocker is
+    //   appended deterministically after it. Absolute scratch path, raw fs error, and stack
+    //   trace are never surfaced.
     if (scratchRoot) {
+      let cleanupOk = false;
       try {
         rmSync(scratchRoot, { recursive: true, force: true, maxRetries: 3 });
-        report.cleanupPerformed = !existsSync(scratchRoot);
+        cleanupOk = !existsSync(scratchRoot);
       } catch {
-        report.cleanupPerformed = false;
+        cleanupOk = false;
+      }
+      report.cleanupPerformed = cleanupOk;
+      if (!cleanupOk) {
+        push('scratch-cleanup-failed');
+        report.ok = false;
+        report.applyReady = false;
       }
     } else {
       report.cleanupPerformed = true; // 尚未建立 scratch，等同已清除。

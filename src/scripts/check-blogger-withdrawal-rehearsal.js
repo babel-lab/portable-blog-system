@@ -17,10 +17,10 @@
 
 import assert from 'node:assert';
 import {
-  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
+  closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync,
   rmSync, statSync, symlinkSync, writeFileSync,
 } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1017,6 +1017,296 @@ async function main() {
       const r = runCli(REHEARSE_CLI, ['--help']);
       allOutputs.push(r.stdout, r.stderr);
       assert.strictEqual(r.status, 0, r.stderr);
+    });
+
+    // ══ Q. Adversarial fail-closed guards (Slice 4E correction) ══════════
+    // Q covers: authorization semantic drift (auth A→B swap; six flavors), source drift,
+    // sidecar drift, cleanup failure after successful rehearsal, primary + cleanup failure.
+    // All fixtures live under tmpRoot / os.tmpdir(); production content and deploy clone are
+    // read-only throughout. Windows exclusive file locks are held by a PowerShell subprocess
+    // so the rehearsal module never grows a child_process import itself.
+
+    const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    function powershellLockFile(filePath, holdMs = 15000) {
+      if (process.platform !== 'win32') return null;
+      const escaped = filePath.replace(/'/g, "''");
+      const script = `try { $fs = [System.IO.File]::Open('${escaped}', 'Open', 'ReadWrite', 'None'); Start-Sleep -Milliseconds ${holdMs}; $fs.Close() } catch { exit 1 }`;
+      try {
+        return spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+          stdio: 'ignore', windowsHide: true, detached: false,
+        });
+      } catch {
+        return null;
+      }
+    }
+    async function waitForWindowsLock(filePath, maxMs = 5000) {
+      if (process.platform !== 'win32') return true; // caller decides skip semantics
+      const start = Date.now();
+      while (Date.now() - start < maxMs) {
+        try {
+          const fd = openSync(filePath, 'r+');
+          closeSync(fd);
+        } catch (e) {
+          if (/EBUSY|EPERM|EACCES/.test(e.code || String(e))) return true;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await sleepMs(75);
+      }
+      return false;
+    }
+
+    // Helpers to write authorization variants that are all schema-valid + approved.
+    function approvedAuthObject(fx, intent = INTENT) {
+      const target = makeTargetFromCandidate(fx.candidate);
+      const recFp = recordFpFor(fx.candidate, intent);
+      return makeAuth({ head: fx.head, planFp: fx.planFp, recFp, target, intent, approved: true });
+    }
+
+    // Fail-closed invariants asserted on every drift branch (auth / source / sidecar).
+    function assertPostPreflightRefused(result, expectedBlocker, msg = '') {
+      assert.strictEqual(result.ok, false, `${msg}: ok should be false; blockers=${JSON.stringify(result.blockers)}`);
+      assert.strictEqual(result.applyReady, false, `${msg}: applyReady must be cleared after post-preflight failure`);
+      assert.strictEqual(result.rehearsalPerformed, false, `${msg}: rehearsalPerformed must be false`);
+      assert.strictEqual(result.scratchMutationPerformed, false, `${msg}: scratchMutationPerformed must be false`);
+      assert.strictEqual(result.productionMutationPerformed, false, `${msg}: productionMutationPerformed must be false`);
+      assert.strictEqual(result.outputSha256, null, `${msg}: outputSha256 must remain null`);
+      assert.strictEqual(result.cleanupPerformed, true, `${msg}: cleanup must succeed when no scratch is created`);
+      assert.ok(result.blockers.includes(expectedBlocker),
+        `${msg}: expected blocker ${expectedBlocker}; got ${JSON.stringify(result.blockers)}`);
+    }
+
+    // ── Q.A. Authorization semantic drift — six flavors ─────────────────
+    async function runAuthDriftCase(label, mutateAuth) {
+      const fx = await setupCandidateRepo(tmpRoot, `q-auth-${label}`);
+      const authPath = await seedApprovedAuth(fx);
+      const prodInvBefore = snapshotTree(fx.repoRoot, ['.md', '.publish.json']);
+      const authBefore = readFileSync(authPath, 'utf-8');
+      // Hook fires after preflight and BEFORE the post-preflight authorization re-read.
+      // We overwrite the same authorization path with legal, approved, but byte-different auth B.
+      const result = await rehearseBloggerWithdrawal({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+        hooks: { afterPreflight: () => mutateAuth({ fx, authPath }) },
+      });
+      allOutputs.push(rehearseFormatJson(result), rehearseFormatHuman(result), result.blockers.join('\n'));
+      // Production unchanged and no scratch residue.
+      const prodInvAfter = snapshotTree(fx.repoRoot, ['.md', '.publish.json']);
+      assert.deepStrictEqual(invMap(prodInvAfter), invMap(prodInvBefore),
+        `${label}: production files must be unchanged`);
+      const authAfter = readFileSync(authPath, 'utf-8');
+      assertPostPreflightRefused(result, 'authorization-hash-toctou-drift', label);
+      // Ensure the swap actually happened (so the test really exercised drift).
+      assert.notStrictEqual(authAfter, authBefore, `${label}: fixture did not actually swap`);
+      // Report body must not leak the raw swap content or authorization path.
+      const joined = rehearseFormatJson(result) + rehearseFormatHuman(result);
+      assert.ok(!joined.includes(authPath), `${label}: report must not echo authorization path`);
+      assert.ok(!joined.includes(fx.repoRoot), `${label}: report must not echo repo root`);
+    }
+
+    await check('adv Q.A1 authorization drift: reasonDetail changed → authorization-hash-toctou-drift', async () => {
+      await runAuthDriftCase('reasonDetail', ({ fx, authPath }) => {
+        const intent = { ...INTENT, reasonDetail: 'operator-injected-detail' };
+        const authB = approvedAuthObject(fx, intent);
+        writeFileSync(authPath, JSON.stringify(authB, null, 2) + '\n', 'utf-8');
+      });
+    });
+    await check('adv Q.A2 authorization drift: reason changed → authorization-hash-toctou-drift', async () => {
+      await runAuthDriftCase('reason', ({ fx, authPath }) => {
+        const intent = { ...INTENT, reason: 'policy' };
+        const authB = approvedAuthObject(fx, intent);
+        writeFileSync(authPath, JSON.stringify(authB, null, 2) + '\n', 'utf-8');
+      });
+    });
+    await check('adv Q.A3 authorization drift: remoteDisposition changed → authorization-hash-toctou-drift', async () => {
+      await runAuthDriftCase('remoteDisposition', ({ fx, authPath }) => {
+        const intent = { ...INTENT, remoteDisposition: 'remote-draft' };
+        const authB = approvedAuthObject(fx, intent);
+        writeFileSync(authPath, JSON.stringify(authB, null, 2) + '\n', 'utf-8');
+      });
+    });
+    await check('adv Q.A4 authorization drift: operator-identity-in-reasonDetail changed → authorization-hash-toctou-drift', async () => {
+      // The withdrawal-authorization schema has no dedicated operator field; a schema-valid
+      // authorization can only carry operator-identity semantics through reasonDetail free text.
+      // Prove that swapping between two operator identities embedded in reasonDetail — while
+      // remaining schema-valid + approved — is still caught by raw-byte SHA-256 binding.
+      await runAuthDriftCase('operator', ({ fx, authPath }) => {
+        const intent = { ...INTENT, reasonDetail: 'operator=bob' };
+        const authB = approvedAuthObject(fx, intent);
+        writeFileSync(authPath, JSON.stringify(authB, null, 2) + '\n', 'utf-8');
+      });
+    });
+    await check('adv Q.A5 authorization drift: whitespace-only reformat → authorization-hash-toctou-drift', async () => {
+      await runAuthDriftCase('whitespace', ({ fx, authPath }) => {
+        const authB = approvedAuthObject(fx);
+        // Same JSON semantics; different indent width → different bytes.
+        writeFileSync(authPath, JSON.stringify(authB, null, 4) + '\n', 'utf-8');
+      });
+    });
+    await check('adv Q.A6 authorization drift: key-order-only permutation → authorization-hash-toctou-drift', async () => {
+      await runAuthDriftCase('key-order', ({ fx, authPath }) => {
+        const authB = approvedAuthObject(fx);
+        // Reverse top-level key insertion order. JSON semantically identical, byte different.
+        const reordered = {};
+        for (const k of Object.keys(authB).reverse()) reordered[k] = authB[k];
+        writeFileSync(authPath, JSON.stringify(reordered, null, 2) + '\n', 'utf-8');
+      });
+    });
+
+    // ── Q.B. Source post-preflight drift ────────────────────────────────
+    await check('adv Q.B source post-preflight drift → source-hash-toctou-drift, no scratch mutation', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'q-src-drift');
+      const authPath = await seedApprovedAuth(fx);
+      const absSource = path.join(fx.repoRoot, CAND_SOURCE);
+      const sidecarBefore = readFileSync(path.join(fx.repoRoot, CAND_SIDECAR), 'utf-8');
+      const result = await rehearseBloggerWithdrawal({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+        hooks: {
+          afterPreflight: () => {
+            // Modify source bytes only. Sidecar and authorization untouched.
+            writeFileSync(absSource, readFileSync(absSource, 'utf-8') + '\n<!-- injected -->\n', 'utf-8');
+          },
+        },
+      });
+      allOutputs.push(rehearseFormatJson(result), rehearseFormatHuman(result));
+      assertPostPreflightRefused(result, 'source-hash-toctou-drift');
+      // Sidecar bytes must not have been touched by us; production sidecar unchanged.
+      assert.strictEqual(readFileSync(path.join(fx.repoRoot, CAND_SIDECAR), 'utf-8'), sidecarBefore);
+    });
+
+    // ── Q.C. Sidecar post-preflight drift ───────────────────────────────
+    await check('adv Q.C sidecar post-preflight drift → sidecar-hash-toctou-drift, no scratch mutation', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'q-sidecar-drift');
+      const authPath = await seedApprovedAuth(fx);
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const sourceBefore = readFileSync(path.join(fx.repoRoot, CAND_SOURCE), 'utf-8');
+      const result = await rehearseBloggerWithdrawal({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+        hooks: {
+          afterPreflight: () => {
+            const prior = JSON.parse(readFileSync(absSidecar, 'utf-8'));
+            // Add an arbitrary key to change bytes without breaking JSON parsing.
+            prior.__injected = 'drift';
+            writeFileSync(absSidecar, JSON.stringify(prior, null, 2), 'utf-8');
+          },
+        },
+      });
+      allOutputs.push(rehearseFormatJson(result), rehearseFormatHuman(result));
+      assertPostPreflightRefused(result, 'sidecar-hash-toctou-drift');
+      assert.strictEqual(readFileSync(path.join(fx.repoRoot, CAND_SOURCE), 'utf-8'), sourceBefore);
+    });
+
+    // ── Q.D. Cleanup failure after successful rehearsal ─────────────────
+    // Pre-create a scratch dir under os.tmpdir(); pre-place a `stuck-file.dat` inside; hold a
+    // Windows FileShare.None lock on it via PowerShell for the duration of the rehearsal call.
+    // Rehearsal completes successfully in scratch, then rmSync fails on the locked file.
+    await check('adv Q.D cleanup failure after successful rehearsal → scratch-cleanup-failed + ok=false + applyReady=false', async () => {
+      if (process.platform !== 'win32') {
+        // Locking mechanism is Windows-specific; skip in-band on other OSes rather than pretend.
+        assert.ok(true, 'OS-SKIPPED: Windows-only file-lock injection path');
+        return;
+      }
+      const scratchRoot = mkdtempSync(path.join(os.tmpdir(), `${SCRATCH_PREFIX}stuck-`));
+      const stuckFile = path.join(scratchRoot, 'stuck-file.dat');
+      writeFileSync(stuckFile, 'held', 'utf-8');
+      const lockProc = powershellLockFile(stuckFile, 15000);
+      assert.ok(lockProc, 'powershell lock process failed to start');
+      let result;
+      try {
+        const locked = await waitForWindowsLock(stuckFile, 6000);
+        assert.ok(locked, 'file lock was not acquired within timeout');
+        const fx = await setupCandidateRepo(tmpRoot, 'q-cleanup-happy');
+        const authPath = await seedApprovedAuth(fx);
+        result = await rehearseBloggerWithdrawal({
+          projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+          scratchRootFactory: () => scratchRoot,
+        });
+        allOutputs.push(rehearseFormatJson(result), rehearseFormatHuman(result));
+        // Rehearsal itself completed: scratch mutation + read-back succeeded.
+        assert.strictEqual(result.scratchMutationPerformed, true, `expected mutation; blockers=${JSON.stringify(result.blockers)}`);
+        assert.strictEqual(result.rehearsalPerformed, true);
+        assert.strictEqual(result.readBackOk, true);
+        // But cleanup failed → overall failure per §Correction C.
+        assert.strictEqual(result.cleanupPerformed, false, `expected cleanup fail; blockers=${JSON.stringify(result.blockers)}`);
+        assert.strictEqual(result.ok, false);
+        assert.strictEqual(result.applyReady, false);
+        assert.strictEqual(result.productionMutationPerformed, false);
+        assert.ok(result.blockers.includes('scratch-cleanup-failed'),
+          `expected scratch-cleanup-failed blocker; got ${JSON.stringify(result.blockers)}`);
+        // Redaction: no absolute scratch path in report body.
+        const joined = rehearseFormatJson(result) + rehearseFormatHuman(result);
+        assert.ok(!joined.includes(scratchRoot), 'report leaked scratch root path');
+        assert.ok(!joined.includes(stuckFile), 'report leaked stuck-file path');
+      } finally {
+        // Release the lock and clean up the harness-owned residue.
+        try { lockProc.kill(); } catch { /* ignore */ }
+        // Give Windows a moment to release the lock before we rm.
+        await sleepMs(500);
+        try { rmSync(scratchRoot, { recursive: true, force: true, maxRetries: 5 }); } catch { /* ignore */ }
+      }
+    });
+
+    // ── Q.E. Primary failure + cleanup failure ──────────────────────────
+    // Pre-place marker file to induce `scratch-marker-write-failed` primary blocker; pre-place
+    // locked stuck-file.dat so cleanup also fails. Assert both blockers present and primary
+    // blocker is NOT masked by cleanup blocker.
+    await check('adv Q.E primary blocker + cleanup failure → both blockers present, primary not masked', async () => {
+      if (process.platform !== 'win32') {
+        assert.ok(true, 'OS-SKIPPED: Windows-only file-lock injection path');
+        return;
+      }
+      const scratchRoot = mkdtempSync(path.join(os.tmpdir(), `${SCRATCH_PREFIX}prim-plus-`));
+      const stuckFile = path.join(scratchRoot, 'stuck-file.dat');
+      writeFileSync(stuckFile, 'held', 'utf-8');
+      // Pre-place a marker with any bytes; the code writes with `wx`, which fails EEXIST →
+      //   primary blocker `scratch-marker-write-failed` before any mutation happens.
+      writeFileSync(path.join(scratchRoot, '.blogger-withdrawal-rehearsal-marker.json'), '{}', 'utf-8');
+      const lockProc = powershellLockFile(stuckFile, 15000);
+      assert.ok(lockProc, 'powershell lock process failed to start');
+      let result;
+      try {
+        const locked = await waitForWindowsLock(stuckFile, 6000);
+        assert.ok(locked, 'file lock was not acquired within timeout');
+        const fx = await setupCandidateRepo(tmpRoot, 'q-primary-plus-cleanup');
+        const authPath = await seedApprovedAuth(fx);
+        result = await rehearseBloggerWithdrawal({
+          projectRoot: fx.repoRoot, authorizationPath: authPath, sourcePath: CAND_SOURCE,
+          scratchRootFactory: () => scratchRoot,
+        });
+        allOutputs.push(rehearseFormatJson(result), rehearseFormatHuman(result));
+        // Primary blocker present (from marker EEXIST).
+        assert.ok(result.blockers.includes('scratch-marker-write-failed'),
+          `expected primary blocker scratch-marker-write-failed; got ${JSON.stringify(result.blockers)}`);
+        // Cleanup blocker also present.
+        assert.ok(result.blockers.includes('scratch-cleanup-failed'),
+          `expected scratch-cleanup-failed blocker; got ${JSON.stringify(result.blockers)}`);
+        // Deterministic order: primary comes first, cleanup second.
+        const iPrimary = result.blockers.indexOf('scratch-marker-write-failed');
+        const iCleanup = result.blockers.indexOf('scratch-cleanup-failed');
+        assert.ok(iPrimary >= 0 && iCleanup > iPrimary,
+          `blockers order must be primary→cleanup; got ${JSON.stringify(result.blockers)}`);
+        // Whole-report invariants.
+        assert.strictEqual(result.ok, false);
+        assert.strictEqual(result.applyReady, false);
+        assert.strictEqual(result.cleanupPerformed, false);
+        assert.strictEqual(result.scratchMutationPerformed, false);
+        assert.strictEqual(result.rehearsalPerformed, false);
+        assert.strictEqual(result.productionMutationPerformed, false);
+      } finally {
+        try { lockProc.kill(); } catch { /* ignore */ }
+        await sleepMs(500);
+        try { rmSync(scratchRoot, { recursive: true, force: true, maxRetries: 5 }); } catch { /* ignore */ }
+      }
+    });
+
+    // ── Q.F. Redaction of new failure branches ──────────────────────────
+    await check('adv Q.F redaction: no leaks in any Q-section output (authorization path / repo root / scratch path / stack trace / raw fs error)', () => {
+      const joined = allOutputs.join('\n');
+      // Repo-agnostic leak checks: no windows drive path, no os.tmpdir prefix on its own,
+      // no stack-frame markers, no raw fs errors.
+      for (const needle of ['at Object.', 'ENOENT:', 'EEXIST:', 'EACCES:', 'EBUSY:', 'EPERM:', 'errno:']) {
+        assert.ok(!joined.includes(needle), `leaked: ${needle}`);
+      }
+      // No stack frames pointing at rehearse module.
+      assert.ok(!/rehearse-blogger-withdrawal\.js:\d+:/.test(joined), 'leaked stack frame from rehearse module');
     });
 
     // final aggregate leak scan
