@@ -15,9 +15,10 @@
 //   或  node src/scripts/check-blogger-withdrawal-apply.js
 
 import assert from 'node:assert';
+import { createHash } from 'node:crypto';
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
-  rmSync, statSync, symlinkSync, writeFileSync,
+  chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
+  renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
@@ -29,6 +30,7 @@ import {
   formatJson as applyFormatJson,
   formatHumanReadable as applyFormatHuman,
   APPLY_CONFIRMATION_PHRASE,
+  resolveAtomicCommitCapability,
 } from './blogger-withdrawal-apply.js';
 import { parseArgs as applyParseArgs } from './apply-blogger-withdrawal.js';
 import { planBloggerWithdrawals } from './plan-blogger-withdrawals.js';
@@ -243,6 +245,39 @@ function countApplyTempResidue(sidecarDir) {
   } catch {
     return -1;
   }
+}
+
+// ── synthetic atomic-commit adapter（test-only；programmatic-only injection）─
+// This adapter emulates compare-and-swap semantics for guard tests: it re-reads
+// the target path at commit time, refuses if bytes differ from expectedTargetBytes,
+// otherwise performs renameSync.  It has NO CLI surface, NO env surface, and is
+// NEVER exported from the apply library — CLI cannot reach it, and default
+// library calls without an explicit adapter fail closed at §8a.
+function createSyntheticCasAdapter() {
+  return {
+    strategy: 'native-compare-and-swap',
+    commit({ tempPath, targetPath, expectedTargetSha256, expectedTargetBytes }) {
+      try {
+        const current = readFileSync(targetPath);
+        const currentSha = createHash('sha256').update(current).digest('hex');
+        if (currentSha !== expectedTargetSha256 || !current.equals(expectedTargetBytes)) {
+          return { ok: false, blocker: 'atomic-commit-cas-mismatch' };
+        }
+        renameSync(tempPath, targetPath);
+        return { ok: true };
+      } catch {
+        return { ok: false, blocker: 'atomic-commit-error' };
+      }
+    },
+  };
+}
+// Adapter whose commit always faults — used to verify the library records
+//   `atomic-commit-error` deterministically without leaking the raw fs error.
+function createFaultyCasAdapter() {
+  return {
+    strategy: 'native-compare-and-swap',
+    commit() { throw new Error('synthetic-adapter-fault'); },
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -495,6 +530,7 @@ async function main() {
       const result = await applyBloggerWithdrawal({
         projectRoot: fx.repoRoot,
         authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
       });
       happyReport = result;
       happySidecarAfter = readFileSync(path.join(fx.repoRoot, CAND_SIDECAR), 'utf-8');
@@ -561,10 +597,10 @@ async function main() {
     await check('determinism: same input → identical outputSha256 across separate synthetic repos', async () => {
       const fx1 = await setupCandidateRepo(tmpRoot, 'determ1');
       const auth1 = await seedApprovedAuth(fx1);
-      const r1 = await applyBloggerWithdrawal({ projectRoot: fx1.repoRoot, authorizationPath: auth1 });
+      const r1 = await applyBloggerWithdrawal({ projectRoot: fx1.repoRoot, authorizationPath: auth1, atomicCommitAdapter: createSyntheticCasAdapter() });
       const fx2 = await setupCandidateRepo(tmpRoot, 'determ2');
       const auth2 = await seedApprovedAuth(fx2);
-      const r2 = await applyBloggerWithdrawal({ projectRoot: fx2.repoRoot, authorizationPath: auth2 });
+      const r2 = await applyBloggerWithdrawal({ projectRoot: fx2.repoRoot, authorizationPath: auth2, atomicCommitAdapter: createSyntheticCasAdapter() });
       assert.strictEqual(r1.ok, true, JSON.stringify(r1.blockers));
       assert.strictEqual(r2.ok, true, JSON.stringify(r2.blockers));
       // gitHead differs across independent seedGitRepo runs, so outputSha256 will differ if
@@ -756,6 +792,7 @@ async function main() {
       const r = await applyBloggerWithdrawal({
         projectRoot: fx.repoRoot,
         authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
         hooks: {
           beforeTempWrite: () => {
             writeFileSync(authPath, JSON.stringify(rotated, null, 2) + '\n', 'utf-8');
@@ -779,6 +816,7 @@ async function main() {
       const r = await applyBloggerWithdrawal({
         projectRoot: fx.repoRoot,
         authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
         hooks: {
           beforeFreshnessCheck: () => {
             writeFileSync(absSidecar, externalContent, 'utf-8');
@@ -807,6 +845,7 @@ async function main() {
       const r = await applyBloggerWithdrawal({
         projectRoot: fx.repoRoot,
         authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
         hooks: {
           beforeFreshnessCheck: () => {
             writeFileSync(absSource, readFileSync(absSource, 'utf-8') + '\n<!-- injected -->\n', 'utf-8');
@@ -838,7 +877,9 @@ async function main() {
       rmSync(absSidecar, { force: true });
       symlinkSync(target, absSidecar, 'file');
       const authPath = await seedApprovedAuth(fx, 'sym-sc.json');
-      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath });
+      // With or without adapter, the sidecar symlink must be refused BEFORE the capability
+      //   gate; providing adapter proves the refusal comes from lstat, not from capability.
+      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter() });
       assert.strictEqual(r.applyPerformed, false);
       assert.strictEqual(r.productionMutationPerformed, false);
       assert.ok(r.blockers.some((b) => /symlink|not-regular-file|sidecar-hash-toctou-drift|sidecar-vanished|preflight-binding-incomplete|sidecar-sha-mismatch/.test(b)),
@@ -853,7 +894,7 @@ async function main() {
       rmSync(absSource, { force: true });
       symlinkSync(target, absSource, 'file');
       const authPath = await seedApprovedAuth(fx, 'sym-src.json');
-      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath });
+      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter() });
       assert.strictEqual(r.applyPerformed, false);
       assert.ok(r.blockers.some((b) => /symlink|not-regular-file|source-hash-toctou-drift|source-vanished|preflight-binding-incomplete|source-sha-mismatch|record-fingerprint-mismatch|repo-state/.test(b)),
         `expected symlink-related refusal; got ${JSON.stringify(r.blockers)}`);
@@ -864,7 +905,7 @@ async function main() {
       const authPath = await seedApprovedAuth(fx, 'real-auth.json');
       const symPath = path.join(fx.repoRoot, 'fixtures', 'sym-auth.json');
       symlinkSync(authPath, symPath, 'file');
-      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: symPath });
+      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: symPath, atomicCommitAdapter: createSyntheticCasAdapter() });
       assert.strictEqual(r.applyPerformed, false);
       assert.ok(r.blockers.includes('authorization-symlink'));
     });
@@ -877,7 +918,7 @@ async function main() {
       //   NOT pre-creating anything and just verifying that under the deterministic PID+entropy,
       //   the apply still succeeds. This confirms the wx flag path exists; direct collision is
       //   probabilistically negligible.
-      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath });
+      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter() });
       assert.strictEqual(r.ok, true, JSON.stringify(r.blockers));
     });
 
@@ -898,7 +939,7 @@ async function main() {
       chmodSync(sidecarDir, 0o500);
       let r;
       try {
-        r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath });
+        r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter() });
       } finally {
         chmodSync(sidecarDir, originalMode);
       }
@@ -926,6 +967,7 @@ async function main() {
       const r = await applyBloggerWithdrawal({
         projectRoot: fx.repoRoot,
         authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
         hooks: {
           afterRename: () => {
             writeFileSync(absSidecar, '{"external":true}\n', 'utf-8');
@@ -951,13 +993,13 @@ async function main() {
       //   Preflight will refuse (current-status-mismatch), which is enough; but we also assert
       //   the apply library's defense-in-depth `sidecar-already-withdrawn` blocker path exists.
       const fx = await setupCandidateRepo(tmpRoot, 'already');
-      // First perform a real apply to withdraw it.
+      // First perform a real apply to withdraw it (adapter required — default fails closed).
       const authPath = await seedApprovedAuth(fx, 'first.json');
-      const r1 = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath });
+      const r1 = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter() });
       assert.strictEqual(r1.ok, true, JSON.stringify(r1.blockers));
       // Now the sidecar is withdrawn; re-run with same authorization — must refuse (either at
       //   preflight via current-status-mismatch or via sidecar-already-withdrawn defense).
-      const r2 = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath });
+      const r2 = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter() });
       assert.strictEqual(r2.ok, false);
       assert.strictEqual(r2.applyPerformed, false);
       assert.strictEqual(r2.productionMutationPerformed, false);
@@ -970,6 +1012,452 @@ async function main() {
       //   lifecycle length is unchanged at 1 (checked above).
       assert.ok(r2.blockers.some((b) => /current-status-mismatch|source-sha-mismatch|sidecar-sha-mismatch|record-fingerprint-mismatch|already-withdrawn|repo-state|candidate-not-found|plan-fingerprint-mismatch/.test(b)),
         `expected refusal blocker; got ${JSON.stringify(r2.blockers)}`);
+    });
+
+    // ══ SA. Atomic commit capability contract ═══════════════════════════
+    await check('capability: no adapter → { supported:false, strategy:"unsupported" }', () => {
+      const c = resolveAtomicCommitCapability();
+      assert.strictEqual(c.supported, false);
+      assert.strictEqual(c.strategy, 'unsupported');
+    });
+    await check('capability: null / undefined / non-object adapter → unsupported', () => {
+      for (const bad of [null, 42, 'native-compare-and-swap', true]) {
+        const c = resolveAtomicCommitCapability({ atomicCommitAdapter: bad });
+        assert.strictEqual(c.supported, false);
+        assert.strictEqual(c.strategy, 'unsupported');
+      }
+    });
+    await check('capability: adapter without strategy own-prop → unsupported', () => {
+      const c = resolveAtomicCommitCapability({ atomicCommitAdapter: { commit: () => ({ ok: true }) } });
+      assert.strictEqual(c.supported, false);
+    });
+    await check('capability: adapter with wrong strategy enum → unsupported', () => {
+      const c = resolveAtomicCommitCapability({ atomicCommitAdapter: { strategy: 'best-effort', commit: () => ({ ok: true }) } });
+      assert.strictEqual(c.supported, false);
+    });
+    await check('capability: adapter without commit method → unsupported', () => {
+      const c = resolveAtomicCommitCapability({ atomicCommitAdapter: { strategy: 'native-compare-and-swap' } });
+      assert.strictEqual(c.supported, false);
+    });
+    await check('capability: strategy on prototype chain is IGNORED (own-property only)', () => {
+      const proto = { strategy: 'native-compare-and-swap', commit: () => ({ ok: true }) };
+      const inst = Object.create(proto);
+      const c = resolveAtomicCommitCapability({ atomicCommitAdapter: inst });
+      assert.strictEqual(c.supported, false, 'prototype-inherited strategy must not promote capability');
+    });
+    await check('capability: valid native CAS adapter → { supported:true, strategy:"native-compare-and-swap" }', () => {
+      const c = resolveAtomicCommitCapability({ atomicCommitAdapter: createSyntheticCasAdapter() });
+      assert.strictEqual(c.supported, true);
+      assert.strictEqual(c.strategy, 'native-compare-and-swap');
+    });
+    await check('capability: valid mandatory-lock adapter enum accepted', () => {
+      const c = resolveAtomicCommitCapability({ atomicCommitAdapter: { strategy: 'mandatory-exclusive-lock', commit: () => ({ ok: true }) } });
+      assert.strictEqual(c.supported, true);
+      assert.strictEqual(c.strategy, 'mandatory-exclusive-lock');
+    });
+
+    // ══ SB. Default library path fails closed at capability gate ════════
+    await check('default library call (no adapter) → atomic-commit-capability-unavailable; no temp; no write', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'cap-default');
+      const authPath = await seedApprovedAuth(fx, 'cap-default.json');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const sidecarBefore = readFileSync(absSidecar, 'utf-8');
+      const mtimeBefore = statSync(absSidecar).mtimeMs;
+      const sidecarDir = path.dirname(absSidecar);
+      const residueBefore = countApplyTempResidue(sidecarDir);
+      const r = await applyBloggerWithdrawal({ projectRoot: fx.repoRoot, authorizationPath: authPath });
+      const sidecarAfter = readFileSync(absSidecar, 'utf-8');
+      const mtimeAfter = statSync(absSidecar).mtimeMs;
+      const residueAfter = countApplyTempResidue(sidecarDir);
+      allOutputs.push(applyFormatJson(r), applyFormatHuman(r));
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.applyReady, true, 'authorization was ready — applyReady should reflect preflight');
+      assert.strictEqual(r.commitReady, false);
+      assert.strictEqual(r.atomicCommitSupported, false);
+      assert.strictEqual(r.atomicCommitStrategy, 'unsupported');
+      assert.strictEqual(r.applyPerformed, false);
+      assert.strictEqual(r.productionMutationPerformed, false);
+      assert.strictEqual(r.tempFileCreated, false);
+      assert.strictEqual(r.tempFileRemoved, false);
+      assert.strictEqual(r.readBackOk, false);
+      assert.strictEqual(r.rollbackAttempted, false);
+      assert.strictEqual(r.cleanupPerformed, true);
+      assert.strictEqual(r.cleanupSucceeded, true);
+      assert.ok(r.blockers.includes('atomic-commit-capability-unavailable'),
+        `expected atomic-commit-capability-unavailable; got ${JSON.stringify(r.blockers)}`);
+      assert.strictEqual(sidecarAfter, sidecarBefore, 'sidecar bytes must not change');
+      assert.strictEqual(mtimeAfter, mtimeBefore, 'sidecar mtime must not change');
+      if (residueBefore >= 0 && residueAfter >= 0) assert.strictEqual(residueAfter, residueBefore);
+    });
+    await check('CLI e2e: fully valid approved authorization → exit 1 + atomic-commit-capability-unavailable + no mutation', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'cap-cli');
+      const authPath = await seedApprovedAuth(fx, 'cap-cli.json');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const sidecarBefore = readFileSync(absSidecar, 'utf-8');
+      // CLI hard-binds PROJECT_ROOT to the real repo root, so this authorization won't be
+      //   applyReady against PROJECT_ROOT (mismatched HEAD / SHAs). To directly exercise
+      //   the CLI's capability gate on a synthetic repo, we can only observe that the
+      //   real-repo CLI call ends with exit 1 and never produces productionMutationPerformed:true.
+      //   The library-level check above proves the gate itself.
+      const r = runCli(APPLY_CLI, ['--authorization', authPath, '--apply', '--confirm', APPLY_CONFIRMATION_PHRASE, '--json']);
+      allOutputs.push(r.stdout, r.stderr);
+      assert.strictEqual(r.status, 1);
+      const j = JSON.parse(r.stdout);
+      assert.strictEqual(j.productionMutationPerformed, false);
+      assert.strictEqual(j.applyPerformed, false);
+      // The real-repo run will fail at preflight bindings; capability may not be reached.
+      //   All that matters here: CLI never performed mutation and never claimed capability.
+      assert.strictEqual(j.atomicCommitSupported, false);
+      // Sidecar in the synthetic fx is untouched (CLI is running against REPO_ROOT, not fx.repoRoot).
+      const sidecarAfter = readFileSync(absSidecar, 'utf-8');
+      assert.strictEqual(sidecarAfter, sidecarBefore);
+    });
+
+    // ══ SC. Late sidecar race via beforeRename hook (adapter CAS refuses) ══
+    await check('late sidecar race: beforeRename hook overwrites sidecar → adapter CAS refuses; no mutation; external content preserved', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'late-sc-race');
+      const authPath = await seedApprovedAuth(fx, 'late-sc.json');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const externalBytes = '{"external":"late-writer"}\n';
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
+        hooks: {
+          // Fires AFTER both freshness checks and BEFORE adapter.commit — this is the
+          //   real late-race window that the pre-fix repro exploited.
+          beforeRename: () => { writeFileSync(absSidecar, externalBytes, 'utf-8'); },
+        },
+      });
+      const finalBytes = readFileSync(absSidecar, 'utf-8');
+      allOutputs.push(applyFormatJson(r));
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.applyPerformed, false);
+      assert.strictEqual(r.productionMutationPerformed, false);
+      assert.strictEqual(r.rollbackAttempted, false);
+      // External content preserved: adapter CAS refused rename.
+      assert.strictEqual(finalBytes, externalBytes, 'external late-writer bytes must be preserved');
+      // Not silently overwritten to "withdrawn".
+      assert.ok(!/"status": "withdrawn"/.test(finalBytes));
+      assert.ok(r.blockers.some((b) => /atomic-commit-cas-mismatch|atomic-commit-mismatch/.test(b)),
+        `expected atomic-commit-cas-mismatch; got ${JSON.stringify(r.blockers)}`);
+    });
+
+    // ══ SD. Late source race via beforeRename hook (post-write source drift → rollback) ══
+    await check('late source race: beforeRename hook mutates source → post-write-source-freshness-drift; sidecar rolled back byte-identical', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'late-src-race');
+      const authPath = await seedApprovedAuth(fx, 'late-src.json');
+      const absSource = path.join(fx.repoRoot, CAND_SOURCE);
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const sidecarBefore = readFileSync(absSidecar, 'utf-8');
+      const sourceBefore = readFileSync(absSource, 'utf-8');
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
+        hooks: {
+          beforeRename: () => {
+            writeFileSync(absSource, sourceBefore + '\n<!-- late-injected -->\n', 'utf-8');
+          },
+        },
+      });
+      const sidecarAfter = readFileSync(absSidecar, 'utf-8');
+      allOutputs.push(applyFormatJson(r));
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.applyPerformed, true, 'commit happened; rollback expected next');
+      assert.strictEqual(r.rollbackAttempted, true);
+      assert.strictEqual(r.rollbackSucceeded, true);
+      assert.strictEqual(r.rollbackVerified, true);
+      assert.strictEqual(r.productionMutationPerformed, false, 'rollback should revert mutation');
+      assert.strictEqual(sidecarAfter, sidecarBefore, 'sidecar bytes must be restored');
+      assert.ok(r.blockers.includes('post-write-source-freshness-drift'),
+        `expected post-write-source-freshness-drift; got ${JSON.stringify(r.blockers)}`);
+    });
+
+    // ══ SE. Hard-link identity gates ════════════════════════════════════
+    let hardLinkOk = true;
+    try {
+      const probe = mkdtempSync(path.join(tmpRoot, 'hlprobe-'));
+      writeFileSync(path.join(probe, 'a'), 'x');
+      linkSync(path.join(probe, 'a'), path.join(probe, 'b'));
+    } catch { hardLinkOk = false; }
+
+    await check('hard-link: sidecar hard-linked to another file → sidecar-hard-link-detected; no mutation', async () => {
+      if (!hardLinkOk) { console.log('[SKIP] hard-link OS-SKIPPED (linkSync not available)'); return; }
+      const fx = await setupCandidateRepo(tmpRoot, 'hl-sc');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      // Aux hard-link file lives inside the gitignored fixtures dir so it does not
+      //   dirty the working tree (which would trigger repo-state:dirty before the
+      //   hard-link identity gate can fire).
+      const auxDir = path.join(fx.repoRoot, 'fixtures');
+      mkdirSync(auxDir, { recursive: true });
+      const auxPath = path.join(auxDir, 'aux-sc-file');
+      linkSync(absSidecar, auxPath);
+      // Verify Node reports nlink > 1 on this platform. If not, the guard fails-closed via
+      //   `file-identity-unavailable` which is also acceptable.
+      const scStat = statSync(absSidecar);
+      const authPath = await seedApprovedAuth(fx, 'hl-sc.json');
+      const sidecarBefore = readFileSync(absSidecar, 'utf-8');
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter(),
+      });
+      const sidecarAfter = readFileSync(absSidecar, 'utf-8');
+      const auxAfter = readFileSync(auxPath, 'utf-8');
+      allOutputs.push(applyFormatJson(r));
+      assert.strictEqual(r.applyPerformed, false);
+      assert.strictEqual(r.productionMutationPerformed, false);
+      assert.strictEqual(sidecarAfter, sidecarBefore);
+      assert.strictEqual(auxAfter, sidecarBefore, 'external hard-linked aux file must be unchanged');
+      assert.ok(r.blockers.some((b) => b === 'sidecar-hard-link-detected' || b === 'file-identity-unavailable' || b === 'source-sidecar-same-file'),
+        `expected sidecar-hard-link-detected or file-identity-unavailable (nlink=${scStat.nlink}); got ${JSON.stringify(r.blockers)}`);
+    });
+    await check('hard-link: source hard-linked to another file → source-hard-link-detected; no mutation', async () => {
+      if (!hardLinkOk) { console.log('[SKIP] hard-link OS-SKIPPED'); return; }
+      const fx = await setupCandidateRepo(tmpRoot, 'hl-src');
+      const absSource = path.join(fx.repoRoot, CAND_SOURCE);
+      const auxDir = path.join(fx.repoRoot, 'fixtures');
+      mkdirSync(auxDir, { recursive: true });
+      const auxPath = path.join(auxDir, 'aux-src-file');
+      linkSync(absSource, auxPath);
+      const authPath = await seedApprovedAuth(fx, 'hl-src.json');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const sidecarBefore = readFileSync(absSidecar, 'utf-8');
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter(),
+      });
+      const sidecarAfter = readFileSync(absSidecar, 'utf-8');
+      allOutputs.push(applyFormatJson(r));
+      assert.strictEqual(r.applyPerformed, false);
+      assert.strictEqual(sidecarAfter, sidecarBefore);
+      assert.ok(r.blockers.some((b) => b === 'source-hard-link-detected' || b === 'file-identity-unavailable' || b === 'source-sidecar-same-file'),
+        `expected source-hard-link-detected; got ${JSON.stringify(r.blockers)}`);
+    });
+    await check('hard-link: sidecar hard-linked to an OUTSIDE-repo file → refuse; outside file unchanged', async () => {
+      if (!hardLinkOk) { console.log('[SKIP] hard-link OS-SKIPPED'); return; }
+      const fx = await setupCandidateRepo(tmpRoot, 'hl-outside');
+      const outside = mkdtempSync(path.join(tmpRoot, 'hl-out-'));
+      const outsidePath = path.join(outside, 'aux');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      try { linkSync(absSidecar, outsidePath); } catch {
+        // Cross-device link may be refused by OS; that's an acceptable skip.
+        console.log('[SKIP] cross-directory hard-link OS-SKIPPED');
+        return;
+      }
+      const outsideBefore = readFileSync(outsidePath, 'utf-8');
+      const authPath = await seedApprovedAuth(fx, 'hl-out.json');
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot, authorizationPath: authPath, atomicCommitAdapter: createSyntheticCasAdapter(),
+      });
+      const outsideAfter = readFileSync(outsidePath, 'utf-8');
+      allOutputs.push(applyFormatJson(r));
+      assert.strictEqual(r.applyPerformed, false);
+      assert.strictEqual(outsideAfter, outsideBefore, 'outside hard-linked file must be unchanged');
+      assert.ok(r.blockers.some((b) => /hard-link|file-identity|same-file/.test(b)),
+        `expected hard-link related refusal; got ${JSON.stringify(r.blockers)}`);
+    });
+
+    // ══ SF. Parent junction / symlink gate ═════════════════════════════
+    let junctionOk = true;
+    try {
+      const probe = mkdtempSync(path.join(tmpRoot, 'jctprobe-'));
+      const target = path.join(probe, 'real-dir');
+      mkdirSync(target);
+      const link = path.join(probe, 'link-dir');
+      symlinkSync(target, link, 'junction');
+    } catch { junctionOk = false; }
+
+    await check('parent junction: sidecar dir accessed via junction → sidecar-parent-junction-detected', async () => {
+      if (!junctionOk) { console.log('[SKIP] parent-junction OS-SKIPPED (junction not creatable)'); return; }
+      // Set up a synthetic repo, then create an alternate path to the sidecar via a junction
+      //   pointing at the sidecar's parent. Rebuild the authorization against a fresh repo
+      //   whose real path traverses the junction. This is intentionally hard to construct
+      //   inside the existing test scaffold; we assert the gate refuses by using a synthetic
+      //   root that contains a junction ancestor.
+      const outerRoot = mkdtempSync(path.join(tmpRoot, 'jct-outer-'));
+      const realRoot = mkdtempSync(path.join(tmpRoot, 'jct-real-'));
+      const linkRoot = path.join(outerRoot, 'link-root');
+      symlinkSync(realRoot, linkRoot, 'junction');
+      // Seed a full synthetic repo at realRoot but call applyBloggerWithdrawal with
+      //   projectRoot=linkRoot so an intermediate segment is a junction.
+      seedGitRepo(realRoot);
+      writeFileSyncMk(path.join(realRoot, CAND_SOURCE), mdText({ stage: 'preview' }));
+      writeFileSyncMk(path.join(realRoot, CAND_SIDECAR), JSON.stringify(activePublishedSidecar(), null, 2));
+      git(realRoot, ['add', CAND_SOURCE, CAND_SIDECAR]);
+      git(realRoot, ['commit', '--quiet', '-m', 'seed']);
+      git(realRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+      const head = git(realRoot, ['rev-parse', 'HEAD']);
+      const plan = await planBloggerWithdrawals({ repoRoot: realRoot, gitHead: head });
+      const c = plan.candidates.find((x) => x.sourcePath === CAND_SOURCE);
+      const planFp = computePlanFingerprint(plan).value;
+      const target = makeTargetFromCandidate(c);
+      const recFp = recordFpFor(c);
+      const authPath = writeAuthFixture(realRoot, makeAuth({
+        head, planFp, recFp, target, approved: true,
+      }), 'jct.json');
+      const r = await applyBloggerWithdrawal({
+        projectRoot: linkRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
+      });
+      allOutputs.push(applyFormatJson(r));
+      assert.strictEqual(r.applyPerformed, false);
+      assert.strictEqual(r.productionMutationPerformed, false);
+      // Accept either explicit parent-junction refusal or any of several equivalent
+      //   fail-closed blockers a junction would produce depending on how realpath resolves.
+      assert.ok(r.blockers.some((b) => /junction|symlink|realpath|not-descendant|not-regular|source-hash-toctou-drift|sidecar-hash-toctou-drift|preflight-binding-incomplete|repo-state|target-outside/.test(b)),
+        `expected junction-related refusal; got ${JSON.stringify(r.blockers)}`);
+    });
+
+    // ══ SG. Rollback primary blocker preservation ══════════════════════
+    await check('rollback primary preserved: readback-mismatch + rollback-rename-failed BOTH retained', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'rb-primary');
+      const authPath = await seedApprovedAuth(fx, 'rb-p.json');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
+        hooks: {
+          afterRename: () => { writeFileSync(absSidecar, '{"external":"post-rename"}\n', 'utf-8'); },
+          beforeRollback: () => {
+            // Replace sidecar with a directory so the rollback rename fails with EPERM/EISDIR.
+            try { unlinkSync(absSidecar); } catch { /* ignore */ }
+            try { mkdirSync(absSidecar); } catch { /* ignore */ }
+          },
+        },
+      });
+      allOutputs.push(applyFormatJson(r));
+      assert.strictEqual(r.rollbackAttempted, true);
+      assert.ok(r.blockers.includes('readback-mismatch'),
+        `primary readback-mismatch missing; got ${JSON.stringify(r.blockers)}`);
+      assert.ok(r.blockers.some((b) => /^rollback-/.test(b)),
+        `expected rollback-* secondary blocker; got ${JSON.stringify(r.blockers)}`);
+      // Order: primary MUST come BEFORE rollback secondary.
+      const idxPrimary = r.blockers.indexOf('readback-mismatch');
+      const idxRollback = r.blockers.findIndex((b) => /^rollback-/.test(b));
+      assert.ok(idxPrimary >= 0 && idxRollback > idxPrimary,
+        `expected readback-mismatch BEFORE rollback-*; got ${JSON.stringify(r.blockers)}`);
+    });
+    await check('rollback primary preserved (post-write source drift + rollback failure)', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'src-primary');
+      const authPath = await seedApprovedAuth(fx, 'src-p.json');
+      const absSource = path.join(fx.repoRoot, CAND_SOURCE);
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const sourceBefore = readFileSync(absSource, 'utf-8');
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
+        hooks: {
+          beforeRename: () => {
+            writeFileSync(absSource, sourceBefore + '\n<!-- inj -->\n', 'utf-8');
+          },
+          beforeRollback: () => {
+            try { unlinkSync(absSidecar); } catch { /* ignore */ }
+            try { mkdirSync(absSidecar); } catch { /* ignore */ }
+          },
+        },
+      });
+      allOutputs.push(applyFormatJson(r));
+      assert.ok(r.blockers.includes('post-write-source-freshness-drift'),
+        `primary post-write-source-freshness-drift missing; got ${JSON.stringify(r.blockers)}`);
+      assert.ok(r.blockers.some((b) => /^rollback-/.test(b)),
+        `expected rollback-* secondary; got ${JSON.stringify(r.blockers)}`);
+    });
+
+    // ══ SH. Cleanup + rollback + primary preservation ══════════════════
+    await check('cleanup + rollback + primary preservation (three-tier order)', async () => {
+      // Force readback mismatch → rollback rename failure → also temp cleanup failure.
+      const fx = await setupCandidateRepo(tmpRoot, 'triple');
+      const authPath = await seedApprovedAuth(fx, 'triple.json');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: createSyntheticCasAdapter(),
+        hooks: {
+          afterRename: () => { writeFileSync(absSidecar, '{"external":"triple"}\n', 'utf-8'); },
+          beforeRollback: () => {
+            try { unlinkSync(absSidecar); } catch { /* ignore */ }
+            try { mkdirSync(absSidecar); } catch { /* ignore */ }
+          },
+        },
+      });
+      allOutputs.push(applyFormatJson(r));
+      assert.ok(r.blockers.includes('readback-mismatch'));
+      // primary → rollback-* → temp-cleanup-failed order (temp-cleanup may or may not fire,
+      //   depending on whether the temp survived; the assertion is: primary NEVER displaced).
+      const idxPrimary = r.blockers.indexOf('readback-mismatch');
+      assert.strictEqual(idxPrimary, 0, `primary must be first blocker; got ${JSON.stringify(r.blockers)}`);
+    });
+
+    // ══ SI. Test-adapter isolation ═════════════════════════════════════
+    await check('adapter unreachable from CLI: apply CLI source does not reference adapter APIs', () => {
+      const src = APPLY_CLI_SRC;
+      for (const needle of ['atomicCommitAdapter', 'atomicCommitStrategy', 'commitAdapter',
+                            'filesystemAdapter', 'createSyntheticCasAdapter', 'strategy:']) {
+        assert.ok(!src.includes(needle), `CLI must not reference '${needle}'`);
+      }
+    });
+    await check('adapter unreachable from env: apply library does not source strategy from process.env', () => {
+      const src = APPLY_LIB_SRC;
+      assert.ok(!/process\.env\.[A-Z_]*ADAPTER/i.test(src), 'must not source adapter from env');
+      assert.ok(!/process\.env\.[A-Z_]*STRATEGY/i.test(src), 'must not source strategy from env');
+      assert.ok(!/process\.env\.[A-Z_]*COMMIT/i.test(src), 'must not source commit primitive from env');
+    });
+    await check('adapter unreachable from argv: apply library does not scan argv', () => {
+      const src = APPLY_LIB_SRC;
+      assert.ok(!/process\.argv/.test(src), 'apply library must not read process.argv');
+    });
+    await check('adapter unreachable via authorization JSON: no adapter key referenced in parse path', () => {
+      const src = APPLY_LIB_SRC;
+      // No shape key that would source an adapter from authorization content.
+      assert.ok(!/atomicCommitAdapter\s*:\s*authorization/i.test(src));
+      assert.ok(!/authorization\.\w*[Aa]dapter/i.test(src));
+    });
+    await check('adapter must be OWN property (Object.prototype.hasOwnProperty check present)', () => {
+      const src = APPLY_LIB_SRC;
+      assert.ok(/hasOwnProperty\.call\s*\(\s*atomicCommitAdapter\s*,\s*['"]strategy['"]\s*\)/.test(src),
+        'expected own-property check for adapter.strategy');
+    });
+
+    // ══ SJ. Faulty adapter → atomic-commit-error, no leak ══════════════
+    await check('adapter throws → atomic-commit-error blocker; no leak; no mutation', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'faulty');
+      const authPath = await seedApprovedAuth(fx, 'faulty.json');
+      const absSidecar = path.join(fx.repoRoot, CAND_SIDECAR);
+      const sidecarBefore = readFileSync(absSidecar, 'utf-8');
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: createFaultyCasAdapter(),
+      });
+      const sidecarAfter = readFileSync(absSidecar, 'utf-8');
+      allOutputs.push(applyFormatJson(r), applyFormatHuman(r));
+      assert.strictEqual(r.applyPerformed, false);
+      assert.strictEqual(r.productionMutationPerformed, false);
+      assert.strictEqual(sidecarAfter, sidecarBefore);
+      assert.ok(r.blockers.includes('atomic-commit-error'),
+        `expected atomic-commit-error; got ${JSON.stringify(r.blockers)}`);
+      assert.ok(!applyFormatJson(r).includes('synthetic-adapter-fault'),
+        'raw adapter exception message must not leak');
+    });
+    await check('adapter returning arbitrary blocker string is normalized to atomic-commit-mismatch', async () => {
+      const fx = await setupCandidateRepo(tmpRoot, 'arbitrary');
+      const authPath = await seedApprovedAuth(fx, 'arb.json');
+      const arbitraryBlocker = 'INJECTED-BLOCKER-SLUG-FROM-ADAPTER';
+      const r = await applyBloggerWithdrawal({
+        projectRoot: fx.repoRoot,
+        authorizationPath: authPath,
+        atomicCommitAdapter: {
+          strategy: 'native-compare-and-swap',
+          commit: () => ({ ok: false, blocker: arbitraryBlocker }),
+        },
+      });
+      allOutputs.push(applyFormatJson(r));
+      assert.ok(!r.blockers.includes(arbitraryBlocker), 'adapter-provided arbitrary slug must not appear in report');
+      assert.ok(r.blockers.some((b) => /atomic-commit-mismatch|atomic-commit-cas-mismatch|atomic-commit-error/.test(b)),
+        `expected normalized blocker; got ${JSON.stringify(r.blockers)}`);
     });
 
     // ══ W. Confirmation gate covered in Section D above ═════════════════

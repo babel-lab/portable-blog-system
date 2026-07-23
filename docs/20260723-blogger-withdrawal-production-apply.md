@@ -13,16 +13,21 @@ plan:blogger-withdrawals                                  (Slice 4C；read-only 
   → (future) post-commit audit / push / redraft           (各須獨立授權)
 ```
 
-## 1. 能力與非能力
+## 1. 能力與非能力（Strategy B — fail-closed capability gate）
 
-### 能力
+### 能力（authorization / preflight / rehearsal 全程可用）
 
-- 對 authorization 指定之單一 `.publish.json` sidecar 執行 deterministic mutate-in-place
-  transformation：`blogger.status: "published" → "withdrawn"`、append 一次 withdrawn
-  lifecycle event、`schemaVersion: 2`。
-- Raw-byte authorization binding、same-buffer source/sidecar binding、in-directory
-  sibling temp file、atomic rename、read-back byte-compare + SHA-256 verification、
-  rollback on read-back mismatch、unconditional cleanup、redacted report。
+- 對 authorization 指定之單一 `.publish.json` sidecar 執行 read-only 之 authorization
+  parse / duplicate-key scan / preflight（含 remote-disposition / repository / plan /
+  record / target bindings）、hash observation、path safety gate（strict containment /
+  lstat / realpath / parent junction / hard-link identity）。
+- 在具備受支持 atomic-commit primitive 之 runtime（`native-compare-and-swap` 或
+  `mandatory-exclusive-lock`）上，執行 deterministic mutate-in-place transformation：
+  `blogger.status: "published" → "withdrawn"`、append 一次 withdrawn lifecycle event、
+  `schemaVersion: 2`；並提供 raw-byte authorization binding、same-buffer source/sidecar
+  binding、in-directory sibling temp file、adapter 主導之 atomic commit、read-back
+  byte-compare + SHA-256 verification、post-commit source freshness gate、rollback on
+  read-back / source drift、unconditional cleanup、redacted report。
 
 ### 非能力
 
@@ -31,6 +36,34 @@ plan:blogger-withdrawals                                  (Slice 4C；read-only 
 - **不** 呼叫 Blogger / Google / GA4 / AdSense API、**不** fetch、**不** child_process。
 - **不** 動 source Markdown、**不** 動其他 sidecar、**不** 動 authorization 以外之任何 metadata。
 - **不** 自動掃描並 apply 其他 candidate；本 Slice **只** 支援 single record。
+- **不** 於任何缺乏 CAS 或 mandatory exclusive lock 之 runtime 執行 production temp write /
+  rename。目前 Node.js（含 Windows）Core 不提供受支持之 CAS / mandatory lock primitive，
+  因此 CLI 之 default library path 會於 `atomic-commit-capability-unavailable` 安全 fail
+  closed（見 §8a）。真實 withdrawal apply 尚不可執行；authorization / preflight /
+  rehearsal 仍可使用。
+
+### Strategy 選擇（B）
+
+Runtime constraint（Node.js on Windows、無 child_process、無未稽核 native binding、無 shell、
+無 unaudited dependency）下，Node core 未提供：
+
+- native compare-and-swap primitive（Linux 為 `renameat2(..., RENAME_EXCHANGE)`；Windows
+  為 `SetFileInformationByHandle FILE_RENAME_INFO` 之 atomic verify-if-unchanged 語意，
+  Node fs API 未曝露）
+- mandatory exclusive lock（Windows FILE_SHARE_NONE 需要底層 API；POSIX flock/fcntl 為
+  advisory；均非 mandatory）
+
+Advisory lock 及 rename-after-check 不合契約規範對「compare-and-swap／mandatory exclusion」之
+明示要求，因此本 Slice 採 Strategy B（fail-closed capability gate）。default CLI / default
+library path 於任何 temp file 建立、production write、rename 之前，emit 穩定 blocker
+`atomic-commit-capability-unavailable`；`applyReady` 可保留 preflight 之 authorization 判定
+（表示 authorization ready），但 `commitReady=false`、`applyPerformed=false`、
+`productionMutationPerformed=false`、`tempFileCreated=false`、`readBackOk=false`、
+`rollbackAttempted=false`。
+
+未來若 Node core / 受稽核 dependency 提供可證明之 CAS 或 mandatory exclusion primitive，另
+開 Slice 提出實作與正式驗收；本 Slice **不** 主動導入 native binding / child_process /
+shell command / unaudited native API。
 
 ## 2. 單筆限制
 
@@ -106,22 +139,75 @@ Blogger 後台真的把文章轉草稿 / 刪除，重新驗證 disposition，再
 - Pre-rename freshness check 為 **compare-only**：重讀 sidecar bytes，若與原 buffer byte-identical
   才繼續；否則拒絕 apply（不覆蓋外部新內容）。此 second read **不** 作為 transformation input。
 
-## 8. Atomic write
+## 8. Atomic commit（Strategy B；adapter-driven）
 
-流程（依序）：
+Production commit primitive **不** 由本 library 直接以 `renameSync` 執行，而是委由
+`atomicCommitAdapter` 執行。CLI **不** 建構 adapter；default library call（無 adapter）
+一律於 §8a capability gate fail closed。
 
-1. 於 sidecar 同 directory 建立 exclusive sibling temp file，檔名 `.<basename>.apply-<pid>-<suffix>.tmp`，`suffix` 由 process.hrtime + attempt counter 產生（不可預測）。
-2. `openSync(candidate, 'wx', 0o600)`：`wx` 提供 `O_EXCL` 語意；已存在即 `EEXIST` fail。bounded retry 上限 5 次。
-3. `writeSync` 寫入完整 bytes；`fstatSync` 驗證 size；`fsyncSync` flush；`closeSync`。
-4. `lstat` 再次確認 sidecar target 仍為 regular file、非 symlink。
-5. Compare-only freshness gate：重讀 sidecar bytes，byte-compare 與 SHA-256 均須等於原 buffer。
-6. Source freshness gate：重讀 source bytes，byte-compare 與 SHA-256 均須等於原 buffer。
-7. `renameSync(tempAbs, absSidecar)`：atomic replace（Windows 上為 `MoveFileEx` 之 REPLACE_EXISTING 語意）。
-8. 讀 back production sidecar；byte-compare 與 SHA-256 驗證；schema 驗證。
-9. Cleanup temp（無論成功 / 失敗）。
+當 adapter 已提供時，流程（依序）：
+
+1. 執行 §10a hard-link identity gate 與 §10b realpath / parent junction gate。
+2. §8a atomic-commit capability gate 通過。
+3. 讀 source / sidecar 為單一 buffer 並比對 preflight-observed SHA-256（TOCTOU pre-check）。
+4. Parse sidecar；build transformation payload（reuse `buildWithdrawnSidecar`）；semantic
+   validation。
+5. 於 sidecar 同 directory 建立 exclusive sibling temp file，檔名
+   `.<basename>.apply-<pid>-<suffix>.tmp`，`suffix` 由 `process.hrtime` + attempt counter
+   產生（不可預測）。`openSync(candidate, 'wx', 0o600)`；bounded retry 上限 5 次。
+6. `writeSync` 寫入完整 bytes；`fstatSync` 驗證 size；`fsyncSync` flush；`closeSync`。
+7. `lstat` 再次確認 sidecar target 仍為 regular file、非 symlink、`nlink === 1`。
+8. Pre-commit compare-only freshness gate：重讀 sidecar bytes / source bytes，byte-compare
+   與 SHA-256 均須等於原 buffer；drift → 拒絕（不進入 adapter.commit）。
+9. `atomicCommitAdapter.commit({ tempPath, targetPath, expectedTargetSha256,
+   expectedTargetBytes })`：adapter 於其自身之 CAS 或 mandatory-exclusive-lock 語意下重新
+   讀 target bytes，若與 `expectedTargetBytes` 不 byte-identical 或 SHA-256 不匹配則拒絕
+   （不 rename、target 保留原 bytes）；一致則執行 rename。回傳 `{ ok, blocker? }`。
+10. 讀 back production sidecar；byte-compare 與 SHA-256 驗證；schema 驗證。
+11. §9a post-commit source freshness gate：重讀 source，若 drift → 進入 rollback
+    路徑並保留 `post-write-source-freshness-drift` 為 primary blocker。
+12. Cleanup temp（無論成功 / 失敗）。
 
 **永不** 直接 truncate production sidecar、**永不** 先 delete 再 rename、**永不** copyFile 後才驗證、
 **永不** 寫 source / 其他 sidecar / deploy repo。
+
+## 8a. Atomic commit capability gate
+
+`resolveAtomicCommitCapability({ atomicCommitAdapter })` 為唯一 authoritative capability
+判定，report 含 `atomicCommitSupported` / `atomicCommitStrategy`。`atomicCommitStrategy`
+enum 只允許：
+
+```
+native-compare-and-swap
+mandatory-exclusive-lock
+unsupported
+```
+
+Adapter 契約：own-property `strategy` ∈ 前二者、own method `commit`；否則 capability 判定為
+`{ supported: false, strategy: 'unsupported' }`。Prototype pollution 無法通過 own-property
+check；env / argv / authorization content / repo file / JSON 皆不可到達（見 §14a）。
+
+Capability gate 執行時機：於 preflight / hash observation / path safety gate 通過之後、
+於 temp file 建立、source / sidecar production write、adapter.commit 之前。
+
+`supported=false` 時：
+
+```
+ok = false
+applyReady = <preflight verdict（可為 true 表示 authorization ready）>
+commitReady = false
+applyPerformed = false
+productionMutationPerformed = false
+tempFileCreated = false
+tempFileRemoved = false
+readBackOk = false
+rollbackAttempted = false
+cleanupPerformed = true
+cleanupSucceeded = true
+blockers 含 "atomic-commit-capability-unavailable"
+```
+
+Default CLI / default library call（無 adapter）在本 runtime 必於此 gate fail closed。
 
 ## 9. Read-back
 
@@ -131,9 +217,21 @@ Blogger 後台真的把文章轉草稿 / 刪除，重新驗證 disposition，再
   `blogger.status` 必為 `"withdrawn"`。
 - 任一不符 → `readBackOk=false` → 進入 rollback。
 
+## 9a. Post-commit source freshness gate
+
+即使 adapter.commit 成功、read-back 通過，若 source Markdown 在 pre-commit 與此刻之間
+drifted，withdrawal lifecycle event 綁定之 `sourceSha256` 已無法描述 source bytes 真值。
+本 library **必** rollback sidecar 並保留 `post-write-source-freshness-drift` 為 primary
+blocker；不得回 `ok=true`。Rollback 使用 apply 前保留之原始 sidecar buffer；rollback
+失敗時 rollback-* blocker 追加於 primary 之後、不覆蓋 primary。
+
 ## 10. Rollback
 
-- 條件：production rename 已發生，但 read-back 失敗。
+- 條件：production rename 已發生，但（a）read-back 失敗；或（b）post-commit source
+  freshness gate 偵測到 source drift。
+- Primary blocker（`readback-mismatch` / `post-write-source-freshness-drift`）**必** 於
+  rollback 執行前先寫入 blockers；rollback 失敗時 rollback-* blocker append，不得 displace
+  primary。
 - 使用 apply 前保留之原始 sidecar buffer；同一 temp+rename primitive；不 truncate。
 - 成功：`rollbackSucceeded=true` + `rollbackVerified=true` +
   `productionMutationPerformed=false` + `sidecarSha256After=sidecarSha256Before` +
@@ -143,13 +241,40 @@ Blogger 後台真的把文章轉草稿 / 刪除，重新驗證 disposition，再
 - Blocker slugs：`rollback-temp-create-failed` / `rollback-temp-write-failed` /
   `rollback-rename-failed` / `rollback-verification-failed`。
 
+## 10a. Hard-link identity gate
+
+Apply 自身於 lstat 完 source / sidecar 後、於 capability gate 之前，執行 dev + ino +
+nlink identity check：
+
+- source 與 sidecar 相同 `dev + ino`（皆非 0）→ 拒絕 `source-sidecar-same-file`
+- source `nlink > 1` → 拒絕 `source-hard-link-detected`
+- sidecar `nlink > 1` → 拒絕 `sidecar-hard-link-detected`
+- platform 未提供可信 identity（`ino === 0` 或 non-finite）→ 拒絕 `file-identity-unavailable`
+
+Pre-commit 前重跑 sidecar nlink check；rollback / commit path 中偵測到 `sidecar-hard-link-detected`
+即 refuse。
+
+## 10b. Realpath / parent junction gate
+
+Apply 對 project root、source、sidecar 執行 `realpathSync.native`；若 realpath 解析失敗
+→ 拒絕 `realpath-unresolvable`。實際 path 必須仍為 project root real path 之 strict
+descendant；否則拒絕 `target-outside-project-root-after-realpath`。
+
+對 source 與 sidecar 之每一 intermediate parent segment（不含 leaf）執行 `lstatSync`；若
+任何 segment 為 symbolic link / junction / reparse-point → 拒絕
+`source-parent-junction-detected` / `sidecar-parent-junction-detected`。
+
+於 OS 不允許建立 junction / reparse point 之 guard 環境，對應 guard 明確 OS-SKIPPED
+（不計入 executed PASS），fail-closed production policy 不因 skip 而改變。
+
 ## 11. Cleanup
 
 - 每次 apply 結束（成功 / 失敗）皆嘗試清 temp file。
 - Report：`cleanupPerformed:true/false` + `cleanupSucceeded:true/false` +
   `tempFileCreated:true/false` + `tempFileRemoved:true/false`。
 - Cleanup failure **不** 掩蓋 primary blocker；primary blocker 先加，`temp-cleanup-failed`
-  後加，兩者皆保留於 blockers。
+  後加，兩者皆保留於 blockers。順序：primary → rollback-* → temp-cleanup-failed；
+  deterministic。
 - Session 結束後 sidecar dir 不應留下 `.apply-*.tmp` / `.rollback-*.tmp` 殘留。
 
 ## 12. Exit codes
@@ -181,6 +306,9 @@ remoteDispositionEligible
 explicitlyAuthorized
 preflightEligible
 applyReady
+commitReady
+atomicCommitSupported
+atomicCommitStrategy
 applyPerformed
 productionMutationPerformed
 authorizationSha256
@@ -199,6 +327,10 @@ tempFileRemoved
 blockers
 ```
 
+`applyReady` 反映 preflight（authorization）verdict；`commitReady` 進一步要求
+`atomicCommitSupported === true` 與 path safety gate 均通過。`applyReady:true`
+且 `commitReady:false` 之組合表示 authorization 已通過但目前 runtime 無法安全執行 commit。
+
 ## 14. Redaction
 
 Report 與 stderr **絕不** 回顯：
@@ -215,6 +347,22 @@ secret token / API key / credential
 回顯只含：boolean / repo-relative POSIX path / SHA-256 hex / git40 hex / enum / 安全短碼
 （穩定、機器可判讀）。Human-readable 與 JSON 語意一致。
 
+## 14a. Adapter isolation
+
+`atomicCommitAdapter` 只能透過 direct programmatic API 傳入（`applyBloggerWithdrawal({
+projectRoot, authorizationPath, hooks, atomicCommitAdapter })`）；本 CLI **不**構造、
+**不**接受、**不**轉發 adapter。無 adapter 之 library call 於 §8a fail closed。
+
+Guard 需靜態證明：
+
+```
+CLI source 不出現 atomicCommitAdapter / atomicCommitStrategy / commitAdapter reference
+apply library 不從 process.env / process.argv / authorization content / repo file /
+  JSON parse 讀取 adapter
+adapter 之 strategy field check 為 Object.prototype.hasOwnProperty own-property check，
+  prototype chain 不生效
+```
+
 ## 15. CLI examples（placeholder；不使用真實 URL / identity）
 
 ```
@@ -222,7 +370,10 @@ secret token / API key / credential
 node src/scripts/apply-blogger-withdrawal.js --help
 
 # Attempt apply against an authorization file that lives OUTSIDE the repo.
-# (Runs preflight; refuses if not applyReady; never modifies content on failure.)
+# On the current runtime (Node.js on Windows, no supported CAS / mandatory lock
+# primitive) this will fail closed at the atomic-commit capability gate with
+# blocker `atomic-commit-capability-unavailable`; no temp file, no write, no
+# rename will be performed.  Preflight is still executed and reported.
 node src/scripts/apply-blogger-withdrawal.js \
   --authorization "/absolute/path/to/authorization.json" \
   --apply \

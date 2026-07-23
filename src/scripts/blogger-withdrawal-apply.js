@@ -2,34 +2,31 @@
 // Phase 20260723-publish-target-stage Slice 4I：Blogger withdrawal — production apply library.
 //
 // 上位契約：
-//   - docs/20260723-blogger-withdrawal-production-apply.md（本 Slice 契約）
+//   - docs/20260723-blogger-withdrawal-production-apply.md（本 Slice 契約；Strategy B fail-closed）
 //   - docs/20260722-blogger-withdrawal-rehearsal.md（Slice 4E：OS-temp rehearsal）
 //   - docs/20260722-blogger-withdrawal-authorization-preparation.md（Slice 4D：authorization / preflight）
 //   - docs/20260721-blogger-withdrawal-planner.md（Slice 4C：read-only planner）
 //   - docs/publish-json-schema.md §5.7 / §9（withdrawn / schemaVersion 2 / lifecycle）
 //
-// 目的：
-//   在既有 authorization contract、planner、preflight、rehearsal 皆 apply-ready 的前提下，把
-//   deterministic withdrawal mutation 實際套用到單一 production `.publish.json` sidecar。所有寫入
-//   限於「authorization 指定之 sidecar 檔案本身」；source Markdown 全程唯讀；deploy repo 全程無關；
-//   無網路、無 Blogger／Google／GA4／AdSense API、無 child_process、無 git mutation。
+// Strategy B（fail-closed atomic commit capability gate）：
+//   本 runtime（Node.js 於 Windows，無 child_process、無未稽核 native binding、無 shell、無 unaudited
+//   dependency）**無**受支持之：
+//     - native compare-and-swap（e.g. Linux renameat2 + RENAME_EXCHANGE / Windows atomic rename-if-unchanged）
+//     - mandatory exclusive lock（Windows FILE_SHARE_NONE 需要底層 API、POSIX flock/fcntl 為 advisory）
+//   因此 default CLI / default library path **不**執行 production temp write / rename。所有 production
+//   mutation 之嘗試皆 fail-closed 於 `atomic-commit-capability-unavailable` blocker。
 //
-// Pipeline position（見 docs/20260723-blogger-withdrawal-production-apply.md §0）：
-//   plan:blogger-withdrawals                     (Slice 4C；read-only planner)
-//     → remote disposition verification          (人工；本工具不做)
-//     → prepare:blogger-withdrawal-authorization (Slice 4D；draft generator)
-//     → operator review + 手動 flip explicitlyAuthorized
-//     → validate:blogger-withdrawal-authorization(Slice 4D；read-only preflight)
-//     → rehearse:blogger-withdrawal              (Slice 4E；OS-temp mutation rehearsal)
-//     → **this slice** apply:blogger-withdrawal  (single-record production mutation)
-//     → (future) post-commit audit / push / redraft  (各須獨立授權)
+//   test / synthetic mutation 需要 commit primitive 時，只能透過 programmatic API 之
+//   `atomicCommitAdapter` 明示注入；CLI / env / authorization / repo config / prototype 皆不可到達；
+//   default library call（無 adapter）必 fail closed。
 //
 // 硬邊界（zero-secondary-mutation；違反即設計錯誤）：
 //   - 只寫「authorization 指定之 sidecar 檔案」；不動 source Markdown、不動其他 sidecar、不動
 //     dist*、不動 deploy repo、不動 git index、不 commit / push / rebase / reset。
 //   - No network / no child_process / no fetch / no https / no googleapis / no exec / no spawn。
-//   - CLI 硬綁 project root（PROJECT_ROOT）；programmatic API 之 projectRoot / hooks 只由 guard
-//     以直接函式呼叫注入，永不由 CLI / env / authorization / repo file / JSON 觸發。
+//   - CLI 硬綁 project root（PROJECT_ROOT）；programmatic API 之 projectRoot / hooks /
+//     atomicCommitAdapter 只由 guard 以直接函式呼叫注入，永不由 CLI / env / authorization / repo
+//     file / JSON / prototype 觸發。
 //
 // Redaction：所有 human／JSON／blocker slug 皆為固定安全短碼；**絕不**回顯 raw publishedUrl /
 //   Blogger host / Blogger post id / publishedAt / operator identity / authorization absolute path
@@ -38,7 +35,7 @@
 import { createHash } from 'node:crypto';
 import {
   closeSync, existsSync, fstatSync, fsyncSync, lstatSync, openSync, readFileSync,
-  renameSync, rmSync, statSync, writeSync,
+  realpathSync, renameSync, rmSync, statSync, writeSync,
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,6 +71,12 @@ export const APPLY_CONFIRMATION_PHRASE = 'APPLY BLOGGER WITHDRAWAL';
 const TEMP_SUFFIX_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const TEMP_SUFFIX_LEN = 16;
 const TEMP_MAX_ATTEMPTS = 5;
+
+// Stable atomic commit strategy enum. Adapter must self-report exactly one of these.
+const STRATEGY_NATIVE_CAS = 'native-compare-and-swap';
+const STRATEGY_MANDATORY_LOCK = 'mandatory-exclusive-lock';
+const STRATEGY_UNSUPPORTED = 'unsupported';
+const SUPPORTED_STRATEGIES = new Set([STRATEGY_NATIVE_CAS, STRATEGY_MANDATORY_LOCK]);
 
 // ── deterministic helpers ────────────────────────────────────────────────────
 function sha256HexOfBuffer(buf) {
@@ -116,6 +119,46 @@ function randomTempSuffix(attempt) {
   return out;
 }
 
+// ── atomic-commit capability contract ───────────────────────────────────────
+// Single authoritative capability probe. Report echoes { atomicCommitSupported, atomicCommitStrategy }.
+//
+// Contract:
+//   - If a programmatic adapter is provided and its `strategy` field is one of the stable enums
+//     (native-compare-and-swap / mandatory-exclusive-lock), capability is supported.
+//   - Otherwise capability is unsupported. The default library / CLI path always lands here
+//     because CLI never constructs an adapter.
+//   - No environment, argv, authorization content, repo file, or prototype chain can promote
+//     capability from unsupported to supported. Only a direct programmatic call may pass an
+//     adapter whose own-property `strategy` matches an enum value.
+//
+// Adapter object contract (opaque; consumed by apply library only when supported):
+//   - own property `strategy` ∈ SUPPORTED_STRATEGIES (own-property check; prototype ignored)
+//   - own method  `commit({ tempPath, targetPath, expectedTargetSha256, expectedTargetBytes })`
+//       returns { ok: true } on successful atomic replace of targetPath with tempPath
+//       returns { ok: false, blocker: 'atomic-commit-cas-mismatch' | 'atomic-commit-error' }
+//         if target bytes differ from expectedTargetBytes (mandatory CAS refusal) or the
+//         commit primitive itself faulted. Adapter MUST NOT perform rename if bytes drifted.
+export function resolveAtomicCommitCapability({ atomicCommitAdapter } = {}) {
+  if (atomicCommitAdapter === undefined || atomicCommitAdapter === null) {
+    return { supported: false, strategy: STRATEGY_UNSUPPORTED };
+  }
+  if (typeof atomicCommitAdapter !== 'object') {
+    return { supported: false, strategy: STRATEGY_UNSUPPORTED };
+  }
+  // Own-property strategy only; prototype pollution cannot inject strategy.
+  if (!Object.prototype.hasOwnProperty.call(atomicCommitAdapter, 'strategy')) {
+    return { supported: false, strategy: STRATEGY_UNSUPPORTED };
+  }
+  const s = atomicCommitAdapter.strategy;
+  if (typeof s !== 'string' || !SUPPORTED_STRATEGIES.has(s)) {
+    return { supported: false, strategy: STRATEGY_UNSUPPORTED };
+  }
+  if (typeof atomicCommitAdapter.commit !== 'function') {
+    return { supported: false, strategy: STRATEGY_UNSUPPORTED };
+  }
+  return { supported: true, strategy: s };
+}
+
 // ── report shape ────────────────────────────────────────────────────────────
 function baseReport(sourcePath, sidecarPath) {
   return {
@@ -135,6 +178,9 @@ function baseReport(sourcePath, sidecarPath) {
     explicitlyAuthorized: false,
     preflightEligible: false,
     applyReady: false,
+    commitReady: false,
+    atomicCommitSupported: false,
+    atomicCommitStrategy: STRATEGY_UNSUPPORTED,
     applyPerformed: false,
     productionMutationPerformed: false,
     authorizationSha256: null,
@@ -154,37 +200,71 @@ function baseReport(sourcePath, sidecarPath) {
   };
 }
 
+// ── path safety helpers ─────────────────────────────────────────────────────
+// Check every intermediate parent segment between `fromRoot` (real path) and `toAbs`
+//   (real path) for symbolic link / junction / reparse-point. On Windows Node treats
+//   junction / reparse-point as symbolic link via lstat. Any hit → fail closed.
+function firstSymlinkOrJunctionAncestor(fromRoot, toAbs) {
+  if (!isStrictDescendant(fromRoot, toAbs)) return { ok: false, reason: 'not-descendant' };
+  const rel = path.relative(fromRoot, toAbs);
+  const segments = rel.split(path.sep);
+  let current = fromRoot;
+  // Iterate all segments EXCEPT the leaf (which the caller already lstat-checked).
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    current = path.join(current, segments[i]);
+    let s;
+    try { s = lstatSync(current); } catch { return { ok: false, reason: 'ancestor-unreadable' }; }
+    if (s.isSymbolicLink()) return { ok: false, reason: 'ancestor-symlink' };
+    if (!s.isDirectory()) return { ok: false, reason: 'ancestor-not-directory' };
+  }
+  return { ok: true };
+}
+
+// Safe realpath: returns null on failure (caller decides how to react).
+function safeRealpath(p) {
+  try { return realpathSync.native(p); } catch { return null; }
+}
+
 // ── main apply API ──────────────────────────────────────────────────────────
 // programmatic-only parameters（CLI **不**傳入；guard 直接以 function invocation 注入）：
-//   projectRoot — synthetic guard 以 mkdtemp git repo 驅動；CLI 硬編碼 PROJECT_ROOT。
+//   projectRoot          — synthetic guard 以 mkdtemp git repo 驅動；CLI 硬編碼 PROJECT_ROOT。
+//   atomicCommitAdapter  — Strategy B commit primitive；CLI **never** constructs；default
+//                          library call without this parameter fails closed at the capability gate.
 //   hooks — pre/post filesystem stages 供 guard 注入 race / failure：
 //     beforeFreshnessCheck({ sidecarPath })  — 於 temp write 完成後、freshness compare 前
 //     beforeTempWrite({ sidecarPath, tempPath }) — 於 temp file writeSync 前
-//     beforeRename({ tempPath, sidecarPath })    — 於 rename primitive 前
-//     afterRename({ sidecarPath })                — 於 rename primitive 完成、read-back 前
+//     beforeRename({ tempPath, sidecarPath })    — 於 adapter.commit 前（final race window）
+//     afterRename({ sidecarPath })                — 於 adapter.commit 完成、read-back 前
 //     beforeReadBack({ sidecarPath })             — 於 read-back readFileSync 前
 //     beforeRollback({ sidecarPath, rollbackTempPath }) — 於 rollback rename 前
 //   Hook exception 一律 swallowed；hooks 不影響 CLI code path（CLI 從不建構 hooks 物件）。
 //
-// applyReady 語意：
-//   preflight 決定 applyReady；apply-time TOCTOU drift / temp write fail / rename fail /
-//   readback mismatch / rollback / cleanup failure 均會清空 applyReady 為 false。
+// applyReady vs commitReady 語意：
+//   - applyReady   ← preflight outcome（authorization / bindings / disposition / explicit approval）
+//   - commitReady  ← applyReady AND atomicCommitSupported AND path safety gates cleared
+//   - ok           ← commitReady AND successful atomic commit AND read-back verified AND
+//                    post-write source freshness verified AND rollback not required
 //
 // 硬綁定：
 //   - authorization raw bytes 只讀一次（authorizationPath），計算 SHA-256，透過
 //     authorizationText 傳給 preflight；apply 使用同一份 in-memory bytes 之 parsed object。
 //   - source / sidecar 各讀入單一 buffer，SHA-256 從 buffer 計算，與 preflight 觀察值相等
 //     方可繼續；pre-rename freshness check 只作 compare-only，不 rebuild transformation。
+//   - post-commit source freshness check：re-read source after successful commit；若 SHA
+//     或 bytes 不匹配 apply-time buffer → rollback sidecar 並保留 post-write-source-freshness-drift
+//     為 primary blocker。
 export async function applyBloggerWithdrawal({
   projectRoot = PROJECT_ROOT,
   authorizationPath,
   hooks,
+  atomicCommitAdapter,
 } = {}) {
   const report = baseReport(null, null);
   const push = (b) => { if (!report.blockers.includes(b)) report.blockers.push(b); };
   const refuse = (blocker) => {
     push(blocker);
     report.applyReady = false;
+    report.commitReady = false;
   };
 
   // ── read authorization raw bytes exactly once（apply layer 之 single-read 契約）──
@@ -285,51 +365,115 @@ export async function applyBloggerWithdrawal({
   const absSource = path.join(projectRoot, ...sourcePath.split('/'));
   const absSidecar = path.join(projectRoot, ...sidecarPath.split('/'));
 
-  // strict containment: both files must be strict descendants of projectRoot; no
-  //   `..` escape, no absolute injection. path.join+relative gives us a defense-in-depth
-  //   check against symbolic path shapes even before lstat.
+  // Strict containment: both files must be strict descendants of projectRoot; no
+  //   `..` escape, no absolute injection.
   if (!isStrictDescendant(projectRoot, absSource) || !isStrictDescendant(projectRoot, absSidecar)) {
     refuse('target-outside-project-root');
     return report;
   }
 
-  // lstat gates: refuse symlinks / non-regular files. lstat (not stat) so symlinks
-  //   are surfaced instead of being silently dereferenced. Windows junctions/reparse
-  //   points also surface as symbolic links via lstat.
+  // ── lstat gates: symlink / non-regular file → refuse ──
   let sourceLst;
-  try {
-    sourceLst = lstatSync(absSource);
-  } catch {
-    refuse('source-unreadable');
-    return report;
-  }
+  try { sourceLst = lstatSync(absSource); } catch { refuse('source-unreadable'); return report; }
   if (sourceLst.isSymbolicLink()) { refuse('source-symlink'); return report; }
   if (!sourceLst.isFile()) { refuse('source-not-regular-file'); return report; }
 
   let sidecarLst;
-  try {
-    sidecarLst = lstatSync(absSidecar);
-  } catch {
-    refuse('sidecar-unreadable');
-    return report;
-  }
+  try { sidecarLst = lstatSync(absSidecar); } catch { refuse('sidecar-unreadable'); return report; }
   if (sidecarLst.isSymbolicLink()) { refuse('sidecar-symlink'); return report; }
   if (!sidecarLst.isFile()) { refuse('sidecar-not-regular-file'); return report; }
 
-  // Same-file alias defense: on POSIX filesystems dev+ino uniquely identifies a file;
-  //   two distinct paths sharing dev+ino means they alias the same bytes (e.g., hard link).
-  //   On Windows node's lstat may not populate dev/ino uniquely (both can be 0 or share
-  //   values across different files on the same volume), so we can't reliably detect
-  //   aliases via inode. The path-level check above (different absolute paths, both
-  //   regular non-symlink files, sidecar filename ends `.publish.json` distinct from `.md`)
-  //   is the primary anti-alias gate. Inode check only fires when we can distinguish.
-  if (process.platform !== 'win32'
-      && sourceLst.dev === sidecarLst.dev
-      && sourceLst.ino === sidecarLst.ino
-      && sourceLst.ino !== 0) {
-    refuse('source-sidecar-same-inode');
+  // ── hard-link identity gate (§10) ──
+  //   Windows NTFS file indexes (used for ino) frequently exceed Number.MAX_SAFE_INTEGER
+  //   (2^53); reading them via default fs.Stats can silently collapse two distinct inodes
+  //   to the same Number and produce a false-positive "same file" verdict. We therefore
+  //   re-stat with { bigint: true } for the identity comparison, keeping dev / ino as
+  //   BigInt so equality is bit-exact. `nlink` remains a small integer (Number-safe).
+  //
+  //   If both files share dev+ino (both non-zero), they alias the same bytes. If nlink
+  //   is > 1 for either file, an unknown external hard-link exists — fail closed because
+  //   our CAS invariants only cover the one path we control. If the platform cannot
+  //   provide reliable identity (ino is 0n), fail closed with a stable blocker.
+  let sourceBig;
+  let sidecarBig;
+  try { sourceBig = lstatSync(absSource, { bigint: true }); } catch { refuse('source-unreadable'); return report; }
+  try { sidecarBig = lstatSync(absSidecar, { bigint: true }); } catch { refuse('sidecar-unreadable'); return report; }
+  const srcDev = sourceBig.dev;
+  const srcIno = sourceBig.ino;
+  const scDev = sidecarBig.dev;
+  const scIno = sidecarBig.ino;
+  if (typeof srcDev !== 'bigint' || typeof srcIno !== 'bigint'
+    || typeof scDev !== 'bigint' || typeof scIno !== 'bigint'
+    || srcIno === 0n || scIno === 0n) {
+    refuse('file-identity-unavailable');
     return report;
   }
+  if (srcDev === scDev && srcIno === scIno) {
+    refuse('source-sidecar-same-file');
+    return report;
+  }
+  const srcNlink = Number(sourceBig.nlink);
+  const scNlink = Number(sidecarBig.nlink);
+  if (!Number.isFinite(srcNlink) || srcNlink > 1) {
+    refuse('source-hard-link-detected');
+    return report;
+  }
+  if (!Number.isFinite(scNlink) || scNlink > 1) {
+    refuse('sidecar-hard-link-detected');
+    return report;
+  }
+
+  // ── realpath + parent junction gate (§10b / §11) ──
+  //   Two-layer check:
+  //   (a) Iterate every intermediate parent segment of the ORIGINAL (un-realpath'd)
+  //       absSource / absSidecar starting at projectRoot; if any segment is a symbolic
+  //       link / junction / reparse-point (isSymbolicLink()), refuse. This catches the
+  //       case where an attacker has replaced a repo-relative directory with a junction
+  //       pointing elsewhere.
+  //   (b) Resolve projectRoot / absSource / absSidecar through realpathSync.native and
+  //       verify the resolved source / sidecar remain strict descendants of the resolved
+  //       root. This catches subtler cases where realpath resolution escapes the tree.
+  //   Additionally lstat the projectRoot leaf itself: if projectRoot is a symlink,
+  //   refuse (any subsequent write would traverse the link).
+  let projectRootLst;
+  try { projectRootLst = lstatSync(projectRoot); } catch { refuse('realpath-unresolvable'); return report; }
+  if (projectRootLst.isSymbolicLink()) {
+    refuse('project-root-symlink');
+    return report;
+  }
+  const srcAncestor = firstSymlinkOrJunctionAncestor(projectRoot, absSource);
+  if (!srcAncestor.ok) { refuse('source-parent-junction-detected'); return report; }
+  const scAncestor = firstSymlinkOrJunctionAncestor(projectRoot, absSidecar);
+  if (!scAncestor.ok) { refuse('sidecar-parent-junction-detected'); return report; }
+  const projectRootReal = safeRealpath(projectRoot);
+  const sourceReal = safeRealpath(absSource);
+  const sidecarReal = safeRealpath(absSidecar);
+  if (projectRootReal === null || sourceReal === null || sidecarReal === null) {
+    refuse('realpath-unresolvable');
+    return report;
+  }
+  if (!isStrictDescendant(projectRootReal, sourceReal)
+    || !isStrictDescendant(projectRootReal, sidecarReal)) {
+    refuse('target-outside-project-root-after-realpath');
+    return report;
+  }
+
+  // ── atomic commit capability gate (Strategy B) ──
+  //   Runs AFTER read-only preflight / hash observation / path safety gates but BEFORE
+  //   any production temp file creation, source / sidecar production write, or rename.
+  //   If unsupported: applyReady preserves preflight verdict (authorization may be
+  //   ready) but commitReady is false and a stable blocker is emitted.
+  const capability = resolveAtomicCommitCapability({ atomicCommitAdapter });
+  report.atomicCommitSupported = capability.supported;
+  report.atomicCommitStrategy = capability.strategy;
+  if (!capability.supported) {
+    push('atomic-commit-capability-unavailable');
+    report.commitReady = false;
+    // applyReady preserved (authorization gate outcome); no temp file created.
+    // productionMutationPerformed / tempFileCreated / rollbackAttempted stay false.
+    return report;
+  }
+  report.commitReady = true;
 
   // ── same-buffer source / sidecar binding ──
   let sourceBuf;
@@ -360,9 +504,7 @@ export async function applyBloggerWithdrawal({
   }
 
   // Already-withdrawn no-op: contract §15 chooses "fail closed" so operator cannot
-  //   accidentally append a second withdrawn lifecycle event or re-hash. Fingerprints
-  //   would already fail preflight (expectedCurrentStatus === 'published') — this is
-  //   defense-in-depth in case preflight is later relaxed.
+  //   accidentally append a second withdrawn lifecycle event or re-hash.
   if (priorSidecar
       && priorSidecar.blogger
       && priorSidecar.blogger.status === WITHDRAWN_STATUS) {
@@ -371,8 +513,6 @@ export async function applyBloggerWithdrawal({
   }
 
   // ── build withdrawal transformation via authorized production helper ──
-  //   Reuses rehearsal's buildWithdrawnSidecar (single mutation authority). No second
-  //   transformation lives in this module.
   const newSidecarObj = buildWithdrawnSidecar({
     priorSidecar,
     authorization,
@@ -394,8 +534,6 @@ export async function applyBloggerWithdrawal({
     for (const t of types) refuse(`apply-payload-invalid:${t}`);
     return report;
   }
-
-  // Additional invariants (§14 requires these hard checks even if collect passes):
   if (newSidecarObj.schemaVersion !== OUTPUT_SCHEMA_VERSION
     || !newSidecarObj.blogger
     || newSidecarObj.blogger.status !== WITHDRAWN_STATUS
@@ -420,15 +558,12 @@ export async function applyBloggerWithdrawal({
       `.${sidecarBase}.apply-${process.pid}-${randomTempSuffix(attempt)}.tmp`,
     );
     try {
-      // O_EXCL semantics via 'wx' flag: fails with EEXIST if candidate already exists.
-      //   Bounded retry (5) shields against collision; exhausting means fail-closed.
       tempFd = openSync(candidate, 'wx', 0o600);
       tempAbs = candidate;
       break;
     } catch {
       tempAbs = null;
       tempFd = -1;
-      // continue retry loop
     }
   }
   if (tempFd === -1 || tempAbs === null) {
@@ -445,7 +580,6 @@ export async function applyBloggerWithdrawal({
         return false;
       }
     }
-    // Verify residue gone.
     const still = tempAbs ? existsSync(tempAbs) : false;
     return !still;
   };
@@ -462,10 +596,12 @@ export async function applyBloggerWithdrawal({
     report.cleanupSucceeded = ok;
     report.tempFileRemoved = ok;
     if (!ok) {
-      // §18 cleanup contract: cleanup failure must surface as blocker without masking primary.
+      // §12 cleanup contract: cleanup failure surfaces as blocker AFTER primary blockers,
+      //   without masking them.
       push('temp-cleanup-failed');
       report.ok = false;
       report.applyReady = false;
+      report.commitReady = false;
     }
   };
 
@@ -483,7 +619,6 @@ export async function applyBloggerWithdrawal({
       if (written <= 0) throw new Error('short-write');
       offset += written;
     }
-    // Confirm we wrote every byte before continuing.
     const st = fstatSync(tempFd);
     if (st.size !== encoded.length) throw new Error('size-mismatch');
     fsyncSync(tempFd);
@@ -502,12 +637,8 @@ export async function applyBloggerWithdrawal({
   }
 
   // ── re-verify sidecar target safety immediately before rename ──
-  //   §12 requires we do NOT follow symlinks; a between-preflight-and-rename swap that
-  //   converts the target to a symlink must be refused.
   let sidecarLst2;
-  try {
-    sidecarLst2 = lstatSync(absSidecar);
-  } catch {
+  try { sidecarLst2 = lstatSync(absSidecar, { bigint: true }); } catch {
     refuse('sidecar-vanished-pre-rename');
     finalizeCleanup();
     return report;
@@ -517,14 +648,16 @@ export async function applyBloggerWithdrawal({
     finalizeCleanup();
     return report;
   }
+  const scNlink2 = Number(sidecarLst2.nlink);
+  if (!Number.isFinite(scNlink2) || scNlink2 > 1) {
+    refuse('sidecar-hard-link-detected');
+    finalizeCleanup();
+    return report;
+  }
 
-  // Compare-only freshness gate: sidecar bytes must still equal the buffer we hashed
-  //   at preflight. This is a compare, not a transformation input; if drift is detected,
-  //   we refuse without overwriting external content.
+  // Compare-only freshness gate.
   let sidecarBufNow;
-  try {
-    sidecarBufNow = readFileSync(absSidecar);
-  } catch {
+  try { sidecarBufNow = readFileSync(absSidecar); } catch {
     refuse('sidecar-vanished-pre-rename');
     finalizeCleanup();
     return report;
@@ -536,12 +669,9 @@ export async function applyBloggerWithdrawal({
     return report;
   }
 
-  // Source freshness gate (§13): source must not have changed either — its SHA-256 is
-  //   embedded in the withdrawal event, and drifting source would invalidate the payload.
+  // Source freshness gate — pre-commit compare.
   let sourceBufNow;
-  try {
-    sourceBufNow = readFileSync(absSource);
-  } catch {
+  try { sourceBufNow = readFileSync(absSource); } catch {
     refuse('source-vanished-pre-rename');
     finalizeCleanup();
     return report;
@@ -552,22 +682,40 @@ export async function applyBloggerWithdrawal({
     return report;
   }
 
-  // Guard-only hook: before rename primitive.
+  // Guard-only hook: before rename primitive (final race window).
   if (hooks && typeof hooks.beforeRename === 'function') {
     try { hooks.beforeRename({ tempPath: tempAbs, sidecarPath }); } catch { /* swallow */ }
   }
 
-  // ── atomic rename primitive ──
-  //   Node's renameSync on Windows is atomic replace (MoveFileEx with MOVEFILE_REPLACE_EXISTING
-  //   semantics under the hood). We never truncate + write; we never delete-then-rename.
+  // ── atomic commit primitive via adapter (Strategy B) ──
+  //   Adapter re-reads target bytes under its own strategy (native CAS or mandatory
+  //   exclusive lock) and refuses rename if target bytes drifted from expectedTargetBytes.
+  //   The library holds no assumption about how the adapter achieves atomicity; it only
+  //   consumes { ok, blocker? } and reflects them in the report.
+  let commitResult;
   try {
-    renameSync(tempAbs, absSidecar);
+    commitResult = atomicCommitAdapter.commit({
+      tempPath: tempAbs,
+      targetPath: absSidecar,
+      expectedTargetSha256: sidecarSha256Before,
+      expectedTargetBytes: sidecarBuf,
+    });
   } catch {
-    refuse('rename-failed');
+    commitResult = { ok: false, blocker: 'atomic-commit-error' };
+  }
+  if (!commitResult || commitResult.ok !== true) {
+    const blocker = (commitResult && typeof commitResult.blocker === 'string')
+      ? commitResult.blocker
+      : 'atomic-commit-mismatch';
+    // Restrict to a small stable set — never echo adapter-provided arbitrary strings.
+    const stable = new Set(['atomic-commit-cas-mismatch', 'atomic-commit-error', 'atomic-commit-mismatch']);
+    push(stable.has(blocker) ? blocker : 'atomic-commit-mismatch');
+    report.applyReady = false;
+    report.commitReady = false;
     finalizeCleanup();
     return report;
   }
-  // After rename, temp path no longer exists as a separate file.
+  // Adapter succeeded: production sidecar now holds tempAbs's bytes.
   tempAbs = null;
   report.tempFileRemoved = true;
   report.applyPerformed = true;
@@ -594,7 +742,6 @@ export async function applyBloggerWithdrawal({
   report.sidecarSha256After = readBackSha256;
 
   if (readBackBytes && readBackText === newBytes && readBackSha256 === outputSha256) {
-    // Semantic verification: parse and re-collect issues from the on-disk artifact.
     try {
       const parsedBack = JSON.parse(readBackText);
       const backIssues = collectSidecarWithdrawalIssues(parsedBack, { sourcePath, sidecarPath });
@@ -610,9 +757,9 @@ export async function applyBloggerWithdrawal({
   }
   report.readBackOk = readBackOk;
 
-  if (!readBackOk) {
-    // ── rollback ──
-    //   Restore original sidecar bytes via same temp+rename primitive; do NOT truncate.
+  // Rollback helper: primary blocker MUST be pushed by caller BEFORE this is invoked;
+  //   rollback failure paths append rollback-* blockers without overwriting primary.
+  const attemptRollback = () => {
     report.rollbackAttempted = true;
     if (hooks && typeof hooks.beforeRollback === 'function') {
       try { hooks.beforeRollback({ sidecarPath, rollbackTempPath: null }); } catch { /* swallow */ }
@@ -637,14 +784,11 @@ export async function applyBloggerWithdrawal({
     }
     if (rbTempFd === -1) {
       push('rollback-temp-create-failed');
-      report.ok = false;
-      report.applyReady = false;
-      finalizeCleanup();
-      return report;
+      return;
     }
     let rbWriteOk = false;
     try {
-      const enc = sidecarBuf; // original bytes buffered before mutation
+      const enc = sidecarBuf;
       let off = 0;
       while (off < enc.length) {
         const w = writeSync(rbTempFd, enc, off, enc.length - off);
@@ -658,54 +802,67 @@ export async function applyBloggerWithdrawal({
     } catch {
       rbWriteOk = false;
     }
-    try { closeSync(rbTempFd); rbTempFd = -1; } catch { /* ignore */ }
+    try { closeSync(rbTempFd); } catch { /* ignore */ }
     if (!rbWriteOk) {
-      push('rollback-temp-write-failed');
-      // Best-effort cleanup of rollback temp, then leave production sidecar in mutated state.
       try { if (rbTempAbs && existsSync(rbTempAbs)) rmSync(rbTempAbs, { force: true }); } catch { /* ignore */ }
-      report.rollbackSucceeded = false;
-      report.rollbackVerified = false;
-      report.ok = false;
-      report.applyReady = false;
-      // productionMutationPerformed stays true — mutation state is compromised.
-      finalizeCleanup();
-      return report;
+      push('rollback-temp-write-failed');
+      return;
     }
     try {
       renameSync(rbTempAbs, absSidecar);
       rbTempAbs = null;
     } catch {
-      push('rollback-rename-failed');
       try { if (rbTempAbs && existsSync(rbTempAbs)) rmSync(rbTempAbs, { force: true }); } catch { /* ignore */ }
-      report.rollbackSucceeded = false;
-      report.rollbackVerified = false;
-      report.ok = false;
-      report.applyReady = false;
-      finalizeCleanup();
-      return report;
+      push('rollback-rename-failed');
+      return;
     }
-    // Verify rollback: sidecar bytes byte-identical to original.
     try {
       const verifyBuf = readFileSync(absSidecar);
       if (verifyBuf.equals(sidecarBuf) && sha256HexOfBuffer(verifyBuf) === sidecarSha256Before) {
         report.rollbackSucceeded = true;
         report.rollbackVerified = true;
-        // Successful rollback: production mutation semantically reverted.
         report.productionMutationPerformed = false;
         report.sidecarSha256After = sidecarSha256Before;
       } else {
         push('rollback-verification-failed');
-        report.rollbackSucceeded = false;
-        report.rollbackVerified = false;
       }
     } catch {
       push('rollback-verification-failed');
-      report.rollbackSucceeded = false;
-      report.rollbackVerified = false;
     }
+  };
+
+  if (!readBackOk) {
+    // §12: push primary blocker BEFORE invoking rollback so rollback failures append
+    //   rollback-* blockers without ever displacing readback-mismatch.
     push('readback-mismatch');
+    attemptRollback();
     report.ok = false;
     report.applyReady = false;
+    report.commitReady = false;
+    finalizeCleanup();
+    return report;
+  }
+
+  // ── post-commit source freshness gate (§9) ──
+  //   Even after successful commit + readback, if source drifted between our pre-commit
+  //   freshness check and now, the withdrawal lifecycle event we just persisted has a
+  //   sourceSha256 that no longer describes the current source bytes. Rollback the
+  //   sidecar so we do not leave production with a stale-source-bound lifecycle.
+  let sourceBufPostCommit;
+  let sourceDrifted = false;
+  try {
+    sourceBufPostCommit = readFileSync(absSource);
+    if (sha256HexOfBuffer(sourceBufPostCommit) !== sourceSha256
+      || !sourceBufPostCommit.equals(sourceBuf)) sourceDrifted = true;
+  } catch {
+    sourceDrifted = true;
+  }
+  if (sourceDrifted) {
+    push('post-write-source-freshness-drift');
+    attemptRollback();
+    report.ok = false;
+    report.applyReady = false;
+    report.commitReady = false;
     finalizeCleanup();
     return report;
   }
@@ -713,6 +870,7 @@ export async function applyBloggerWithdrawal({
   // ── success path ──
   report.ok = true;
   report.applyReady = true;
+  report.commitReady = true;
   finalizeCleanup();
   return report;
 }
@@ -736,6 +894,9 @@ export function formatJson(result) {
     explicitlyAuthorized: result.explicitlyAuthorized,
     preflightEligible: result.preflightEligible,
     applyReady: result.applyReady,
+    commitReady: result.commitReady,
+    atomicCommitSupported: result.atomicCommitSupported,
+    atomicCommitStrategy: result.atomicCommitStrategy,
     applyPerformed: result.applyPerformed,
     productionMutationPerformed: result.productionMutationPerformed,
     authorizationSha256: result.authorizationSha256,
@@ -775,6 +936,9 @@ export function formatHumanReadable(result) {
   lines.push(`explicitly authorized:           ${result.explicitlyAuthorized ? 'YES' : 'NO'}`);
   lines.push(`preflight eligible:              ${result.preflightEligible ? 'YES' : 'NO'}`);
   lines.push(`apply ready:                     ${result.applyReady ? 'YES' : 'NO'}`);
+  lines.push(`commit ready:                    ${result.commitReady ? 'YES' : 'NO'}`);
+  lines.push(`atomic commit supported:         ${result.atomicCommitSupported ? 'YES' : 'NO'}`);
+  lines.push(`atomic commit strategy:          ${result.atomicCommitStrategy}`);
   lines.push(`apply performed:                 ${result.applyPerformed ? 'YES' : 'NO'}`);
   lines.push(`production mutation performed:   ${result.productionMutationPerformed ? 'YES' : 'NO'}`);
   lines.push(`authorization sha256:            ${result.authorizationSha256 ?? '(not computed)'}`);

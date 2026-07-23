@@ -52,13 +52,21 @@ const USAGE = `Usage: apply-blogger-withdrawal \\
   --confirm "${APPLY_CONFIRMATION_PHRASE}" \\
   [--json] [--help]
 
-Single-record Blogger withdrawal production apply. Given an operator-authored,
-approved, apply-ready authorization document, mutates ONE Blogger sidecar
-(\`content/blogger/posts/<slug>.publish.json\`) in place from status
-"published" to "withdrawn". Uses raw-byte authorization binding, same-buffer
-source/sidecar binding, in-directory sibling temp file, atomic rename,
-read-back verification, rollback on read-back mismatch, and unconditional
-cleanup with a redacted report.
+Single-record Blogger withdrawal production apply CLI. Given an operator-authored,
+approved, apply-ready authorization document, this CLI runs read-only preflight
+against ONE Blogger sidecar (\`content/blogger/posts/<slug>.publish.json\`) and
+then attempts to atomically transition its \`blogger.status\` from "published" to
+"withdrawn".
+
+Production mutation may be blocked by the atomic-commit capability gate. On
+platforms where the runtime does NOT provide a supported compare-and-swap or
+mandatory-exclusive-lock commit primitive, the CLI fails closed BEFORE creating
+any temp file, writing to disk, or renaming, and returns exit 1 with the
+blocker \`atomic-commit-capability-unavailable\`. Authorization / preflight /
+rehearsal remain fully usable in that mode; only the final commit step is
+blocked. The CLI never enables a bypass; a capable adapter can only be provided
+via direct programmatic invocation of the library and is unreachable from CLI,
+env, authorization content, or repo files.
 
 Required:
   --authorization <path>      Path to the withdrawal authorization JSON.
@@ -72,12 +80,15 @@ Options:
   --help / -h                 Print this usage.
 
 This CLI:
-  - performs a single-record apply only
+  - performs a single-record apply attempt only
+  - fails closed at the atomic-commit capability gate when the runtime cannot
+    provide a supported CAS or mandatory-exclusive-lock primitive
   - never runs commit, push, build, deploy, or preview
   - never calls the Blogger / Google / GA4 / AdSense API
   - never touches the deploy repository
   - never modifies Markdown or any sidecar other than the authorized one
-  - never accepts a project root / test root / dependency injection / hook
+  - never accepts a project root / test root / dependency injection / hook /
+    atomic-commit adapter
 
 Forbidden flags (any occurrence → exit 2):
   --project-root, --repo-root, --test-root, --scratch-root, --temp-root,
@@ -92,7 +103,9 @@ Forbidden flags (any occurrence → exit 2):
 
 Exit codes:
   0   apply succeeded (ok:true / applyPerformed:true / productionMutationPerformed:true)
-  1   apply refused / failed (blockers reported; sidecar either untouched or rolled back)
+  1   apply refused / failed (blockers reported; sidecar either untouched or rolled back).
+      Includes: atomic-commit-capability-unavailable (no CAS / mandatory lock primitive
+      on this runtime); no temp file, no write, no rename was performed.
   2   CLI misuse (unknown / forbidden / duplicate / missing required flag)
 `;
 
